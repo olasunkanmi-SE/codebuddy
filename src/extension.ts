@@ -6,11 +6,11 @@ import { fixCodeError } from "./fix";
 import { generateOptimizeCode } from "./optimize";
 
 export function activate(context: vscode.ExtensionContext) {
-  const commentCode = vscode.commands.registerCommand("pipet-code-agent.commentCode", generateComment);
-  const reviewCode = vscode.commands.registerCommand("pipet-code-agent.reviewCode", generateReview);
-  const refactorCode = vscode.commands.registerCommand("pipet-code-agent.codeRefactor", generateRefactoredCode);
-  const optimizeCode = vscode.commands.registerCommand("pipet-code-agent.codeOptimize", generateOptimizeCode);
-  const fixCode = vscode.commands.registerCommand("pipet-code-agent.codeFix", (errorMessage: string) => {
+  const commentCode = vscode.commands.registerCommand("ola.commentCode", generateComment);
+  const reviewCode = vscode.commands.registerCommand("ola.reviewCode", generateReview);
+  const refactorCode = vscode.commands.registerCommand("ola.codeRefactor", generateRefactoredCode);
+  const optimizeCode = vscode.commands.registerCommand("ola.codeOptimize", generateOptimizeCode);
+  const fixCode = vscode.commands.registerCommand("ola.codeFix", (errorMessage: string) => {
     fixCodeError(errorMessage);
   });
 
@@ -36,7 +36,7 @@ class AskExtensionProvider implements vscode.CodeActionProvider {
       const errorMessage = diagnostic.message;
       const action = new vscode.CodeAction("Ask Ola to Fix", vscode.CodeActionKind.QuickFix);
       action.command = {
-        command: "pipet-code-agent.codeFix",
+        command: "ola.codeFix",
         title: "Ask Ola to Fix",
         arguments: [errorMessage],
       };

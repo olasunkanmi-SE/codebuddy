@@ -13,27 +13,33 @@ describe "why", explain any "magic" values and non-obvious behaviour.
 Below are some examples of good code comments.
 
 ${CODE_LABEL}
-print(f" \\033[33m {msg}\\033[00m", file=sys.stderr)
+async getRestaurantById(id: Types.ObjectId): Promise<Result<IRestaurantResponseDTO>> {
+    await this.singleclientService.validateContext();
+    const result = await this.restaurantRepository.findById(id);
+    const restaurantId: Types.ObjectId = result.getValue().id;
+    const restaurantWithSingleClientData: Restaurant = await this.restaurantRepository.getRestaurant(restaurantId);
+    const context = this.contextService.getContext();
+    const email = context.email;
+    const userDoc = await this.singleclientRepository.findOne({ email });
+    const user: SingleClient = userDoc.getValue();
+    if (user.id.toString() !== restaurantWithSingleClientData.singleclient.id.toString()) {
+      throwApplicationError(HttpStatus.UNAUTHORIZED, 'You dont have sufficient priviledge');
+    }
+    return Result.ok(
+      RestaurantParser.createRestaurantResponse(restaurantWithSingleClientData),
+      'Restaurant retrieved successfully',
+    );
+  }
 ${COMMENT_LABEL}
-Use terminal codes to print color output to console.
-
-${CODE_LABEL}
-to_delete = set(data.keys()) - frozenset(keep)
-for key in to_delete:
-  del data[key]
-${COMMENT_LABEL}
-Modifies \`data\` to remove any entry not specified in the \`keep\` list.
-
-${CODE_LABEL}
-lines[text_range.start_line - 1:text_range.end_line - 1] = [repl.new_content]
-${COMMENT_LABEL}
-Replace text from \`lines\` with \`new_content\`, noting that array indices 
-are offset 1 from line numbers.
-
-${CODE_LABEL}
-api_key = os.getenv("GOOGLE_API_KEY")
-${COMMENT_LABEL}
-Attempt to load the API key from the environment.`;
+/**
+ * Retrieves a restaurant by its ID, along with associated single client data,
+ * and checks the user's privileges and context.
+ *
+ * @param id - The ID of the restaurant to retrieve
+ * @returns A Promise that resolves to a Result object containing an IRestaurantResponseDTO object
+ * @throws {ApplicationError} If the user does not have sufficient privileges
+ */
+`;
 
 export async function generateComment() {
   vscode.window.showInformationMessage("Generating comment...");
@@ -75,24 +81,6 @@ export async function generateComment() {
 
   // Insert before selection.
   editor.edit((editBuilder) => {
-    const commentPrefix = " * ";
-    const commentStart = "/**\n";
-    const commentEnd = " */\n";
-
-    // Copy the indent from the first line of the selection.
-    const trimmed = selectedCode.trimStart();
-    const padding = selectedCode.substring(0, selectedCode.length - trimmed.length);
-
-    // Split the comment into lines and add the padding and comment prefix to each line.
-    let tsComment: string = comment
-      .split("\n")
-      .map((line: string) => `${padding}${commentPrefix}${line}`)
-      .join("\n");
-
-    // Add the comment start and end markers.
-    tsComment = `${padding}${commentStart}${tsComment}\n${padding}${commentEnd}`;
-
-    // Insert the generated comment at the start of the selection.
-    editBuilder.insert(selection.start, tsComment);
+    editBuilder.insert(selection.start, comment);
   });
 }
