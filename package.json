@@ -1,6 +1,6 @@
 {
-  "name": "pipet-code-agent",
-  "displayName": "Pipet Code Agent",
+  "name": "codebuddy",
+  "displayName": "Yout personal copilot",
   "description": "",
   "version": "0.0.1",
   "engines": {
@@ -19,56 +19,56 @@
       "editor/context": [
         {
           "when": "editorHasSelection",
-          "command": "pipet-code-agent.commentCode",
+          "command": "ola.commentCode",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "pipet-code-agent.reviewCode",
+          "command": "ola.reviewCode",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "pipet-code-agent.codeRefactor",
+          "command": "ola.codeRefactor",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "pipet-code-agent.codeOptimize",
+          "command": "ola.codeOptimize",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "pipet-code-agent.codeFix",
+          "command": "ola.codeFix",
           "group": "CodeBuddy"
         }
       ]
     },
     "commands": [
       {
-        "command": "pipet-code-agent.commentCode",
-        "title": "Pipet: Add a comment to selected code."
+        "command": "ola.commentCode",
+        "title": "Ola: Add a comment to selected code."
       },
       {
-        "command": "pipet-code-agent.reviewCode",
-        "title": "Pipet: Review the selected code."
+        "command": "ola.reviewCode",
+        "title": "Ola: Review the selected code."
       },
       {
-        "command": "pipet-code-agent.codeRefactor",
-        "title": "Pipet: Refactor the selected code."
+        "command": "ola.codeRefactor",
+        "title": "Ola: Refactor the selected code."
       },
       {
-        "command": "pipet-code-agent.codeOptimize",
-        "title": "Pipet: Optimize the selected code."
+        "command": "ola.codeOptimize",
+        "title": "Ola: Optimize the selected code."
       },
       {
-        "command": "pipet-code-agent.codeFix",
-        "title": "Pipet: Fix the error."
+        "command": "ola.codeFix",
+        "title": "Ola: Fix the error."
       }
     ],
     "configuration": [
       {
-        "title": "Pipet Code Agent: Google Gemini",
+        "title": "Ola Code Agent: Google Gemini",
         "properties": {
           "google.gemini.apiKey": {
             "type": [

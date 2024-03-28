@@ -1,6 +1,6 @@
 # Change Log
 
-All notable changes to the "pipet-code-agent" extension are documented in this file.
+All notable changes to the "ola" extension are documented in this file.
 
 ## v0.0.1
 
