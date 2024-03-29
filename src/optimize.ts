@@ -13,7 +13,7 @@ Please provide the optimized code along with explanations for each significant o
 `;
 
 export async function generateOptimizeCode() {
-  vscode.window.showInformationMessage("Generating optimized code...");
+  const action = vscode.window.showInformationMessage("Generating optimized code...");
 
   const modelName = vscode.workspace
     .getConfiguration()

@@ -13,7 +13,7 @@ Parallelization and Concurrency: Identify portions of the code that can be paral
 Please provide the optimized code along with explanations for each significant optimization made. Justify how the optimizations improve the code's performance and efficiency. If trade-offs are involved, discuss the benefits and drawbacks of each optimization approach.
 `;
 async function generateOptimizeCode() {
-    vscode.window.showInformationMessage("Generating optimized code...");
+    const action = vscode.window.showInformationMessage("Generating optimized code...");
     const modelName = vscode.workspace
         .getConfiguration()
         .get("google.gemini.textModel", "models/gemini-1.0-pro-latest");
