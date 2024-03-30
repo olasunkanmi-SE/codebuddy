@@ -4,17 +4,19 @@ import { OptimizeCode } from "./optimize";
 import { RefactorCode } from "./refactor";
 import { ReviewCode } from "./review";
 import { fixCodeError } from "./fix";
+import { OLA_ACTIONS, USER_MESSAGE } from "./constant";
 
 export function activate(context: vscode.ExtensionContext) {
-  const getComment = new Comments("Hold on while Ola generates the code comments...");
-  const generateOptimizeCode = new OptimizeCode("Hold on while Ola optimizes the code...");
-  const generateRefactoredCode = new RefactorCode("Hold on while Ola refactors the code...");
-  const generateReview = new ReviewCode("Hold on while Ola reviews the code...");
-  const commentCode = vscode.commands.registerCommand("ola.commentCode", () => getComment.execute());
-  const reviewCode = vscode.commands.registerCommand("ola.reviewCode", () => generateReview.execute());
-  const refactorCode = vscode.commands.registerCommand("ola.codeRefactor", () => generateRefactoredCode.execute());
-  const optimizeCode = vscode.commands.registerCommand("ola.codeOptimize", () => generateOptimizeCode.execute());
-  const fixCode = vscode.commands.registerCommand("ola.codeFix", (errorMessage: string) => {
+  const { comment, review, refactor, optimize, fix } = OLA_ACTIONS;
+  const getComment = new Comments(`${USER_MESSAGE} generates the code comments...`);
+  const generateOptimizeCode = new OptimizeCode(`${USER_MESSAGE} optimizes the code...`);
+  const generateRefactoredCode = new RefactorCode(`${USER_MESSAGE} refactors the code...`);
+  const generateReview = new ReviewCode(`${USER_MESSAGE} reviews the code...`);
+  const commentCode = vscode.commands.registerCommand(comment, () => getComment.execute());
+  const reviewCode = vscode.commands.registerCommand(review, () => generateReview.execute());
+  const refactorCode = vscode.commands.registerCommand(refactor, () => generateRefactoredCode.execute());
+  const optimizeCode = vscode.commands.registerCommand(optimize, () => generateOptimizeCode.execute());
+  const fixCode = vscode.commands.registerCommand(fix, (errorMessage: string) => {
     fixCodeError(errorMessage);
   });
 
