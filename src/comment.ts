@@ -1,5 +1,4 @@
-import * as vscode from "vscode";
-import { EventGenerator } from "./code-generator";
+import { EventGenerator } from "./event-generator";
 
 export class Comments extends EventGenerator {
   selectedCode: string | undefined;
@@ -46,29 +45,6 @@ export class Comments extends EventGenerator {
     return PROMPT;
   }
 
-  async execute(): Promise<void> {
-    const comment = await this.generateResponse();
-    if (!comment) {
-      vscode.window.showErrorMessage("model not reponding, try again later");
-      return;
-    }
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-      vscode.window.showErrorMessage("Page editor not available");
-      return;
-    }
-
-    editor.edit((editBuilder) => {
-      const formattedComment = this.formatResponse(comment);
-      const selection = editor.selection;
-      if (!formattedComment) {
-        vscode.window.showErrorMessage("model not reponding, try again later");
-        return;
-      }
-      editBuilder.insert(selection.start, formattedComment);
-    });
-  }
-
   formatResponse(comment: string): string | undefined {
     return comment;
   }
@@ -77,17 +53,5 @@ export class Comments extends EventGenerator {
     const prompt = this.generatePrompt();
     const fullPrompt = `${prompt} \n ${selectedCode}`;
     return fullPrompt;
-  }
-
-  async generateResponse(): Promise<string | undefined> {
-    this.showInformationMessage();
-    this.selectedCode = this.getSelectedWindowArea();
-    if (!this.selectedCode) {
-      vscode.window.showErrorMessage("select a piece of code.");
-      return;
-    }
-    const prompt = this.createPrompt(this.selectedCode);
-    const response = await this.generateModelResponse(prompt);
-    return response;
   }
 }

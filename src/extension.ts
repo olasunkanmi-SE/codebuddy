@@ -2,15 +2,16 @@ import * as vscode from "vscode";
 import { generateReview } from "./review";
 import { generateRefactoredCode } from "./refactor";
 import { fixCodeError } from "./fix";
-import { generateOptimizeCode } from "./optimize";
 import { Comments } from "./comment";
+import { OptimizeCode } from "./optimize";
 
 export function activate(context: vscode.ExtensionContext) {
   const getComment = new Comments("Hold on while Ola generates the code comments...");
+  const generateOptimizeCode = new OptimizeCode("Hold on while Ola optimizes the code comments...");
   const commentCode = vscode.commands.registerCommand("ola.commentCode", () => getComment.execute());
   const reviewCode = vscode.commands.registerCommand("ola.reviewCode", generateReview);
   const refactorCode = vscode.commands.registerCommand("ola.codeRefactor", generateRefactoredCode);
-  const optimizeCode = vscode.commands.registerCommand("ola.codeOptimize", generateOptimizeCode);
+  const optimizeCode = vscode.commands.registerCommand("ola.codeOptimize", () => generateOptimizeCode.execute());
   const fixCode = vscode.commands.registerCommand("ola.codeFix", (errorMessage: string) => {
     fixCodeError(errorMessage);
   });
@@ -38,7 +39,7 @@ class AskExtensionProvider implements vscode.CodeActionProvider {
       const action = new vscode.CodeAction("Ask Ola to Fix", vscode.CodeActionKind.QuickFix);
       action.command = {
         command: "ola.codeFix",
-        title: "Ask Ola to Fix",
+        title: "Ola fix this error",
         arguments: [errorMessage],
       };
       actions.push(action);
