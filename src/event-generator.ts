@@ -129,16 +129,27 @@ export abstract class EventGenerator implements IEventGenerator {
 
   abstract formatResponse(comment: string): string | undefined;
 
-  abstract createPrompt(text: string): string;
+  abstract createPrompt(text?: string): string;
 
   async generateResponse(): Promise<string | undefined> {
     this.showInformationMessage();
+    let prompt;
     const selectedCode = this.getSelectedWindowArea();
     if (!selectedCode) {
       vscode.window.showErrorMessage("select a piece of code.");
       return;
     }
-    const prompt = this.createPrompt(selectedCode);
+    if (selectedCode) {
+      prompt = this.createPrompt(selectedCode);
+    } else {
+      prompt = this.createPrompt();
+    }
+
+    if (!prompt) {
+      vscode.window.showErrorMessage("model not reponding, try again later");
+      return;
+    }
+
     const response = await this.generateModelResponse(prompt);
     return response;
   }
