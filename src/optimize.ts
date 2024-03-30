@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import { EventGenerator } from "./event-generator";
 
 export class OptimizeCode extends EventGenerator {
-  selectedCode: string | undefined;
   constructor(action: string) {
     super(action);
   }

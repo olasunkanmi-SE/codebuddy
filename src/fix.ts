@@ -14,13 +14,11 @@ Error Message: {errorMessage}
 
 export async function fixCodeError(errorMessage: string) {
   vscode.window.showInformationMessage("Generating Fix...");
-  // Build the full prompt using the template and error message.
   const fullPrompt = PROMPT.replace("{errorMessage}", errorMessage);
   const modelName = vscode.workspace
     .getConfiguration()
-    .get<string>("google.gemini.textModel", "models/gemini-1.0-pro-latest");
+    .get<string>("google.gemini.model", "models/gemini-1.0-pro-latest");
 
-  // Get API Key from local user configuration
   const apiKey = vscode.workspace.getConfiguration().get<string>("google.gemini.apiKey");
   if (!apiKey) {
     vscode.window.showErrorMessage("API key not configured. Check your settings.");
