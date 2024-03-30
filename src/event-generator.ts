@@ -127,9 +127,42 @@ export abstract class EventGenerator implements IEventGenerator {
     return response.text();
   }
 
-  abstract execute(): Promise<void>;
+  abstract formatResponse(comment: string): string | undefined;
 
   abstract createPrompt(text: string): string;
 
-  abstract generateResponse(): Promise<string | undefined> | undefined;
+  async generateResponse(): Promise<string | undefined> {
+    this.showInformationMessage();
+    const selectedCode = this.getSelectedWindowArea();
+    if (!selectedCode) {
+      vscode.window.showErrorMessage("select a piece of code.");
+      return;
+    }
+    const prompt = this.createPrompt(selectedCode);
+    const response = await this.generateModelResponse(prompt);
+    return response;
+  }
+
+  async execute(): Promise<void> {
+    const comment = await this.generateResponse();
+    if (!comment) {
+      vscode.window.showErrorMessage("model not reponding, try again later");
+      return;
+    }
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      console.debug("Abandon: no open text editor.");
+      return;
+    }
+
+    editor.edit((editBuilder) => {
+      const formattedComment = this.formatResponse(comment);
+      const selection = editor.selection;
+      if (!formattedComment) {
+        vscode.window.showErrorMessage("model not reponding, try again later");
+        return;
+      }
+      editBuilder.insert(selection.start, formattedComment);
+    });
+  }
 }
