@@ -1,8 +1,10 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 import * as vscode from "vscode";
 
-interface IBaseGenerator {
-  generateGeminiModel(apiKey: string, name: string): GenerativeModel;
+interface IEventGenerator {
+  getModelConfig(configSuffix: string): IModelConfig;
+  getApplicationConfig(configKey: string): string | undefined;
+  showInformationMessage(): Thenable<string | undefined>;
   getSelectedWindowArea(): string | undefined;
 }
 
@@ -17,11 +19,11 @@ interface IActiveConfig<T> {
   config: T;
 }
 
-export class CodeGenerator implements IBaseGenerator {
+export abstract class EventGenerator implements IEventGenerator {
   private apiKeys: IModelConfig;
   private currentModelIndex: number;
   private models: IModelConfig;
-  constructor(private readonly presentAction: string, private readonly editor?: vscode.TextEditor) {
+  constructor(private readonly action: string) {
     this.apiKeys = this.getModelConfig("apiKey");
     this.models = this.getModelConfig("model");
     this.currentModelIndex = 0;
@@ -40,7 +42,7 @@ export class CodeGenerator implements IBaseGenerator {
   }
 
   private getActiveConfig<T extends IModelConfig>(config: T): IActiveConfig<T> | undefined {
-    const activeConfigs = Object.entries(config).filter(([_, value]) => value !== undefined);
+    const activeConfigs = Object.entries(config).filter(([_, value]) => value);
     if (activeConfigs.length === 0) {
       vscode.window.showErrorMessage("Configuration not found. Check your settings.");
       return undefined;
@@ -53,9 +55,10 @@ export class CodeGenerator implements IBaseGenerator {
     };
   }
 
-  private async createModel(): Promise<GenerativeModel | undefined> {
+  protected createModel(): { name?: string; model?: GenerativeModel } | undefined {
     try {
       let model;
+      let modelName;
       const activeApiKeyConfig = this.getActiveConfig(this.apiKeys);
       if (!activeApiKeyConfig) {
         vscode.window.showErrorMessage("ApiKey not found. Check your settings.");
@@ -71,30 +74,62 @@ export class CodeGenerator implements IBaseGenerator {
       const modelConfig: IModelConfig = activeModelConfig.config;
       if (Object.hasOwnProperty.call(modelConfig, apiKeyName)) {
         const generativeAiModel: string | undefined = modelConfig[apiKeyName as keyof IModelConfig];
+        modelName = apiKeyName;
         if (apiKeyName === "gemini" && generativeAiModel) {
-          model = this.generateGeminiModel(apiKey, generativeAiModel);
+          model = this.createGeminiModel(apiKey, generativeAiModel);
         }
       }
-      return model;
+      return { name: modelName, model };
     } catch (error) {
       console.error("Error creating model:", error);
       vscode.window.showErrorMessage("An error occurred while creating the model. Please try again.");
     }
   }
 
-  showInformationMessage() {
-    return vscode.window.showInformationMessage(this.presentAction);
+  showInformationMessage(): Thenable<string | undefined> {
+    return vscode.window.showInformationMessage(this.action);
   }
 
   getSelectedWindowArea(): string | undefined {
-    const selection: vscode.Selection | undefined = this.editor?.selection;
-    const selectedArea: string | undefined = this.editor?.document.getText(selection);
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      console.debug("Abandon: no open text editor.");
+      return;
+    }
+    const selection: vscode.Selection | undefined = editor.selection;
+    const selectedArea: string | undefined = editor.document.getText(selection);
     return selectedArea;
   }
 
-  generateGeminiModel(apiKey: string, name: string): GenerativeModel {
+  private createGeminiModel(apiKey: string, name: string): GenerativeModel {
     const genAi = new GoogleGenerativeAI(apiKey);
     const model = genAi.getGenerativeModel({ model: name });
     return model;
   }
+
+  protected async generateModelResponse(text: string): Promise<string | undefined> {
+    const activeModel = this.createModel();
+    if (!activeModel) {
+      vscode.window.showErrorMessage("model not found. Check your settings.");
+      return;
+    }
+    const { name, model } = activeModel;
+    if (!name) {
+      vscode.window.showErrorMessage("model not found. Check your settings.");
+      return;
+    }
+    if (!model) {
+      vscode.window.showErrorMessage("model not found. Check your settings.");
+      return;
+    }
+    const result = await model.generateContent(text);
+    const response = await result.response;
+    return response.text();
+  }
+
+  abstract execute(): Promise<void>;
+
+  abstract createPrompt(text: string): string;
+
+  abstract generateResponse(): Promise<string | undefined> | undefined;
 }

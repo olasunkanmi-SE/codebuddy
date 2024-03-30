@@ -47,28 +47,28 @@
     "commands": [
       {
         "command": "ola.commentCode",
-        "title": "Ola: Add a comment to selected code."
+        "title": "Ola add comment to selected code."
       },
       {
         "command": "ola.reviewCode",
-        "title": "Ola: Review the selected code."
+        "title": "Ola review these selected code."
       },
       {
         "command": "ola.codeRefactor",
-        "title": "Ola: Refactor the selected code."
+        "title": "Ola refactor these selected code."
       },
       {
         "command": "ola.codeOptimize",
-        "title": "Ola: Optimize the selected code."
+        "title": "Ola optimize these selected code."
       },
       {
         "command": "ola.codeFix",
-        "title": "Ola: Fix the error."
+        "title": "Ola fix this error."
       }
     ],
     "configuration": [
       {
-        "title": "Ola Code Agent: Google Gemini",
+        "title": "Your codding buddy, Ola",
         "properties": {
           "google.gemini.apiKey": {
             "type": [
@@ -78,12 +78,45 @@
             "default": null,
             "markdownDescription": "Enter your [API Key](https://aistudio.google.com/app/apikey) for Gemini."
           },
-          "google.gemini.textModel": {
+          "google.gemini.model": {
             "type": [
-              "string"
+              "string",
+              "null"
             ],
-            "default": "models/gemini-1.0-pro-latest",
+            "default": null,
             "markdownDescription": "Provide the name of the model you want to use. Choose from the [base models](https://ai.google.dev/models/gemini) or your own [tuned model](https://ai.google.dev/docs/model_tuning_guidance)."
+          },
+          "groq.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "markdownDescription": "Provide the name of the model you want to use. Choose from the ..."
+          },
+          "groq.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "markdownDescription": "Provide the name of the model you want to use. Choose from the ..."
+          },
+          "openai.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "markdownDescription": "Provide the name of the model you want to use. Choose from the ..."
+          },
+          "openai.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "markdownDescription": "Provide the name of the model you want to use. Choose from the ..."
           }
         }
       }

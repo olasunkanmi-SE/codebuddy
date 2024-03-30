@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
-import { generateComment } from "./comments";
 import { generateReview } from "./review";
 import { generateRefactoredCode } from "./refactor";
 import { fixCodeError } from "./fix";
 import { generateOptimizeCode } from "./optimize";
+import { Comments } from "./comment";
 
 export function activate(context: vscode.ExtensionContext) {
-  const commentCode = vscode.commands.registerCommand("ola.commentCode", generateComment);
+  const getComment = new Comments("Hold on while Ola generates the code comments...");
+  const commentCode = vscode.commands.registerCommand("ola.commentCode", () => getComment.execute());
   const reviewCode = vscode.commands.registerCommand("ola.reviewCode", generateReview);
   const refactorCode = vscode.commands.registerCommand("ola.codeRefactor", generateRefactoredCode);
   const optimizeCode = vscode.commands.registerCommand("ola.codeOptimize", generateOptimizeCode);
