@@ -44,7 +44,10 @@ export abstract class EventGenerator implements IEventGenerator {
   private getActiveConfig<T extends IModelConfig>(config: T): IActiveConfig<T> | undefined {
     const activeConfigs = Object.entries(config).filter(([_, value]) => value);
     if (activeConfigs.length === 0) {
-      vscode.window.showErrorMessage("Configuration not found. Check your settings.");
+      vscode.window.showInformationMessage(
+        "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
+        { modal: true }
+      );
       return undefined;
     }
     const activeConfigsObj = Object.fromEntries(activeConfigs) as T;

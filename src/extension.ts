@@ -5,8 +5,10 @@ import { RefactorCode } from "./refactor";
 import { ReviewCode } from "./review";
 import { fixCodeError } from "./fix";
 import { OLA_ACTIONS, USER_MESSAGE } from "./constant";
+import { generateResponse, getWebviewContent } from "./chat";
 
 export function activate(context: vscode.ExtensionContext) {
+  const apiKey = vscode.workspace.getConfiguration().get<string>("google.gemini.apiKey");
   const { comment, review, refactor, optimize, fix } = OLA_ACTIONS;
   const getComment = new Comments(`${USER_MESSAGE} generates the code comments...`);
   const generateOptimizeCode = new OptimizeCode(`${USER_MESSAGE} optimizes the code...`);
@@ -20,13 +22,43 @@ export function activate(context: vscode.ExtensionContext) {
     fixCodeError(errorMessage);
   });
 
+  let disposable = vscode.commands.registerCommand("ola.openChatBox", () => {
+    const panel = vscode.window.createWebviewPanel("chatBox", "Chat Box", vscode.ViewColumn.One, {});
+    if (!apiKey) {
+      vscode.window.showErrorMessage("API key not configured. Check your settings.");
+      return;
+    }
+    panel.webview.html = getWebviewContent(apiKey);
+
+    panel.webview.onDidReceiveMessage((message) => {
+      if (message.type === "user-input") {
+        const response = generateResponse(message.text);
+        panel.webview.postMessage({ type: "bot-response", text: response });
+      }
+    });
+  });
+
   const askExtensionProvider = new AskExtensionProvider();
   const askExtensionDisposable = vscode.languages.registerCodeActionsProvider(
     { scheme: "file", language: "*" },
     askExtensionProvider
   );
 
-  context.subscriptions.push(commentCode, reviewCode, refactorCode, fixCode, optimizeCode, askExtensionDisposable);
+  context.subscriptions.push(
+    commentCode,
+    reviewCode,
+    refactorCode,
+    fixCode,
+    optimizeCode,
+    askExtensionDisposable,
+    disposable
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("catChatView.focus", () => {
+      vscode.commands.executeCommand("catChatView.focus");
+    })
+  );
 }
 
 class AskExtensionProvider implements vscode.CodeActionProvider {

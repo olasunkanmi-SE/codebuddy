@@ -41,6 +41,11 @@
           "when": "editorHasSelection",
           "command": "ola.codeFix",
           "group": "CodeBuddy"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "ola.openChatBox",
+          "group": "CodeBuddy"
         }
       ]
     },
@@ -64,6 +69,10 @@
       {
         "command": "ola.codeFix",
         "title": "Ola fix this error."
+      },
+      {
+        "command": "ola.openChatBox",
+        "title": "Send to Chat"
       }
     ],
     "configuration": [
