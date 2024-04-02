@@ -7,7 +7,7 @@ import { OptimizeCode } from "./optimize";
 import { RefactorCode } from "./refactor";
 import { ReviewCode } from "./review";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
+import * as markdownit from "markdown-it";
 export interface IHistory {
   role?: string;
   parts?: { text?: string }[];
@@ -15,34 +15,17 @@ export interface IHistory {
 
 export async function activate(context: vscode.ExtensionContext) {
   const { comment, review, refactor, optimize, fix } = OLA_ACTIONS;
-  const getComment = new Comments(
-    `${USER_MESSAGE} generates the code comments...`
-  );
-  const generateOptimizeCode = new OptimizeCode(
-    `${USER_MESSAGE} optimizes the code...`
-  );
-  const generateRefactoredCode = new RefactorCode(
-    `${USER_MESSAGE} refactors the code...`
-  );
+  const getComment = new Comments(`${USER_MESSAGE} generates the code comments...`);
+  const generateOptimizeCode = new OptimizeCode(`${USER_MESSAGE} optimizes the code...`);
+  const generateRefactoredCode = new RefactorCode(`${USER_MESSAGE} refactors the code...`);
   const generateReview = new ReviewCode(`${USER_MESSAGE} reviews the code...`);
-  const commentCode = vscode.commands.registerCommand(comment, () =>
-    getComment.execute()
-  );
-  const reviewCode = vscode.commands.registerCommand(review, () =>
-    generateReview.execute()
-  );
-  const refactorCode = vscode.commands.registerCommand(refactor, () =>
-    generateRefactoredCode.execute()
-  );
-  const optimizeCode = vscode.commands.registerCommand(optimize, () =>
-    generateOptimizeCode.execute()
-  );
-  const fixCode = vscode.commands.registerCommand(
-    fix,
-    (errorMessage: string) => {
-      fixCodeError(errorMessage);
-    }
-  );
+  const commentCode = vscode.commands.registerCommand(comment, () => getComment.execute());
+  const reviewCode = vscode.commands.registerCommand(review, () => generateReview.execute());
+  const refactorCode = vscode.commands.registerCommand(refactor, () => generateRefactoredCode.execute());
+  const optimizeCode = vscode.commands.registerCommand(optimize, () => generateOptimizeCode.execute());
+  const fixCode = vscode.commands.registerCommand(fix, (errorMessage: string) => {
+    fixCodeError(errorMessage);
+  });
 
   const askExtensionProvider = new AskExtensionProvider();
   const askExtensionDisposable = vscode.languages.registerCodeActionsProvider(
@@ -50,54 +33,36 @@ export async function activate(context: vscode.ExtensionContext) {
     askExtensionProvider
   );
   const provider = new ChatViewProvider(context.extensionUri);
-  const chatWebViewProvider = vscode.window.registerWebviewViewProvider(
-    ChatViewProvider.viewId,
-    provider
-  );
+  const chatWebViewProvider = vscode.window.registerWebviewViewProvider(ChatViewProvider.viewId, provider);
 
-  const chatWithOla = vscode.commands.registerCommand(
-    "ola.sendChatMessage",
-    async () => {
-      try {
-        const apiKey = vscode.workspace
-          .getConfiguration()
-          .get<string>("google.gemini.apiKey");
-        if (!apiKey) {
-          vscode.window.showErrorMessage(
-            "API key not configured. Check your settings."
-          );
-          return;
-        }
-        const modelName = "gemini-1.0-pro-latest";
-        const activeEditor = vscode.window.activeTextEditor;
-        if (!activeEditor) {
-          console.debug("Abandon: no open text editor.");
-          return;
-        }
-        const selectedText = activeEditor.document.getText(
-          activeEditor.selection
-        );
-        const message = selectedText;
-
-        const response = await provider.generateResponse(
-          apiKey,
-          modelName,
-          message
-        );
-        if (!response) {
-          throw new Error("Failed to generate content");
-        }
-        console.log(response);
-        provider.sendResponse(message, "You");
-        provider.sendResponse(response, "bot");
-      } catch (error) {
-        console.error(error);
-        vscode.window.showErrorMessage(
-          "Failed to generate content. Please try again later."
-        );
+  const chatWithOla = vscode.commands.registerCommand("ola.sendChatMessage", async () => {
+    try {
+      const apiKey = vscode.workspace.getConfiguration().get<string>("google.gemini.apiKey");
+      if (!apiKey) {
+        vscode.window.showErrorMessage("API key not configured. Check your settings.");
+        return;
       }
+      const modelName = "gemini-1.0-pro-latest";
+      const activeEditor = vscode.window.activeTextEditor;
+      if (!activeEditor) {
+        console.debug("Abandon: no open text editor.");
+        return;
+      }
+      const selectedText = activeEditor.document.getText(activeEditor.selection);
+      const message = selectedText;
+
+      const response = await provider.generateResponse(apiKey, modelName, message);
+      if (!response) {
+        throw new Error("Failed to generate content");
+      }
+      console.log(formatText(response));
+      provider.sendResponse(formatText(message), "You");
+      provider.sendResponse(formatText(response), "bot");
+    } catch (error) {
+      console.error(error);
+      vscode.window.showErrorMessage("Failed to generate content. Please try again later.");
     }
-  );
+  });
 
   context.subscriptions.push(
     commentCode,
@@ -111,6 +76,11 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 }
 
+function formatText(text: string): string {
+  const md = markdownit();
+  return md.render(text);
+}
+
 class AskExtensionProvider implements vscode.CodeActionProvider {
   provideCodeActions(
     document: vscode.TextDocument,
@@ -122,10 +92,7 @@ class AskExtensionProvider implements vscode.CodeActionProvider {
     if (context.diagnostics.length > 0) {
       const diagnostic = context.diagnostics[0];
       const errorMessage = diagnostic.message;
-      const action = new vscode.CodeAction(
-        "Ola fix this error",
-        vscode.CodeActionKind.QuickFix
-      );
+      const action = new vscode.CodeAction("Ola fix this error", vscode.CodeActionKind.QuickFix);
       action.command = {
         command: "ola.codeFix",
         title: "Ola fix this error",
@@ -154,13 +121,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri],
     };
 
-    const apiKey = vscode.workspace
-      .getConfiguration()
-      .get<string>("google.gemini.apiKey");
+    const apiKey = vscode.workspace.getConfiguration().get<string>("google.gemini.apiKey");
     if (!apiKey) {
-      vscode.window.showErrorMessage(
-        "API key not configured. Check your settings."
-      );
+      vscode.window.showErrorMessage("API key not configured. Check your settings.");
       return;
     }
     const modelName = "gemini-1.0-pro-latest";
@@ -169,11 +132,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view.webview.onDidReceiveMessage(async (message) => {
       if (message.type === "user-input") {
         console.log(message.message);
-        const response = await this.generateResponse(
-          apiKey,
-          modelName,
-          message.message
-        );
+        const response = await this.generateResponse(apiKey, modelName, message.message);
         this.sendResponse(response, "bot");
       }
     });
@@ -187,11 +146,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  async generateResponse(
-    apiKey: string,
-    name: string,
-    message: string
-  ): Promise<string> {
+  async generateResponse(apiKey: string, name: string, message: string): Promise<string> {
     const genAi = new GoogleGenerativeAI(apiKey);
     const model = genAi.getGenerativeModel({ model: name });
     const chat = model.startChat({

@@ -29,7 +29,7 @@ export function getWebviewContent() {
     }
 
     #chat-messages {
-        height: 200px;
+        height:700px;
         overflow-y: scroll;
         padding: 10px;
         max-width: 100%;
@@ -96,11 +96,6 @@ export function getWebviewContent() {
     }
 
 
-    @keyframes loading {
-        100% {
-            transform: translateX(100%);
-        }
-    }
 
     body {
         display: flex;
@@ -111,6 +106,38 @@ export function getWebviewContent() {
         padding: 0;
         font-family: SF Mono;
     }
+
+
+  h1 {
+    color: #569cd6;
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+
+  p {
+    margin-bottom: 15px;
+  }
+
+  ol {
+    margin-left: 20px;
+    margin-bottom: 20px;
+  }
+
+  li {
+    margin-bottom: 10px;
+  }
+
+  pre {
+    border-radius: 4px;
+    padding: 10px;
+    overflow-x: auto;
+    background-color: #000;
+  }
+
+  code {
+    color: rgb(97, 175, 239);
+    font-size: 14px;
+  }
     </style>
     <title>AI</title>
 </head>
@@ -129,8 +156,6 @@ export function getWebviewContent() {
     </div>
     </div>
     <script>
-        const cache = {};
-
         const chatContainer = document.getElementById("chat-container");
         const chatMessages = document.getElementById("chat-messages");
         const chatInput = document.getElementById("chat-input");
@@ -167,7 +192,7 @@ export function getWebviewContent() {
             messageHeader.textContent = sender + ":";
             const messageBody = document.createElement("div");
             messageBody.classList.add("chat-message-body");
-            messageBody.textContent = message;
+            messageBody.innerHTML = message;
             messageContainer.appendChild(messageHeader);
             messageContainer.appendChild(messageBody);
             chatMessages.appendChild(messageContainer);
