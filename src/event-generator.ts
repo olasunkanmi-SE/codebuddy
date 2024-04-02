@@ -41,7 +41,9 @@ export abstract class EventGenerator implements IEventGenerator {
     return vscode.workspace.getConfiguration().get<string>(configKey);
   }
 
-  private getActiveConfig<T extends IModelConfig>(config: T): IActiveConfig<T> | undefined {
+  private getActiveConfig<T extends IModelConfig>(
+    config: T
+  ): IActiveConfig<T> | undefined {
     const activeConfigs = Object.entries(config).filter(([_, value]) => value);
     if (activeConfigs.length === 0) {
       vscode.window.showInformationMessage(
@@ -58,25 +60,32 @@ export abstract class EventGenerator implements IEventGenerator {
     };
   }
 
-  protected createModel(): { name?: string; model?: GenerativeModel } | undefined {
+  protected createModel():
+    | { name?: string; model?: GenerativeModel }
+    | undefined {
     try {
       let model;
       let modelName;
       const activeApiKeyConfig = this.getActiveConfig(this.apiKeys);
       if (!activeApiKeyConfig) {
-        vscode.window.showErrorMessage("ApiKey not found. Check your settings.");
+        vscode.window.showErrorMessage(
+          "ApiKey not found. Check your settings."
+        );
         return;
       }
       const activeModelConfig = this.getActiveConfig(this.models);
 
       if (!activeModelConfig) {
-        vscode.window.showErrorMessage("ApiKey not found. Check your settings.");
+        vscode.window.showErrorMessage(
+          "ApiKey not found. Check your settings."
+        );
         return;
       }
       const [apiKeyName, apiKey] = activeApiKeyConfig.activeConfig;
       const modelConfig: IModelConfig = activeModelConfig.config;
-      if (Object.hasOwnProperty.call(modelConfig, apiKeyName)) {
-        const generativeAiModel: string | undefined = modelConfig[apiKeyName as keyof IModelConfig];
+      if (Object.hasOwn(modelConfig, apiKeyName)) {
+        const generativeAiModel: string | undefined =
+          modelConfig[apiKeyName as keyof IModelConfig];
         modelName = apiKeyName;
         if (apiKeyName === "gemini" && generativeAiModel) {
           model = this.createGeminiModel(apiKey, generativeAiModel);
@@ -85,7 +94,9 @@ export abstract class EventGenerator implements IEventGenerator {
       return { name: modelName, model };
     } catch (error) {
       console.error("Error creating model:", error);
-      vscode.window.showErrorMessage("An error occurred while creating the model. Please try again.");
+      vscode.window.showErrorMessage(
+        "An error occurred while creating the model. Please try again."
+      );
     }
   }
 
@@ -110,7 +121,9 @@ export abstract class EventGenerator implements IEventGenerator {
     return model;
   }
 
-  protected async generateModelResponse(text: string): Promise<string | undefined> {
+  protected async generateModelResponse(
+    text: string
+  ): Promise<string | undefined> {
     const activeModel = this.createModel();
     if (!activeModel) {
       vscode.window.showErrorMessage("model not found. Check your settings.");
@@ -176,6 +189,7 @@ export abstract class EventGenerator implements IEventGenerator {
         vscode.window.showErrorMessage("model not reponding, try again later");
         return;
       }
+
       editBuilder.insert(selection.start, formattedComment);
     });
   }
