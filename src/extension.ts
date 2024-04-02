@@ -167,28 +167,23 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view.webview.html = getWebviewContent();
 
     this._view.webview.onDidReceiveMessage(async (message) => {
-      console.log(message);
       if (message.type === "user-input") {
+        console.log(message.message);
         const response = await this.generateResponse(
           apiKey,
           modelName,
           message.message
         );
-        this.sendResponse(response, "bot", message.id);
+        this.sendResponse(response, "bot");
       }
     });
   }
 
-  public async sendResponse(
-    response: string,
-    currentChat: string,
-    messageId?: string
-  ) {
+  public async sendResponse(response: string, currentChat: string) {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
     return await this._view?.webview.postMessage({
       type,
       message: response,
-      id: messageId,
     });
   }
 

@@ -143,8 +143,7 @@ export function getWebviewContent() {
                 event.preventDefault();
                 const userInput = chatInput.value.trim();
                 if (userInput) {
-                    const messageId = Date.now().toString()
-                    addChatMessage("You", userInput, messageId);
+                    addChatMessage("You", userInput);
                     sendChatMessage(userInput);
                     chatInput.value = "";
                 }
@@ -154,8 +153,7 @@ export function getWebviewContent() {
         chatSendButton.addEventListener("click", () => {
             const userInput = chatInput.value.trim();
             if (userInput) {
-                const messageId = Date.now().toString()
-                addChatMessage("You", userInput, messageId);
+                addChatMessage("You", userInput);
                 sendChatMessage(userInput);
                 chatInput.value = "";
             }
@@ -164,7 +162,6 @@ export function getWebviewContent() {
         function addChatMessage(sender, message) {
             const messageContainer = document.createElement("div");
             messageContainer.classList.add("chat-message-container");
-            messageContainer.setAttribute("data-message-id", messageId)
             const messageHeader = document.createElement("div");
             messageHeader.classList.add("chat-message-header");
             messageHeader.textContent = sender + ":";
@@ -179,16 +176,15 @@ export function getWebviewContent() {
 
         function sendChatMessage(message) {
             const vscode = acquireVsCodeApi()
-            const messageId = Date.now().toString()
-            vscode.postMessage({ type: 'user-input', message: message, id: messageId })
+            vscode.postMessage({ type: 'user-input', message: message })
         }
 
         window.addEventListener('message', (event) => {
             const message = event.data;
             if (message.type === 'bot-response') {
-                addChatMessage("bot", message.message, message.id)
+                addChatMessage("bot", message.message)
             }else if (message.type === 'user-input'){
-                addChatMessage("You", message.message, message.id)
+                addChatMessage("You", message.message)
             }
         })
         
