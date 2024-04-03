@@ -8,10 +8,14 @@ import { RefactorCode } from "./refactor";
 import { ReviewCode } from "./review";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as markdownit from "markdown-it";
+
+type Role = "function" | "user" | "model";
 export interface IHistory {
-  role?: string;
-  parts?: { text?: string }[];
+  role: Role;
+  parts: { text: string }[];
 }
+
+const chatHistory: IHistory[] = [];
 
 export async function activate(context: vscode.ExtensionContext) {
   const { comment, review, refactor, optimize, fix } = OLA_ACTIONS;
@@ -131,15 +135,26 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     this._view.webview.onDidReceiveMessage(async (message) => {
       if (message.type === "user-input") {
-        console.log(message.message);
-        const response = await this.generateResponse(apiKey, modelName, message.message);
-        this.sendResponse(response, "bot");
+        const response = await this.generateResponse(apiKey, modelName, formatText(message.message));
+        this.sendResponse(formatText(response), "bot");
       }
     });
   }
 
   public async sendResponse(response: string, currentChat: string) {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
+    if (currentChat === "bot") {
+      chatHistory.push({
+        role: "model",
+        parts: [{ text: response }],
+      });
+    } else {
+      chatHistory.push({
+        role: "user",
+        parts: [{ text: response }],
+      });
+    }
+    console.log(chatHistory);
     return await this._view?.webview.postMessage({
       type,
       message: response,
@@ -167,6 +182,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             },
           ],
         },
+        ...chatHistory,
       ],
     });
     const result = await chat.sendMessage(message);
