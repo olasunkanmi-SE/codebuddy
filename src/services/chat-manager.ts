@@ -29,7 +29,6 @@ export class ChatManager {
         if (!response) {
           throw new Error("Failed to generate content");
         }
-        console.log(formatText(response));
         chatViewProvider.sendResponse(formatText(message), "You");
         chatViewProvider.sendResponse(formatText(response), "bot");
       } catch (error) {

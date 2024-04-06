@@ -167,20 +167,15 @@ export abstract class EventGenerator implements IEventGenerator {
       return;
     }
 
-    editor.edit(async (editBuilder) => {
-      const formattedComment = this.formatResponse(comment);
-      const selection = editor.selection;
-      if (!formattedComment) {
-        vscode.window.showErrorMessage("model not reponding, try again later");
-        return;
-      }
+    const formattedComment = this.formatResponse(comment);
+    if (!formattedComment) {
+      vscode.window.showErrorMessage("model not reponding, try again later");
+      return;
+    }
 
-      await ChatViewProvider.v?.webview.postMessage({
-        type: "user-input",
-        message: formattedComment,
-      });
-
-      editBuilder.insert(selection.start, formattedComment);
+    await ChatViewProvider.v?.webview.postMessage({
+      type: "user-input",
+      message: formattedComment,
     });
   }
 }
