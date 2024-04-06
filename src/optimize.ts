@@ -1,5 +1,5 @@
-import * as vscode from "vscode";
 import { EventGenerator } from "./event-generator";
+import { formatText } from "./utils";
 
 export class OptimizeCode extends EventGenerator {
   constructor(action: string) {
@@ -19,32 +19,8 @@ export class OptimizeCode extends EventGenerator {
     return PROMPT;
   }
 
-  formatResponse(comment: string): string | undefined {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-      console.debug("Abandon: no open text editor.");
-      return;
-    }
-    let trimmed = "";
-    let padding = "";
-    const commentPrefix = " * ";
-    const commentStart = "/**\n";
-    const commentEnd = " */\n";
-    const selectedCode = this.getSelectedWindowArea();
-    if (selectedCode) {
-      trimmed = selectedCode.trimStart();
-      padding = selectedCode.substring(0, selectedCode.length - trimmed.length);
-    }
-
-    // Split the comment into lines and add the padding and comment prefix to each line.
-    let comments: string = comment
-      .split("\n")
-      .map((line: string) => `${padding}${commentPrefix}${line}`)
-      .join("\n");
-
-    // Add the comment start and end markers.
-    comments = `${padding}${commentStart}${comments}\n${padding}${commentEnd}`;
-    return comments;
+  formatResponse(comment: string): string {
+    return formatText(comment);
   }
 
   createPrompt(selectedCode: string): string {

@@ -45,7 +45,7 @@ export class Comments extends EventGenerator {
     return PROMPT;
   }
 
-  formatResponse(comment: string): string | undefined {
+  formatResponse(comment: string): string {
     return comment;
   }
 
