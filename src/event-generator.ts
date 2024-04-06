@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 import * as vscode from "vscode";
+import { ChatViewProvider } from "./providers/chat-web-view-provider";
 
 interface IEventGenerator {
   getModelConfig(configSuffix: string): IModelConfig;
@@ -41,9 +43,7 @@ export abstract class EventGenerator implements IEventGenerator {
     return vscode.workspace.getConfiguration().get<string>(configKey);
   }
 
-  private getActiveConfig<T extends IModelConfig>(
-    config: T
-  ): IActiveConfig<T> | undefined {
+  private getActiveConfig<T extends IModelConfig>(config: T): IActiveConfig<T> | undefined {
     const activeConfigs = Object.entries(config).filter(([_, value]) => value);
     if (activeConfigs.length === 0) {
       vscode.window.showInformationMessage(
@@ -60,32 +60,25 @@ export abstract class EventGenerator implements IEventGenerator {
     };
   }
 
-  protected createModel():
-    | { name?: string; model?: GenerativeModel }
-    | undefined {
+  protected createModel(): { name?: string; model?: GenerativeModel } | undefined {
     try {
       let model;
       let modelName;
       const activeApiKeyConfig = this.getActiveConfig(this.apiKeys);
       if (!activeApiKeyConfig) {
-        vscode.window.showErrorMessage(
-          "ApiKey not found. Check your settings."
-        );
+        vscode.window.showErrorMessage("ApiKey not found. Check your settings.");
         return;
       }
       const activeModelConfig = this.getActiveConfig(this.models);
 
       if (!activeModelConfig) {
-        vscode.window.showErrorMessage(
-          "ApiKey not found. Check your settings."
-        );
+        vscode.window.showErrorMessage("ApiKey not found. Check your settings.");
         return;
       }
       const [apiKeyName, apiKey] = activeApiKeyConfig.activeConfig;
       const modelConfig: IModelConfig = activeModelConfig.config;
-      if (Object.hasOwn(modelConfig, apiKeyName)) {
-        const generativeAiModel: string | undefined =
-          modelConfig[apiKeyName as keyof IModelConfig];
+      if (Object.hasOwnProperty.call(modelConfig, apiKeyName)) {
+        const generativeAiModel: string | undefined = modelConfig[apiKeyName as keyof IModelConfig];
         modelName = apiKeyName;
         if (apiKeyName === "gemini" && generativeAiModel) {
           model = this.createGeminiModel(apiKey, generativeAiModel);
@@ -94,9 +87,7 @@ export abstract class EventGenerator implements IEventGenerator {
       return { name: modelName, model };
     } catch (error) {
       console.error("Error creating model:", error);
-      vscode.window.showErrorMessage(
-        "An error occurred while creating the model. Please try again."
-      );
+      vscode.window.showErrorMessage("An error occurred while creating the model. Please try again.");
     }
   }
 
@@ -121,9 +112,7 @@ export abstract class EventGenerator implements IEventGenerator {
     return model;
   }
 
-  protected async generateModelResponse(
-    text: string
-  ): Promise<string | undefined> {
+  protected async generateModelResponse(text: string): Promise<string | undefined> {
     const activeModel = this.createModel();
     if (!activeModel) {
       vscode.window.showErrorMessage("model not found. Check your settings.");
@@ -143,7 +132,7 @@ export abstract class EventGenerator implements IEventGenerator {
     return response.text();
   }
 
-  abstract formatResponse(comment: string): string | undefined;
+  abstract formatResponse(comment: string): string;
 
   abstract createPrompt(text?: string): string;
 
@@ -155,11 +144,7 @@ export abstract class EventGenerator implements IEventGenerator {
       vscode.window.showErrorMessage("select a piece of code.");
       return;
     }
-    if (selectedCode) {
-      prompt = this.createPrompt(selectedCode);
-    } else {
-      prompt = this.createPrompt();
-    }
+    prompt = this.createPrompt(selectedCode);
 
     if (!prompt) {
       vscode.window.showErrorMessage("model not reponding, try again later");
@@ -182,13 +167,18 @@ export abstract class EventGenerator implements IEventGenerator {
       return;
     }
 
-    editor.edit((editBuilder) => {
+    editor.edit(async (editBuilder) => {
       const formattedComment = this.formatResponse(comment);
       const selection = editor.selection;
       if (!formattedComment) {
         vscode.window.showErrorMessage("model not reponding, try again later");
         return;
       }
+
+      await ChatViewProvider.v?.webview.postMessage({
+        type: "user-input",
+        message: formattedComment,
+      });
 
       editBuilder.insert(selection.start, formattedComment);
     });
