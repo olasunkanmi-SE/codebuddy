@@ -21,6 +21,7 @@ export class ChatManager {
           console.debug("Abandon: no open text editor.");
           return;
         }
+        vscode.window.showInformationMessage("Asking Ola for help");
         const selectedText = activeEditor.document.getText(activeEditor.selection);
         const message = selectedText;
         const chatViewProvider = new ChatViewProvider(this._context.extensionUri);

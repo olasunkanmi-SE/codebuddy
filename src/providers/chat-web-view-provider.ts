@@ -14,17 +14,14 @@ let _view: vscode.WebviewView | undefined;
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "chatView";
+  public static v: vscode.WebviewView | undefined;
 
   chatHistory: IHistory[] = [];
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
-
-  public resolveWebviewView(
-    webviewView: vscode.WebviewView,
-    context: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken
-  ) {
+  public resolveWebviewView(webviewView: vscode.WebviewView) {
     _view = webviewView;
+    ChatViewProvider.v = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [this._extensionUri],
@@ -41,22 +38,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     _view.webview.onDidReceiveMessage(async (message) => {
       if (message.type === "user-input") {
         const response = await this.generateResponse(apiKey, modelName, formatText(message.message));
-        this.sendResponse(formatText(response), "bot");
+        this.sendResponse(formatText(response), "bot", formatText(message.message));
       }
     });
   }
 
-  // Todo:
+  // Todo
   // 1. Move this to AI service, rememeber since _view is global you can call it within the AI service to return the present view
   // Remove all hard coded Gemini models within the code to pave way for a more generic generative ai models
 
-  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  public async sendResponse(response: string, currentChat: string, userMessage?: string): Promise<boolean | undefined> {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
-    if (currentChat === "bot") {
-      this.chatHistory.push({
-        role: "model",
-        parts: [{ text: response }],
-      });
+    if (currentChat === "bot" && userMessage?.length) {
+      this.chatHistory.push(
+        {
+          role: "user",
+          parts: [{ text: userMessage }],
+        },
+        {
+          role: "model",
+          parts: [{ text: response }],
+        }
+      );
     } else {
       this.chatHistory.push({
         role: "user",

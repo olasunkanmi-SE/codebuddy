@@ -1,6 +1,6 @@
 {
   "name": "codebuddy",
-  "displayName": "Yout personal copilot",
+  "displayName": "Your personal codebuddy",
   "description": "",
   "version": "0.0.1",
   "engines": {
@@ -146,7 +146,7 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "vscode-test"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
@@ -154,9 +154,11 @@
     "@types/mocha": "^10.0.1",
     "@types/node": "20.2.5",
     "@types/readable-stream": "^4.0.11",
+    "@types/sinon": "^17.0.3",
     "@types/vscode": "^1.78.0",
     "@typescript-eslint/eslint-plugin": "^5.59.8",
     "@typescript-eslint/parser": "^5.59.8",
+    "@vscode/test-cli": "^0.0.8",
     "@vscode/test-electron": "^2.3.2",
     "eslint": "^8.41.0",
     "glob": "^8.1.0",
@@ -169,6 +171,7 @@
     "dotenv": "^16.1.4",
     "markdown-it": "^14.1.0",
     "node-fetch": "^3.3.2",
-    "readable-stream": "^4.5.2"
+    "readable-stream": "^4.5.2",
+    "sinon": "^17.0.1"
   }
 }
