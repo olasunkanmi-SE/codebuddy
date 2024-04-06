@@ -31,12 +31,23 @@ This is your Free version of Copilot. All you need is a gmail account. Sign up t
 5. You can interact with CodeBuddy through the chat interface or within your workspace to get explanations, clarify requirements, or iterate on the generated code suggestions.
 6. CodeBuddy will adapt its suggestions and explanations based on the programming language, framework, or library you are using.
 
+## Roadmap
+- [x] Code generation: The assistant can generate code snippets based on your input, allowing you to quickly create code without having to write it all yourself.
+- [x] Task completion: The assistant can help you complete tasks such as debugging, testing, and refactoring, making your development workflow more efficient.
+- [x] Code refactoring: The assistant can refactor your code to make it more efficient, readable, and maintainable.
+- [x] Code analysis: The assistant can analyze your code and provide suggestions for improvement, such as pointing out potential bugs, security vulnerabilities, and performance issues.
+- [x] Code formatting: The assistant can format your code to conform to your preferred style guide, making your code more readable and maintainable.
+- []  Code search: The assistant can search for code snippets and functions within your codebase, allowing you to quickly find and reuse existing code.
+- []  Upload documents and retrieve knowledge from it
+- []  Auto-completion of code aka code suggestions
+- []  Support for various Generative AIs
+
 ## Configuration
 
 CodeBuddy provides the following configuration options:
 
-- `codebuddy.apiKey`: Set your Google Generative AI API key to enable the AI functionality.
-- `codebuddy.model`: Specify the AI model to use for code assistance (default: "gemini-1.0-pro-latest").
+- `google.gemini.apiKey`: Set your Google Generative AI API key to enable the AI functionality.
+- `google.gemini.model`: Specify the AI model to use for code assistance (default: "gemini-1.0-pro-latest").
 
 To configure these options, go to the Visual Studio Code settings and search for "CodeBuddy".
 
@@ -51,8 +62,8 @@ To configure these options, go to the Visual Studio Code settings and search for
 - In vscode settings, search for Ola, and under extensions, click on 'Your coding buddy'. 
 - Enter your Google Gemini API key and Gemini Model
 - Or in the settings.json file, enter this   
-- "google.gemini.apiKey": "Your API key",
-- "google.gemini.model": "models/gemini model",
+- `google.gemini.apiKey`: "Your API key",
+- `google.gemini.model`: "models/gemini model",
 
 ## Release Notes
 
