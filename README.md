@@ -37,10 +37,10 @@ This is your Free version of Copilot. All you need is a gmail account. Sign up t
 - [x] Code refactoring: The assistant can refactor your code to make it more efficient, readable, and maintainable.
 - [x] Code analysis: The assistant can analyze your code and provide suggestions for improvement, such as pointing out potential bugs, security vulnerabilities, and performance issues.
 - [x] Code formatting: The assistant can format your code to conform to your preferred style guide, making your code more readable and maintainable.
-- []  Code search: The assistant can search for code snippets and functions within your codebase, allowing you to quickly find and reuse existing code.
-- []  Upload documents and retrieve knowledge from it
-- []  Auto-completion of code aka code suggestions
-- []  Support for various Generative AIs
+- [ ]  Code search: The assistant can search for code snippets and functions within your codebase, allowing you to quickly find and reuse existing code.
+- [ ]  Upload documents and retrieve knowledge from it
+- [ ]  Auto-completion of code aka code suggestions
+- [ ]  Support for various Generative AIs
 
 ## Configuration
 
