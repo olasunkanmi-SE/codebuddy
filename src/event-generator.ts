@@ -173,7 +173,7 @@ export abstract class EventGenerator implements IEventGenerator {
       return;
     }
 
-    await ChatViewProvider.v?.webview.postMessage({
+    await ChatViewProvider.webView?.webview.postMessage({
       type: "user-input",
       message: formattedComment,
     });
