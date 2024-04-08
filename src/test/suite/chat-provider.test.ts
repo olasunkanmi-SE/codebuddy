@@ -25,7 +25,32 @@ suite("Test the ChatProvider", async () => {
         },
       },
     };
-    const provider = new ChatViewProvider(vscode.Uri.file("../../../../codebuddy"));
+
+    const createExtensionContextStub = (): vscode.ExtensionContext =>
+      ({
+        subscriptions: [],
+        workspaceState: {
+          get: () => {
+            return {
+              chatHistory: [
+                { role: "user", parts: [{ text: "Hello" }] },
+                { role: "model", parts: [{ text: "Hi there!" }] },
+              ],
+            };
+          },
+          update: () => {
+            return {
+              chatHistory: [
+                { role: "user", parts: [{ text: "Hello" }] },
+                { role: "model", parts: [{ text: "Hi there!" }] },
+              ],
+            };
+          },
+        },
+      } as any);
+    let extensionContext: vscode.ExtensionContext;
+    extensionContext = createExtensionContextStub();
+    const provider = new ChatViewProvider(vscode.Uri.file("../../../../codebuddy"), extensionContext);
     provider.resolveWebviewView(webview as any);
     assert.strictEqual(typeof webview.webview.html, "string");
     assert.strictEqual(provider.chatHistory.length, 0);
@@ -81,7 +106,27 @@ suite("Test the ChatProvider", async () => {
         apiKeyStub.returns({
           get: sinon.stub().withArgs("google.gemini.apiKey").returns("1234"),
         });
-        const provider = new ChatViewProvider(vscode.Uri.file("../../../../codebuddy"));
+        const createExtensionContextStub = (): vscode.ExtensionContext =>
+          ({
+            subscriptions: [],
+            workspaceState: {
+              get: () => {
+                return [
+                  { role: "user", parts: [{ text: "Hello" }] },
+                  { role: "model", parts: [{ text: "Hi there!" }] },
+                ];
+              },
+              update: () => {
+                return [
+                  { role: "user", parts: [{ text: "Hello" }] },
+                  { role: "model", parts: [{ text: "Hi there!" }] },
+                ];
+              },
+            },
+          } as any);
+        let extensionContext: vscode.ExtensionContext;
+        extensionContext = createExtensionContextStub();
+        const provider = new ChatViewProvider(vscode.Uri.file("../../../../codebuddy"), extensionContext);
         const sendResponsePromise = new Promise<void>((resolve) => {
           const sendResponse = provider.sendResponse;
           provider.sendResponse = async (...args) => {
@@ -94,10 +139,9 @@ suite("Test the ChatProvider", async () => {
         await sendResponsePromise;
 
         sinon.assert.calledOnce(googleGenerativeAIStub);
-        assert.strictEqual(provider.chatHistory.length, 2, "Chat history should have 2 entries");
-        assert.strictEqual(provider.chatHistory[0].role, "user");
-        assert.strictEqual(provider.chatHistory[0].parts[0].text, formatText(question));
-        assert.strictEqual(provider.chatHistory[1].role, "model");
+        assert.strictEqual(provider.chatHistory.length, 1);
+        assert.strictEqual(provider.chatHistory[0].role, "model");
+        assert.strictEqual(provider.chatHistory[0].parts[0].text, formatText("Hello World"));
         sinon.restore();
       });
     } catch (error) {
