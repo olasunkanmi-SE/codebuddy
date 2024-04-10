@@ -2,7 +2,6 @@
 
 CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding assistant to help developers write better code more efficiently. With CodeBuddy, you can get intelligent code suggestions, completions, and assistance based on the context and requirements of your code.
 
-This is your Free version of Copilot. All you need is a gmail account. Sign up to Google Gemini, grab your API key.
 
 ## Features
 
