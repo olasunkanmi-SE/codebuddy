@@ -25,7 +25,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const quickFix = new CodeActionsProvider();
   const quickFixCodeAction = vscode.languages.registerCodeActionsProvider({ scheme: "file", language: "*" }, quickFix);
-  const chatViewProvider = new ChatViewProvider(context.extensionUri);
+  const chatViewProvider = new ChatViewProvider(context.extensionUri, context);
   const chatWebViewProvider = vscode.window.registerWebviewViewProvider(ChatViewProvider.viewId, chatViewProvider);
   const chatManager = new ChatManager(context);
   const chatWithOla = chatManager.chatWithOla();

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { formatText } from "../utils";
 import { ChatViewProvider } from "../providers/chat-web-view-provider";
+import { formatText } from "../utils";
 
 export class ChatManager {
   _context: vscode.ExtensionContext;
@@ -24,13 +24,13 @@ export class ChatManager {
         vscode.window.showInformationMessage("Asking Ola for help");
         const selectedText = activeEditor.document.getText(activeEditor.selection);
         const message = selectedText;
-        const chatViewProvider = new ChatViewProvider(this._context.extensionUri);
+        const chatViewProvider = new ChatViewProvider(this._context.extensionUri, this._context);
         const response = await chatViewProvider.generateResponse(apiKey, modelName, message);
         if (!response) {
-          throw new Error("Failed to generate content");
+          this._context.workspaceState.update("chatHistory", []);
+          throw new Error("Failed to generate content, try again");
         }
-        console.log(formatText(response));
-        chatViewProvider.sendResponse(formatText(message), "You");
+        chatViewProvider.sendResponse(formatText(message), "user-input");
         chatViewProvider.sendResponse(formatText(response), "bot");
       } catch (error) {
         console.error(error);
