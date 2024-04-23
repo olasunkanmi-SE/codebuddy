@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import Anthropic from "@anthropic-ai/sdk";
+import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import * as vscode from "vscode";
 import { ChatViewProvider } from "./providers/chat-web-view-provider";
 
@@ -10,7 +12,7 @@ interface IEventGenerator {
   getSelectedWindowArea(): string | undefined;
 }
 
-type TModelName = "gemini" | "openai" | "groq";
+type TModelName = "gemini" | "openai" | "groq" | "claude";
 
 type IModelConfig = {
   [key in TModelName]?: string;
@@ -36,6 +38,7 @@ export abstract class EventGenerator implements IEventGenerator {
       groq: this.getApplicationConfig(`groq.${configSuffix}`),
       gemini: this.getApplicationConfig(`google.gemini.${configSuffix}`),
       openai: this.getApplicationConfig(`openai.${configSuffix}`),
+      claude: this.getApplicationConfig(`claude.opus.${configSuffix}`),
     };
   }
 
@@ -43,7 +46,9 @@ export abstract class EventGenerator implements IEventGenerator {
     return vscode.workspace.getConfiguration().get<string>(configKey);
   }
 
-  private getActiveConfig<T extends IModelConfig>(config: T): IActiveConfig<T> | undefined {
+  private getActiveConfig<T extends IModelConfig>(
+    config: T
+  ): IActiveConfig<T> | undefined {
     const activeConfigs = Object.entries(config).filter(([_, value]) => value);
     if (activeConfigs.length === 0) {
       vscode.window.showInformationMessage(
@@ -60,34 +65,58 @@ export abstract class EventGenerator implements IEventGenerator {
     };
   }
 
-  protected createModel(): { name?: string; model?: GenerativeModel } | undefined {
+  protected createModel():
+    | { name: string; model: any; generativeAiModel?: string }
+    | undefined {
     try {
-      let model;
-      let modelName;
       const activeApiKeyConfig = this.getActiveConfig(this.apiKeys);
       if (!activeApiKeyConfig) {
-        vscode.window.showErrorMessage("ApiKey not found. Check your settings.");
+        vscode.window.showErrorMessage(
+          "ApiKey not found. Check your settings."
+        );
         return;
       }
-      const activeModelConfig = this.getActiveConfig(this.models);
 
+      const activeModelConfig = this.getActiveConfig(this.models);
       if (!activeModelConfig) {
-        vscode.window.showErrorMessage("ApiKey not found. Check your settings.");
+        vscode.window.showErrorMessage(
+          "ApiKey not found. Check your settings."
+        );
         return;
       }
-      const [apiKeyName, apiKey] = activeApiKeyConfig.activeConfig;
-      const modelConfig: IModelConfig = activeModelConfig.config;
-      if (Object.hasOwnProperty.call(modelConfig, apiKeyName)) {
-        const generativeAiModel: string | undefined = modelConfig[apiKeyName as keyof IModelConfig];
-        modelName = apiKeyName;
-        if (apiKeyName === "gemini" && generativeAiModel) {
-          model = this.createGeminiModel(apiKey, generativeAiModel);
+
+      const {
+        activeConfig: [apiKeyName, apiKey],
+      } = activeApiKeyConfig;
+      const { config: modelConfig } = activeModelConfig;
+
+      if (modelConfig.hasOwnProperty(apiKeyName)) {
+        const generativeAiModel = modelConfig[apiKeyName as keyof IModelConfig];
+        const modelName = apiKeyName;
+        let model: any;
+        switch (apiKeyName) {
+          case "gemini":
+            if (generativeAiModel) {
+              model = this.createGeminiModel(apiKey, generativeAiModel);
+            }
+            break;
+          case "claude":
+            model = this.createAnthropicModel(apiKey);
+            break;
+          case "groq":
+            model = this.createGroqModel(apiKey);
+            break;
+          default:
+            console.error(`Unsupported api key name: ${apiKeyName}`);
+            return;
         }
+        return { name: modelName, model, generativeAiModel };
       }
-      return { name: modelName, model };
     } catch (error) {
       console.error("Error creating model:", error);
-      vscode.window.showErrorMessage("An error occurred while creating the model. Please try again.");
+      vscode.window.showErrorMessage(
+        "An error occurred while creating the model. Please try again."
+      );
     }
   }
 
@@ -112,31 +141,133 @@ export abstract class EventGenerator implements IEventGenerator {
     return model;
   }
 
-  protected async generateModelResponse(text: string): Promise<string | undefined> {
-    const activeModel = this.createModel();
-    if (!activeModel) {
-      vscode.window.showErrorMessage("model not found. Check your settings.");
-      return;
+  private createAnthropicModel(apiKey: string): Anthropic {
+    return new Anthropic({
+      apiKey,
+    });
+  }
+
+  private createGroqModel(apiKey: string): Groq {
+    return new Groq({ apiKey });
+  }
+
+  protected async generateModelResponse(
+    text: string
+  ): Promise<string | Anthropic.Messages.Message | undefined> {
+    try {
+      const activeModel = this.createModel();
+      if (!activeModel) {
+        throw new Error("Model not found. Check your settings.");
+      }
+
+      const { name, model, generativeAiModel } = activeModel;
+      if (!name || !model) {
+        throw new Error("Model not found. Check your settings.");
+      }
+
+      let response;
+      switch (name) {
+        case "gemini":
+          response = await this.generateGeminiResponse(model, text);
+          break;
+        case "claude":
+          if (generativeAiModel) {
+            response = await this.anthropicResponse(
+              model,
+              generativeAiModel,
+              text
+            );
+          }
+          break;
+        case "groq":
+          if (generativeAiModel) {
+            response = await this.groqResponse(model, text, generativeAiModel);
+          }
+          break;
+        default:
+          throw new Error("Unsupported model name.");
+      }
+
+      if (!response) {
+        throw new Error(
+          "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly."
+        );
+      }
+
+      return response;
+    } catch (error) {
+      console.error("Error generating response:", error);
+      vscode.window.showErrorMessage(
+        "An error occurred while generating the response. Please try again."
+      );
     }
-    const { name, model } = activeModel;
-    if (!name) {
-      vscode.window.showErrorMessage("model not found. Check your settings.");
-      return;
-    }
-    if (!model) {
-      vscode.window.showErrorMessage("model not found. Check your settings.");
-      return;
-    }
+  }
+
+  async generateGeminiResponse(
+    model: any,
+    text: string
+  ): Promise<string | undefined> {
     const result = await model.generateContent(text);
-    const response = await result.response;
-    return response.text();
+    return result ? await result.response.text() : undefined;
+  }
+
+  private async anthropicResponse(
+    model: Anthropic,
+    generativeAiModel: string,
+    userPrompt: string
+  ) {
+    try {
+      const response = await model.messages.create({
+        model: generativeAiModel,
+        system: "",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+      return response;
+    } catch (error) {
+      console.error("Error generating response:", error);
+      vscode.window.showErrorMessage(
+        "An error occurred while generating the response. Please try again."
+      );
+      return;
+    }
+  }
+
+  private async groqResponse(
+    model: Groq,
+    prompt: string,
+    generativeAiModel: string
+  ): Promise<string | undefined> {
+    try {
+      const params = {
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        model: generativeAiModel,
+      };
+
+      const completion: Groq.Chat.ChatCompletion =
+        await model.chat.completions.create(params);
+      return completion.choices[0]?.message?.content ?? undefined;
+    } catch (error) {
+      console.error("Error generating response:", error);
+      vscode.window.showErrorMessage(
+        "An error occurred while generating the response. Please try again."
+      );
+      return;
+    }
   }
 
   abstract formatResponse(comment: string): string;
 
   abstract createPrompt(text?: string): string;
 
-  async generateResponse(): Promise<string | undefined> {
+  async generateResponse(): Promise<
+    string | Anthropic.Messages.Message | undefined
+  > {
     this.showInformationMessage();
     let prompt;
     const selectedCode = this.getSelectedWindowArea();
@@ -156,7 +287,7 @@ export abstract class EventGenerator implements IEventGenerator {
   }
 
   async execute(): Promise<void> {
-    const comment = await this.generateResponse();
+    const comment = (await this.generateResponse()) as string;
     if (!comment) {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
