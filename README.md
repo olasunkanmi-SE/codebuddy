@@ -2,6 +2,7 @@
 
 CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding assistant to help developers write better code more efficiently. With CodeBuddy, you can get intelligent code suggestions, completions, and assistance based on the context and requirements of your code.
 
+<img width="1675" alt="Co pilot extension by Oyinlola Olasunkanmi Raymond" src="https://github.com/olasunkanmi-SE/codebuddy/assets/60177090/093ab139-84a5-4ef4-939a-1d72e21e2d1d">
 
 ## Features
 
@@ -31,17 +32,17 @@ CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding a
 - [x] Code refactoring: The assistant can refactor your code to make it more efficient, readable, and maintainable.
 - [x] Code analysis: The assistant can analyze your code and provide suggestions for improvement, such as pointing out potential bugs, security vulnerabilities, and performance issues.
 - [x] Code formatting: The assistant can format your code to conform to your preferred style guide, making your code more readable and maintainable.
-- [ ]  Code search: The assistant can search for code snippets and functions within your codebase, allowing you to quickly find and reuse existing code.
-- [ ]  Upload documents and retrieve knowledge from it
-- [ ]  Auto-completion of code aka code suggestions
-- [x]  Support for various Generative AIs
+- [ ] Code search: The assistant can search for code snippets and functions within your codebase, allowing you to quickly find and reuse existing code.
+- [ ] Upload documents and retrieve knowledge from it
+- [ ] Auto-completion of code aka code suggestions
+- [x] Support for various Generative AIs
 
 ## Configuration
 
 CodeBuddy provides the following configuration options:
 
 - 'google.gemini.apiKey': Set your Google Generative AI API key to enable the AI functionality.
-- `'oogle.gemini.model': Specify the AI model to use for code assistance (default: "gemini-1.0-pro-latest").
+- `'google.gemini.model': Specify the AI model to use for code assistance (default: "gemini-1.0-pro-latest").
 - "groq.apiKey": "Groq API key",
   "groq.model": "llama3-70b-8192",
 
