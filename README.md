@@ -22,7 +22,7 @@ CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding a
 - To access code buddy. Drag the explorer button to the right of the page. A chat interface should be displayed
 - Highlight any code, right-click. You should see lists of options like refactoring, optimize code, etc.
 - Also you can simply type an instruction, in conjunction with some highlighted code if you will, right-click and click on send to Ola
-- you can have a chat-like conversation and it does remember your previous questions because there is support for chet history
+- you can have a chat-like conversation and it does remember your previous questions because there is support for chat history
 
 
 ## Roadmap
