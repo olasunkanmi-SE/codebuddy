@@ -13,16 +13,25 @@ import { ExplainCode } from "./explain";
 export async function activate(context: vscode.ExtensionContext) {
   const { comment, review, refactor, optimize, fix, explain } = OLA_ACTIONS;
   const getComment = new Comments(
-    `${USER_MESSAGE} generates the code comments...`
+    `${USER_MESSAGE} generates the code comments...`,
+    context
   );
   const generateOptimizeCode = new OptimizeCode(
-    `${USER_MESSAGE} optimizes the code...`
+    `${USER_MESSAGE} optimizes the code...`,
+    context
   );
   const generateRefactoredCode = new RefactorCode(
-    `${USER_MESSAGE} refactors the code...`
+    `${USER_MESSAGE} refactors the code...`,
+    context
   );
-  const explainCode = new ExplainCode(`${USER_MESSAGE} explains the code...`);
-  const generateReview = new ReviewCode(`${USER_MESSAGE} reviews the code...`);
+  const explainCode = new ExplainCode(
+    `${USER_MESSAGE} explains the code...`,
+    context
+  );
+  const generateReview = new ReviewCode(
+    `${USER_MESSAGE} reviews the code...`,
+    context
+  );
 
   const actionMap = {
     [comment]: () => getComment.execute(),

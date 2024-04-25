@@ -43,7 +43,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     });
   }
 
-  async generateResponse(): Promise<string | undefined> {
+  async generateResponse(message: string): Promise<string | undefined> {
     try {
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
       const groq = new Groq({
@@ -66,6 +66,10 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
               "Feel free to provide a code snippet or describe the problem you're working on, and I'll do my best to help you.",
           },
           ...chatHistory,
+          {
+            role: "user",
+            content: message,
+          },
         ],
         model: this.generativeAiModel,
         temperature,
