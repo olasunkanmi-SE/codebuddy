@@ -39,7 +39,7 @@ export class ChatManager {
           this.generativeAiModel,
           this._context
         );
-        const response = await chatViewProvider.generateResponse();
+        const response = await chatViewProvider.generateResponse(message);
         if (!response) {
           this._context.workspaceState.update("chatHistory", []);
           throw new Error("Failed to generate content, try again");

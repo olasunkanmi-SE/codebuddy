@@ -27,10 +27,15 @@ export abstract class EventGenerator implements IEventGenerator {
   private apiKeys: IModelConfig;
   private currentModelIndex: number;
   private models: IModelConfig;
-  constructor(private readonly action: string) {
+  private context: vscode.ExtensionContext;
+  constructor(
+    private readonly action: string,
+    _context: vscode.ExtensionContext
+  ) {
     this.apiKeys = this.getModelConfig("apiKey");
     this.models = this.getModelConfig("model");
     this.currentModelIndex = 0;
+    this.context = _context;
   }
 
   getModelConfig(configSuffix: string): IModelConfig {
@@ -283,6 +288,18 @@ export abstract class EventGenerator implements IEventGenerator {
     }
 
     const response = await this.generateModelResponse(prompt);
+    if (prompt && response) {
+      this.context.workspaceState.update("chatHistory", [
+        {
+          role: "user",
+          content: prompt,
+        },
+        {
+          role: "system",
+          content: response,
+        },
+      ]);
+    }
     return response;
   }
 

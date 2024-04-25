@@ -1,9 +1,10 @@
+import * as vscode from "vscode";
 import { EventGenerator } from "./event-generator";
 import { formatText } from "./utils";
 
 export class ExplainCode extends EventGenerator {
-  constructor(action: string) {
-    super(action);
+  constructor(action: string, context: vscode.ExtensionContext) {
+    super(action, context);
   }
 
   generatePrompt() {

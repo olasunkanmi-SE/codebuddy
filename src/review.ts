@@ -1,9 +1,10 @@
 import { EventGenerator } from "./event-generator";
 import { formatText } from "./utils";
+import * as vscode from "vscode";
 
 export class ReviewCode extends EventGenerator {
-  constructor(action: string) {
-    super(action);
+  constructor(action: string, context: vscode.ExtensionContext) {
+    super(action, context);
   }
 
   generatePrompt() {
