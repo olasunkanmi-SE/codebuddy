@@ -14,13 +14,9 @@ export class ChatManager {
   chatWithOla() {
     return vscode.commands.registerCommand("ola.sendChatMessage", async () => {
       try {
-        const apiKey = vscode.workspace
-          .getConfiguration()
-          .get<string>(this.apiKey);
+        const apiKey = vscode.workspace.getConfiguration().get<string>(this.apiKey);
         if (!apiKey) {
-          vscode.window.showErrorMessage(
-            "API key not configured. Check your settings."
-          );
+          vscode.window.showErrorMessage("API key not configured. Check your settings.");
           return;
         }
         const activeEditor = vscode.window.activeTextEditor;
@@ -28,10 +24,8 @@ export class ChatManager {
           console.debug("Abandon: no open text editor.");
           return;
         }
-        vscode.window.showInformationMessage("Asking Ola for help");
-        const selectedText = activeEditor.document.getText(
-          activeEditor.selection
-        );
+        vscode.window.showInformationMessage("☕️ Relax and Grab a coffee");
+        const selectedText = activeEditor.document.getText(activeEditor.selection);
         const message = selectedText;
         const chatViewProvider = new GroqWebViewProvider(
           this._context.extensionUri,
@@ -48,9 +42,7 @@ export class ChatManager {
         chatViewProvider.sendResponse(formatText(response), "bot");
       } catch (error) {
         console.error(error);
-        vscode.window.showErrorMessage(
-          "Failed to generate content. Please try again later."
-        );
+        vscode.window.showErrorMessage("Failed to generate content. Please try again later.");
       }
     });
   }
