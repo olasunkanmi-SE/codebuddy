@@ -48,40 +48,49 @@
         },
         {
           "when": "editorHasSelection",
+          "command": "ola.explain",
+          "group": "CodeBuddy"
+        },
+        {
+          "when": "editorHasSelection",
           "command": "ola.codeFix",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
           "command": "ola.sendChatMessage",
-          "group": "CodeBuddy"
+          "group": "CodeBuddy@7"
         }
       ]
     },
     "commands": [
       {
         "command": "ola.commentCode",
-        "title": "Ola add comment to selected code."
+        "title": "Ola. Add comment to selected code."
       },
       {
         "command": "ola.reviewCode",
-        "title": "Ola review these selected code."
+        "title": "Ola. Review these selected code."
       },
       {
         "command": "ola.codeRefactor",
-        "title": "Ola refactor these selected code."
+        "title": "Ola. Refactor these selected code."
       },
       {
         "command": "ola.codeOptimize",
-        "title": "Ola optimize these selected code."
+        "title": "Ola. Optimize these selected code."
       },
       {
         "command": "ola.codeFix",
-        "title": "Ola fix this error."
+        "title": "Ola. Fix this error."
       },
       {
         "command": "ola.sendChatMessage",
-        "title": "Send to Ola"
+        "title": "Send to your CodeBuddy, Ola."
+      },
+      {
+        "command": "ola.explain",
+        "title": "Ola. Explain this code"
       }
     ],
     "configuration": [

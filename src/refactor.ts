@@ -1,9 +1,10 @@
 import { EventGenerator } from "./event-generator";
 import { formatText } from "./utils";
+import * as vscode from "vscode";
 
 export class RefactorCode extends EventGenerator {
-  constructor(action: string) {
-    super(action);
+  constructor(action: string, context: vscode.ExtensionContext) {
+    super(action, context);
   }
 
   generatePrompt() {
@@ -14,6 +15,7 @@ export class RefactorCode extends EventGenerator {
         3. Simplicity: Simplify complex logic, remove unnecessary complexity, and streamline the code. Suggest ways to make the code more concise and easier to maintain.
         4. Maintainability: Enhance the overall maintainability of the code by improving code documentation, error handling, and adherence to coding standards and best practices.
         Please provide the refactored code along with explanations for each significant change made. Justify how the refactoring improves the code's quality and maintainability.
+        Respond based on the programming language of the requested code. Unless stated otherwise
 `;
     return PROMPT;
   }

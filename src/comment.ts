@@ -1,9 +1,10 @@
 import { EventGenerator } from "./event-generator";
+import * as vscode from "vscode";
 
 export class Comments extends EventGenerator {
   selectedCode: string | undefined;
-  constructor(action: string) {
-    super(action);
+  constructor(action: string, context: vscode.ExtensionContext) {
+    super(action, context);
   }
 
   generatePrompt() {
@@ -14,6 +15,7 @@ export class Comments extends EventGenerator {
         repeating information that's obvious from the code itself. Good comments
         describe "why", explain any "magic" values and non-obvious behaviour.
         Below are some examples of good code comments.
+        Respond based on the programming language of the requested code. Unless stated otherwise
         ${CODE_LABEL}
         async getRestaurantById(id: Types.ObjectId): Promise<Result<IRestaurantResponseDTO>> {
             await this.singleclientService.validateContext();

@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
-import { ChatViewProvider } from "./providers/chat-web-view-provider";
+import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 
 interface IEventGenerator {
   getModelConfig(configSuffix: string): IModelConfig;
@@ -27,10 +27,15 @@ export abstract class EventGenerator implements IEventGenerator {
   private apiKeys: IModelConfig;
   private currentModelIndex: number;
   private models: IModelConfig;
-  constructor(private readonly action: string) {
+  private context: vscode.ExtensionContext;
+  constructor(
+    private readonly action: string,
+    _context: vscode.ExtensionContext
+  ) {
     this.apiKeys = this.getModelConfig("apiKey");
     this.models = this.getModelConfig("model");
     this.currentModelIndex = 0;
+    this.context = _context;
   }
 
   getModelConfig(configSuffix: string): IModelConfig {
@@ -127,7 +132,7 @@ export abstract class EventGenerator implements IEventGenerator {
   getSelectedWindowArea(): string | undefined {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      console.debug("Abandon: no open text editor.");
+      vscode.window.showInformationMessage("No active text editor.");
       return;
     }
     const selection: vscode.Selection | undefined = editor.selection;
@@ -283,6 +288,18 @@ export abstract class EventGenerator implements IEventGenerator {
     }
 
     const response = await this.generateModelResponse(prompt);
+    if (prompt && response) {
+      this.context.workspaceState.update("chatHistory", [
+        {
+          role: "user",
+          content: prompt,
+        },
+        {
+          role: "system",
+          content: response,
+        },
+      ]);
+    }
     return response;
   }
 
@@ -304,7 +321,7 @@ export abstract class EventGenerator implements IEventGenerator {
       return;
     }
 
-    await ChatViewProvider.webView?.webview.postMessage({
+    await GroqWebViewProvider.webView?.webview.postMessage({
       type: "user-input",
       message: formattedComment,
     });

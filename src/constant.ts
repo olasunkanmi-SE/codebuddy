@@ -5,4 +5,13 @@ export enum OLA_ACTIONS {
   refactor = "ola.codeRefactor",
   optimize = "ola.codeOptimize",
   fix = "ola.codeFix",
+  explain = "ola.explain",
 }
+
+export const GROQ_CONFIG = {
+  temperature: 0.1,
+  max_tokens: 1024,
+  top_p: 1,
+  stream: false,
+  stop: null,
+};

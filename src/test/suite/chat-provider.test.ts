@@ -2,7 +2,7 @@ import { formatText } from "./../../utils";
 import * as assert from "assert";
 import * as vscode from "vscode";
 import * as sinon from "sinon";
-import { getWebviewContent } from "../../chat";
+import { getWebviewContent } from "../../webview/chat";
 import { ChatViewProvider } from "../../providers/chat-web-view-provider";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -50,7 +50,10 @@ suite("Test the ChatProvider", async () => {
       } as any);
     let extensionContext: vscode.ExtensionContext;
     extensionContext = createExtensionContextStub();
-    const provider = new ChatViewProvider(vscode.Uri.file("../../../../codebuddy"), extensionContext);
+    const provider = new ChatViewProvider(
+      vscode.Uri.file("../../../../codebuddy"),
+      extensionContext
+    );
     provider.resolveWebviewView(webview as any);
     assert.strictEqual(typeof webview.webview.html, "string");
     assert.strictEqual(provider.chatHistory.length, 0);
@@ -60,7 +63,10 @@ suite("Test the ChatProvider", async () => {
     try {
       test("Should send a response to the webview when a message is received", async () => {
         const question = "Write K nearest neighbour function in typescript";
-        const googleGenerativeAIStub = sinon.stub(GoogleGenerativeAI.prototype, "getGenerativeModel") as any;
+        const googleGenerativeAIStub = sinon.stub(
+          GoogleGenerativeAI.prototype,
+          "getGenerativeModel"
+        ) as any;
         const startChartStub = sinon.stub();
         const sendMessageStub = sinon.stub();
 
@@ -102,7 +108,10 @@ suite("Test the ChatProvider", async () => {
           },
         };
 
-        const apiKeyStub = sinon.stub(vscode.workspace, "getConfiguration") as any;
+        const apiKeyStub = sinon.stub(
+          vscode.workspace,
+          "getConfiguration"
+        ) as any;
         apiKeyStub.returns({
           get: sinon.stub().withArgs("google.gemini.apiKey").returns("1234"),
         });
@@ -126,7 +135,10 @@ suite("Test the ChatProvider", async () => {
           } as any);
         let extensionContext: vscode.ExtensionContext;
         extensionContext = createExtensionContextStub();
-        const provider = new ChatViewProvider(vscode.Uri.file("../../../../codebuddy"), extensionContext);
+        const provider = new ChatViewProvider(
+          vscode.Uri.file("../../../../codebuddy"),
+          extensionContext
+        );
         const sendResponsePromise = new Promise<void>((resolve) => {
           const sendResponse = provider.sendResponse;
           provider.sendResponse = async (...args) => {
@@ -141,7 +153,10 @@ suite("Test the ChatProvider", async () => {
         sinon.assert.calledOnce(googleGenerativeAIStub);
         assert.strictEqual(provider.chatHistory.length, 1);
         assert.strictEqual(provider.chatHistory[0].role, "model");
-        assert.strictEqual(provider.chatHistory[0].parts[0].text, formatText("Hello World"));
+        assert.strictEqual(
+          provider.chatHistory[0].parts[0].text,
+          formatText("Hello World")
+        );
         sinon.restore();
       });
     } catch (error) {
