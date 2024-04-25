@@ -59,7 +59,7 @@
         {
           "when": "editorHasSelection",
           "command": "ola.sendChatMessage",
-          "group": "CodeBuddy@7"
+          "group": "CodeBuddy"
         }
       ]
     },
@@ -86,7 +86,7 @@
       },
       {
         "command": "ola.sendChatMessage",
-        "title": "Send to your CodeBuddy, Ola."
+        "title": "Send to Ola"
       },
       {
         "command": "ola.explain",
