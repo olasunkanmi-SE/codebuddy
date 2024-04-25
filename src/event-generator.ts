@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
-import { ChatViewProvider } from "./providers/chat-web-view-provider";
+import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 
 interface IEventGenerator {
   getModelConfig(configSuffix: string): IModelConfig;
@@ -127,7 +127,7 @@ export abstract class EventGenerator implements IEventGenerator {
   getSelectedWindowArea(): string | undefined {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      console.debug("Abandon: no open text editor.");
+      vscode.window.showInformationMessage("No active text editor.");
       return;
     }
     const selection: vscode.Selection | undefined = editor.selection;
@@ -304,7 +304,7 @@ export abstract class EventGenerator implements IEventGenerator {
       return;
     }
 
-    await ChatViewProvider.webView?.webview.postMessage({
+    await GroqWebViewProvider.webView?.webview.postMessage({
       type: "user-input",
       message: formattedComment,
     });

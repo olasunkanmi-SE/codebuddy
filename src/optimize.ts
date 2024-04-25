@@ -15,6 +15,7 @@ export class OptimizeCode extends EventGenerator {
         Caching and Memoization: Identify computations or function calls that can benefit from caching or memoization. Suggest ways to store and reuse previously computed results to avoid redundant calculations.
         Parallelization and Concurrency: Identify portions of the code that can be parallelized or executed concurrently to leverage multi-core processors or distributed systems. Propose appropriate parallelization techniques or libraries to improve performance.
         Please provide the optimized code along with explanations for each significant optimization made. Justify how the optimizations improve the code's performance and efficiency. If trade-offs are involved, discuss the benefits and drawbacks of each optimization approach.
+        Respond based on the programming language of the requested code. Unless stated otherwise
 `;
     return PROMPT;
   }

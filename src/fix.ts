@@ -8,6 +8,7 @@ As an AI-powered code assistant, your task is to identify and fix errors within 
 Identify syntax errors, logical errors, or potential runtime errors in the code.
 Provide a corrected version of the code that resolves the identified issues.
 Offer alternative solutions or best practices, if applicable, to improve the code's efficiency, readability, or maintainability.
+Respond based on the programming language of the requested code. Unless stated otherwise
 
 Error Message: {errorMessage}
 `;
@@ -19,9 +20,13 @@ export async function fixCodeError(errorMessage: string) {
     .getConfiguration()
     .get<string>("google.gemini.model", "models/gemini-1.0-pro-latest");
 
-  const apiKey = vscode.workspace.getConfiguration().get<string>("google.gemini.apiKey");
+  const apiKey = vscode.workspace
+    .getConfiguration()
+    .get<string>("google.gemini.apiKey");
   if (!apiKey) {
-    vscode.window.showErrorMessage("API key not configured. Check your settings.");
+    vscode.window.showErrorMessage(
+      "API key not configured. Check your settings."
+    );
     return;
   }
 
