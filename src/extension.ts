@@ -9,36 +9,23 @@ import { ReviewCode } from "./review";
 import { ChatManager } from "./services/chat-manager";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { ExplainCode } from "./explain";
+import { FixError } from "./fixError";
 
 export async function activate(context: vscode.ExtensionContext) {
   const { comment, review, refactor, optimize, fix, explain } = OLA_ACTIONS;
-  const getComment = new Comments(
-    `${USER_MESSAGE} generates the code comments...`,
-    context
-  );
-  const generateOptimizeCode = new OptimizeCode(
-    `${USER_MESSAGE} optimizes the code...`,
-    context
-  );
-  const generateRefactoredCode = new RefactorCode(
-    `${USER_MESSAGE} refactors the code...`,
-    context
-  );
-  const explainCode = new ExplainCode(
-    `${USER_MESSAGE} explains the code...`,
-    context
-  );
-  const generateReview = new ReviewCode(
-    `${USER_MESSAGE} reviews the code...`,
-    context
-  );
+  const getComment = new Comments(`${USER_MESSAGE} generates the code comments...`, context);
+  const generateOptimizeCode = new OptimizeCode(`${USER_MESSAGE} optimizes the code...`, context);
+  const generateRefactoredCode = new RefactorCode(`${USER_MESSAGE} refactors the code...`, context);
+  const explainCode = new ExplainCode(`${USER_MESSAGE} explains the code...`, context);
+  const generateReview = new ReviewCode(`${USER_MESSAGE} reviews the code...`, context);
 
   const actionMap = {
     [comment]: () => getComment.execute(),
     [review]: () => generateReview.execute(),
     [refactor]: () => generateRefactoredCode.execute(),
     [optimize]: () => generateOptimizeCode.execute(),
-    [fix]: (errorMessage: string) => fixCodeError(errorMessage),
+    [fix]: (errorMessage: string) =>
+      new FixError(`${USER_MESSAGE} finds a solution to the error...`, context, errorMessage).execute(),
     [explain]: () => explainCode.execute(),
   };
 
@@ -47,10 +34,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   const quickFix = new CodeActionsProvider();
-  const quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
-    { scheme: "file", language: "*" },
-    quickFix
-  );
+  const quickFixCodeAction = vscode.languages.registerCodeActionsProvider({ scheme: "file", language: "*" }, quickFix);
 
   const groqWebViewProvider = new GroqWebViewProvider(
     context.extensionUri,
@@ -78,17 +62,8 @@ export async function activate(context: vscode.ExtensionContext) {
     groqWebViewProvider
   );
 
-  const chatManager = new ChatManager(
-    "groq.llama3.apiKey",
-    "llama3-70b-8192",
-    context
-  );
+  const chatManager = new ChatManager("groq.llama3.apiKey", "llama3-70b-8192", context);
   const chatWithOla = chatManager.chatWithOla();
 
-  context.subscriptions.push(
-    ...subscriptions,
-    quickFixCodeAction,
-    registerGroqWebViewProvider,
-    chatWithOla
-  );
+  context.subscriptions.push(...subscriptions, quickFixCodeAction, registerGroqWebViewProvider, chatWithOla);
 }
