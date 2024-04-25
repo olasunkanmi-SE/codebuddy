@@ -1,15 +1,14 @@
 import * as vscode from "vscode";
-import { Comments } from "./comment";
 import { OLA_ACTIONS, USER_MESSAGE } from "./constant";
-import { fixCodeError } from "./fix";
-import { OptimizeCode } from "./optimize";
+import { Comments } from "./events/comment";
+import { ExplainCode } from "./events/explain";
+import { FixError } from "./events/fixError";
+import { OptimizeCode } from "./events/optimize";
+import { RefactorCode } from "./events/refactor";
+import { ReviewCode } from "./events/review";
 import { CodeActionsProvider } from "./providers/code-actions-provider";
-import { RefactorCode } from "./refactor";
-import { ReviewCode } from "./review";
-import { ChatManager } from "./services/chat-manager";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
-import { ExplainCode } from "./explain";
-import { FixError } from "./fixError";
+import { ChatManager } from "./services/chat-manager";
 
 export async function activate(context: vscode.ExtensionContext) {
   const { comment, review, refactor, optimize, fix, explain } = OLA_ACTIONS;

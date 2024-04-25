@@ -1,5 +1,5 @@
+import { formatText } from "../utils";
 import { EventGenerator } from "./event-generator";
-import { formatText } from "./utils";
 import * as vscode from "vscode";
 
 export class RefactorCode extends EventGenerator {

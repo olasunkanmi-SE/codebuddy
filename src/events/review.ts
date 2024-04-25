@@ -1,6 +1,6 @@
-import { EventGenerator } from "./event-generator";
-import { formatText } from "./utils";
+import { formatText } from "../utils";
 import * as vscode from "vscode";
+import { EventGenerator } from "./event-generator";
 
 export class ReviewCode extends EventGenerator {
   constructor(action: string, context: vscode.ExtensionContext) {

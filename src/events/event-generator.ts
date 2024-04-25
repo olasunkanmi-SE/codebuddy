@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
-import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
+import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
 
 interface IEventGenerator {
   getModelConfig(configSuffix: string): IModelConfig;
