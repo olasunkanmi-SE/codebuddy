@@ -33,6 +33,7 @@ export class ReviewCode extends EventGenerator {
     Error handling: Does the code handle exceptions and error cases gracefully?
     Testability: Is the code designed in a way that facilitates unit testing and automated testing?
     Please provide your feedback in a constructive and supportive manner, explaining the reasoning behind your suggestions. Use code examples to illustrate your points whenever necessary. Remember, the goal is to help the developer learn and grow, not to criticize or demean their work.
+    Respond based on the programming language of the requested code. Unless stated otherwise
     ${CODE_LABEL}
     createModel(): { name?: string; model?: GenerativeModel } | undefined {
     try {
