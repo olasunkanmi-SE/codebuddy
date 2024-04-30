@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { OLA_ACTIONS, USER_MESSAGE } from "./constant";
+import { appConfig, generativeModel, OLA_ACTIONS, USER_MESSAGE } from "./constant";
 import { Comments } from "./events/comment";
 import { ExplainCode } from "./events/explain";
 import { FixError } from "./events/fixError";
@@ -10,6 +10,8 @@ import { CodeActionsProvider } from "./providers/code-actions-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { ChatManager } from "./services/chat-manager";
 import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
+import { getConfigValue } from "./utils";
+const { generativeAi, geminiKey, geminiModel, groqKey, groqModel } = appConfig;
 
 export async function activate(context: vscode.ExtensionContext) {
   const { comment, review, refactor, optimize, fix, explain } = OLA_ACTIONS;
@@ -33,44 +35,38 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(action, handler)
   );
 
-  const selectedGenerativeAiModel = vscode.workspace.getConfiguration().get<string>("generativeAi.option");
+  const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
 
   const quickFix = new CodeActionsProvider();
   const quickFixCodeAction = vscode.languages.registerCodeActionsProvider({ scheme: "file", language: "*" }, quickFix);
 
   // Todo: move each generative Ai view providers to different files
-  if (selectedGenerativeAiModel === "Gemini") {
-    const geminiWebViewProvider = new GeminiWebViewProvider(
-      context.extensionUri,
-      "groq.llama3.apiKey",
-      "llama3-70b-8192",
-      context
-    );
+  if (selectedGenerativeAiModel === generativeModel.GEMINI) {
+    const key = getConfigValue(geminiKey);
+    const model = getConfigValue(geminiModel);
+    const geminiWebViewProvider = new GeminiWebViewProvider(context.extensionUri, key, model, context);
 
     const registerGeminiWebViewProvider = vscode.window.registerWebviewViewProvider(
       GeminiWebViewProvider.viewId,
       geminiWebViewProvider
     );
 
-    const chatManager = new ChatManager("groq.llama3.apiKey", "llama3-70b-8192", context);
+    const chatManager = new ChatManager(context);
     const chatWithOla = chatManager.registerChatCommand();
 
     context.subscriptions.push(...subscriptions, quickFixCodeAction, registerGeminiWebViewProvider, chatWithOla);
   }
 
-  if (selectedGenerativeAiModel === "Grok") {
-    const groqWebViewProvider = new GroqWebViewProvider(
-      context.extensionUri,
-      "groq.llama3.apiKey",
-      "llama3-70b-8192",
-      context
-    );
+  if (selectedGenerativeAiModel === generativeModel.GROQ) {
+    const key = getConfigValue(groqKey);
+    const model = getConfigValue(groqModel);
+    const groqWebViewProvider = new GroqWebViewProvider(context.extensionUri, key, model, context);
     const registerGroqWebViewProvider = vscode.window.registerWebviewViewProvider(
       GroqWebViewProvider.viewId,
       groqWebViewProvider
     );
 
-    const chatManager = new ChatManager("groq.llama3.apiKey", "llama3-70b-8192", context);
+    const chatManager = new ChatManager(context);
     const chatWithOla = chatManager.registerChatCommand();
 
     context.subscriptions.push(...subscriptions, quickFixCodeAction, registerGroqWebViewProvider, chatWithOla);

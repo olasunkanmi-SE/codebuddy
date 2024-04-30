@@ -10,50 +10,39 @@ export interface IHistory {
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
   chatHistory: IHistory[] = [];
-  constructor(
-    extensionUri: vscode.Uri,
-    apiKey: string,
-    generativeAiModel: string,
-    context: vscode.ExtensionContext
-  ) {
+  constructor(extensionUri: vscode.Uri, apiKey: string, generativeAiModel: string, context: vscode.ExtensionContext) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
-  async sendResponse(
-    response: string,
-    currentChat: string
-  ): Promise<boolean | undefined> {
-    const type = currentChat === "bot" ? "bot-response" : "user-input";
-    if (currentChat === "bot") {
-      this.chatHistory.push({
-        role: "model",
-        parts: [{ text: response }],
+  async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+    try {
+      const type = currentChat === "bot" ? "bot-response" : "user-input";
+      if (currentChat === "bot") {
+        this.chatHistory.push({
+          role: "model",
+          parts: [{ text: response }],
+        });
+      } else {
+        this.chatHistory.push({
+          role: "user",
+          parts: [{ text: response }],
+        });
+      }
+      this._context.workspaceState.update("chatHistory", [...this.chatHistory]);
+      return await this.currentWebView?.webview.postMessage({
+        type,
+        message: response,
       });
-    } else {
-      this.chatHistory.push({
-        role: "user",
-        parts: [{ text: response }],
-      });
+    } catch (error) {
+      console.error(error);
     }
-    this._context.workspaceState.update("chatHistory", [...this.chatHistory]);
-    return await this.currentWebView?.webview.postMessage({
-      type,
-      message: response,
-    });
   }
 
-  async generateResponse(
-    apiKey: string,
-    name: string,
-    message: string
-  ): Promise<string | undefined> {
+  async generateResponse(apiKey: string, name: string, message: string): Promise<string | undefined> {
     try {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
-      const chatHistory = this._context.workspaceState.get<IHistory[]>(
-        "chatHistory",
-        []
-      );
+      const chatHistory = this._context.workspaceState.get<IHistory[]>("chatHistory", []);
       const chat = model.startChat({
         history: [
           {
