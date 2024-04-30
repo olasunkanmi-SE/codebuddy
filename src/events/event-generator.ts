@@ -4,9 +4,11 @@ import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
 import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
+import { getConfigValue, vscodeErrorMessage } from "../utils";
+import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
+import { appConfig, generativeModel } from "../constant";
 
 interface IEventGenerator {
-  getModelConfig(configSuffix: string): IModelConfig;
   getApplicationConfig(configKey: string): string | undefined;
   showInformationMessage(): Thenable<string | undefined>;
   getSelectedWindowArea(): string | undefined;
@@ -24,90 +26,54 @@ interface IActiveConfig<T> {
 }
 
 export abstract class EventGenerator implements IEventGenerator {
-  private apiKeys: IModelConfig;
-  private currentModelIndex: number;
-  private models: IModelConfig;
   private context: vscode.ExtensionContext;
   protected error?: string;
+  private readonly generativeAi: string;
+  private readonly geminiApiKey: string;
+  private readonly geminiModel: string;
+  private readonly grokApiKey: string;
+  private readonly grokModel: string;
   constructor(private readonly action: string, _context: vscode.ExtensionContext, errorMessage?: string) {
-    this.apiKeys = this.getModelConfig("apiKey");
-    this.models = this.getModelConfig("model");
-    this.currentModelIndex = 0;
     this.context = _context;
     this.error = errorMessage;
-  }
-
-  getModelConfig(configSuffix: string): IModelConfig {
-    return {
-      groq: this.getApplicationConfig(`groq.llama3.${configSuffix}`),
-      gemini: this.getApplicationConfig(`google.gemini.${configSuffix}`),
-      openai: this.getApplicationConfig(`openai.${configSuffix}`),
-      claude: this.getApplicationConfig(`claude.opus.${configSuffix}`),
-    };
+    const { generativeAi, geminiKey, geminiModel, groqKey, groqModel } = appConfig;
+    this.generativeAi = getConfigValue(generativeAi);
+    this.geminiApiKey = getConfigValue(geminiKey);
+    this.geminiModel = getConfigValue(geminiModel);
+    this.grokApiKey = getConfigValue(groqKey);
+    this.grokModel = getConfigValue(groqModel);
   }
 
   getApplicationConfig(configKey: string): string | undefined {
-    return vscode.workspace.getConfiguration().get<string>(configKey);
+    return getConfigValue(configKey);
   }
 
-  private getActiveConfig<T extends IModelConfig>(config: T): IActiveConfig<T> | undefined {
-    const activeConfigs = Object.entries(config).filter(([_, value]) => value);
-    if (activeConfigs.length === 0) {
-      vscode.window.showInformationMessage(
-        "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
-        { modal: true }
-      );
-      return undefined;
-    }
-    const activeConfigsObj = Object.fromEntries(activeConfigs) as T;
-    const [key, value] = activeConfigs[this.currentModelIndex];
-    return {
-      activeConfig: [key, value],
-      config: activeConfigsObj,
-    };
-  }
-
-  protected createModel(): { name: string; model: any; generativeAiModel?: string } | undefined {
+  protected createModel(): { generativeAi: string; generativeAiModel: any; modelName: string } | undefined {
     try {
-      const activeApiKeyConfig = this.getActiveConfig(this.apiKeys);
-      if (!activeApiKeyConfig) {
-        vscode.window.showErrorMessage("ApiKey not found. Check your settings.");
-        return;
+      let generativeAiModel;
+      let modelName = "";
+      if (!this.generativeAi) {
+        vscodeErrorMessage(
+          "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
+        );
       }
-
-      const activeModelConfig = this.getActiveConfig(this.models);
-      if (!activeModelConfig) {
-        vscode.window.showErrorMessage("ApiKey not found. Check your settings.");
-        return;
-      }
-
-      const {
-        activeConfig: [apiKeyName, apiKey],
-      } = activeApiKeyConfig;
-      const { config: modelConfig } = activeModelConfig;
-
-      if (modelConfig.hasOwnProperty(apiKeyName)) {
-        const generativeAiModel = modelConfig[apiKeyName as keyof IModelConfig];
-        const modelName = apiKeyName;
-        let model: any;
-        switch (apiKeyName) {
-          case "gemini":
-            if (generativeAiModel) {
-              model = this.createGeminiModel(apiKey, generativeAiModel);
-            }
-            break;
-          case "claude":
-            model = this.createAnthropicModel(apiKey);
-            break;
-          case "groq":
-            model = this.createGroqModel(apiKey);
-            break;
-          default:
-            console.error(`Unsupported api key name: ${apiKeyName}`);
-            return;
+      if (this.generativeAi === generativeModel.GROQ) {
+        const apiKey = this.grokApiKey;
+        modelName = this.grokModel;
+        if (!apiKey || !modelName) {
+          vscodeErrorMessage(
+            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
+          );
         }
-        return { name: modelName, model, generativeAiModel };
+        generativeAiModel = this.createGroqModel(apiKey);
       }
+
+      if (this.generativeAi === generativeModel.GEMINI) {
+        const apiKey = this.geminiApiKey;
+        modelName = this.geminiModel;
+        generativeAiModel = this.createGeminiModel(apiKey, modelName);
+      }
+      return { generativeAi: this.generativeAi, generativeAiModel, modelName };
     } catch (error) {
       console.error("Error creating model:", error);
       vscode.window.showErrorMessage("An error occurred while creating the model. Please try again.");
@@ -152,24 +118,24 @@ export abstract class EventGenerator implements IEventGenerator {
         throw new Error("Model not found. Check your settings.");
       }
 
-      const { name, model, generativeAiModel } = activeModel;
-      if (!name || !model) {
+      const { generativeAi, generativeAiModel, modelName } = activeModel;
+      if (!generativeAi || !generativeAiModel) {
         throw new Error("Model not found. Check your settings.");
       }
 
       let response;
-      switch (name) {
-        case "gemini":
-          response = await this.generateGeminiResponse(model, text);
+      switch (generativeAi) {
+        case "Gemini":
+          response = await this.generateGeminiResponse(generativeAiModel, text);
           break;
-        case "claude":
-          if (generativeAiModel) {
-            response = await this.anthropicResponse(model, generativeAiModel, text);
+        case "Claude":
+          if (modelName) {
+            response = await this.anthropicResponse(generativeAiModel, modelName, text);
           }
           break;
-        case "groq":
-          if (generativeAiModel) {
-            response = await this.groqResponse(model, text, generativeAiModel);
+        case "Groq":
+          if (modelName) {
+            response = await this.groqResponse(generativeAiModel, text, modelName);
           }
           break;
         default:
@@ -181,7 +147,6 @@ export abstract class EventGenerator implements IEventGenerator {
           "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly."
         );
       }
-
       return response;
     } catch (error) {
       console.error("Error generating response:", error);
@@ -284,10 +249,18 @@ export abstract class EventGenerator implements IEventGenerator {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
     }
+    if (this.generativeAi === "Groq") {
+      await GroqWebViewProvider.webView?.webview.postMessage({
+        type: "user-input",
+        message: formattedComment,
+      });
+    }
 
-    await GroqWebViewProvider.webView?.webview.postMessage({
-      type: "user-input",
-      message: formattedComment,
-    });
+    if (this.generativeAi === "Gemini") {
+      await GeminiWebViewProvider.webView?.webview.postMessage({
+        type: "user-input",
+        message: formattedComment,
+      });
+    }
   }
 }

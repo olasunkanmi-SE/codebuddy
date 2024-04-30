@@ -3,9 +3,12 @@ import * as vscode from "vscode";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
-export const formatText = (text: string): string => {
-  const md = markdownit();
-  return md.render(text);
+export const formatText = (text?: string): string => {
+  if (text) {
+    const md = markdownit();
+    return md.render(text);
+  }
+  return "";
 };
 
 export const getConfigValue: GetConfigValueType<any> = <T>(key: string): T | undefined => {

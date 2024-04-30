@@ -18,10 +18,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   _context: vscode.ExtensionContext;
   chatHistory: IHistory[] = [];
 
-  constructor(
-    private readonly _extensionUri: vscode.Uri,
-    context: vscode.ExtensionContext
-  ) {
+  constructor(private readonly _extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
     this._context = context;
   }
   public resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -32,13 +29,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri],
     };
 
-    const apiKey = vscode.workspace
-      .getConfiguration()
-      .get<string>("google.gemini.apiKey");
+    const apiKey = vscode.workspace.getConfiguration().get<string>("google.gemini.apiKeys");
     if (!apiKey) {
-      vscode.window.showErrorMessage(
-        "API key not configured. Check your settings."
-      );
+      vscode.window.showErrorMessage("API key not configured. Check your settings.");
       return;
     }
     const modelName = "gemini-1.0-pro-latest";
@@ -46,11 +39,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     _view.webview.onDidReceiveMessage(async (message) => {
       if (message.type === "user-input") {
-        const response = await this.generateResponse(
-          apiKey,
-          modelName,
-          formatText(message.message)
-        );
+        const response = await this.generateResponse(apiKey, modelName, formatText(message.message));
         if (response) {
           this.sendResponse(formatText(response), "bot");
         }
@@ -62,10 +51,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   // 1. Move this to AI service, rememeber you can call the static method webView, a property of ChatViewProvider
   // Remove all hard coded Gemini models within the code to pave way for a more generic generative ai models
 
-  public async sendResponse(
-    response: string,
-    currentChat: string
-  ): Promise<boolean | undefined> {
+  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
     if (currentChat === "bot") {
       this.chatHistory.push({
@@ -85,10 +71,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  public async sendGroqResponse(
-    response: string,
-    currentChat: string
-  ): Promise<boolean | undefined> {
+  public async sendGroqResponse(response: string, currentChat: string): Promise<boolean | undefined> {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
     if (currentChat === "bot") {
       this.chatHistory.push({
@@ -108,18 +91,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  async generateResponse(
-    apiKey: string,
-    name: string,
-    message: string
-  ): Promise<string | undefined> {
+  async generateResponse(apiKey: string, name: string, message: string): Promise<string | undefined> {
     try {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
-      const chatHistory = this._context.workspaceState.get<IHistory[]>(
-        "chatHistory",
-        []
-      );
+      const chatHistory = this._context.workspaceState.get<IHistory[]>("chatHistory", []);
       const chat = model.startChat({
         history: [
           {
