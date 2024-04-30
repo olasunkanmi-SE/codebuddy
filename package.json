@@ -97,7 +97,16 @@
       {
         "title": "Your codding buddy, Ola",
         "properties": {
-          "google.gemini.apiKey": {
+          "generativeAi.option": {
+            "type": "string",
+            "enum": [
+              "Gemini",
+              "Groq"
+            ],
+            "default": "Groq",
+            "description": "Select the Generative AI to use with code buddy"
+          },
+          "google.gemini.apiKeys": {
             "type": [
               "string",
               "null"
@@ -113,7 +122,7 @@
             "default": null,
             "markdownDescription": "Provide the name of the model you want to use. Choose from the [base models](https://ai.google.dev/models/gemini) or your own [tuned model](https://ai.google.dev/docs/model_tuning_guidance)."
           },
-          "groq.apiKey": {
+          "groq.llama3.apiKey": {
             "type": [
               "string",
               "null"
@@ -121,29 +130,13 @@
             "default": null,
             "markdownDescription": "Enter your [API Key](https://console.groq.com/keys) Groq"
           },
-          "groq.model": {
+          "groq.llama3.model": {
             "type": [
               "string",
               "null"
             ],
             "default": null,
             "markdownDescription": "Provide the name of the Groq model you want to use. Choose from the ..."
-          },
-          "claude.opus.apiKey": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "default": null,
-            "markdownDescription": "Enter your [API Key](https://console.anthropic.com/settings/keys) Claude"
-          },
-          "claude.opus.model": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "default": null,
-            "markdownDescription": "Provide the name of the model you want to use. Choose from the ..."
           }
         }
       }

@@ -15,3 +15,16 @@ export const GROQ_CONFIG = {
   stream: false,
   stop: null,
 };
+
+export const appConfig = {
+  geminiKey: "google.gemini.apiKeys",
+  geminiModel: "google.gemini.model",
+  groqKey: "groq.llama3.apiKey",
+  groqModel: "groq.llama3.model",
+  generativeAi: "generativeAi.option",
+};
+
+export enum generativeModel {
+  GEMINI = "Gemini",
+  GROQ = "Groq",
+}
