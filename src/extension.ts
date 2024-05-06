@@ -27,7 +27,7 @@ export async function activate(context: vscode.ExtensionContext) {
     [refactor]: () => generateRefactoredCode.execute(),
     [optimize]: () => generateOptimizeCode.execute(),
     [fix]: (errorMessage: string) =>
-      new FixError(`${USER_MESSAGE} finds a solution to the error...`, context, errorMessage).execute(),
+      new FixError(`${USER_MESSAGE} finds a solution to the error...`, context, errorMessage).execute(errorMessage),
     [explain]: () => explainCode.execute(),
   };
 

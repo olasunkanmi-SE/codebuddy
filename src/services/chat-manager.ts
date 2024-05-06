@@ -34,7 +34,6 @@ export class ChatManager {
         vscode.window.showInformationMessage("☕️ Asking Ola for Help");
         const selectedText = this.getActiveEditorText();
         const response = await this.generateResponse(selectedText);
-        console.log(response);
         this.sendResponse(selectedText, response);
       } catch (error) {
         console.error(error);

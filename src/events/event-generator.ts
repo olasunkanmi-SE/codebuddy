@@ -14,17 +14,6 @@ interface IEventGenerator {
   getSelectedWindowArea(): string | undefined;
 }
 
-type TModelName = "gemini" | "openai" | "groq" | "claude";
-
-type IModelConfig = {
-  [key in TModelName]?: string;
-};
-
-interface IActiveConfig<T> {
-  activeConfig: string[];
-  config: T;
-}
-
 export abstract class EventGenerator implements IEventGenerator {
   private context: vscode.ExtensionContext;
   protected error?: string;
@@ -200,16 +189,16 @@ export abstract class EventGenerator implements IEventGenerator {
 
   abstract createPrompt(text?: string): string;
 
-  async generateResponse(): Promise<string | Anthropic.Messages.Message | undefined> {
+  async generateResponse(errorMessage?: string): Promise<string | Anthropic.Messages.Message | undefined> {
     this.showInformationMessage();
     let prompt;
     const selectedCode = this.getSelectedWindowArea();
-    if (!selectedCode) {
+    if (!errorMessage && !selectedCode) {
       vscode.window.showErrorMessage("select a piece of code.");
       return;
     }
 
-    prompt = this.createPrompt(selectedCode);
+    errorMessage ? (prompt = this.createPrompt(errorMessage)) : (prompt = this.createPrompt(selectedCode));
 
     if (!prompt) {
       vscode.window.showErrorMessage("model not reponding, try again later");
@@ -232,19 +221,23 @@ export abstract class EventGenerator implements IEventGenerator {
     return response;
   }
 
-  async execute(): Promise<void> {
-    const comment = (await this.generateResponse()) as string;
+  async execute(errorMessage?: string): Promise<void> {
+    const comment = (await this.generateResponse(errorMessage)) as string;
     if (!comment) {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
     }
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-      console.debug("Abandon: no open text editor.");
-      return;
+    if (!errorMessage) {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        console.debug("Abandon: no open text editor.");
+        return;
+      }
     }
-
-    const formattedComment = this.formatResponse(comment);
+    let formattedComment;
+    errorMessage
+      ? (formattedComment = this.formatResponse(errorMessage))
+      : (formattedComment = this.formatResponse(comment));
     if (!formattedComment) {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
