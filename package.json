@@ -53,11 +53,6 @@
         },
         {
           "when": "editorHasSelection",
-          "command": "ola.codeFix",
-          "group": "CodeBuddy"
-        },
-        {
-          "when": "editorHasSelection",
           "command": "ola.sendChatMessage",
           "group": "CodeBuddy"
         }
@@ -79,10 +74,6 @@
       {
         "command": "ola.codeOptimize",
         "title": "Ola. Optimize these selected code."
-      },
-      {
-        "command": "ola.codeFix",
-        "title": "Ola. Fix this error."
       },
       {
         "command": "ola.sendChatMessage",
