@@ -247,18 +247,34 @@ export abstract class EventGenerator implements IEventGenerator {
     }
 
     const response = await this.generateModelResponse(prompt);
+    const generativeAiModel = this.geminiModel;
     if (prompt && response) {
-      this.context.workspaceState.update("chatHistory", [
-        {
-          role: "user",
-          content: prompt,
-        },
-        {
-          role: "system",
-          content: response,
-        },
-      ]);
+      if (generativeAiModel === generativeModel.GEMINI) {
+        this.context.workspaceState.update("chatHistory", [
+          {
+            role: "user",
+            parts: [{ text: response }],
+          },
+          {
+            role: "model",
+            parts: [{ text: response }],
+          },
+        ]);
+      }
+      if (generativeAiModel === generativeModel.GROQ) {
+        this.context.workspaceState.update("chatHistory", [
+          {
+            role: "user",
+            content: prompt,
+          },
+          {
+            role: "system",
+            content: response,
+          },
+        ]);
+      }
     }
+
     return response;
   }
 
