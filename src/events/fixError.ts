@@ -15,6 +15,7 @@ export class FixError extends EventGenerator {
         Offer alternative solutions or best practices, if applicable, to improve the code's efficiency, readability, or maintainability.
         Respond based on the programming language of the requested code. Unless stated otherwise
         Error Message: {errorMessage}
+        Once you detect the function where the error is coming from, your response should return only the function affected with your fix and afore mentioned actions
 `;
     return PROMPT.replace("{errorMessage}", this.error ?? "");
   }
