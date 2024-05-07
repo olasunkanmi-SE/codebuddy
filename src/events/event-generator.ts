@@ -22,10 +22,15 @@ export abstract class EventGenerator implements IEventGenerator {
   private readonly geminiModel: string;
   private readonly grokApiKey: string;
   private readonly grokModel: string;
-  constructor(private readonly action: string, _context: vscode.ExtensionContext, errorMessage?: string) {
+  constructor(
+    private readonly action: string,
+    _context: vscode.ExtensionContext,
+    errorMessage?: string
+  ) {
     this.context = _context;
     this.error = errorMessage;
-    const { generativeAi, geminiKey, geminiModel, groqKey, groqModel } = appConfig;
+    const { generativeAi, geminiKey, geminiModel, groqKey, groqModel } =
+      appConfig;
     this.generativeAi = getConfigValue(generativeAi);
     this.geminiApiKey = getConfigValue(geminiKey);
     this.geminiModel = getConfigValue(geminiModel);
@@ -37,7 +42,9 @@ export abstract class EventGenerator implements IEventGenerator {
     return getConfigValue(configKey);
   }
 
-  protected createModel(): { generativeAi: string; generativeAiModel: any; modelName: string } | undefined {
+  protected createModel():
+    | { generativeAi: string; generativeAiModel: any; modelName: string }
+    | undefined {
     try {
       let generativeAiModel;
       let modelName = "";
@@ -65,7 +72,9 @@ export abstract class EventGenerator implements IEventGenerator {
       return { generativeAi: this.generativeAi, generativeAiModel, modelName };
     } catch (error) {
       console.error("Error creating model:", error);
-      vscode.window.showErrorMessage("An error occurred while creating the model. Please try again.");
+      vscode.window.showErrorMessage(
+        "An error occurred while creating the model. Please try again."
+      );
     }
   }
 
@@ -100,7 +109,9 @@ export abstract class EventGenerator implements IEventGenerator {
     return new Groq({ apiKey });
   }
 
-  protected async generateModelResponse(text: string): Promise<string | Anthropic.Messages.Message | undefined> {
+  protected async generateModelResponse(
+    text: string
+  ): Promise<string | Anthropic.Messages.Message | undefined> {
     try {
       const activeModel = this.createModel();
       if (!activeModel) {
@@ -119,12 +130,20 @@ export abstract class EventGenerator implements IEventGenerator {
           break;
         case "Claude":
           if (modelName) {
-            response = await this.anthropicResponse(generativeAiModel, modelName, text);
+            response = await this.anthropicResponse(
+              generativeAiModel,
+              modelName,
+              text
+            );
           }
           break;
         case "Groq":
           if (modelName) {
-            response = await this.groqResponse(generativeAiModel, text, modelName);
+            response = await this.groqResponse(
+              generativeAiModel,
+              text,
+              modelName
+            );
           }
           break;
         default:
@@ -139,16 +158,25 @@ export abstract class EventGenerator implements IEventGenerator {
       return response;
     } catch (error) {
       console.error("Error generating response:", error);
-      vscode.window.showErrorMessage("An error occurred while generating the response. Please try again.");
+      vscode.window.showErrorMessage(
+        "An error occurred while generating the response. Please try again."
+      );
     }
   }
 
-  async generateGeminiResponse(model: any, text: string): Promise<string | undefined> {
+  async generateGeminiResponse(
+    model: any,
+    text: string
+  ): Promise<string | undefined> {
     const result = await model.generateContent(text);
     return result ? await result.response.text() : undefined;
   }
 
-  private async anthropicResponse(model: Anthropic, generativeAiModel: string, userPrompt: string) {
+  private async anthropicResponse(
+    model: Anthropic,
+    generativeAiModel: string,
+    userPrompt: string
+  ) {
     try {
       const response = await model.messages.create({
         model: generativeAiModel,
@@ -159,12 +187,18 @@ export abstract class EventGenerator implements IEventGenerator {
       return response;
     } catch (error) {
       console.error("Error generating response:", error);
-      vscode.window.showErrorMessage("An error occurred while generating the response. Please try again.");
+      vscode.window.showErrorMessage(
+        "An error occurred while generating the response. Please try again."
+      );
       return;
     }
   }
 
-  private async groqResponse(model: Groq, prompt: string, generativeAiModel: string): Promise<string | undefined> {
+  private async groqResponse(
+    model: Groq,
+    prompt: string,
+    generativeAiModel: string
+  ): Promise<string | undefined> {
     try {
       const params = {
         messages: [
@@ -176,11 +210,14 @@ export abstract class EventGenerator implements IEventGenerator {
         model: generativeAiModel,
       };
 
-      const completion: Groq.Chat.ChatCompletion = await model.chat.completions.create(params);
+      const completion: Groq.Chat.ChatCompletion =
+        await model.chat.completions.create(params);
       return completion.choices[0]?.message?.content ?? undefined;
     } catch (error) {
       console.error("Error generating response:", error);
-      vscode.window.showErrorMessage("An error occurred while generating the response. Please try again.");
+      vscode.window.showErrorMessage(
+        "An error occurred while generating the response. Please try again."
+      );
       return;
     }
   }
@@ -189,7 +226,9 @@ export abstract class EventGenerator implements IEventGenerator {
 
   abstract createPrompt(text?: string): string;
 
-  async generateResponse(errorMessage?: string): Promise<string | Anthropic.Messages.Message | undefined> {
+  async generateResponse(
+    errorMessage?: string
+  ): Promise<string | Anthropic.Messages.Message | undefined> {
     this.showInformationMessage();
     let prompt;
     const selectedCode = this.getSelectedWindowArea();
@@ -198,7 +237,9 @@ export abstract class EventGenerator implements IEventGenerator {
       return;
     }
 
-    errorMessage ? (prompt = this.createPrompt(errorMessage)) : (prompt = this.createPrompt(selectedCode));
+    errorMessage
+      ? (prompt = this.createPrompt(errorMessage))
+      : (prompt = this.createPrompt(selectedCode));
 
     if (!prompt) {
       vscode.window.showErrorMessage("model not reponding, try again later");
@@ -234,10 +275,7 @@ export abstract class EventGenerator implements IEventGenerator {
         return;
       }
     }
-    let formattedComment;
-    errorMessage
-      ? (formattedComment = this.formatResponse(errorMessage))
-      : (formattedComment = this.formatResponse(comment));
+    const formattedComment = this.formatResponse(comment);
     if (!formattedComment) {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
