@@ -43,10 +43,10 @@ CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding a
 - Presently supports Google Gemini and Groq generative AIs.
 
 ## Settings.json
-- 'google.gemini.apiKeys': Set your Google Generative AI API key to enable the AI functionality.
-- `'google.gemini.model': Specify the AI model for code assistance (default: "gemini-1.0-pro-latest").
-- "groq.llama3.apiKey": "your Groq API key",
-- "groq.model": "llama3-70b-8192",
+- "google.gemini.apiKeys": 'Your API Key'. Get Gemini APIKey https://aistudio.google.com/app/apikey
+- "google.gemini.model": Specify the AI model for code assistance (default: "gemini-1.0-pro-latest").
+- "groq.llama3.apiKey": "your Groq API key". Get Grok API Key https://console.groq.com/keys
+- "groq.model": "llama3-70b-8192"
 
 ## How to run locally
   - In package.json, hover on "vscode:prepublish", click on run script. This will create a build for the application
