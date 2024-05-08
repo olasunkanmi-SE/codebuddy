@@ -36,30 +36,23 @@ CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding a
 - [ ] Auto-completion of code aka code suggestions
 - [x] Support for various Generative AIs
 
-## Configuration
-
-CodeBuddy provides the following configuration options:
-
-- 'google.gemini.apiKey': Set your Google Generative AI API key to enable the AI functionality.
-- `'google.gemini.model': Specify the AI model to use for code assistance (default: "gemini-1.0-pro-latest").
-- "groq.apiKey": "Groq API key",
-  "groq.model": "llama3-70b-8192",
-
-To configure these options, go to the Visual Studio Code settings and search for "CodeBuddy".
-
 ## Requirements
 
 - A Gemini or Groq API key is required.
 - Latest version of Vscode
+- Presently supports Google Gemini and Groq generative AIs.
 
-## Extension Settings
+## Settings.json
+- 'google.gemini.apiKeys': Set your Google Generative AI API key to enable the AI functionality.
+- `'google.gemini.model': Specify the AI model for code assistance (default: "gemini-1.0-pro-latest").
+- "groq.llama3.apiKey": "your Groq API key",
+- "groq.model": "llama3-70b-8192",
 
-- Presently supports Google Gemini.
-- In vscode settings, search for Ola, and under extensions, click on 'Your coding buddy'. 
-- Enter your Google Gemini API key and Gemini Model
-- Or in the settings.json file, enter this   
-- `google.gemini.apiKey`: "Your API key",
-- `google.gemini.model`: "models/gemini model",
+## How to run locally
+  - In package.json, hover on "vscode:prepublish", click on run script. This will create a build for the application
+  - On the Vscode Menu, click on run -> start debugging. A new Vscode instance is opened
+  - In the new instance, type command shift p, search for Explorer: Focus on chat view. This opens up the chat terminal
+  - To ask for help on a piece of code, simply highlight the code and right-click. There are a variety of actions listed to soothe your need
 
 ## Release Notes
 
