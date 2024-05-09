@@ -15,14 +15,14 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     extensionUri: vscode.Uri,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
   public async sendResponse(
     response: string,
-    currentChat: string
+    currentChat: string,
   ): Promise<boolean | undefined> {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
     if (currentChat === "bot") {
@@ -51,7 +51,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       });
       const chatHistory = this._context.workspaceState.get<IHistory[]>(
         "chatHistory",
-        []
+        [],
       );
       const chatCompletion = groq.chat.completions.create({
         messages: [
@@ -83,7 +83,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     } catch (error) {
       console.error(error);
       vscode.window.showErrorMessage(
-        "An error occurred while generating the response. Please try again."
+        "An error occurred while generating the response. Please try again.",
       );
       return;
     }

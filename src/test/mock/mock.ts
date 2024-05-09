@@ -10,7 +10,10 @@ export class MockGoogleGenerativeAi {
           sendMessage: async (message: string) => {
             return {
               response: {
-                text: () => Promise.resolve("Here is how to write the K nearest neighbour function in typescript"),
+                text: () =>
+                  Promise.resolve(
+                    "Here is how to write the K nearest neighbour function in typescript",
+                  ),
               },
             };
           },

@@ -1,0 +1,25 @@
+name: CI for restaurant
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v2
+        with:
+          node-version: "21"
+      - name: ci for api
+        working-directory: ./src
+        run: |
+          npm i
+          npm i typescript
+          npm run compile
+          npm run format
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

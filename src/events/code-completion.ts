@@ -26,13 +26,22 @@ export class CustomCompletionProvider implements vscode.CompletionItemProvider {
 
   async provideCompletionItems(
     document: vscode.TextDocument,
-    position: vscode.Position
+    position: vscode.Position,
   ): Promise<vscode.CompletionItem[]> {
-    const file = ts.createSourceFile(document.fileName, document.getText(), ts.ScriptTarget.ES2020, true);
+    const file = ts.createSourceFile(
+      document.fileName,
+      document.getText(),
+      ts.ScriptTarget.ES2020,
+      true,
+    );
     const completions: vscode.CompletionItem[] = [];
 
     const offset = document.offsetAt(position);
-    const info = this.tsServer.getCompletionsAtPosition(file.fileName, offset, {});
+    const info = this.tsServer.getCompletionsAtPosition(
+      file.fileName,
+      offset,
+      {},
+    );
 
     if (info) {
       const symbols = info.entries;
@@ -72,12 +81,16 @@ export class CustomCompletionProvider implements vscode.CompletionItemProvider {
           undefined,
           undefined,
           undefined,
-          undefined
+          undefined,
         );
         if (details) {
           const documentation = ts.displayPartsToString(details.documentation);
-          const tags = details.tags ? details.tags.map((tag) => `@${tag.name} ${tag.text}`).join(` \n`) : "";
-          completionItem.documentation = new vscode.MarkdownString(`${documentation}\n\n${tags}`);
+          const tags = details.tags
+            ? details.tags.map((tag) => `@${tag.name} ${tag.text}`).join(` \n`)
+            : "";
+          completionItem.documentation = new vscode.MarkdownString(
+            `${documentation}\n\n${tags}`,
+          );
         }
         completionItem.sortText = symbol.sortText;
         completionItem.filterText = symbol.name;
