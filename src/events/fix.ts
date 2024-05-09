@@ -20,9 +20,13 @@ export async function fixCodeError(errorMessage: string) {
     .getConfiguration()
     .get<string>("google.gemini.model", "models/gemini-1.0-pro-latest");
 
-  const apiKey = vscode.workspace.getConfiguration().get<string>("google.gemini.apiKeys");
+  const apiKey = vscode.workspace
+    .getConfiguration()
+    .get<string>("google.gemini.apiKeys");
   if (!apiKey) {
-    vscode.window.showErrorMessage("API key not configured. Check your settings.");
+    vscode.window.showErrorMessage(
+      "API key not configured. Check your settings.",
+    );
     return;
   }
 
