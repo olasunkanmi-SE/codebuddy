@@ -1,6 +1,11 @@
 {
   "name": "codebuddy",
   "displayName": "Your personal codebuddy",
+  "author": {
+    "name": "Oyinlola Olasunkanmi Raymond",
+    "email": "oyinolasunkanmi@gmail.com",
+    "url": "https://fiatinnovations.com"
+  },
   "description": "",
   "version": "0.0.1",
   "engines": {
@@ -139,7 +144,8 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "format": "prettier --write \"**/*.ts\""
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
@@ -166,6 +172,7 @@
     "groq-sdk": "^0.3.2",
     "markdown-it": "^14.1.0",
     "node-fetch": "^3.3.2",
+    "prettier": "^3.2.5",
     "readable-stream": "^4.5.2",
     "sinon": "^17.0.1"
   }
