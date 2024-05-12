@@ -52,18 +52,22 @@ export abstract class BaseWebViewProvider {
     modelName: string,
     _view: vscode.WebviewView,
   ): void {
-    _view.webview.onDidReceiveMessage(async (message) => {
-      if (message.type === "user-input") {
-        const response = await this.generateResponse(
-          apiKey,
-          modelName,
-          formatText(message.message),
-        );
-        if (response) {
-          this.sendResponse(formatText(response), "bot");
+    try {
+      _view.webview.onDidReceiveMessage(async (message) => {
+        if (message.type === "user-input") {
+          const response = await this.generateResponse(
+            apiKey,
+            modelName,
+            formatText(message.message),
+          );
+          if (response) {
+            this.sendResponse(formatText(response), "bot");
+          }
         }
-      }
-    });
+      });
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   abstract generateResponse(
