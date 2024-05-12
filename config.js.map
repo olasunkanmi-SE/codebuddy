@@ -1,1 +1,0 @@
-{"version":3,"file":"config.js","sourceRoot":"/","sources":["../config.ts"],"names":[],"mappings":";;;AAAa,QAAA,UAAU,GACrB,iGAAiG,CAAC","sourcesContent":["export const SENTRY_DSN =\n  \"https://c8450acfa522f8cd510bfdbb9085e4c3@o4507242450386944.ingest.us.sentry.io/4507242627661824\";\n"]}
