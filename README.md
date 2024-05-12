@@ -51,7 +51,7 @@ CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding a
 ## How to run locally
   - In package.json, hover on "vscode:prepublish", click on run script. This will create a build for the application
   - On the Vscode Menu, click on run -> start debugging. A new Vscode instance is opened
-  - In the new instance, type command shift p, search for Explorer: Focus on chat view. This opens up the chat terminal
+  - In the new instance, press command/ctrl + shift + p, search for Explorer: Focus on chat view. This opens up the chat terminal
   - To ask for help on a piece of code, simply highlight the code and right-click. There are a variety of actions listed to soothe your need
 
 ## Release Notes
