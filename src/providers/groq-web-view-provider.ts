@@ -11,36 +11,32 @@ export interface IHistory {
 
 export class GroqWebViewProvider extends BaseWebViewProvider {
   chatHistory: IHistory[] = [];
-  constructor(
-    extensionUri: vscode.Uri,
-    apiKey: string,
-    generativeAiModel: string,
-    context: vscode.ExtensionContext,
-  ) {
+  constructor(extensionUri: vscode.Uri, apiKey: string, generativeAiModel: string, context: vscode.ExtensionContext) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
-  public async sendResponse(
-    response: string,
-    currentChat: string,
-  ): Promise<boolean | undefined> {
-    const type = currentChat === "bot" ? "bot-response" : "user-input";
-    if (currentChat === "bot") {
-      this.chatHistory.push({
-        role: "system",
-        content: response,
+  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+    try {
+      const type = currentChat === "bot" ? "bot-response" : "user-input";
+      if (currentChat === "bot") {
+        this.chatHistory.push({
+          role: "system",
+          content: response,
+        });
+      } else {
+        this.chatHistory.push({
+          role: "user",
+          content: response,
+        });
+      }
+      this._context.workspaceState.update("chatHistory", [...this.chatHistory]);
+      return await this.currentWebView?.webview.postMessage({
+        type,
+        message: response,
       });
-    } else {
-      this.chatHistory.push({
-        role: "user",
-        content: response,
-      });
+    } catch (error) {
+      console.error(error);
     }
-    this._context.workspaceState.update("chatHistory", [...this.chatHistory]);
-    return await this.currentWebView?.webview.postMessage({
-      type,
-      message: response,
-    });
   }
 
   async generateResponse(message: string): Promise<string | undefined> {
@@ -49,10 +45,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       const groq = new Groq({
         apiKey: this.apiKey,
       });
-      const chatHistory = this._context.workspaceState.get<IHistory[]>(
-        "chatHistory",
-        [],
-      );
+      const chatHistory = this._context.workspaceState.get<IHistory[]>("chatHistory", []);
       const chatCompletion = groq.chat.completions.create({
         messages: [
           {
@@ -82,9 +75,8 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       return response;
     } catch (error) {
       console.error(error);
-      vscode.window.showErrorMessage(
-        "An error occurred while generating the response. Please try again.",
-      );
+      this._context.workspaceState.update("chatHistory", []);
+      vscode.window.showErrorMessage("Model not responding, please resend your question");
       return;
     }
   }

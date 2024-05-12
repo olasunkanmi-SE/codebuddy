@@ -2,3 +2,7 @@ out
 node_modules
 .vscode-test/
 *.vsix
+
+# Sentry Config File
+.sentryclirc
+config.ts

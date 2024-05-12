@@ -1,7 +1,7 @@
-import { chatCss } from "./chat_css"
-import { chatJs } from "./chat_js"
+import { chatCss } from "./chat_css";
+import { chatJs } from "./chat_js";
 
-export const chartComponent :string = `
+export const chartComponent: string = `
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -34,4 +34,4 @@ ${chatCss}
 </body>
 
 </html>
-`
+`;
