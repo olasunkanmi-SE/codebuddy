@@ -12,6 +12,13 @@
   "engines": {
     "vscode": "^1.78.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/olasunkanmi-SE/codebuddy"
+  },
+  "gallery": {
+    "icon": "codebuddy.png"
+  },
   "categories": [
     "Other"
   ],
