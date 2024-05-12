@@ -139,13 +139,14 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run compile && npm run sentry:sourcemaps",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "vscode-test",
-    "format": "prettier --write \"**/*.ts\""
+    "format": "prettier --write \"**/*.ts\"",
+    "sentry:sourcemaps": "sentry-cli sourcemaps inject --org regov-technologies --project node ./out && sentry-cli sourcemaps upload --org regov-technologies --project node ./out"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
@@ -167,6 +168,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.6",
     "@google/generative-ai": "^0.3.0",
+    "@sentry/cli": "^2.31.2",
     "@types/node-fetch": "^2.6.11",
     "dotenv": "^16.1.4",
     "groq-sdk": "^0.3.2",
