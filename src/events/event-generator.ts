@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import * as Sentry from "@sentry/node";
 import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
@@ -69,7 +68,6 @@ export abstract class EventGenerator implements IEventGenerator {
       }
       return { generativeAi: this.generativeAi, generativeAiModel, modelName };
     } catch (error) {
-      Sentry;
       console.error("Error creating model:", error);
       vscode.window.showErrorMessage("An error occurred while creating the model. Please try again.");
     }

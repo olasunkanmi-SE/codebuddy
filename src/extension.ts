@@ -1,5 +1,3 @@
-import * as Sentry from "@sentry/node";
-import { RewriteFrames } from "@sentry/integrations";
 import * as vscode from "vscode";
 import { appConfig, generativeModel, OLA_ACTIONS, USER_MESSAGE } from "./constant";
 import { Comments } from "./events/comment";
@@ -18,16 +16,6 @@ const { generativeAi, geminiKey, geminiModel, groqKey, groqModel } = appConfig;
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    Sentry.init({
-      dsn: SENTRY_DSN,
-      tracesSampleRate: 1.0,
-      profilesSampleRate: 1.0,
-      integrations: [
-        new RewriteFrames({
-          root: global.__dirname,
-        }),
-      ],
-    });
     const { comment, review, refactor, optimize, fix, explain } = OLA_ACTIONS;
     const getComment = new Comments(`${USER_MESSAGE} generates the code comments...`, context);
     const generateOptimizeCode = new OptimizeCode(`${USER_MESSAGE} optimizes the code...`, context);
