@@ -13,7 +13,6 @@ import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { ChatManager } from "./services/chat-manager";
 import { getConfigValue } from "./utils";
-import { SENTRY_DSN } from "../config";
 
 const { generativeAi, geminiKey, geminiModel, groqKey, groqModel } = appConfig;
 
