@@ -1,11 +1,12 @@
 {
-  "name": "codebuddy",
-  "displayName": "Your personal codebuddy",
+  "name": "ola-code-buddy",
+  "displayName": "CodeBuddy: Your AI Coding Assistant",
   "author": {
     "name": "Oyinlola Olasunkanmi Raymond",
     "email": "oyinolasunkanmi@gmail.com",
     "url": "https://fiatinnovations.com"
   },
+  "publisher": "fiatinnovations",
   "description": "",
   "version": "0.0.1",
   "engines": {
