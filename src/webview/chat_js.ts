@@ -4,6 +4,8 @@ const chatMessages = document.getElementById("chat-messages");
 const chatInput = document.getElementById("chat-input");
 const chatSendButton = document.getElementById("chat-send");
 
+chatSendButton.disabled = true;
+
 let chatVisible = false;
 
 chatInput.addEventListener("keydown", (event) => {

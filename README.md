@@ -12,7 +12,7 @@ CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding a
 - Code search: The assistant can search for code snippets and functions within your codebase, allowing you to quickly find and reuse existing code.
 
 
-## How to use
+## For local development purposes
 - Clone this repository
 - Open this in VSCode.
 - Click on run -> start debugging
@@ -22,6 +22,12 @@ CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding a
 - Highlight any code, right-click. You should see lists of options like refactoring, optimize code, etc.
 - Also you can simply type an instruction, in conjunction with some highlighted code if you will, right-click and click on send to Ola
 - you can have a chat-like conversation and it does remember your previous questions because there is support for chat history
+
+## How to use
+- Once installed, press command/ctrl + shift + p, search for Explorer: Focus on chat view, this opens up a chat webview
+- Highlight your code, right click, and click any of the desired assistant options
+- If you have a none coding questions, you can type it in your vscode editor and send to Ola.
+- The chat button is disabled for now. Help is needed in fixing here https://github.com/olasunkanmi-SE/codebuddy/issues/37
 
 
 ## Roadmap
@@ -51,7 +57,7 @@ CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding a
 ## How to run locally
   - In package.json, hover on "vscode:prepublish", click on run script. This will create a build for the application
   - On the Vscode Menu, click on run -> start debugging. A new Vscode instance is opened
-  - In the new instance, press command/ctrl + shift + p, search for Explorer: Focus on chat view. This opens up the chat terminal
+  - In the new instance, press command/ctrl + shift + p, search for Explorer: Focus on chat view. This opens up a chat webview
   - To ask for help on a piece of code, simply highlight the code and right-click. There are a variety of actions listed to soothe your need
 
 ## Release Notes
