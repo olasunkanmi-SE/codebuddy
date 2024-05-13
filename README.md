@@ -44,6 +44,7 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - [ ] Upload documents and retrieve knowledge from it
 - [ ] Auto-completion of code aka code suggestions
 - [x] Support for various Generative AIs
+- [ ] Pefform folder specific tasks like. Summarize, create and update
 
 ## Requirements
 
