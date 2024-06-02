@@ -1,3 +1,5 @@
+import { codeHighlightCss } from "./code-highlight_atom-one-dark-reasonable";
+
 export const chatCss: string = `
 #chat-container {
     width: 100%;
@@ -94,7 +96,7 @@ body {
     height: 100vh;
     margin: 0;
     padding: 0;
-    font-family: SF Mono;
+    font-family: 'Montserrat', sans-serif;
 }
 
 
@@ -124,7 +126,9 @@ overflow-x: auto;
 background-color: #000;
 }
 
-code {
-color: rgb(97, 175, 239);
-font-size: 14px;
-}`;
+div.code {
+white-space: pre;
+}
+
+${codeHighlightCss}
+`;

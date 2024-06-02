@@ -56,5 +56,8 @@ window.addEventListener('message', (event) => {
     }else if (message.type === 'user-input'){
         addChatMessage("You", message.message)
     }
+    
+    //call code higlighter function here
+    hljs.highlightAll();
 })
 `;
