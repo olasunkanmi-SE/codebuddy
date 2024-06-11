@@ -187,7 +187,7 @@
     "lint": "eslint src --ext ts",
     "test": "vscode-test",
     "format": "prettier --write \"**/*.ts\"",
-    "deploy": "vsce publish --npm"
+    "deploy": "vsce publish"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
