@@ -47,7 +47,8 @@ switch (theme) {
     break;
 }
 
-const selectedFontFamily = fontFamily === "SF Mono" ? "SF Mono" : `'Montserrat', sans-serif`;
+const selectedFontFamily =
+  fontFamily === "SF Mono" ? "SF Mono" : `'Montserrat', sans-serif`;
 
 console.log(`${fontSize}px`);
 
