@@ -1,10 +1,60 @@
-import { codeHighlightCss } from "./code-highlight_atom-one-dark-reasonable";
+import { getConfigValue } from "../utils";
+import { oneDarkCss } from "./themes/atom-one-dark";
+import { oneDarkReasonableCss } from "./themes/code-highlight_atom-one-dark-reasonable";
+import { codePenCss } from "./themes/code-pen";
+import { felipecCss } from "./themes/felipec";
+import { githubDarkDimmed } from "./themes/gitbub-dark";
+import { irBlack } from "./themes/ir-black";
+import { nightOwlCss } from "./themes/night-owl";
+import { stackOverFlowCss } from "./themes/stackoverflow";
+import { tokyoNightCss } from "./themes/tokyo-night";
+
+const fontFamily = getConfigValue("font.family");
+const theme = getConfigValue("chatview.theme");
+const fontSize = getConfigValue("chatview.font.size");
+
+let selectedTheme = "";
+
+switch (theme) {
+  case "Atom One Dark":
+    selectedTheme = oneDarkCss;
+    break;
+  case "Atom One Dark Reasonable":
+    selectedTheme = oneDarkReasonableCss;
+    break;
+  case "Code Pen":
+    selectedTheme = codePenCss;
+    break;
+  case "felipec":
+    selectedTheme = felipecCss;
+    break;
+  case "github dark":
+    selectedTheme = githubDarkDimmed;
+    break;
+  case "ir black":
+    selectedTheme = irBlack;
+    break;
+  case "night owl":
+    selectedTheme = nightOwlCss;
+    break;
+  case "stackoverflow":
+    selectedTheme = stackOverFlowCss;
+    break;
+  case "tokyo night":
+    selectedTheme = tokyoNightCss;
+    break;
+  default:
+    break;
+}
+
+const selectedFontFamily = fontFamily === "SF Mono" ? "SF Mono" : `'Montserrat', sans-serif`;
+
+console.log(`${fontSize}px`);
 
 export const chatCss: string = `
 #chat-container {
     width: 100%;
     max-width: 600px;
-
     display: flex;
     flex-direction: column;
     border-radius: 10px;
@@ -25,6 +75,7 @@ export const chatCss: string = `
     overflow-y: scroll;
     padding: 10px;
     max-width: 100%;
+    font-size: ${fontSize}px;
 }
 
 .chat-message-container {
@@ -96,39 +147,38 @@ body {
     height: 100vh;
     margin: 0;
     padding: 0;
-    font-family: 'Montserrat', sans-serif;
+    font-family: ${selectedFontFamily};
 }
 
 
 h1 {
-color: #569cd6;
-font-size: 24px;
-margin-bottom: 20px;
+    color: #569cd6;
+    font-size: 24px;
+    margin-bottom: 20px;
 }
 
 p {
-margin-bottom: 15px;
+    margin-bottom: 15px;
 }
 
 ol {
-margin-left: 20px;
-margin-bottom: 20px;
+    margin-left: 20px;
+    margin-bottom: 20px;
 }
 
 li {
-margin-bottom: 10px;
+    margin-bottom: 10px;
 }
 
 pre {
-border-radius: 4px;
-padding: 10px;
-overflow-x: auto;
-background-color: #000;
+    border-radius: 4px;
+    padding: 10px;
+    overflow-x: auto;
+    background-color: #000;
 }
 
 div.code {
-white-space: pre;
+    white-space: pre;
 }
-
-${codeHighlightCss}
+${selectedTheme}
 `;
