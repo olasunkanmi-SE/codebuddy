@@ -48,20 +48,6 @@ export class Comments extends EventGenerator {
          */
         </code>
         </pre>
-
-        ${CODE_LABEL}
-        helloWorld(): string {
-          return "Hello World"
-        }
-        ${COMMENT_LABEL}
-        <pre>
-        <code class="language-javascript">
-        /**
-         * Returns a string that has value "Hello World"
-         * @returns string
-        */
-       </code>
-       </pre>
 `;
     return PROMPT;
   }

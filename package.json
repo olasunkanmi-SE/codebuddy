@@ -141,6 +141,39 @@
             ],
             "default": null,
             "markdownDescription": "Provide the name of the Groq model you want to use. Choose from the ..."
+          },
+          "font.family": {
+            "type": "string",
+            "enum": [
+              "Montserrat",
+              "SF Mono"
+            ],
+            "default": "SF Mono",
+            "description": "Select preffered font family"
+          },
+          "chatview.theme": {
+            "type": "string",
+            "enum": [
+              "Atom One Dark",
+              "Atom One Dark Reasonable",
+              "Code Pen",
+              "felipec",
+              "github dark",
+              "ir black",
+              "night owl",
+              "stackoverflow",
+              "tokyo night"
+            ],
+            "default": "Atom One Dark",
+            "description": "Select preffered chat view theme"
+          },
+          "chatview.font.size": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "default": 16,
+            "description": "Enter your preferred font size (default is 16)"
           }
         }
       }
