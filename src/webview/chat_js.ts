@@ -4,6 +4,9 @@ const chatMessages = document.getElementById("chat-messages");
 const chatInput = document.getElementById("chat-input");
 const chatSendButton = document.getElementById("chat-send");
 
+const textArea = document.getElementById("chat-input-container");
+testArea.setAttribute('disabled', 'true')
+
 chatSendButton.disabled = true;
 
 let chatVisible = false;
