@@ -31,7 +31,7 @@ ${chatCss}
     <div id="chat-title">ChatBuddy (Ola)</div>
     <div id="chat-messages"></div>
     <div id="chat-input-container">
-        <input id="chat-input" type="text" placeholder="Ask me to explain, debug, or optimize your code" />
+        <input id="chat-input" type="text" placeholder="The text area is diabled for now, type in your vscode window" />
     </div>
     <button id="chat-send">Send</button>
     <div id="loading">
