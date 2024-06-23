@@ -146,7 +146,15 @@
             "type": "string",
             "enum": [
               "Montserrat",
-              "SF Mono"
+              "SF Mono",
+              "Space Mono",
+              "Fira Code",
+              "Source Code Pro",
+              "JetBrains Mono",
+              "Roboto Mono",
+              "Ubuntu Mono",
+              "IBM Plex Mono",
+              "Inconsolata"
             ],
             "default": "SF Mono",
             "description": "Select preffered font family"
