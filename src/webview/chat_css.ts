@@ -47,8 +47,43 @@ switch (theme) {
     break;
 }
 
-const selectedFontFamily =
-  fontFamily === "SF Mono" ? "SF Mono" : `'Montserrat', sans-serif`;
+let selectedFontFamily = "";
+
+switch (fontFamily) {
+  case "SF Mono":
+    selectedFontFamily = '"SF Mono"';
+    break;
+  case "Montserrat":
+    selectedFontFamily = `'Montserrat', sans-serif`;
+    break;
+  case "Space Mono":
+    selectedFontFamily = "Space Mono";
+    break;
+  case "Fira Code":
+    selectedFontFamily = "Fira Code";
+    break;
+  case "Source Code Pro":
+    selectedFontFamily = "Source Code Pro";
+    break;
+  case "JetBrains Mono":
+    selectedFontFamily = "JetBrains Mono";
+    break;
+  case "Roboto Mono":
+    selectedFontFamily = "Roboto Mono";
+    break;
+  case "Ubuntu Mono":
+    selectedFontFamily = "Ubuntu Mono";
+    break;
+  case "IBM Plex Mono":
+    selectedFontFamily = "IBM Plex Mono";
+    break;
+  case "Inconsolata":
+    selectedFontFamily = "Inconsolata";
+    break;
+
+  default:
+    break;
+}
 
 console.log(`${fontSize}px`);
 
