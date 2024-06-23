@@ -5,7 +5,7 @@ const chatInput = document.getElementById("chat-input");
 const chatSendButton = document.getElementById("chat-send");
 
 const textArea = document.getElementById("chat-input-container");
-testArea.setAttribute('disabled', 'true')
+textArea.setAttribute('disabled', 'true')
 
 chatSendButton.disabled = true;
 
