@@ -33,12 +33,6 @@ ${chatCss}
     <div id="chat-input-container">
         <input id="chat-input" type="text" placeholder="The text area is diabled for now, type in your vscode window" />
     </div>
-    <button id="chat-send">Send</button>
-    <div id="loading">
-    <div class="loader"></div>
-    <div class="loader"></div>
-</div>
-</div>
 <script>
     ${chatJs}
 </script>
