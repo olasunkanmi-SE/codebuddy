@@ -1,23 +1,104 @@
-export const chatCss: string = `
-    body {
-        margin: 0;
-        padding: 0;
-        font-family: 'Open Sans', sans-serif;
-        background-color: #333;
-        color: #eee;
-        height: 100%;
-    }
+import { getConfigValue } from "../utils";
+import { oneDarkCss } from "./themes/atom-one-dark";
+import { oneDarkReasonableCss } from "./themes/code-highlight_atom-one-dark-reasonable";
+import { codePenCss } from "./themes/code-pen";
+import { felipecCss } from "./themes/felipec";
+import { githubDarkDimmed } from "./themes/gitbub-dark";
+import { irBlack } from "./themes/ir-black";
+import { nightOwlCss } from "./themes/night-owl";
+import { stackOverFlowCss } from "./themes/stackoverflow";
+import { tokyoNightCss } from "./themes/tokyo-night";
 
-    .chat-container {
-        height: 100vh;
-        max-width: 600px;
-        margin: 0 auto;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        display: flex;
-        flex-direction: column;
-    }
+const fontFamily = getConfigValue("font.family");
+const theme = getConfigValue("chatview.theme");
+const fontSize = getConfigValue("chatview.font.size");
+
+let selectedTheme = "";
+
+switch (theme) {
+  case "Atom One Dark":
+    selectedTheme = oneDarkCss;
+    break;
+  case "Atom One Dark Reasonable":
+    selectedTheme = oneDarkReasonableCss;
+    break;
+  case "Code Pen":
+    selectedTheme = codePenCss;
+    break;
+  case "felipec":
+    selectedTheme = felipecCss;
+    break;
+  case "github dark":
+    selectedTheme = githubDarkDimmed;
+    break;
+  case "ir black":
+    selectedTheme = irBlack;
+    break;
+  case "night owl":
+    selectedTheme = nightOwlCss;
+    break;
+  case "stackoverflow":
+    selectedTheme = stackOverFlowCss;
+    break;
+  case "tokyo night":
+    selectedTheme = tokyoNightCss;
+    break;
+  default:
+    break;
+}
+
+let selectedFontFamily = "";
+
+switch (fontFamily) {
+  case "SF Mono":
+    selectedFontFamily = '"SF Mono"';
+    break;
+  case "Montserrat":
+    selectedFontFamily = `'Montserrat', sans-serif`;
+    break;
+  case "Space Mono":
+    selectedFontFamily = "Space Mono";
+    break;
+  case "Fira Code":
+    selectedFontFamily = "Fira Code";
+    break;
+  case "Source Code Pro":
+    selectedFontFamily = "Source Code Pro";
+    break;
+  case "JetBrains Mono":
+    selectedFontFamily = "JetBrains Mono";
+    break;
+  case "Roboto Mono":
+    selectedFontFamily = "Roboto Mono";
+    break;
+  case "Ubuntu Mono":
+    selectedFontFamily = "Ubuntu Mono";
+    break;
+  case "IBM Plex Mono":
+    selectedFontFamily = "IBM Plex Mono";
+    break;
+  case "Inconsolata":
+    selectedFontFamily = "Inconsolata";
+    break;
+
+  default:
+    break;
+}
+
+console.log(`${fontSize}px`);
+
+export const chatCss: string = `
+#chat-container {
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    border-radius: 10px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
 
     .chat-header {
         background-color: #444;
@@ -27,13 +108,13 @@ export const chatCss: string = `
         text-align: center;
     }
 
-    .chat-messages {
-        flex: 1;
-        overflow-y: auto;
-        padding: 10px;
-        background-color: #222;
-        position: relative;
-    }
+#chat-messages {
+    height:700px;
+    overflow-y: scroll;
+    padding: 10px;
+    max-width: 100%;
+    font-size: ${fontSize}px;
+}
 
     .chat-message {
         margin-bottom: 20px;
@@ -124,15 +205,15 @@ export const chatCss: string = `
         color: #eee;
     }
 
-    .chat-send {
-        background-color: #636363;
-        color: #fff;
-        border: none;
-        border-radius: 5px;
-        padding: 10px 20px;
-        cursor: pointer;
-        font-size: 14px;
-    }
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    font-family: ${selectedFontFamily};
+}
 
    .scroll-button {
         position: absolute;
@@ -157,7 +238,34 @@ export const chatCss: string = `
         padding: 13px;
     }
 
-    .chat-container:hover .scroll-button {
-        display: flex;
-    }
+h1 {
+    color: #569cd6;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+p {
+    margin-bottom: 15px;
+}
+
+ol {
+    margin-left: 20px;
+    margin-bottom: 20px;
+}
+
+li {
+    margin-bottom: 10px;
+}
+
+pre {
+    border-radius: 4px;
+    padding: 10px;
+    overflow-x: auto;
+    background-color: #000;
+}
+
+div.code {
+    white-space: pre;
+}
+${selectedTheme}
 `;

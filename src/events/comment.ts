@@ -15,7 +15,8 @@ export class Comments extends EventGenerator {
         repeating information that's obvious from the code itself. Good comments
         describe "why", explain any "magic" values and non-obvious behaviour.
         Below are some examples of good code comments.
-        Respond based on the programming language of the requested code. Unless stated otherwise
+        Respond based on the programming language of the requested code. Unless stated otherwise.
+
         ${CODE_LABEL}
         async getRestaurantById(id: Types.ObjectId): Promise<Result<IRestaurantResponseDTO>> {
             await this.singleclientService.validateContext();
@@ -35,6 +36,8 @@ export class Comments extends EventGenerator {
             );
         }
         ${COMMENT_LABEL}
+        <pre>
+        <code>
         /**
          * Retrieves restaurant information by its ID asynchronously.
          * This function validates the user's context, by checking the user privileges 
@@ -43,6 +46,8 @@ export class Comments extends EventGenerator {
          * @returns A Promise that resolves to a Result object containing an IRestaurantResponseDTO object
          * @throws {ApplicationError} If the user does not have sufficient privileges
          */
+        </code>
+        </pre>
 `;
     return PROMPT;
   }

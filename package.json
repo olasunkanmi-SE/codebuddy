@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "",
-  "version": "0.0.1",
+  "version": "1.1.2",
   "engines": {
     "vscode": "^1.78.0"
   },
@@ -141,6 +141,47 @@
             ],
             "default": null,
             "markdownDescription": "Provide the name of the Groq model you want to use. Choose from the ..."
+          },
+          "font.family": {
+            "type": "string",
+            "enum": [
+              "Montserrat",
+              "SF Mono",
+              "Space Mono",
+              "Fira Code",
+              "Source Code Pro",
+              "JetBrains Mono",
+              "Roboto Mono",
+              "Ubuntu Mono",
+              "IBM Plex Mono",
+              "Inconsolata"
+            ],
+            "default": "SF Mono",
+            "description": "Select preffered font family"
+          },
+          "chatview.theme": {
+            "type": "string",
+            "enum": [
+              "Atom One Dark",
+              "Atom One Dark Reasonable",
+              "Code Pen",
+              "felipec",
+              "github dark",
+              "ir black",
+              "night owl",
+              "stackoverflow",
+              "tokyo night"
+            ],
+            "default": "Atom One Dark",
+            "description": "Select preffered chat view theme"
+          },
+          "chatview.font.size": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "default": 16,
+            "description": "Enter your preferred font size (default is 16)"
           }
         }
       }

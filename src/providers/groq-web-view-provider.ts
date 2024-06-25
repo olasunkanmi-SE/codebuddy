@@ -11,11 +11,19 @@ export interface IHistory {
 
 export class GroqWebViewProvider extends BaseWebViewProvider {
   chatHistory: IHistory[] = [];
-  constructor(extensionUri: vscode.Uri, apiKey: string, generativeAiModel: string, context: vscode.ExtensionContext) {
+  constructor(
+    extensionUri: vscode.Uri,
+    apiKey: string,
+    generativeAiModel: string,
+    context: vscode.ExtensionContext,
+  ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
-  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  public async sendResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -45,7 +53,10 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       const groq = new Groq({
         apiKey: this.apiKey,
       });
-      const chatHistory = this._context.workspaceState.get<IHistory[]>("chatHistory", []);
+      const chatHistory = this._context.workspaceState.get<IHistory[]>(
+        "chatHistory",
+        [],
+      );
       const chatCompletion = groq.chat.completions.create({
         messages: [
           {
@@ -76,7 +87,9 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     } catch (error) {
       console.error(error);
       this._context.workspaceState.update("chatHistory", []);
-      vscode.window.showErrorMessage("Model not responding, please resend your question");
+      vscode.window.showErrorMessage(
+        "Model not responding, please resend your question",
+      );
       return;
     }
   }

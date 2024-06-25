@@ -2,7 +2,13 @@ export const chatJs = `
 const chatMessages = document.getElementById("chat-messages");
 const chatInput = document.getElementById("chat-input");
 const chatSendButton = document.getElementById("chat-send");
-const scrollButton = document.getElementById("scroll-button");
+
+const textArea = document.getElementById("chat-input-container");
+textArea.setAttribute('disabled', 'true')
+
+chatSendButton.disabled = true;
+
+let chatVisible = false;
 
 chatInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
@@ -99,17 +105,15 @@ function sendChatMessage(message) {
   vscode.postMessage({ type: "user-input", message: message });
 }
 
-function detectLanguage(code) {
-  const result = hljs.highlightAuto(code);
-  return result.language || "plaintext";
-}
-
-window.addEventListener("message", (event) => {
-  const message = event.data;
-  if (message.type === "bot-response") {
-    addChatMessage("bot", message.message, true);
-  } else if (message.type === "user-input") {
-    addChatMessage("You", message.message, false);
-  }
-});
+window.addEventListener('message', (event) => {
+    const message = event.data;
+    if (message.type === 'bot-response') {
+        addChatMessage("bot", message.message)
+    }else if (message.type === 'user-input'){
+        addChatMessage("You", message.message)
+    }
+    
+    //call code higlighter function here
+    hljs.highlightAll();
+})
 `;
