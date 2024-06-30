@@ -13,7 +13,7 @@ export class CodePattern implements ICodePattern {
   private patternDir: string;
   constructor(
     private readonly action: string,
-    private readonly context: vscode.ExtensionContext
+    private readonly context: vscode.ExtensionContext,
   ) {
     this.showInformationMessage(this.action);
     this.patternDir = path.join(this.context.extensionPath, "patterns");
@@ -27,7 +27,9 @@ export class CodePattern implements ICodePattern {
     const patternName = path.basename(file.fsPath);
     const patternPath = path.join(this.patternDir, patternName);
     await fs.promises.writeFile(patternPath, content);
-    vscode.window.showInformationMessage(`Pattern ${patternName} Upload successful`);
+    vscode.window.showInformationMessage(
+      `Pattern ${patternName} Upload successful`,
+    );
   }
 
   async getPatterns(): Promise<string[]> {
@@ -50,7 +52,9 @@ export class CodePattern implements ICodePattern {
         await this.uploadPattern(file[0]);
         this.getPatterns();
       } catch (error: any) {
-        vscode.window.showErrorMessage(`Failed to upload pattern: ${error.message}`);
+        vscode.window.showErrorMessage(
+          `Failed to upload pattern: ${error.message}`,
+        );
       }
     }
   }
