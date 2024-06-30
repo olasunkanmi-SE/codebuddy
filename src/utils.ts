@@ -11,9 +11,7 @@ export const formatText = (text?: string): string => {
   return "";
 };
 
-export const getConfigValue: GetConfigValueType<any> = <T>(
-  key: string,
-): T | undefined => {
+export const getConfigValue: GetConfigValueType<any> = <T>(key: string): T | undefined => {
   return vscode.workspace.getConfiguration().get<T>(key);
 };
 

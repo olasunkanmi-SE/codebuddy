@@ -6,6 +6,7 @@ export enum OLA_ACTIONS {
   optimize = "ola.codeOptimize",
   fix = "ola.codeFix",
   explain = "ola.explain",
+  pattern = "ola.savePattern",
 }
 
 export const GROQ_CONFIG = {
