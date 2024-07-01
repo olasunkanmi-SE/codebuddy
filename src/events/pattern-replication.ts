@@ -13,7 +13,7 @@ export class CodePattern implements ICodePattern {
   private patternDir: string;
   constructor(
     private readonly action: string,
-    private readonly context: vscode.ExtensionContext,
+    private readonly context: vscode.ExtensionContext
   ) {
     this.showInformationMessage(this.action);
     this.patternDir = path.join(this.context.extensionPath, "patterns");
@@ -22,13 +22,14 @@ export class CodePattern implements ICodePattern {
     }
   }
 
+  //TODO check if the filename already exists?
   async uploadPattern(file: vscode.Uri): Promise<void> {
     const content = await fs.promises.readFile(file.fsPath, "utf8");
     const patternName = path.basename(file.fsPath);
     const patternPath = path.join(this.patternDir, patternName);
     await fs.promises.writeFile(patternPath, content);
     vscode.window.showInformationMessage(
-      `Pattern ${patternName} Upload successful`,
+      `Pattern ${patternName} Upload successful`
     );
   }
 
@@ -47,13 +48,13 @@ export class CodePattern implements ICodePattern {
       },
     });
 
-    if (file && file[0]) {
+    if (file?.[0]) {
       try {
         await this.uploadPattern(file[0]);
         this.getPatterns();
       } catch (error: any) {
         vscode.window.showErrorMessage(
-          `Failed to upload pattern: ${error.message}`,
+          `Failed to upload pattern: ${error.message}`
         );
       }
     }

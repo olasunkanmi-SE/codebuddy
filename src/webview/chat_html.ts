@@ -1,7 +1,8 @@
 import { chatCss } from "./chat_css";
 import { chatJs } from "./chat_js";
+import * as path from "path";
 
-export const chartComponent: string = `
+export const chartComponent = (docs: string[]) => `
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -30,6 +31,12 @@ ${chatCss}
 <div id="chat-container">
     <div id="chat-title">ChatBuddy (Ola)</div>
     <div id="chat-messages"></div>
+    <div id="knowledge-base">
+         <select id="chat-options">
+            <option value="">Select Doc</option>
+           ${docs.map((doc) => `<option value="${doc}">${path.basename(doc)}</option>`)}
+        </select>
+    </div>
     <div id="chat-input-container">
         <input id="chat-input" type="text" placeholder="The text area is diabled for now, type in your vscode window" />
     </div>

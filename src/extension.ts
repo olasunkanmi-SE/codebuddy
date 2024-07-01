@@ -45,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext) {
       context,
     );
     const codePattern = new CodePattern(
-      `${USER_MESSAGE} saves this code pattern...`,
+      `${USER_MESSAGE} fetches knowledgeBase documents...`,
       context,
     );
 

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { getWebviewContent } from "../webview/chat";
 import { formatText } from "../utils";
+import { CodePattern } from "../events/pattern-replication";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider {
@@ -43,8 +44,10 @@ export abstract class BaseWebViewProvider {
     );
   }
 
-  private setWebviewHtml(view: vscode.WebviewView): void {
-    view.webview.html = getWebviewContent();
+  private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
+    const codepatterns: CodePattern = new CodePattern("", this._context);
+    const knowledgeBaseDocs: string[] = await codepatterns.getPatterns();
+    view.webview.html = getWebviewContent(knowledgeBaseDocs);
   }
 
   private setupMessageHandler(
