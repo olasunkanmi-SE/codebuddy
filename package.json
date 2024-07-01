@@ -68,6 +68,10 @@
           "when": "editorHasSelection",
           "command": "ola.sendChatMessage",
           "group": "CodeBuddy"
+        },
+        {
+          "command": "ola.savePattern",
+          "group": "CodeBuddy"
         }
       ]
     },
@@ -95,6 +99,10 @@
       {
         "command": "ola.explain",
         "title": "Ola. Explain this code"
+      },
+      {
+        "command": "ola.savePattern",
+        "title": "Ola. Save this code pattern"
       }
     ],
     "configuration": [

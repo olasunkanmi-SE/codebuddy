@@ -3,6 +3,7 @@ import { formatText } from "../utils";
 import { getWebviewContent } from "../webview/chat";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
+import { CodePattern } from "../events/pattern-replication";
 
 type Role = "function" | "user" | "model";
 
@@ -20,11 +21,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    context: vscode.ExtensionContext,
+    context: vscode.ExtensionContext
   ) {
     this._context = context;
   }
-  public resolveWebviewView(webviewView: vscode.WebviewView) {
+  public async resolveWebviewView(webviewView: vscode.WebviewView) {
     _view = webviewView;
     ChatViewProvider.webView = webviewView;
     webviewView.webview.options = {
@@ -37,19 +38,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       .get<string>("google.gemini.apiKeys");
     if (!apiKey) {
       vscode.window.showErrorMessage(
-        "API key not configured. Check your settings.",
+        "API key not configured. Check your settings."
       );
       return;
     }
     const modelName = "gemini-1.0-pro-latest";
-    _view.webview.html = getWebviewContent();
+    const codepatterns: CodePattern = new CodePattern("", this._context);
+    const knowledgeBaseDocs: string[] = await codepatterns.getPatterns();
+    _view.webview.html = getWebviewContent(knowledgeBaseDocs);
 
     _view.webview.onDidReceiveMessage(async (message) => {
       if (message.type === "user-input") {
         const response = await this.generateResponse(
           apiKey,
           modelName,
-          formatText(message.message),
+          formatText(message.message)
         );
         if (response) {
           this.sendResponse(formatText(response), "bot");
@@ -64,7 +67,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public async sendResponse(
     response: string,
-    currentChat: string,
+    currentChat: string
   ): Promise<boolean | undefined> {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
     if (currentChat === "bot") {
@@ -87,7 +90,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public async sendGroqResponse(
     response: string,
-    currentChat: string,
+    currentChat: string
   ): Promise<boolean | undefined> {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
     if (currentChat === "bot") {
@@ -111,14 +114,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   async generateResponse(
     apiKey: string,
     name: string,
-    message: string,
+    message: string
   ): Promise<string | undefined> {
     try {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
       const chatHistory = this._context.workspaceState.get<IHistory[]>(
         "chatHistory",
-        [],
+        []
       );
       const chat = model.startChat({
         history: [
@@ -155,7 +158,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     temperature: number,
     max_tokens: number,
     top_p: number,
-    stream: boolean,
+    stream: boolean
   ) {
     const groq = new Groq();
     groq.chat.completions

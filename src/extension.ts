@@ -16,12 +16,14 @@ import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { ChatManager } from "./services/chat-manager";
 import { getConfigValue } from "./utils";
+import { CodePattern } from "./events/pattern-replication";
 
-const { generativeAi, geminiKey, geminiModel, groqKey, groqModel } = appConfig;
+const { geminiKey, geminiModel, groqKey, groqModel } = appConfig;
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    const { comment, review, refactor, optimize, fix, explain } = OLA_ACTIONS;
+    const { comment, review, refactor, optimize, fix, explain, pattern } =
+      OLA_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
       context,
@@ -42,6 +44,10 @@ export async function activate(context: vscode.ExtensionContext) {
       `${USER_MESSAGE} reviews the code...`,
       context,
     );
+    const codePattern = new CodePattern(
+      `${USER_MESSAGE} fetches knowledgeBase documents...`,
+      context,
+    );
 
     const actionMap = {
       [comment]: () => getComment.execute(),
@@ -55,6 +61,7 @@ export async function activate(context: vscode.ExtensionContext) {
           errorMessage,
         ).execute(errorMessage),
       [explain]: () => explainCode.execute(),
+      [pattern]: () => codePattern.uploadPatternHandler(),
     };
 
     const subscriptions = Object.entries(actionMap).map(([action, handler]) =>
