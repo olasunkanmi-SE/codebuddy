@@ -216,5 +216,63 @@ pre {
 div.code {
     white-space: pre;
 }
+
+.scroll-button {
+    position: absolute;
+    bottom: 150px;
+    right: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #333;
+    color: #fff;
+    border-style: solid;
+    boder-color: white;
+    border-radius: 50%;
+    font-family: FontAwesome;
+    content: "\f0d7"; 
+    width: 40px;
+    height: 35px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    margin-left: auto;
+    display: none;
+    padding: 13px;
+}
+
+.chat-container:hover .scroll-button {
+    display: flex;
+}
+
+.code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: -15px;
+    padding: 5px 10px;
+    background-color: #222;
+    color: #fff;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+.code-language {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.copy-code-button {
+    background-color: #444;
+    color: #fff;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.copy-code-button:hover {
+    background-color: #666;
+}
+
 ${selectedTheme}
 `;
