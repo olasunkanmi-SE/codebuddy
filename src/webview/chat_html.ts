@@ -35,9 +35,10 @@ ${chatCss}
     </div>
     <button id="chat-send">Send</button>
     <div id="loading">
-    <div class="loader"></div>
-    <div class="loader"></div>
-</div>
+        <div class="loader"></div>
+        <div class="loader"></div>
+    </div>
+    <button class="scroll-button" id="scroll-button">&#x2193;</button>
 </div>
 <script>
     ${chatJs}
