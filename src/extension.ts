@@ -17,13 +17,22 @@ import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { ChatManager } from "./services/chat-manager";
 import { getConfigValue } from "./utils";
 import { PatternUploader } from "./events/pattern-uploader";
+import { ReadFromKnowledgeBase } from "./events/knowledge-base";
 
 const { geminiKey, geminiModel, groqKey, groqModel } = appConfig;
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    const { comment, review, refactor, optimize, fix, explain, pattern } =
-      OLA_ACTIONS;
+    const {
+      comment,
+      review,
+      refactor,
+      optimize,
+      fix,
+      explain,
+      pattern,
+      knowledge,
+    } = OLA_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
       context,
@@ -45,6 +54,10 @@ export async function activate(context: vscode.ExtensionContext) {
       context,
     );
     const codePattern = new PatternUploader(context);
+    const knowledgeBase = new ReadFromKnowledgeBase(
+      `${USER_MESSAGE} generate your code pattern...`,
+      context,
+    );
 
     const actionMap = {
       [comment]: () => getComment.execute(),
@@ -59,6 +72,7 @@ export async function activate(context: vscode.ExtensionContext) {
         ).execute(errorMessage),
       [explain]: () => explainCode.execute(),
       [pattern]: () => codePattern.uploadPatternHandler(),
+      [knowledge]: () => knowledgeBase.execute(),
     };
 
     const subscriptions = Object.entries(actionMap).map(([action, handler]) =>

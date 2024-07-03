@@ -72,6 +72,11 @@
         {
           "command": "ola.savePattern",
           "group": "CodeBuddy"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "ola.readFromKnowledgeBase",
+          "group": "CodeBuddy"
         }
       ]
     },
@@ -103,6 +108,10 @@
       {
         "command": "ola.savePattern",
         "title": "Ola. Save this code pattern"
+      },
+      {
+        "command": "ola.readFromKnowledgeBase",
+        "title": "Ola. Generate based on knowledgeBase"
       }
     ],
     "configuration": [

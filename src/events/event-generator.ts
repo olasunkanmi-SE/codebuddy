@@ -15,7 +15,7 @@ interface IEventGenerator {
 }
 
 export abstract class EventGenerator implements IEventGenerator {
-  private context: vscode.ExtensionContext;
+  context: vscode.ExtensionContext;
   protected error?: string;
   private readonly generativeAi: string;
   private readonly geminiApiKey: string;
@@ -122,7 +122,7 @@ export abstract class EventGenerator implements IEventGenerator {
       if (!generativeAi || !generativeAiModel) {
         throw new Error("Model not found. Check your settings.");
       }
-
+      console.log({ text });
       let response;
       switch (generativeAi) {
         case "Gemini":
@@ -224,7 +224,7 @@ export abstract class EventGenerator implements IEventGenerator {
 
   abstract formatResponse(comment: string): string;
 
-  abstract createPrompt(text?: string): string;
+  abstract createPrompt(text?: string): any;
 
   async generateResponse(
     errorMessage?: string,
@@ -239,7 +239,7 @@ export abstract class EventGenerator implements IEventGenerator {
 
     errorMessage
       ? (prompt = this.createPrompt(errorMessage))
-      : (prompt = this.createPrompt(selectedCode));
+      : (prompt = await this.createPrompt(selectedCode));
 
     if (!prompt) {
       vscode.window.showErrorMessage("model not reponding, try again later");
