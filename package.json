@@ -68,6 +68,15 @@
           "when": "editorHasSelection",
           "command": "ola.sendChatMessage",
           "group": "CodeBuddy"
+        },
+        {
+          "command": "ola.savePattern",
+          "group": "CodeBuddy"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "ola.readFromKnowledgeBase",
+          "group": "CodeBuddy"
         }
       ]
     },
@@ -95,6 +104,14 @@
       {
         "command": "ola.explain",
         "title": "Ola. Explain this code"
+      },
+      {
+        "command": "ola.savePattern",
+        "title": "Ola. Save this code pattern"
+      },
+      {
+        "command": "ola.readFromKnowledgeBase",
+        "title": "Ola. Generate based on knowledgeBase"
       }
     ],
     "configuration": [

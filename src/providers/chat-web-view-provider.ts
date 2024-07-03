@@ -3,6 +3,7 @@ import { formatText } from "../utils";
 import { getWebviewContent } from "../webview/chat";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
+import { PatternUploader } from "../events/pattern-uploader";
 
 type Role = "function" | "user" | "model";
 
@@ -24,7 +25,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   ) {
     this._context = context;
   }
-  public resolveWebviewView(webviewView: vscode.WebviewView) {
+  public async resolveWebviewView(webviewView: vscode.WebviewView) {
     _view = webviewView;
     ChatViewProvider.webView = webviewView;
     webviewView.webview.options = {
@@ -42,7 +43,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     const modelName = "gemini-1.0-pro-latest";
-    _view.webview.html = getWebviewContent();
+    const codepatterns: PatternUploader = new PatternUploader(this._context);
+    const knowledgeBaseDocs: string[] = await codepatterns.getPatterns();
+    _view.webview.html = getWebviewContent(knowledgeBaseDocs);
 
     _view.webview.onDidReceiveMessage(async (message) => {
       if (message.type === "user-input") {

@@ -15,7 +15,7 @@ suite("Test the ChatProvider", async () => {
         localResourceRoots: [vscode.Uri.file("../../../../codebuddy")],
       },
       webview: {
-        html: getWebviewContent(),
+        html: getWebviewContent([]),
         onDidReceiveMessage: (callBack: (message: any) => void) => {
           callBack({ type: "user-input", message: question });
         },
@@ -97,7 +97,7 @@ suite("Test the ChatProvider", async () => {
             localResourceRoots: [vscode.Uri.file("../../../../codebuddy")],
           },
           webview: {
-            html: getWebviewContent(),
+            html: getWebviewContent([]),
             onDidReceiveMessage: (callBack: (message: any) => void) => {
               callBack({ type: "user-input", message: question });
             },
