@@ -107,7 +107,7 @@ export const chatCss: string = `
 }
 
 #chat-messages {
-    height:700px;
+    height:650px;
     overflow-y: scroll;
     padding: 10px;
     max-width: 100%;
@@ -274,5 +274,31 @@ div.code {
     background-color: #666;
 }
 
+#knowledge-base-title {
+    position: relative;
+    margin-bottom: 5px;
+  }
+  
+  #knowledge-base-title::after {
+    content: "Upload your knowledge base or code pattern (txt)";
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    white-space: nowrap;
+  }
+  
+  #knowledge-base-title:hover::after {
+    opacity: 1;
+    visibility: visible;
+  }
 ${selectedTheme}
 `;

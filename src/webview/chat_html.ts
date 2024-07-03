@@ -31,9 +31,9 @@ ${chatCss}
 <div id="chat-container">
     <div id="chat-title">ChatBuddy (Ola)</div>
     <div id="chat-messages"></div>
+    <div id="knowledge-base-title" title="Select a knowledge base document">KnowledgeBase</div>
     <div id="knowledge-base">
          <select id="chat-options">
-            <option value="">Select Doc</option>
            ${docs.map((doc) => `<option value="${doc}">${path.basename(doc)}</option>`)}
         </select>
     </div>
@@ -48,7 +48,7 @@ ${chatCss}
     <button class="scroll-button" id="scroll-button">&#x2193;</button>
 </div>
 <script>
-    ${chatJs}
+    ${chatJs()}
 </script>
 </body>
 

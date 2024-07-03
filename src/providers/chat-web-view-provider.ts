@@ -3,7 +3,7 @@ import { formatText } from "../utils";
 import { getWebviewContent } from "../webview/chat";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
-import { CodePattern } from "../events/pattern-replication";
+import { PatternUploader } from "../events/pattern-uploader";
 
 type Role = "function" | "user" | "model";
 
@@ -43,7 +43,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     const modelName = "gemini-1.0-pro-latest";
-    const codepatterns: CodePattern = new CodePattern("", this._context);
+    const codepatterns: PatternUploader = new PatternUploader(this._context);
     const knowledgeBaseDocs: string[] = await codepatterns.getPatterns();
     _view.webview.html = getWebviewContent(knowledgeBaseDocs);
 

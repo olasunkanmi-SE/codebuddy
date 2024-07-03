@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-export const chatJs = (context: vscode.ExtensionContext) => `
+export const chatJs = () => `
 const chatContainer = document.getElementById("chat-container");
 const chatMessages = document.getElementById("chat-messages");
 const chatInput = document.getElementById("chat-input");
