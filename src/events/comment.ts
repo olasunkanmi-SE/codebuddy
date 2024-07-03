@@ -1,3 +1,4 @@
+import { formatText } from "../utils";
 import { EventGenerator } from "./event-generator";
 import * as vscode from "vscode";
 
@@ -53,7 +54,7 @@ export class Comments extends EventGenerator {
   }
 
   formatResponse(comment: string): string {
-    return comment;
+    return formatText(comment);
   }
 
   createPrompt(selectedCode: string): string {

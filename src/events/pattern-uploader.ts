@@ -9,7 +9,7 @@ interface IPatternUploader {
 }
 
 export class PatternUploader implements IPatternUploader {
-  private patternDir: string;
+  patternDir: string;
   constructor(private readonly context: vscode.ExtensionContext) {
     this.patternDir = path.join(this.context.extensionPath, "patterns");
     if (!fs.existsSync(this.patternDir)) {
@@ -37,9 +37,31 @@ export class PatternUploader implements IPatternUploader {
       vscode.window.showInformationMessage(
         `KnowledgeBase uploaded successfully`,
       );
+      console.log({ k: await this.readFileAsync(patternPath) });
     } catch (error: any) {
       vscode.window.showErrorMessage(
         `Failed to upload pattern: ${error.message}`,
+      );
+      throw error;
+    }
+  }
+
+  async getPatternNames(): Promise<string[]> {
+    const patterns = await this.getPatterns();
+    return patterns.map((pattern) => {
+      const patternName = path.basename(pattern);
+      return patternName;
+    });
+  }
+
+  async readFileAsync(filePath: string): Promise<string> {
+    const fullPath = path.resolve(filePath);
+    try {
+      const content = await fs.promises.readFile(fullPath, "utf8");
+      return content;
+    } catch (error: any) {
+      vscode.window.showErrorMessage(
+        `Error reading from knowledgeBase: ${error.message}`,
       );
       throw error;
     }
