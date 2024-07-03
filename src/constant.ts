@@ -8,6 +8,7 @@ export enum OLA_ACTIONS {
   explain = "ola.explain",
   pattern = "ola.savePattern",
   knowledge = "ola.readFromKnowledgeBase",
+  commitMessage = "ola.generateCommitMessage",
 }
 
 export const GROQ_CONFIG = {
