@@ -35,11 +35,11 @@ export class PatternUploader implements IPatternUploader {
       const patternPath = path.join(this.patternDir, patternName);
       await fs.promises.writeFile(patternPath, content);
       vscode.window.showInformationMessage(
-        `KnowledgeBase uploaded successfully`
+        `KnowledgeBase uploaded successfully`,
       );
     } catch (error: any) {
       vscode.window.showErrorMessage(
-        `Failed to upload pattern: ${error.message}`
+        `Failed to upload pattern: ${error.message}`,
       );
       throw error;
     }
@@ -61,7 +61,7 @@ export class PatternUploader implements IPatternUploader {
       await Promise.all(deletePromises);
     } catch (error: any) {
       vscode.window.showErrorMessage(
-        `Unable to delete patterns: ${error.message}`
+        `Unable to delete patterns: ${error.message}`,
       );
       throw error;
     }
@@ -78,7 +78,7 @@ export class PatternUploader implements IPatternUploader {
       return files.map((file) => path.join(this.patternDir, file));
     } catch (error: any) {
       vscode.window.showErrorMessage(
-        `Error fetching the pattern file ${error.message}`
+        `Error fetching the pattern file ${error.message}`,
       );
       throw error;
     }
@@ -104,7 +104,7 @@ export class PatternUploader implements IPatternUploader {
         await this.uploadFile(file[0]);
       } catch (error: any) {
         vscode.window.showErrorMessage(
-          `Failed to upload pattern: ${error.message}`
+          `Failed to upload pattern: ${error.message}`,
         );
         throw error;
       }

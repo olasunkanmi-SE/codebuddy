@@ -26,23 +26,23 @@ export async function activate(context: vscode.ExtensionContext) {
       OLA_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
-      context
+      context,
     );
     const generateOptimizeCode = new OptimizeCode(
       `${USER_MESSAGE} optimizes the code...`,
-      context
+      context,
     );
     const generateRefactoredCode = new RefactorCode(
       `${USER_MESSAGE} refactors the code...`,
-      context
+      context,
     );
     const explainCode = new ExplainCode(
       `${USER_MESSAGE} explains the code...`,
-      context
+      context,
     );
     const generateReview = new ReviewCode(
       `${USER_MESSAGE} reviews the code...`,
-      context
+      context,
     );
     const codePattern = new PatternUploader(context);
 
@@ -55,14 +55,14 @@ export async function activate(context: vscode.ExtensionContext) {
         new FixError(
           `${USER_MESSAGE} finds a solution to the error...`,
           context,
-          errorMessage
+          errorMessage,
         ).execute(errorMessage),
       [explain]: () => explainCode.execute(),
       [pattern]: () => codePattern.uploadPatternHandler(),
     };
 
     const subscriptions = Object.entries(actionMap).map(([action, handler]) =>
-      vscode.commands.registerCommand(action, handler)
+      vscode.commands.registerCommand(action, handler),
     );
 
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
@@ -70,7 +70,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const quickFix = new CodeActionsProvider();
     const quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
       { scheme: "file", language: "*" },
-      quickFix
+      quickFix,
     );
 
     // Todo: move each generative Ai view providers to different files
@@ -81,13 +81,13 @@ export async function activate(context: vscode.ExtensionContext) {
         context.extensionUri,
         key,
         model,
-        context
+        context,
       );
 
       const registerGeminiWebViewProvider =
         vscode.window.registerWebviewViewProvider(
           GeminiWebViewProvider.viewId,
-          geminiWebViewProvider
+          geminiWebViewProvider,
         );
 
       const chatManager = new ChatManager(context);
@@ -97,7 +97,7 @@ export async function activate(context: vscode.ExtensionContext) {
         ...subscriptions,
         quickFixCodeAction,
         registerGeminiWebViewProvider,
-        chatWithOla
+        chatWithOla,
       );
     }
 
@@ -108,12 +108,12 @@ export async function activate(context: vscode.ExtensionContext) {
         context.extensionUri,
         key,
         model,
-        context
+        context,
       );
       const registerGroqWebViewProvider =
         vscode.window.registerWebviewViewProvider(
           GroqWebViewProvider.viewId,
-          groqWebViewProvider
+          groqWebViewProvider,
         );
 
       const chatManager = new ChatManager(context);
@@ -123,7 +123,7 @@ export async function activate(context: vscode.ExtensionContext) {
         ...subscriptions,
         quickFixCodeAction,
         registerGroqWebViewProvider,
-        chatWithOla
+        chatWithOla,
       );
     }
   } catch (error) {
