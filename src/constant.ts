@@ -7,6 +7,7 @@ export enum OLA_ACTIONS {
   fix = "ola.codeFix",
   explain = "ola.explain",
   pattern = "ola.savePattern",
+  knowledge = "ola.readFromKnowledgeBase",
 }
 
 export const GROQ_CONFIG = {
