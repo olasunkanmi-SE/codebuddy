@@ -291,6 +291,7 @@ export abstract class EventGenerator implements IEventGenerator {
         return;
       }
     }
+    console.log({ comment });
     const formattedComment = this.formatResponse(comment);
     if (!formattedComment) {
       vscode.window.showErrorMessage("model not reponding, try again later");
