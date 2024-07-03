@@ -16,7 +16,7 @@ import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { ChatManager } from "./services/chat-manager";
 import { getConfigValue } from "./utils";
-import { CodePattern } from "./events/pattern-replication";
+import { PatternUploader } from "./events/pattern-uploader";
 
 const { geminiKey, geminiModel, groqKey, groqModel } = appConfig;
 
@@ -44,10 +44,7 @@ export async function activate(context: vscode.ExtensionContext) {
       `${USER_MESSAGE} reviews the code...`,
       context,
     );
-    const codePattern = new CodePattern(
-      `${USER_MESSAGE} fetches knowledgeBase documents...`,
-      context,
-    );
+    const codePattern = new PatternUploader(context);
 
     const actionMap = {
       [comment]: () => getComment.execute(),
