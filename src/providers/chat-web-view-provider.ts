@@ -21,7 +21,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     this._context = context;
   }
@@ -38,7 +38,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       .get<string>("google.gemini.apiKeys");
     if (!apiKey) {
       vscode.window.showErrorMessage(
-        "API key not configured. Check your settings."
+        "API key not configured. Check your settings.",
       );
       return;
     }
@@ -52,7 +52,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const response = await this.generateResponse(
           apiKey,
           modelName,
-          formatText(message.message)
+          formatText(message.message),
         );
         if (response) {
           this.sendResponse(formatText(response), "bot");
@@ -67,7 +67,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public async sendResponse(
     response: string,
-    currentChat: string
+    currentChat: string,
   ): Promise<boolean | undefined> {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
     if (currentChat === "bot") {
@@ -90,7 +90,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   public async sendGroqResponse(
     response: string,
-    currentChat: string
+    currentChat: string,
   ): Promise<boolean | undefined> {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
     if (currentChat === "bot") {
@@ -114,14 +114,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   async generateResponse(
     apiKey: string,
     name: string,
-    message: string
+    message: string,
   ): Promise<string | undefined> {
     try {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
       const chatHistory = this._context.workspaceState.get<IHistory[]>(
         "chatHistory",
-        []
+        [],
       );
       const chat = model.startChat({
         history: [
@@ -158,7 +158,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     temperature: number,
     max_tokens: number,
     top_p: number,
-    stream: boolean
+    stream: boolean,
   ) {
     const groq = new Groq();
     groq.chat.completions
