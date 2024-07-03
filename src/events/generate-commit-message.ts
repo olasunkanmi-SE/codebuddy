@@ -27,12 +27,25 @@ export class GenerateCommitMessage extends EventGenerator {
         }
         return { file: file.file, diff: fileDiff, error: null };
       } catch (error: any) {
-        if (error instanceof GitError && error.message.includes("unknown revision or path not in the working tree")) {
+        if (
+          error instanceof GitError &&
+          error.message.includes(
+            "unknown revision or path not in the working tree",
+          )
+        ) {
           try {
             const fileContent = await git.catFile(["-p", `:0:${file.file}`]);
-            return { file: file.file, diff: `New file: ${file.file}\n${fileContent}`, error: null };
+            return {
+              file: file.file,
+              diff: `New file: ${file.file}\n${fileContent}`,
+              error: null,
+            };
           } catch (catError: any) {
-            return { file: file.file, diff: null, error: `Error getting content for new file: ${catError.message}` };
+            return {
+              file: file.file,
+              diff: null,
+              error: `Error getting content for new file: ${catError.message}`,
+            };
           }
         } else {
           return { file: file.file, diff: null, error: error.message };
