@@ -18,6 +18,7 @@ import { ChatManager } from "./services/chat-manager";
 import { getConfigValue } from "./utils";
 import { PatternUploader } from "./events/pattern-uploader";
 import { ReadFromKnowledgeBase } from "./events/knowledge-base";
+import { GenerateCommitMessage } from "./events/generate-commit-message";
 
 const { geminiKey, geminiModel, groqKey, groqModel } = appConfig;
 
@@ -32,6 +33,7 @@ export async function activate(context: vscode.ExtensionContext) {
       explain,
       pattern,
       knowledge,
+      commitMessage,
     } = OLA_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
@@ -58,6 +60,10 @@ export async function activate(context: vscode.ExtensionContext) {
       `${USER_MESSAGE} generate your code pattern...`,
       context,
     );
+    const generateCommitMessage = new GenerateCommitMessage(
+      `${USER_MESSAGE} generates a commit message...`,
+      context,
+    );
 
     const actionMap = {
       [comment]: () => getComment.execute(),
@@ -73,6 +79,7 @@ export async function activate(context: vscode.ExtensionContext) {
       [explain]: () => explainCode.execute(),
       [pattern]: () => codePattern.uploadPatternHandler(),
       [knowledge]: () => knowledgeBase.execute(),
+      [commitMessage]: () => generateCommitMessage.execute("hello"),
     };
 
     const subscriptions = Object.entries(actionMap).map(([action, handler]) =>

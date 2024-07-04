@@ -85,8 +85,6 @@ switch (fontFamily) {
     break;
 }
 
-console.log(`${fontSize}px`);
-
 export const chatCss: string = `
 #chat-container {
     width: 100%;
