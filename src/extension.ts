@@ -151,3 +151,6 @@ export async function activate(context: vscode.ExtensionContext) {
     console.log(error);
   }
 }
+
+//TODO Deactivate all vscode functions
+// export function deactivate() {
