@@ -34,14 +34,9 @@ export class PatternUploader implements IPatternUploader {
       }
       const patternPath = path.join(this.patternDir, patternName);
       await fs.promises.writeFile(patternPath, content);
-      vscode.window.showInformationMessage(
-        `KnowledgeBase uploaded successfully`,
-      );
-      console.log({ k: await this.readFileAsync(patternPath) });
+      vscode.window.showInformationMessage(`KnowledgeBase uploaded successfully`);
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Failed to upload pattern: ${error.message}`,
-      );
+      vscode.window.showErrorMessage(`Failed to upload pattern: ${error.message}`);
       throw error;
     }
   }
@@ -60,9 +55,7 @@ export class PatternUploader implements IPatternUploader {
       const content = await fs.promises.readFile(fullPath, "utf8");
       return content;
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Error reading from knowledgeBase: ${error.message}`,
-      );
+      vscode.window.showErrorMessage(`Error reading from knowledgeBase: ${error.message}`);
       throw error;
     }
   }
@@ -82,9 +75,7 @@ export class PatternUploader implements IPatternUploader {
       });
       await Promise.all(deletePromises);
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Unable to delete patterns: ${error.message}`,
-      );
+      vscode.window.showErrorMessage(`Unable to delete patterns: ${error.message}`);
       throw error;
     }
   }
@@ -99,9 +90,7 @@ export class PatternUploader implements IPatternUploader {
       const files = await fs.promises.readdir(this.patternDir);
       return files.map((file) => path.join(this.patternDir, file));
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Error fetching the pattern file ${error.message}`,
-      );
+      vscode.window.showErrorMessage(`Error fetching the pattern file ${error.message}`);
       throw error;
     }
   }
@@ -125,9 +114,7 @@ export class PatternUploader implements IPatternUploader {
       try {
         await this.uploadFile(file[0]);
       } catch (error: any) {
-        vscode.window.showErrorMessage(
-          `Failed to upload pattern: ${error.message}`,
-        );
+        vscode.window.showErrorMessage(`Failed to upload pattern: ${error.message}`);
         throw error;
       }
     }

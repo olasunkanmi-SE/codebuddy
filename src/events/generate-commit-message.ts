@@ -9,62 +9,80 @@ export class GenerateCommitMessage extends EventGenerator {
   }
 
   async getStagedDifferenceSummary() {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+
+    if (!workspaceFolders) {
+      vscode.window.showErrorMessage("No workspace folder is open");
+      return;
+    }
+
+    const rootPath = workspaceFolders[0].uri.fsPath;
     const options: Partial<SimpleGitOptions> = {
       binary: "git",
       maxConcurrentProcesses: 6,
       trimmed: false,
+      baseDir: rootPath,
     };
-    const git: SimpleGit = simpleGit(options);
-    const stagedDiffSummay = await git.diffSummary("--staged");
+    try {
+      const git: SimpleGit = simpleGit(options);
+      const stagedDiffSummay = await git.diffSummary("--staged");
 
-    const fileDifferencePromises = stagedDiffSummay.files.map(async (file) => {
-      try {
-        let fileDiff;
-        if (file.file.includes("_deleted_")) {
-          fileDiff = "File deleted";
-        } else {
-          fileDiff = await git.diff(["--staged"]);
-        }
-        return { file: file.file, diff: fileDiff, error: null };
-      } catch (error: any) {
-        if (
-          error instanceof GitError &&
-          error.message.includes(
-            "unknown revision or path not in the working tree",
-          )
-        ) {
+      const fileDifferencePromises = stagedDiffSummay.files.map(
+        async (file) => {
           try {
-            const fileContent = await git.catFile(["-p", `:0:${file.file}`]);
-            return {
-              file: file.file,
-              diff: `New file: ${file.file}\n${fileContent}`,
-              error: null,
-            };
-          } catch (catError: any) {
-            return {
-              file: file.file,
-              diff: null,
-              error: `Error getting content for new file: ${catError.message}`,
-            };
+            let fileDiff;
+            if (file.file.includes("_deleted_")) {
+              fileDiff = "File deleted";
+            } else {
+              fileDiff = await git.diff(["--staged"]);
+            }
+            return { file: file.file, diff: fileDiff, error: null };
+          } catch (error: any) {
+            if (
+              error instanceof GitError &&
+              error.message.includes(
+                "unknown revision or path not in the working tree",
+              )
+            ) {
+              try {
+                const fileContent = await git.catFile([
+                  "-p",
+                  `:0:${file.file}`,
+                ]);
+                return {
+                  file: file.file,
+                  diff: `New file: ${file.file}\n${fileContent}`,
+                  error: null,
+                };
+              } catch (catError: any) {
+                return {
+                  file: file.file,
+                  diff: null,
+                  error: `Error getting content for new file: ${catError.message}`,
+                };
+              }
+            } else {
+              return { file: file.file, diff: null, error: error.message };
+            }
           }
+        },
+      );
+
+      const fileDiffs = await Promise.all(fileDifferencePromises);
+      let differenceSummary = "";
+
+      fileDiffs.forEach(({ file, diff, error }) => {
+        if (error) {
+          console.error(`Error: ${error}`);
         } else {
-          return { file: file.file, diff: null, error: error.message };
+          differenceSummary = `\nFile: ${diff}`;
         }
-      }
-    });
-
-    const fileDiffs = await Promise.all(fileDifferencePromises);
-    let differenceSummary = "";
-
-    fileDiffs.forEach(({ file, diff, error }) => {
-      if (error) {
-        console.error(`Error: ${error}`);
-      } else {
-        differenceSummary = `\nFile: ${diff}`;
-      }
-    });
-    console.log({ differenceSummary });
-    return differenceSummary;
+      });
+      console.log({ differenceSummary });
+      return differenceSummary;
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   async generatePrompt() {
