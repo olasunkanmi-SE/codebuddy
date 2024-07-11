@@ -22,7 +22,6 @@ export class ReadFromKnowledgeBase extends EventGenerator {
 
   async generatePrompt() {
     const knowledgeBase = await this.getKnowledgeBase();
-    console.log({ knowledgeBase });
     const PROMPT = `
         You are CodeBuddy, an adaptive AI coding assistant specializing in software development. Your primary focus is on creating clean, maintainable code that matches the user's existing code patterns and architectural style. When asked to generate code, follow these guidelines:
         1. Analyze the existing codebase or provided code samples carefully. Pay attention to:

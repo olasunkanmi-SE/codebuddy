@@ -122,7 +122,6 @@ export abstract class EventGenerator implements IEventGenerator {
       if (!generativeAi || !generativeAiModel) {
         throw new Error("Model not found. Check your settings.");
       }
-      console.log({ text });
       let response;
       switch (generativeAi) {
         case "Gemini":
@@ -238,7 +237,7 @@ export abstract class EventGenerator implements IEventGenerator {
     }
 
     errorMessage
-      ? (prompt = this.createPrompt(errorMessage))
+      ? (prompt = await this.createPrompt(errorMessage))
       : (prompt = await this.createPrompt(selectedCode));
 
     if (!prompt) {

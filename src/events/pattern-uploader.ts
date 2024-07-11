@@ -37,7 +37,6 @@ export class PatternUploader implements IPatternUploader {
       vscode.window.showInformationMessage(
         `KnowledgeBase uploaded successfully`,
       );
-      console.log({ k: await this.readFileAsync(patternPath) });
     } catch (error: any) {
       vscode.window.showErrorMessage(
         `Failed to upload pattern: ${error.message}`,

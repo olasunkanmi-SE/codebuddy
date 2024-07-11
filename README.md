@@ -41,15 +41,12 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - [x] Code formatting: The assistant can format your code to conform to your preferred style guide, making your code more readable and maintainable.
 - [x] Quickfix compilation errors
 - [ ] Code search: The assistant can search for code snippets and functions within your codebase, allowing you to quickly find and reuse existing code.
-- [ ] Upload documents and retrieve knowledge from it
+- [x] Upload documents and retrieve knowledge from it
 - [ ] Auto-completion of code aka code suggestions
 - [x] Support for various Generative AIs. Currently Support Groq and Gemini
 - [ ] Perform folder specific tasks like. Summarize, create, and update
 - [ ] Connect the co-buddy to GitHub Issues
-- [ ] Suggest code changes or provide templates based on the issue type or requirements.
-- [ ] Task-based suggestions, Analyze the current task or issue description and provide code suggestions based on the requirements
-- [ ] Automated issue linking: any code changes, automatically detect the relevant issue or task based on the branch name, commit message, or user input.
-- [ ] Update the issue status or add comments to the issue based on the code changes
+- [x] Auto generate commit message based on git diff
 
 ## Requirements
 

@@ -77,6 +77,10 @@
           "when": "editorHasSelection",
           "command": "ola.readFromKnowledgeBase",
           "group": "CodeBuddy"
+        },
+        {
+          "command": "ola.generateCommitMessage",
+          "group": "CodeBuddy"
         }
       ]
     },
@@ -112,6 +116,10 @@
       {
         "command": "ola.readFromKnowledgeBase",
         "title": "Ola. Generate based on knowledgeBase"
+      },
+      {
+        "command": "ola.generateCommitMessage",
+        "title": "Ola. Generate commit message"
       }
     ],
     "configuration": [
@@ -240,6 +248,7 @@
     "node-fetch": "^3.3.2",
     "prettier": "^3.2.5",
     "readable-stream": "^4.5.2",
+    "simple-git": "^3.25.0",
     "sinon": "^17.0.1"
   }
 }
