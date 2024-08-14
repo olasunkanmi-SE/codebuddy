@@ -80,7 +80,9 @@ switch (fontFamily) {
   case "Inconsolata":
     selectedFontFamily = "Inconsolata";
     break;
-
+  case "JetBrains Mono":
+    selectedFontFamily = "JetBrains Mono";
+    break;
   default:
     break;
 }
@@ -182,6 +184,9 @@ body {
     margin: 0;
     padding: 0;
     font-family: ${selectedFontFamily};
+    font-size: 11.3
+    font-weight: bold
+    font-ligatures: true
 }
 
 
@@ -209,6 +214,7 @@ pre {
     padding: 10px;
     overflow-x: auto;
     background-color: #000;
+    font-family: JetBrains Mono
 }
 
 div.code {
@@ -251,7 +257,7 @@ div.code {
     border-style: solid;
     boder-color: white;
     border-radius: 50%;
-    font-family: FontAwesome;
+    font-family: selectedFontFamily;
     content: "\f0d7"; 
     width: 40px;
     height: 35px;
