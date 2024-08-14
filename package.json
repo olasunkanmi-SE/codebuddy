@@ -81,6 +81,11 @@
         {
           "command": "ola.generateCommitMessage",
           "group": "CodeBuddy"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "ola.interviewMe",
+          "group": "CodeBuddy"
         }
       ]
     },
@@ -120,6 +125,10 @@
       {
         "command": "ola.generateCommitMessage",
         "title": "Ola. Generate commit message"
+      },
+      {
+        "command": "ola.interviewMe",
+        "title": "Ola. Interview Me."
       }
     ],
     "configuration": [
