@@ -37,8 +37,6 @@ export class Comments extends EventGenerator {
             );
         }
         ${COMMENT_LABEL}
-        <pre>
-        <code>
         /**
          * Retrieves restaurant information by its ID asynchronously.
          * This function validates the user's context, by checking the user privileges 
@@ -47,8 +45,6 @@ export class Comments extends EventGenerator {
          * @returns A Promise that resolves to a Result object containing an IRestaurantResponseDTO object
          * @throws {ApplicationError} If the user does not have sufficient privileges
          */
-        </code>
-        </pre>
 `;
     return PROMPT;
   }
