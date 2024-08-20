@@ -34,19 +34,19 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 
 
 ## Roadmap
-- [x] Code generation: The assistant can generate code snippets based on your input, allowing you to quickly create code without having to write it all yourself.
-- [x] Task completion: The assistant can help you complete tasks such as debugging, testing, and refactoring, making your development workflow more efficient.
-- [x] Code refactoring: The assistant can refactor your code to make it more efficient, readable, and maintainable.
-- [x] Code analysis: The assistant can analyze your code and provide suggestions for improvement, such as pointing out potential bugs, security vulnerabilities, and performance issues.
-- [x] Code formatting: The assistant can format your code to conform to your preferred style guide, making your code more readable and maintainable.
-- [x] Quickfix compilation errors
-- [ ] Code search: The assistant can search for code snippets and functions within your codebase, allowing you to quickly find and reuse existing code.
-- [x] Upload documents and retrieve knowledge from it
-- [ ] Auto-completion of code aka code suggestions
-- [x] Support for various Generative AIs. Currently Support Groq and Gemini
-- [ ] Perform folder specific tasks like. Summarize, create, and update
-- [ ] Connect the co-buddy to GitHub Issues
-- [x] Auto generate commit message based on git diff
+- [x] Code Generation: The assistant can generate code snippets based on user input, streamlining the development process.
+- [x] Task Completion: The assistant can aid in completing tasks such as debugging, testing, and refactoring, enhancing development workflow efficiency.
+- [x] Code Refactoring: The assistant can refactor code to improve efficiency, readability, and maintainability.
+- [x] Code Analysis: The assistant can analyze code and provide suggestions for improvement, including identifying potential bugs, security vulnerabilities, and performance issues.
+- [x] Quickfix Compilation Errors: The assistant can quickly resolve compilation errors.
+- [ ] Code Search: The assistant can search for code snippets and functions within the codebase, enabling quick reuse of existing code.
+- [x] Document Upload and Knowledge Retrieval: The assistant can upload documents and retrieve knowledge from them.
+- [ ] Auto-Completion of Code (Code Suggestions): The assistant will provide code suggestions for auto-completion.
+- [x] Support for various Generative AIs. Currently, Support Groq and Gemini
+- [ ] Folder-Specific Tasks: The assistant will be able to perform tasks such as summarizing, creating, and updating within specific folders.
+- [ ] GitHub Issues Integration: The assistant will be connected to GitHub Issues, enhancing collaboration and issue tracking
+- [x] Unit Test Generation: The assistant can generate unit tests.
+- [x] Interview Mode: The assistant can generate interview questions based on selected code or text.
 
 ## Requirements
 
@@ -58,7 +58,7 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - "google.gemini.apiKeys": 'Your API Key'. Get Gemini APIKey https://aistudio.google.com/app/apikey
 - "google.gemini.model": Specify the AI model for code assistance (default: "gemini-1.0-pro-latest").
 - "groq.llama3.apiKey": "your Groq API key". Get Grok API Key https://console.groq.com/keys
-- "groq.model": "llama3-70b-8192"
+- "groq.model": "Specify the AI model. https://console.groq.com/docs/models"
 
 ## How to run locally
   - In package.json, hover on "vscode:prepublish", click on run script. This will create a build for the application
