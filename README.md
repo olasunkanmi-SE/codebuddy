@@ -67,7 +67,7 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 
 - Support for multiple chat view themes, fonts and font size
 
-- ### 1.1.1
+### 1.1.1
   
 - Support for Auto-Generated Code Commit Messages, Knowledgebase, Unit Test Generation, copy and auto-Scroll to bottom of Chat, Interview me.
 
