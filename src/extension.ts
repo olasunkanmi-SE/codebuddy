@@ -8,7 +8,12 @@ import {
 import { Comments } from "./events/comment";
 import { ExplainCode } from "./events/explain";
 import { FixError } from "./events/fixError";
+import { GenerateCommitMessage } from "./events/generate-commit-message";
+import { GenerateUnitTest } from "./events/generate-unit-test";
+import { InterviewMe } from "./events/interview-me";
+import { ReadFromKnowledgeBase } from "./events/knowledge-base";
 import { OptimizeCode } from "./events/optimize";
+import { PatternUploader } from "./events/pattern-uploader";
 import { RefactorCode } from "./events/refactor";
 import { ReviewCode } from "./events/review";
 import { CodeActionsProvider } from "./providers/code-actions-provider";
@@ -16,10 +21,6 @@ import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { ChatManager } from "./services/chat-manager";
 import { getConfigValue } from "./utils";
-import { PatternUploader } from "./events/pattern-uploader";
-import { ReadFromKnowledgeBase } from "./events/knowledge-base";
-import { GenerateCommitMessage } from "./events/generate-commit-message";
-import { InterviewMe } from "./events/interview-me";
 
 const { geminiKey, geminiModel, groqKey, groqModel } = appConfig;
 
@@ -36,6 +37,7 @@ export async function activate(context: vscode.ExtensionContext) {
       knowledge,
       commitMessage,
       interviewMe,
+      generateUnitTest,
     } = OLA_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
@@ -71,12 +73,18 @@ export async function activate(context: vscode.ExtensionContext) {
       context
     );
 
+    const generateUnitTests = new GenerateUnitTest(
+      `${USER_MESSAGE} generates interview questions...`,
+      context
+    );
+
     const actionMap = {
       [comment]: () => getComment.execute(),
       [review]: () => generateReview.execute(),
       [refactor]: () => generateRefactoredCode.execute(),
       [optimize]: () => generateOptimizeCode.execute(),
       [interviewMe]: () => generateInterviewQuestions.execute(),
+      [generateUnitTest]: () => generateUnitTests.execute(),
       [fix]: (errorMessage: string) =>
         new FixError(
           `${USER_MESSAGE} finds a solution to the error...`,
