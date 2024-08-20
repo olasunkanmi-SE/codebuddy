@@ -5,14 +5,20 @@ CodeBuddy is a Visual Studio Code extension that provides an AI-powered coding a
 ## Install in Vscode Market Place
 https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy
 
-## Features
-
-- Code generation: The assistant can generate code snippets based on your input, allowing you to quickly create code without having to write it all yourself.
-- Task completion: The assistant can help you complete tasks such as debugging, testing, and refactoring, making your development workflow more efficient.
-- Code refactoring: The assistant can refactor your code to make it more efficient, readable, and maintainable.
-- Code analysis: The assistant can analyze your code and provide suggestions for improvement, such as pointing out potential bugs, security vulnerabilities, and performance issues.
-- Code formatting: The assistant can format your code to conform to your preferred style guide, making your code more readable and maintainable.
-- Code search: The assistant can search for code snippets and functions within your codebase, allowing you to quickly find and reuse existing code.
+## Roadmap
+- [x] Code Generation: The assistant can generate code snippets based on user input, streamlining the development process.
+- [x] Task Completion: The assistant can aid in completing tasks such as debugging, testing, and refactoring, enhancing development workflow efficiency.
+- [x] Code Refactoring: The assistant can refactor code to improve efficiency, readability, and maintainability.
+- [x] Code Analysis: The assistant can analyze code and provide suggestions for improvement, including identifying potential bugs, security vulnerabilities, and performance issues.
+- [x] Quickfix Compilation Errors: The assistant can quickly resolve compilation errors.
+- [ ] Code Search: The assistant can search for code snippets and functions within the codebase, enabling quick reuse of existing code.
+- [x] Document Upload and Knowledge Retrieval: The assistant can upload documents and retrieve knowledge from them.
+- [ ] Auto-Completion of Code (Code Suggestions): The assistant will provide code suggestions for auto-completion.
+- [x] Support for various Generative AIs. Currently, Support Groq and Gemini
+- [ ] Folder-Specific Tasks: The assistant will be able to perform tasks such as summarizing, creating, and updating within specific folders.
+- [ ] GitHub Issues Integration: The assistant will be connected to GitHub Issues, enhancing collaboration and issue tracking
+- [x] Unit Test Generation: The assistant can generate unit tests.
+- [x] Interview Mode: The assistant can generate interview questions based on selected code or text.
 
 
 ## For local development purposes
@@ -31,22 +37,6 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - Highlight your code, right click, and click any of the desired assistant options
 - If you have a none coding questions, you can type it in your vscode editor and send to Ola.
 - The chat button is disabled for now. Help is needed in fixing here https://github.com/olasunkanmi-SE/codebuddy/issues/37
-
-
-## Roadmap
-- [x] Code Generation: The assistant can generate code snippets based on user input, streamlining the development process.
-- [x] Task Completion: The assistant can aid in completing tasks such as debugging, testing, and refactoring, enhancing development workflow efficiency.
-- [x] Code Refactoring: The assistant can refactor code to improve efficiency, readability, and maintainability.
-- [x] Code Analysis: The assistant can analyze code and provide suggestions for improvement, including identifying potential bugs, security vulnerabilities, and performance issues.
-- [x] Quickfix Compilation Errors: The assistant can quickly resolve compilation errors.
-- [ ] Code Search: The assistant can search for code snippets and functions within the codebase, enabling quick reuse of existing code.
-- [x] Document Upload and Knowledge Retrieval: The assistant can upload documents and retrieve knowledge from them.
-- [ ] Auto-Completion of Code (Code Suggestions): The assistant will provide code suggestions for auto-completion.
-- [x] Support for various Generative AIs. Currently, Support Groq and Gemini
-- [ ] Folder-Specific Tasks: The assistant will be able to perform tasks such as summarizing, creating, and updating within specific folders.
-- [ ] GitHub Issues Integration: The assistant will be connected to GitHub Issues, enhancing collaboration and issue tracking
-- [x] Unit Test Generation: The assistant can generate unit tests.
-- [x] Interview Mode: The assistant can generate interview questions based on selected code or text.
 
 ## Requirements
 
