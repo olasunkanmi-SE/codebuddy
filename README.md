@@ -19,6 +19,7 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - [ ] GitHub Issues Integration: The assistant will be connected to GitHub Issues, enhancing collaboration and issue tracking
 - [x] Unit Test Generation: The assistant can generate unit tests.
 - [x] Interview Mode: The assistant can generate interview questions based on selected code or text.
+- [x] Generate commit messages from Git diff
 
 
 ## For local development purposes
