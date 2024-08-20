@@ -140,12 +140,14 @@
         "title": "CodeBuddy. Generate Unit Test."
       }
     ],
-    "viewsContainers":{
-      "activitybar":[{
-        "id":"codeBuddy-view-container",
-        "title": "CodeBuddy",
-        "icon":"$(chat-editor-label-icon)"
-      }]
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codeBuddy-view-container",
+          "title": "CodeBuddy",
+          "icon": "$(chat-editor-label-icon)"
+        }
+      ]
     },
     "configuration": [
       {
@@ -206,7 +208,7 @@
               "IBM Plex Mono",
               "Inconsolata"
             ],
-            "default": "SF Mono",
+            "default": "JetBrains Mono",
             "description": "Select preffered font family"
           },
           "chatview.theme": {
