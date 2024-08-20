@@ -10,6 +10,7 @@ export enum OLA_ACTIONS {
   knowledge = "ola.readFromKnowledgeBase",
   commitMessage = "ola.generateCommitMessage",
   interviewMe = "ola.interviewMe",
+  generateUnitTest = "ola.generateUnitTest",
 }
 
 export const GROQ_CONFIG = {

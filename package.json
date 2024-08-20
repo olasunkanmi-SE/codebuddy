@@ -29,7 +29,7 @@
   "main": "./out/extension.js",
   "contributes": {
     "views": {
-      "explorer": [
+      "codeBuddy-view-container": [
         {
           "type": "webview",
           "id": "chatView",
@@ -86,51 +86,67 @@
           "when": "editorHasSelection",
           "command": "ola.interviewMe",
           "group": "CodeBuddy"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "ola.generateUnitTest",
+          "group": "CodeBuddy"
         }
       ]
     },
     "commands": [
       {
         "command": "ola.commentCode",
-        "title": "Ola. Add comment to selected code."
+        "title": "CodeBuddy. Add comment to selected code."
       },
       {
         "command": "ola.reviewCode",
-        "title": "Ola. Review these selected code."
+        "title": "CodeBuddy. Review these selected code."
       },
       {
         "command": "ola.codeRefactor",
-        "title": "Ola. Refactor these selected code."
+        "title": "CodeBuddy. Refactor these selected code."
       },
       {
         "command": "ola.codeOptimize",
-        "title": "Ola. Optimize these selected code."
+        "title": "CodeBuddy. Optimize these selected code."
       },
       {
         "command": "ola.sendChatMessage",
-        "title": "Send to Ola"
+        "title": "Send to CodeBuddy"
       },
       {
         "command": "ola.explain",
-        "title": "Ola. Explain this code"
+        "title": "CodeBuddy. Explain this code"
       },
       {
         "command": "ola.savePattern",
-        "title": "Ola. Save this code pattern"
+        "title": "CodeBuddy. Save this code pattern"
       },
       {
         "command": "ola.readFromKnowledgeBase",
-        "title": "Ola. Generate based on knowledgeBase"
+        "title": "CodeBuddy. Generate based on knowledgeBase"
       },
       {
         "command": "ola.generateCommitMessage",
-        "title": "Ola. Generate commit message"
+        "title": "CodeBuddy. Generate commit message"
       },
       {
         "command": "ola.interviewMe",
-        "title": "Ola. Interview Me."
+        "title": "CodeBuddy. Interview Me."
+      },
+      {
+        "command": "ola.generateUnitTest",
+        "title": "CodeBuddy. Generate Unit Test."
       }
     ],
+    "viewsContainers":{
+      "activitybar":[{
+        "id":"codeBuddy-view-container",
+        "title": "CodeBuddy",
+        "icon":"$(chat-editor-label-icon)"
+      }]
+    },
     "configuration": [
       {
         "title": "Your codding buddy, Ola",
