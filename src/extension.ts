@@ -74,7 +74,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     const generateUnitTests = new GenerateUnitTest(
-      `${USER_MESSAGE} generates interview questions...`,
+      `${USER_MESSAGE} generates unit tests...`,
       context
     );
 
