@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import * as fs from "fs";
 import {
   appConfig,
   generativeAiModel,
@@ -8,23 +7,21 @@ import {
 } from "./constant";
 import { Comments } from "./events/comment";
 import { ExplainCode } from "./events/explain";
+import { FileUploader } from "./events/file-uploader";
 import { FixError } from "./events/fixError";
+import { CodeChartGenerator } from "./events/generate-code-chart";
 import { GenerateCommitMessage } from "./events/generate-commit-message";
 import { GenerateUnitTest } from "./events/generate-unit-test";
 import { InterviewMe } from "./events/interview-me";
 import { ReadFromKnowledgeBase } from "./events/knowledge-base";
 import { OptimizeCode } from "./events/optimize";
-import { FileUploader } from "./events/file-uploader";
 import { RefactorCode } from "./events/refactor";
 import { ReviewCode } from "./events/review";
 import { CodeActionsProvider } from "./providers/code-actions-provider";
 import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
-import { ChatManager } from "./services/chat-manager";
-import { getConfigValue } from "./utils";
-import { CodeChartGenerator } from "./events/generate-code-chart";
 import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
-import * as path from "path";
+import { getConfigValue } from "./utils";
 
 const { geminiKey, geminiModel, groqKey, groqModel } = appConfig;
 
