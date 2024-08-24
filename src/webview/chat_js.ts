@@ -79,7 +79,7 @@ function addCodeWrappers() {
     const existingWrapper = preElement.closest('.code-wrapper');
     if (!existingWrapper) {
       const codeText = block.textContent;
-      const assistant = 'CodeBuddy';
+      const assistant = '';
       const wrapper = document.createElement('div');
       wrapper.className = 'code-wrapper';
       const header = document.createElement('div');
