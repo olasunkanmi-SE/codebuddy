@@ -71,6 +71,9 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
   
 - Support for Auto-Generated Code Commit Messages, Knowledgebase, Unit Test Generation, copy and auto-Scroll to bottom of Chat, Interview me.
 
+### 1.1.2
+- Create component flow diagrams with Mermaid
+
 ## Contributing
 - Contributions are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request.
 
