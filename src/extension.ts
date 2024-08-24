@@ -1,7 +1,8 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
 import {
   appConfig,
-  generativeModel,
+  generativeAiModel,
   OLA_ACTIONS,
   USER_MESSAGE,
 } from "./constant";
@@ -13,7 +14,7 @@ import { GenerateUnitTest } from "./events/generate-unit-test";
 import { InterviewMe } from "./events/interview-me";
 import { ReadFromKnowledgeBase } from "./events/knowledge-base";
 import { OptimizeCode } from "./events/optimize";
-import { PatternUploader } from "./events/pattern-uploader";
+import { FileUploader } from "./events/file-uploader";
 import { RefactorCode } from "./events/refactor";
 import { ReviewCode } from "./events/review";
 import { CodeActionsProvider } from "./providers/code-actions-provider";
@@ -21,6 +22,9 @@ import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { ChatManager } from "./services/chat-manager";
 import { getConfigValue } from "./utils";
+import { CodeChartGenerator } from "./events/generate-code-chart";
+import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
+import * as path from "path";
 
 const { geminiKey, geminiModel, groqKey, groqModel } = appConfig;
 
@@ -38,44 +42,49 @@ export async function activate(context: vscode.ExtensionContext) {
       commitMessage,
       interviewMe,
       generateUnitTest,
+      generateCodeChart,
     } = OLA_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
-      context,
+      context
     );
     const generateOptimizeCode = new OptimizeCode(
       `${USER_MESSAGE} optimizes the code...`,
-      context,
+      context
     );
     const generateRefactoredCode = new RefactorCode(
       `${USER_MESSAGE} refactors the code...`,
-      context,
+      context
     );
     const explainCode = new ExplainCode(
       `${USER_MESSAGE} explains the code...`,
-      context,
+      context
     );
     const generateReview = new ReviewCode(
       `${USER_MESSAGE} reviews the code...`,
-      context,
+      context
     );
-    const codePattern = new PatternUploader(context);
+    const codeChartGenerator = new CodeChartGenerator(
+      `${USER_MESSAGE} creates the code chart...`,
+      context
+    );
+    const codePattern = new FileUploader(context);
     const knowledgeBase = new ReadFromKnowledgeBase(
       `${USER_MESSAGE} generate your code pattern...`,
-      context,
+      context
     );
     const generateCommitMessage = new GenerateCommitMessage(
       `${USER_MESSAGE} generates a commit message...`,
-      context,
+      context
     );
     const generateInterviewQuestions = new InterviewMe(
       `${USER_MESSAGE} generates interview questions...`,
-      context,
+      context
     );
 
     const generateUnitTests = new GenerateUnitTest(
       `${USER_MESSAGE} generates unit tests...`,
-      context,
+      context
     );
 
     const actionMap = {
@@ -89,80 +98,73 @@ export async function activate(context: vscode.ExtensionContext) {
         new FixError(
           `${USER_MESSAGE} finds a solution to the error...`,
           context,
-          errorMessage,
+          errorMessage
         ).execute(errorMessage),
       [explain]: () => explainCode.execute(),
-      [pattern]: () => codePattern.uploadPatternHandler(),
+      [pattern]: () => codePattern.uploadFileHandler(),
       [knowledge]: () => knowledgeBase.execute(),
       [commitMessage]: () => generateCommitMessage.execute("hello"),
+      [generateCodeChart]: () => codeChartGenerator.execute(),
     };
 
-    const subscriptions = Object.entries(actionMap).map(([action, handler]) =>
-      vscode.commands.registerCommand(action, handler),
+    const subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
+      ([action, handler]) => vscode.commands.registerCommand(action, handler)
     );
 
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
 
     const quickFix = new CodeActionsProvider();
-    const quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
-      { scheme: "file", language: "*" },
-      quickFix,
-    );
-
-    // Todo: move each generative Ai view providers to different files
-    if (selectedGenerativeAiModel === generativeModel.GEMINI) {
-      const key = getConfigValue(geminiKey);
-      const model = getConfigValue(geminiModel);
-      const geminiWebViewProvider = new GeminiWebViewProvider(
-        context.extensionUri,
-        key,
-        model,
-        context,
+    const quickFixCodeAction: vscode.Disposable =
+      vscode.languages.registerCodeActionsProvider(
+        { scheme: "file", language: "*" },
+        quickFix
       );
 
-      const registerGeminiWebViewProvider =
-        vscode.window.registerWebviewViewProvider(
-          GeminiWebViewProvider.viewId,
-          geminiWebViewProvider,
-        );
-
-      const chatManager = new ChatManager(context);
-      const chatWithOla = chatManager.registerChatCommand();
-
-      context.subscriptions.push(
-        ...subscriptions,
+    const modelConfigurations: {
+      [key: string]: {
+        key: string;
+        model: string;
+        webviewProviderClass: any;
+        subscriptions: vscode.Disposable[];
+        quickFixCodeAction: vscode.Disposable;
+      };
+    } = {
+      [generativeAiModel.GEMINI]: {
+        key: geminiKey,
+        model: geminiModel,
+        webviewProviderClass: GeminiWebViewProvider,
+        subscriptions,
         quickFixCodeAction,
-        registerGeminiWebViewProvider,
-        chatWithOla,
-      );
-    }
-
-    if (selectedGenerativeAiModel === generativeModel.GROQ) {
-      const key = getConfigValue(groqKey);
-      const model = getConfigValue(groqModel);
-      const groqWebViewProvider = new GroqWebViewProvider(
-        context.extensionUri,
-        key,
-        model,
-        context,
-      );
-      const registerGroqWebViewProvider =
-        vscode.window.registerWebviewViewProvider(
-          GroqWebViewProvider.viewId,
-          groqWebViewProvider,
-        );
-
-      const chatManager = new ChatManager(context);
-      const chatWithOla = chatManager.registerChatCommand();
-
-      context.subscriptions.push(
-        ...subscriptions,
+      },
+      [generativeAiModel.GROQ]: {
+        key: groqKey,
+        model: groqModel,
+        webviewProviderClass: GroqWebViewProvider,
+        subscriptions,
         quickFixCodeAction,
-        registerGroqWebViewProvider,
-        chatWithOla,
+      },
+    };
+    if (selectedGenerativeAiModel in modelConfigurations) {
+      const modelConfig = modelConfigurations[selectedGenerativeAiModel];
+      const { key, model, webviewProviderClass } = modelConfig;
+      setUpGenerativeAiModel(
+        context,
+        model,
+        key,
+        webviewProviderClass,
+        subscriptions,
+        quickFixCodeAction
       );
     }
   } catch (error) {
+    vscode.window.showErrorMessage(
+      "An Error occured while setting up generative AI model"
+    );
     console.log(error);
   }
+}
+
+export function deactivate(context: vscode.ExtensionContext) {
+  //TODO once the application is rewritten in React, delete the pattern file on deactivate
+  context.subscriptions.forEach((subscription) => subscription.dispose());
 }
