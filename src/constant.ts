@@ -11,6 +11,7 @@ export enum OLA_ACTIONS {
   commitMessage = "ola.generateCommitMessage",
   interviewMe = "ola.interviewMe",
   generateUnitTest = "ola.generateUnitTest",
+  generateCodeChart = "ola.generateCodeChart",
 }
 
 export const GROQ_CONFIG = {
@@ -29,7 +30,7 @@ export const appConfig = {
   generativeAi: "generativeAi.option",
 };
 
-export enum generativeModel {
+export enum generativeAiModel {
   GEMINI = "Gemini",
   GROQ = "Groq",
 }

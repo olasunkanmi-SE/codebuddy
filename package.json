@@ -91,6 +91,11 @@
           "when": "editorHasSelection",
           "command": "ola.generateUnitTest",
           "group": "CodeBuddy"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "ola.generateCodeChart",
+          "group": "CodeBuddy"
         }
       ]
     },
@@ -138,6 +143,10 @@
       {
         "command": "ola.generateUnitTest",
         "title": "CodeBuddy. Generate Unit Test."
+      },
+      {
+        "command": "ola.generateCodeChart",
+        "title": "CodeBuddy. Generate Code Chart."
       }
     ],
     "viewsContainers": {
@@ -175,7 +184,7 @@
               "string",
               "null"
             ],
-            "default": null,
+            "default": "gemini-1.5-flash",
             "markdownDescription": "Provide the name of the model you want to use. Choose from the [base models](https://ai.google.dev/models/gemini) or your own [tuned model](https://ai.google.dev/docs/model_tuning_guidance)."
           },
           "groq.llama3.apiKey": {
@@ -183,7 +192,7 @@
               "string",
               "null"
             ],
-            "default": null,
+            "default": "llama-3.1-70b-versatile",
             "markdownDescription": "Enter your [API Key](https://console.groq.com/keys) Groq"
           },
           "groq.llama3.model": {

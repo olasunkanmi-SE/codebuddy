@@ -6,7 +6,7 @@ import * as vscode from "vscode";
 import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
 import { getConfigValue, vscodeErrorMessage } from "../utils";
 import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
-import { appConfig, generativeModel } from "../constant";
+import { appConfig, generativeAiModel } from "../constant";
 
 interface IEventGenerator {
   getApplicationConfig(configKey: string): string | undefined;
@@ -43,17 +43,17 @@ export abstract class EventGenerator implements IEventGenerator {
   }
 
   protected createModel():
-    | { generativeAi: string; generativeAiModel: any; modelName: string }
+    | { generativeAi: string; model: any; modelName: string }
     | undefined {
     try {
-      let generativeAiModel;
+      let model;
       let modelName = "";
       if (!this.generativeAi) {
         vscodeErrorMessage(
           "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
         );
       }
-      if (this.generativeAi === generativeModel.GROQ) {
+      if (this.generativeAi === generativeAiModel.GROQ) {
         const apiKey = this.grokApiKey;
         modelName = this.grokModel;
         if (!apiKey || !modelName) {
@@ -61,15 +61,15 @@ export abstract class EventGenerator implements IEventGenerator {
             "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
           );
         }
-        generativeAiModel = this.createGroqModel(apiKey);
+        model = this.createGroqModel(apiKey);
       }
 
-      if (this.generativeAi === generativeModel.GEMINI) {
+      if (this.generativeAi === generativeAiModel.GEMINI) {
         const apiKey = this.geminiApiKey;
         modelName = this.geminiModel;
-        generativeAiModel = this.createGeminiModel(apiKey, modelName);
+        model = this.createGeminiModel(apiKey, modelName);
       }
-      return { generativeAi: this.generativeAi, generativeAiModel, modelName };
+      return { generativeAi: this.generativeAi, model, modelName };
     } catch (error) {
       console.error("Error creating model:", error);
       vscode.window.showErrorMessage(
@@ -118,31 +118,23 @@ export abstract class EventGenerator implements IEventGenerator {
         throw new Error("Model not found. Check your settings.");
       }
 
-      const { generativeAi, generativeAiModel, modelName } = activeModel;
+      const { generativeAi, model, modelName } = activeModel;
       if (!generativeAi || !generativeAiModel) {
         throw new Error("Model not found. Check your settings.");
       }
       let response;
       switch (generativeAi) {
         case "Gemini":
-          response = await this.generateGeminiResponse(generativeAiModel, text);
+          response = await this.generateGeminiResponse(model, text);
           break;
         case "Claude":
           if (modelName) {
-            response = await this.anthropicResponse(
-              generativeAiModel,
-              modelName,
-              text,
-            );
+            response = await this.anthropicResponse(model, modelName, text);
           }
           break;
         case "Groq":
           if (modelName) {
-            response = await this.groqResponse(
-              generativeAiModel,
-              text,
-              modelName,
-            );
+            response = await this.groqResponse(model, text, modelName);
           }
           break;
         default:
@@ -154,6 +146,9 @@ export abstract class EventGenerator implements IEventGenerator {
           "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly.",
         );
       }
+      if (this.action.includes("chart")) {
+        response = this.cleanGraphString(response as string);
+      }
       return response;
     } catch (error) {
       console.error("Error generating response:", error);
@@ -161,6 +156,13 @@ export abstract class EventGenerator implements IEventGenerator {
         "An error occurred while generating the response. Please try again.",
       );
     }
+  }
+
+  cleanGraphString(inputString: string) {
+    if (inputString.includes("|>")) {
+      return inputString.replace(/\|>/g, "|");
+    }
+    return inputString;
   }
 
   async generateGeminiResponse(
@@ -246,31 +248,35 @@ export abstract class EventGenerator implements IEventGenerator {
     }
 
     const response = await this.generateModelResponse(prompt);
-    const generativeAiModel = this.geminiModel;
+    const model = this.geminiModel;
     if (prompt && response) {
-      if (generativeAiModel === generativeModel.GEMINI) {
-        this.context.workspaceState.update("chatHistory", [
-          {
-            role: "user",
-            parts: [{ text: response }],
-          },
-          {
-            role: "model",
-            parts: [{ text: response }],
-          },
-        ]);
-      }
-      if (generativeAiModel === generativeModel.GROQ) {
-        this.context.workspaceState.update("chatHistory", [
-          {
-            role: "user",
-            content: prompt,
-          },
-          {
-            role: "system",
-            content: response,
-          },
-        ]);
+      switch (model) {
+        case generativeAiModel.GEMINI:
+          this.context.workspaceState.update("chatHistory", [
+            {
+              role: "user",
+              parts: [{ text: prompt }],
+            },
+            {
+              role: "model",
+              parts: [{ text: response }],
+            },
+          ]);
+          break;
+        case generativeAiModel.GROQ:
+          this.context.workspaceState.update("chatHistory", [
+            {
+              role: "user",
+              content: prompt,
+            },
+            {
+              role: "system",
+              content: response,
+            },
+          ]);
+          break;
+        default:
+          break;
       }
     }
 
@@ -278,34 +284,27 @@ export abstract class EventGenerator implements IEventGenerator {
   }
 
   async execute(errorMessage?: string): Promise<void> {
-    const comment = (await this.generateResponse(errorMessage)) as string;
-    if (!comment) {
+    const response = (await this.generateResponse(errorMessage)) as string;
+    if (!response) {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
     }
-    if (!errorMessage) {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) {
-        console.debug("Abandon: no open text editor.");
-        return;
-      }
-    }
-    const formattedComment = this.formatResponse(comment);
-    if (!formattedComment) {
+    const formattedResponse = this.formatResponse(response);
+    if (!formattedResponse) {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
     }
     if (this.generativeAi === "Groq") {
       await GroqWebViewProvider.webView?.webview.postMessage({
         type: "user-input",
-        message: formattedComment,
+        message: formattedResponse,
       });
     }
 
     if (this.generativeAi === "Gemini") {
       await GeminiWebViewProvider.webView?.webview.postMessage({
         type: "user-input",
-        message: formattedComment,
+        message: formattedResponse,
       });
     }
   }

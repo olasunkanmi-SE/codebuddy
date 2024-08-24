@@ -3,7 +3,7 @@ import { formatText } from "../utils";
 import { getWebviewContent } from "../webview/chat";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
-import { PatternUploader } from "../events/pattern-uploader";
+import { FileUploader } from "../events/file-uploader";
 
 type Role = "function" | "user" | "model";
 
@@ -13,6 +13,10 @@ export interface IHistory {
 }
 
 export let _view: vscode.WebviewView | undefined;
+/**
+ * @deprecated This module is deprecated and will be removed in a future version.
+ * Please use the new module instead: {@link NewModule}
+ */
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "chatView";
   public static webView: vscode.WebviewView | undefined;
@@ -43,8 +47,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     const modelName = "gemini-1.0-pro-latest";
-    const codepatterns: PatternUploader = new PatternUploader(this._context);
-    const knowledgeBaseDocs: string[] = await codepatterns.getPatterns();
+    const codepatterns: FileUploader = new FileUploader(this._context);
+    const knowledgeBaseDocs: string[] = await codepatterns.getFiles();
     _view.webview.html = getWebviewContent(knowledgeBaseDocs);
 
     _view.webview.onDidReceiveMessage(async (message) => {

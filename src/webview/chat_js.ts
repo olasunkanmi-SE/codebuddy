@@ -79,12 +79,12 @@ function addCodeWrappers() {
     const existingWrapper = preElement.closest('.code-wrapper');
     if (!existingWrapper) {
       const codeText = block.textContent;
-      const language = detectLanguage(codeText);
+      const assistant = '';
       const wrapper = document.createElement('div');
       wrapper.className = 'code-wrapper';
       const header = document.createElement('div');
       header.className = 'code-header';
-      header.innerHTML = \`<span class="code-language">\${language}</span><button class="copy-code-button">Copy</button>\`;
+      header.innerHTML = \`<span class="code-language">\${assistant}</span><button class="copy-code-button">Copy</button>\`;
       preElement.parentNode.insertBefore(wrapper, preElement);
       wrapper.appendChild(header);
       wrapper.appendChild(preElement);
