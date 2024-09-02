@@ -11,11 +11,19 @@ export interface IHistory {
 
 export class AnthropicWebViewProvider extends BaseWebViewProvider {
   chatHistory: IHistory[] = [];
-  constructor(extensionUri: vscode.Uri, apiKey: string, generativeAiModel: string, context: vscode.ExtensionContext) {
+  constructor(
+    extensionUri: vscode.Uri,
+    apiKey: string,
+    generativeAiModel: string,
+    context: vscode.ExtensionContext,
+  ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
-  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  public async sendResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -30,8 +38,12 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         });
       }
       if (this.chatHistory.length === 2) {
-        const history: IHistory[] | undefined = this._context.workspaceState.get(COMMON.CHAT_HISTORY, []);
-        this._context.workspaceState.update(COMMON.CHAT_HISTORY, [...history, ...this.chatHistory]);
+        const history: IHistory[] | undefined =
+          this._context.workspaceState.get(COMMON.CHAT_HISTORY, []);
+        this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
+          ...history,
+          ...this.chatHistory,
+        ]);
       }
 
       return await this.currentWebView?.webview.postMessage({
@@ -49,7 +61,10 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       const anthropic = new Anthropic({
         apiKey: this.apiKey,
       });
-      let chatHistory = this._context.workspaceState.get<IHistory[]>(COMMON.CHAT_HISTORY, []);
+      let chatHistory = this._context.workspaceState.get<IHistory[]>(
+        COMMON.CHAT_HISTORY,
+        [],
+      );
       if (chatHistory?.length >= 3) {
         chatHistory = chatHistory.slice(-2);
       }
@@ -70,7 +85,9 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     } catch (error) {
       console.error(error);
       this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
-      vscode.window.showErrorMessage("Model not responding, please resend your question");
+      vscode.window.showErrorMessage(
+        "Model not responding, please resend your question",
+      );
       return;
     }
   }

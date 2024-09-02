@@ -3,18 +3,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
+import { APP_CONFIG, COMMON, generativeAiModel } from "../constant";
+import { AnthropicWebViewProvider } from "../providers/anthropic-web-view-provider";
+import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
 import {
   GroqWebViewProvider,
   IHistory,
 } from "../providers/groq-web-view-provider";
 import { getConfigValue, vscodeErrorMessage } from "../utils";
-import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
-import {
-  APP_CONFIG,
-  COMMON,
-  generativeAiModel,
-  GROQ_CONFIG,
-} from "../constant";
 
 interface IEventGenerator {
   getApplicationConfig(configKey: string): string | undefined;
@@ -90,7 +86,7 @@ export abstract class EventGenerator implements IEventGenerator {
         model = this.createGeminiModel(apiKey, modelName);
       }
 
-      if (this.geminiApiKey === generativeAiModel.ANTHROPIC) {
+      if (this.generativeAi === generativeAiModel.ANTHROPIC) {
         const apiKey: string = this.anthropicApiKey;
         modelName = this.anthropicModel;
         model = this.createAnthropicModel(apiKey);
@@ -211,7 +207,7 @@ export abstract class EventGenerator implements IEventGenerator {
         max_tokens: 1024,
         messages: [{ role: "user", content: userPrompt }],
       });
-      return response;
+      return response.content[0].text;
     } catch (error) {
       console.error("Error generating response:", error);
       vscode.window.showErrorMessage(
@@ -337,15 +333,22 @@ export abstract class EventGenerator implements IEventGenerator {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
     }
-    if (this.generativeAi === "Groq") {
+    if (this.generativeAi === generativeAiModel.GROQ) {
       await GroqWebViewProvider.webView?.webview.postMessage({
         type: "user-input",
         message: formattedResponse,
       });
     }
 
-    if (this.generativeAi === "Gemini") {
+    if (this.generativeAi === generativeAiModel.GEMINI) {
       await GeminiWebViewProvider.webView?.webview.postMessage({
+        type: "user-input",
+        message: formattedResponse,
+      });
+    }
+
+    if (this.generativeAi === generativeAiModel.ANTHROPIC) {
+      await AnthropicWebViewProvider.webView?.webview.postMessage({
         type: "user-input",
         message: formattedResponse,
       });
