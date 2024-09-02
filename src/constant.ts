@@ -32,12 +32,12 @@ export const APP_CONFIG = {
   groqKey: "groq.llama3.apiKey",
   groqModel: "groq.llama3.model",
   generativeAi: "generativeAi.option",
-  claudeModel: "claude.model",
-  claudeApiKey: "claude.apiKey",
+  anthropicModel: "anthropic.model",
+  anthropicApiKey: "anthropic.apiKey",
 };
 
 export enum generativeAiModel {
   GEMINI = "Gemini",
   GROQ = "Groq",
-  CLAUDE = "Claude",
+  ANTHROPIC = "Anthropic",
 }

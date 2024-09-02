@@ -19,7 +19,8 @@ export class ChatManager {
   private readonly generativeAi: string;
 
   constructor(context: vscode.ExtensionContext) {
-    const { geminiKey, geminiModel, groqKey, groqModel, generativeAi } = APP_CONFIG;
+    const { geminiKey, geminiModel, groqKey, groqModel, generativeAi } =
+      APP_CONFIG;
     this._context = context;
     this.geminiApiKey = getConfigValue(geminiKey);
     this.geminiModel = getConfigValue(geminiModel);
@@ -37,7 +38,9 @@ export class ChatManager {
         this.sendResponse(selectedText, response);
       } catch (error) {
         console.error(error);
-        vscodeErrorMessage("Failed to generate content. Please try again later.");
+        vscodeErrorMessage(
+          "Failed to generate content. Please try again later.",
+        );
       }
     });
   }
@@ -62,30 +65,34 @@ export class ChatManager {
       if (generativeAi === "Groq") {
         if (!this.grokApiKey || !this.grokModel) {
           vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
+            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
           );
         }
         const chatViewProvider = new GroqWebViewProvider(
           this._context.extensionUri,
           this.grokApiKey,
           this.grokModel,
-          this._context
+          this._context,
         );
         return await chatViewProvider.generateResponse(message);
       }
       if (generativeAi === "Gemini") {
         if (!this.geminiApiKey || !this.geminiModel) {
           vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
+            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
           );
         }
         const geminiWebViewProvider = new GeminiWebViewProvider(
           this._context.extensionUri,
           this.geminiApiKey,
           this.geminiModel,
-          this._context
+          this._context,
         );
-        return await geminiWebViewProvider.generateResponse(this.geminiApiKey, this.geminiModel, message);
+        return await geminiWebViewProvider.generateResponse(
+          this.geminiApiKey,
+          this.geminiModel,
+          message,
+        );
       }
     } catch (error) {
       this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
@@ -100,7 +107,7 @@ export class ChatManager {
           this._context.extensionUri,
           this.grokApiKey,
           this.grokModel,
-          this._context
+          this._context,
         );
         chatViewProvider.sendResponse(formatText(userInput), "user-input");
         chatViewProvider.sendResponse(formatText(response), "bot");
@@ -110,7 +117,7 @@ export class ChatManager {
           this._context.extensionUri,
           this.geminiApiKey,
           this.geminiModel,
-          this._context
+          this._context,
         );
         geminiWebViewProvider.sendResponse(formatText(userInput), "user-input");
         geminiWebViewProvider.sendResponse(formatText(response), "bot");

@@ -26,7 +26,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     this._context = context;
   }
@@ -38,9 +38,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri],
     };
 
-    const apiKey = vscode.workspace.getConfiguration().get<string>("google.gemini.apiKeys");
+    const apiKey = vscode.workspace
+      .getConfiguration()
+      .get<string>("google.gemini.apiKeys");
     if (!apiKey) {
-      vscode.window.showErrorMessage("API key not configured. Check your settings.");
+      vscode.window.showErrorMessage(
+        "API key not configured. Check your settings.",
+      );
       return;
     }
     const modelName = "gemini-1.0-pro-latest";
@@ -50,7 +54,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     _view.webview.onDidReceiveMessage(async (message) => {
       if (message.type === "user-input") {
-        const response = await this.generateResponse(apiKey, modelName, formatText(message.message));
+        const response = await this.generateResponse(
+          apiKey,
+          modelName,
+          formatText(message.message),
+        );
         if (response) {
           this.sendResponse(formatText(response), "bot");
         }
@@ -62,7 +70,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   // 1. Move this to AI service, rememeber you can call the static method webView, a property of ChatViewProvider
   // sendResponse and sendGroqResponse look so Identical. Create a generic function for both
 
-  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  public async sendResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
     if (currentChat === "bot") {
       this.chatHistory.push({
@@ -75,14 +86,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         parts: [{ text: response }],
       });
     }
-    this._context.workspaceState.update(COMMON.CHAT_HISTORY, [...this.chatHistory]);
+    this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
+      ...this.chatHistory,
+    ]);
     return await _view?.webview.postMessage({
       type,
       message: response,
     });
   }
 
-  public async sendGroqResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  public async sendGroqResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     const type = currentChat === "bot" ? "bot-response" : "user-input";
     if (currentChat === "bot") {
       this.chatHistory.push({
@@ -95,18 +111,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         parts: [{ text: response }],
       });
     }
-    this._context.workspaceState.update(COMMON.CHAT_HISTORY, [...this.chatHistory]);
+    this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
+      ...this.chatHistory,
+    ]);
     return await _view?.webview.postMessage({
       type,
       message: response,
     });
   }
 
-  async generateResponse(apiKey: string, name: string, message: string): Promise<string | undefined> {
+  async generateResponse(
+    apiKey: string,
+    name: string,
+    message: string,
+  ): Promise<string | undefined> {
     try {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
-      const chatHistory = this._context.workspaceState.get<IHistory[]>(COMMON.CHAT_HISTORY, []);
+      const chatHistory = this._context.workspaceState.get<IHistory[]>(
+        COMMON.CHAT_HISTORY,
+        [],
+      );
       const chat = model.startChat({
         history: [
           {
@@ -142,7 +167,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     temperature: number,
     max_tokens: number,
     top_p: number,
-    stream: boolean
+    stream: boolean,
   ) {
     const groq = new Groq();
     groq.chat.completions
