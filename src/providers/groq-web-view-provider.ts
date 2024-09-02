@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base-web-view-provider";
 import Groq from "groq-sdk";
-import { GROQ_CONFIG } from "../constant";
+import { COMMON, GROQ_CONFIG } from "../constant";
 
 type Role = "user" | "system";
 export interface IHistory {
@@ -37,7 +37,15 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
           content: response,
         });
       }
-      this._context.workspaceState.update("chatHistory", [...this.chatHistory]);
+      if (this.chatHistory.length === 2) {
+        const history: IHistory[] | undefined =
+          this._context.workspaceState.get(COMMON.CHAT_HISTORY, []);
+        this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
+          ...history,
+          ...this.chatHistory,
+        ]);
+      }
+
       return await this.currentWebView?.webview.postMessage({
         type,
         message: response,
@@ -54,7 +62,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         apiKey: this.apiKey,
       });
       const chatHistory = this._context.workspaceState.get<IHistory[]>(
-        "chatHistory",
+        COMMON.CHAT_HISTORY,
         [],
       );
       const chatCompletion = groq.chat.completions.create({
@@ -86,7 +94,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       return response;
     } catch (error) {
       console.error(error);
-      this._context.workspaceState.update("chatHistory", []);
+      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );

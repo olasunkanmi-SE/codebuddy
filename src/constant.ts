@@ -14,6 +14,12 @@ export enum OLA_ACTIONS {
   generateCodeChart = "ola.generateCodeChart",
 }
 
+export enum COMMON {
+  CHAT_HISTORY = "chatHistory",
+  USER_INPUT = "user-input",
+  BOT = "bot",
+}
+
 export const GROQ_CONFIG = {
   temperature: 0.1,
   max_tokens: 1024,
@@ -22,15 +28,18 @@ export const GROQ_CONFIG = {
   stop: null,
 };
 
-export const appConfig = {
+export const APP_CONFIG = {
   geminiKey: "google.gemini.apiKeys",
   geminiModel: "google.gemini.model",
   groqKey: "groq.llama3.apiKey",
   groqModel: "groq.llama3.model",
   generativeAi: "generativeAi.option",
+  anthropicModel: "anthropic.model",
+  anthropicApiKey: "anthropic.apiKey",
 };
 
 export enum generativeAiModel {
   GEMINI = "Gemini",
   GROQ = "Groq",
+  ANTHROPIC = "Anthropic",
 }

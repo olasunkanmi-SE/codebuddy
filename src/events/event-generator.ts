@@ -3,10 +3,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
-import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
-import { getConfigValue, vscodeErrorMessage } from "../utils";
+import { APP_CONFIG, COMMON, generativeAiModel } from "../constant";
+import { AnthropicWebViewProvider } from "../providers/anthropic-web-view-provider";
 import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
-import { appConfig, generativeAiModel } from "../constant";
+import {
+  GroqWebViewProvider,
+  IHistory,
+} from "../providers/groq-web-view-provider";
+import { getConfigValue, vscodeErrorMessage } from "../utils";
 
 interface IEventGenerator {
   getApplicationConfig(configKey: string): string | undefined;
@@ -22,6 +26,9 @@ export abstract class EventGenerator implements IEventGenerator {
   private readonly geminiModel: string;
   private readonly grokApiKey: string;
   private readonly grokModel: string;
+  private readonly anthropicModel: string;
+  private readonly anthropicApiKey: string;
+  // Todo Need to refactor. Only one instance of a model can be created at a time. Therefore no need to retrieve all model information, only retrieve the required model within the application
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,
@@ -29,13 +36,22 @@ export abstract class EventGenerator implements IEventGenerator {
   ) {
     this.context = _context;
     this.error = errorMessage;
-    const { generativeAi, geminiKey, geminiModel, groqKey, groqModel } =
-      appConfig;
+    const {
+      generativeAi,
+      geminiKey,
+      geminiModel,
+      groqKey,
+      groqModel,
+      anthropicModel,
+      anthropicApiKey,
+    } = APP_CONFIG;
     this.generativeAi = getConfigValue(generativeAi);
     this.geminiApiKey = getConfigValue(geminiKey);
     this.geminiModel = getConfigValue(geminiModel);
     this.grokApiKey = getConfigValue(groqKey);
     this.grokModel = getConfigValue(groqModel);
+    this.anthropicModel = getConfigValue(anthropicModel);
+    this.anthropicApiKey = getConfigValue(anthropicApiKey);
   }
 
   getApplicationConfig(configKey: string): string | undefined {
@@ -68,6 +84,12 @@ export abstract class EventGenerator implements IEventGenerator {
         const apiKey = this.geminiApiKey;
         modelName = this.geminiModel;
         model = this.createGeminiModel(apiKey, modelName);
+      }
+
+      if (this.generativeAi === generativeAiModel.ANTHROPIC) {
+        const apiKey: string = this.anthropicApiKey;
+        modelName = this.anthropicModel;
+        model = this.createAnthropicModel(apiKey);
       }
       return { generativeAi: this.generativeAi, model, modelName };
     } catch (error) {
@@ -127,7 +149,7 @@ export abstract class EventGenerator implements IEventGenerator {
         case "Gemini":
           response = await this.generateGeminiResponse(model, text);
           break;
-        case "Claude":
+        case "Anthropic":
           if (modelName) {
             response = await this.anthropicResponse(model, modelName, text);
           }
@@ -185,7 +207,7 @@ export abstract class EventGenerator implements IEventGenerator {
         max_tokens: 1024,
         messages: [{ role: "user", content: userPrompt }],
       });
-      return response;
+      return response.content[0].text;
     } catch (error) {
       console.error("Error generating response:", error);
       vscode.window.showErrorMessage(
@@ -201,8 +223,13 @@ export abstract class EventGenerator implements IEventGenerator {
     generativeAiModel: string,
   ): Promise<string | undefined> {
     try {
+      const chatHistory = this.context.workspaceState.get<IHistory[]>(
+        COMMON.CHAT_HISTORY,
+        [],
+      );
       const params = {
         messages: [
+          ...chatHistory,
           {
             role: "user",
             content: prompt,
@@ -249,10 +276,11 @@ export abstract class EventGenerator implements IEventGenerator {
 
     const response = await this.generateModelResponse(prompt);
     const model = this.geminiModel;
+    //TODO check the format of the history and ensure it conforms with the current model, else delete the history
     if (prompt && response) {
       switch (model) {
         case generativeAiModel.GEMINI:
-          this.context.workspaceState.update("chatHistory", [
+          this.context.workspaceState.update(COMMON.CHAT_HISTORY, [
             {
               role: "user",
               parts: [{ text: prompt }],
@@ -264,7 +292,7 @@ export abstract class EventGenerator implements IEventGenerator {
           ]);
           break;
         case generativeAiModel.GROQ:
-          this.context.workspaceState.update("chatHistory", [
+          this.context.workspaceState.update(COMMON.CHAT_HISTORY, [
             {
               role: "user",
               content: prompt,
@@ -275,11 +303,22 @@ export abstract class EventGenerator implements IEventGenerator {
             },
           ]);
           break;
+        case generativeAiModel.ANTHROPIC:
+          this.context.workspaceState.update(COMMON.CHAT_HISTORY, [
+            {
+              role: "user",
+              content: prompt,
+            },
+            {
+              role: "assistant",
+              content: response,
+            },
+          ]);
+          break;
         default:
           break;
       }
     }
-
     return response;
   }
 
@@ -294,15 +333,22 @@ export abstract class EventGenerator implements IEventGenerator {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
     }
-    if (this.generativeAi === "Groq") {
+    if (this.generativeAi === generativeAiModel.GROQ) {
       await GroqWebViewProvider.webView?.webview.postMessage({
         type: "user-input",
         message: formattedResponse,
       });
     }
 
-    if (this.generativeAi === "Gemini") {
+    if (this.generativeAi === generativeAiModel.GEMINI) {
       await GeminiWebViewProvider.webView?.webview.postMessage({
+        type: "user-input",
+        message: formattedResponse,
+      });
+    }
+
+    if (this.generativeAi === generativeAiModel.ANTHROPIC) {
+      await AnthropicWebViewProvider.webView?.webview.postMessage({
         type: "user-input",
         message: formattedResponse,
       });

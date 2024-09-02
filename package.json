@@ -166,7 +166,8 @@
             "type": "string",
             "enum": [
               "Gemini",
-              "Groq"
+              "Groq",
+              "Anthropic"
             ],
             "default": "Groq",
             "description": "Select the Generative AI to use with code buddy"
@@ -202,6 +203,22 @@
             ],
             "default": null,
             "markdownDescription": "Provide the name of the Groq model you want to use. Choose from the ..."
+          },
+          "anthropic.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "markdownDescription": "Provide the name of the Anthropic model you want to use. Choose from the ..."
+          },
+          "anthropic.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "markdownDescription": "Enter your [API Key](https://docs.anthropic.com/en/docs/about-claude/models) Anthropic"
           },
           "font.family": {
             "type": "string",

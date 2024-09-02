@@ -4,6 +4,7 @@ import { getWebviewContent } from "../webview/chat";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import { FileUploader } from "../events/file-uploader";
+import { COMMON } from "../constant";
 
 type Role = "function" | "user" | "model";
 
@@ -85,7 +86,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         parts: [{ text: response }],
       });
     }
-    this._context.workspaceState.update("chatHistory", [...this.chatHistory]);
+    this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
+      ...this.chatHistory,
+    ]);
     return await _view?.webview.postMessage({
       type,
       message: response,
@@ -108,7 +111,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         parts: [{ text: response }],
       });
     }
-    this._context.workspaceState.update("chatHistory", [...this.chatHistory]);
+    this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
+      ...this.chatHistory,
+    ]);
     return await _view?.webview.postMessage({
       type,
       message: response,
@@ -124,7 +129,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
       const chatHistory = this._context.workspaceState.get<IHistory[]>(
-        "chatHistory",
+        COMMON.CHAT_HISTORY,
         [],
       );
       const chat = model.startChat({
@@ -152,7 +157,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const response = result.response;
       return response.text();
     } catch (error) {
-      this._context.workspaceState.update("chatHistory", []);
+      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
       console.error(error);
     }
   }

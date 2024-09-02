@@ -1,6 +1,7 @@
-import * as vscode from "vscode";
-import { BaseWebViewProvider } from "./base-web-view-provider";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import * as vscode from "vscode";
+import { COMMON } from "../constant";
+import { BaseWebViewProvider } from "./base-web-view-provider";
 
 type Role = "function" | "user" | "model";
 export interface IHistory {
@@ -36,12 +37,20 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
           parts: [{ text: response }],
         });
       }
-      this._context.workspaceState.update("chatHistory", [...this.chatHistory]);
+      if (this.chatHistory.length === 2) {
+        const history: IHistory[] | undefined =
+          this._context.workspaceState.get(COMMON.CHAT_HISTORY, []);
+        this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
+          ...history,
+          ...this.chatHistory,
+        ]);
+      }
       return await this.currentWebView?.webview.postMessage({
         type,
         message: response,
       });
     } catch (error) {
+      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
       console.error(error);
     }
   }
@@ -55,7 +64,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
       const chatHistory = this._context.workspaceState.get<IHistory[]>(
-        "chatHistory",
+        COMMON.CHAT_HISTORY,
         [],
       );
       const chat = model.startChat({
@@ -83,7 +92,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       const response = result.response;
       return response.text();
     } catch (error) {
-      this._context.workspaceState.update("chatHistory", []);
+      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );

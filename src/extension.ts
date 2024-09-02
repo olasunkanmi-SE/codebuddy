@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import {
-  appConfig,
+  APP_CONFIG,
+  COMMON,
   generativeAiModel,
   OLA_ACTIONS,
   USER_MESSAGE,
@@ -22,11 +23,20 @@ import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
 import { getConfigValue } from "./utils";
+import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
 
-const { geminiKey, geminiModel, groqKey, groqModel } = appConfig;
+const {
+  geminiKey,
+  geminiModel,
+  groqKey,
+  groqModel,
+  anthropicApiKey,
+  anthropicModel,
+} = APP_CONFIG;
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    context.workspaceState.update(COMMON.CHAT_HISTORY, []);
     const {
       comment,
       review,
@@ -140,6 +150,13 @@ export async function activate(context: vscode.ExtensionContext) {
         subscriptions,
         quickFixCodeAction,
       },
+      [generativeAiModel.ANTHROPIC]: {
+        key: anthropicApiKey,
+        model: anthropicModel,
+        webviewProviderClass: AnthropicWebViewProvider,
+        subscriptions,
+        quickFixCodeAction,
+      },
     };
     if (selectedGenerativeAiModel in modelConfigurations) {
       const modelConfig = modelConfigurations[selectedGenerativeAiModel];
@@ -154,6 +171,7 @@ export async function activate(context: vscode.ExtensionContext) {
       );
     }
   } catch (error) {
+    context.workspaceState.update(COMMON.CHAT_HISTORY, []);
     vscode.window.showErrorMessage(
       "An Error occured while setting up generative AI model",
     );
