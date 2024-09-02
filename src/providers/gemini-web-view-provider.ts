@@ -11,11 +11,19 @@ export interface IHistory {
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
   chatHistory: IHistory[] = [];
-  constructor(extensionUri: vscode.Uri, apiKey: string, generativeAiModel: string, context: vscode.ExtensionContext) {
+  constructor(
+    extensionUri: vscode.Uri,
+    apiKey: string,
+    generativeAiModel: string,
+    context: vscode.ExtensionContext,
+  ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
-  async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  async sendResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -30,8 +38,12 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         });
       }
       if (this.chatHistory.length === 2) {
-        const history: IHistory[] | undefined = this._context.workspaceState.get(COMMON.CHAT_HISTORY, []);
-        this._context.workspaceState.update(COMMON.CHAT_HISTORY, [...history, ...this.chatHistory]);
+        const history: IHistory[] | undefined =
+          this._context.workspaceState.get(COMMON.CHAT_HISTORY, []);
+        this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
+          ...history,
+          ...this.chatHistory,
+        ]);
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -43,11 +55,18 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(apiKey: string, name: string, message: string): Promise<string | undefined> {
+  async generateResponse(
+    apiKey: string,
+    name: string,
+    message: string,
+  ): Promise<string | undefined> {
     try {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
-      const chatHistory = this._context.workspaceState.get<IHistory[]>(COMMON.CHAT_HISTORY, []);
+      const chatHistory = this._context.workspaceState.get<IHistory[]>(
+        COMMON.CHAT_HISTORY,
+        [],
+      );
       const chat = model.startChat({
         history: [
           {
@@ -74,7 +93,9 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       return response.text();
     } catch (error) {
       this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
-      vscode.window.showErrorMessage("Model not responding, please resend your question");
+      vscode.window.showErrorMessage(
+        "Model not responding, please resend your question",
+      );
       console.error(error);
       return;
     }
