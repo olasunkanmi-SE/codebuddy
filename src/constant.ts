@@ -16,6 +16,8 @@ export enum OLA_ACTIONS {
 
 export enum COMMON {
   CHAT_HISTORY = "chatHistory",
+  USER_INPUT = "user-input",
+  BOT = "bot",
 }
 
 export const GROQ_CONFIG = {
