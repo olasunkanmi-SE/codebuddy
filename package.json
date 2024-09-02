@@ -166,7 +166,8 @@
             "type": "string",
             "enum": [
               "Gemini",
-              "Groq"
+              "Groq",
+              "Anthropic"
             ],
             "default": "Groq",
             "description": "Select the Generative AI to use with code buddy"
