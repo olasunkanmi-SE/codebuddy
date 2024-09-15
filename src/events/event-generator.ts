@@ -204,7 +204,7 @@ export abstract class EventGenerator implements IEventGenerator {
       const response = await model.messages.create({
         model: generativeAiModel,
         system: "",
-        max_tokens: 1024,
+        max_tokens: 3024,
         messages: [{ role: "user", content: userPrompt }],
       });
       return response.content[0].text;

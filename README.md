@@ -14,8 +14,8 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - [ ] Code Search: The assistant can search for code snippets and functions within the codebase, enabling quick reuse of existing code.
 - [x] Document Upload and Knowledge Retrieval: The assistant can upload documents and retrieve knowledge from them.
 - [ ] Auto-Completion of Code (Code Suggestions): The assistant will provide code suggestions for auto-completion.
-- [x] Support for various Generative AIs. Currently, Support Groq and Gemini
-- [ ] Folder-Specific Tasks: The assistant will be able to perform tasks such as summarizing, creating, and updating within specific folders.
+- [x] Support for various Generative AIs. Currently, Support Groq, Gemini, and Anthropic
+- [ ] Folder-Specific Tasks: The assistant performs tasks such as summarizing, creating, and updating within specific folders.
 - [ ] GitHub Issues Integration: The assistant will be connected to GitHub Issues, enhancing collaboration and issue tracking
 - [x] Unit Test Generation: The assistant can generate unit tests.
 - [x] Interview Mode: The assistant can generate interview questions based on selected code or text.
@@ -29,14 +29,14 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - A new instance of VScode will be open to you, this instance contains the latest file you opened on your Vscode
 - You can change the file by clicking on file -> open recent.
 - To access code buddy. Drag the explorer button to the right of the page. A chat interface should be displayed
-- Highlight any code, right-click. You should see lists of options like refactoring, optimizing code, etc.
-- Also you can simply type an instruction, in conjunction with some highlighted code if you will, right-click and click on send to Ola
+Highlight any code and right-click. You should see a list of options for refactoring, optimizing code, etc.
+- Type your instruction, in conjunction with some highlighted code if you will, right-click and click and choose from the available actions
 - you can have a chat-like conversation and it does remember your previous questions because there is support for chat history
 
 ## How to use
-- Once installed, drag the explorer button to the right of the page. A chat interface should be displayed
+- Once installed, drag the Explorer button to the right of the page. A chat interface should be displayed
 - Highlight your code, right-click, and select any of the desired assistant options
-- For generic questions, add your instructions to them, highlight and send them to CodeBuddy.
+- For generic questions, add your instructions to them, highlight and use the send to CodeBuddy command.
 - The chat button is disabled for now. Help is needed in fixing here https://github.com/olasunkanmi-SE/codebuddy/issues/37
 
 ## Requirements
