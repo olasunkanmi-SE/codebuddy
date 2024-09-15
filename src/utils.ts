@@ -1,6 +1,7 @@
 import * as markdownit from "markdown-it";
 import * as vscode from "vscode";
 import { MemoryCache } from "./services/memory";
+import { COMMON, generativeAiModel } from "./constant";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -13,7 +14,7 @@ export const formatText = (text?: string): string => {
 };
 
 export const getConfigValue: GetConfigValueType<any> = <T>(
-  key: string,
+  key: string
 ): T | undefined => {
   return vscode.workspace.getConfiguration().get<T>(key);
 };
@@ -28,4 +29,20 @@ export const getLatestChatHistory = (key: string) => {
     chatHistory = chatHistory.slice(-3);
   }
   return chatHistory;
+};
+
+export const resetChatHistory = (model: string) => {
+  switch (model) {
+    case generativeAiModel.ANTHROPIC:
+      MemoryCache.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
+      break;
+    case generativeAiModel.GEMINI:
+      MemoryCache.set(COMMON.GEMINI_CHAT_HISTORY, []);
+      break;
+    case generativeAiModel.GROQ:
+      MemoryCache.set(COMMON.GROQ_CHAT_HISTORY, []);
+      break;
+    default:
+      break;
+  }
 };

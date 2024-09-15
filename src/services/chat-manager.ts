@@ -1,5 +1,10 @@
 import * as vscode from "vscode";
-import { formatText, getConfigValue, vscodeErrorMessage } from "../utils";
+import {
+  formatText,
+  getConfigValue,
+  resetChatHistory,
+  vscodeErrorMessage,
+} from "../utils";
 import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
 import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
 import { APP_CONFIG, COMMON, generativeAiModel } from "../constant";
@@ -51,7 +56,7 @@ export class ChatManager {
       } catch (error) {
         console.error(error);
         vscodeErrorMessage(
-          "Failed to generate content. Please try again later.",
+          "Failed to generate content. Please try again later."
         );
       }
     });
@@ -77,52 +82,52 @@ export class ChatManager {
       if (generativeAi === "Groq") {
         if (!this.grokApiKey || !this.grokModel) {
           vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
+            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
           );
         }
         const chatViewProvider = new GroqWebViewProvider(
           this._context.extensionUri,
           this.grokApiKey,
           this.grokModel,
-          this._context,
+          this._context
         );
         return await chatViewProvider.generateResponse(message);
       }
       if (generativeAi === "Gemini") {
         if (!this.geminiApiKey || !this.geminiModel) {
           vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
+            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
           );
         }
         const geminiWebViewProvider = new GeminiWebViewProvider(
           this._context.extensionUri,
           this.geminiApiKey,
           this.geminiModel,
-          this._context,
+          this._context
         );
         return await geminiWebViewProvider.generateResponse(
           this.geminiApiKey,
           this.geminiModel,
-          message,
+          message
         );
       }
       if (generativeAi === "Anthropic") {
         if (!this.anthropicApiKey || !this.anthropicModel) {
           vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
+            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
           );
         }
         const geminiWebViewProvider = new AnthropicWebViewProvider(
           this._context.extensionUri,
           this.anthropicApiKey,
           this.anthropicModel,
-          this._context,
+          this._context
         );
         return await geminiWebViewProvider.generateResponse(message);
       }
     } catch (error) {
-      //check the model first and update accordingly
-      // this._context.workspaceState.update(COMMON.ANTHROPIC_CHAT_HISTORY, []);
+      const model = getConfigValue("generativeAi.option");
+      if (model) resetChatHistory(model);
       console.log(error);
     }
   }
@@ -134,7 +139,7 @@ export class ChatManager {
           this._context.extensionUri,
           this.grokApiKey,
           this.grokModel,
-          this._context,
+          this._context
         );
         chatViewProvider.sendResponse(formatText(userInput), COMMON.USER_INPUT);
         chatViewProvider.sendResponse(formatText(response), COMMON.BOT);
@@ -144,11 +149,11 @@ export class ChatManager {
           this._context.extensionUri,
           this.geminiApiKey,
           this.geminiModel,
-          this._context,
+          this._context
         );
         geminiWebViewProvider.sendResponse(
           formatText(userInput),
-          COMMON.USER_INPUT,
+          COMMON.USER_INPUT
         );
         geminiWebViewProvider.sendResponse(formatText(response), COMMON.BOT);
       }
@@ -157,17 +162,17 @@ export class ChatManager {
           this._context.extensionUri,
           this.anthropicApiKey,
           this.anthropicModel,
-          this._context,
+          this._context
         );
         anthropicWebViewProvider.sendResponse(
           formatText(userInput),
-          COMMON.USER_INPUT,
+          COMMON.USER_INPUT
         );
         anthropicWebViewProvider.sendResponse(formatText(response), COMMON.BOT);
       }
     } catch (error) {
-      //check what model and update state accordingly
-      // this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+      const model = getConfigValue("generativeAi.option");
+      if (model) resetChatHistory(model);
       console.error(error);
     }
   }
