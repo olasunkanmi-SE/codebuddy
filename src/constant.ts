@@ -15,7 +15,9 @@ export enum OLA_ACTIONS {
 }
 
 export enum COMMON {
-  CHAT_HISTORY = "chatHistory",
+  GROQ_CHAT_HISTORY = "groqChatHistory",
+  GEMINI_CHAT_HISTORY = "geminiChatHistory",
+  ANTHROPIC_CHAT_HISTORY = "anthropicChatHistory",
   USER_INPUT = "user-input",
   BOT = "bot",
 }
@@ -43,3 +45,7 @@ export enum generativeAiModel {
   GROQ = "Groq",
   ANTHROPIC = "Anthropic",
 }
+
+export const MEMORY_CACHE_OPTIONS = {
+  sessionTTL: 24 * 60 * 60 * 1000,
+};

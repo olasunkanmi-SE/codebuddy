@@ -121,7 +121,8 @@ export class ChatManager {
         return await geminiWebViewProvider.generateResponse(message);
       }
     } catch (error) {
-      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+      //check the model first and update accordingly
+      // this._context.workspaceState.update(COMMON.ANTHROPIC_CHAT_HISTORY, []);
       console.log(error);
     }
   }
@@ -165,7 +166,8 @@ export class ChatManager {
         anthropicWebViewProvider.sendResponse(formatText(response), COMMON.BOT);
       }
     } catch (error) {
-      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+      //check what model and update state accordingly
+      // this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
       console.error(error);
     }
   }
