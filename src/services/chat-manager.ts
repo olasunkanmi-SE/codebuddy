@@ -1,5 +1,10 @@
 import * as vscode from "vscode";
-import { formatText, getConfigValue, vscodeErrorMessage } from "../utils";
+import {
+  formatText,
+  getConfigValue,
+  resetChatHistory,
+  vscodeErrorMessage,
+} from "../utils";
 import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
 import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
 import { APP_CONFIG, COMMON, generativeAiModel } from "../constant";
@@ -121,7 +126,8 @@ export class ChatManager {
         return await geminiWebViewProvider.generateResponse(message);
       }
     } catch (error) {
-      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+      const model = getConfigValue("generativeAi.option");
+      if (model) resetChatHistory(model);
       console.log(error);
     }
   }
@@ -165,7 +171,8 @@ export class ChatManager {
         anthropicWebViewProvider.sendResponse(formatText(response), COMMON.BOT);
       }
     } catch (error) {
-      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+      const model = getConfigValue("generativeAi.option");
+      if (model) resetChatHistory(model);
       console.error(error);
     }
   }

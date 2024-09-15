@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base-web-view-provider";
 import Groq from "groq-sdk";
 import { COMMON, GROQ_CONFIG } from "../constant";
+import { MemoryCache } from "../services/memory";
 
 type Role = "user" | "system";
 export interface IHistory {
@@ -38,10 +39,11 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         });
       }
       if (this.chatHistory.length === 2) {
-        const history: IHistory[] | undefined =
-          this._context.workspaceState.get(COMMON.CHAT_HISTORY, []);
-        this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
-          ...history,
+        const chatHistory = MemoryCache.has(COMMON.GROQ_CHAT_HISTORY)
+          ? MemoryCache.get(COMMON.GROQ_CHAT_HISTORY)
+          : [];
+        MemoryCache.set(COMMON.GROQ_CHAT_HISTORY, [
+          ...chatHistory,
           ...this.chatHistory,
         ]);
       }
@@ -61,10 +63,10 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       const groq = new Groq({
         apiKey: this.apiKey,
       });
-      let chatHistory = this._context.workspaceState.get<IHistory[]>(
-        COMMON.CHAT_HISTORY,
-        [],
-      );
+
+      let chatHistory = MemoryCache.has(COMMON.GROQ_CHAT_HISTORY)
+        ? MemoryCache.get(COMMON.GROQ_CHAT_HISTORY)
+        : [];
 
       if (chatHistory?.length) {
         chatHistory = [...chatHistory, { role: "user", content: message }];
@@ -91,7 +93,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       return response;
     } catch (error) {
       console.error(error);
-      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+      MemoryCache.set(COMMON.GROQ_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );
