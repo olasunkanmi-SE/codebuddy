@@ -15,14 +15,14 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     extensionUri: vscode.Uri,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
   public async sendResponse(
     response: string,
-    currentChat: string
+    currentChat: string,
   ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
@@ -63,7 +63,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       });
       let chatHistory = this._context.workspaceState.get<IHistory[]>(
         COMMON.CHAT_HISTORY,
-        []
+        [],
       );
 
       if (chatHistory?.length) {
@@ -93,7 +93,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       console.error(error);
       this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
-        "Model not responding, please resend your question"
+        "Model not responding, please resend your question",
       );
       return;
     }
