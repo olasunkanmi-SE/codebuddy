@@ -16,14 +16,14 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     extensionUri: vscode.Uri,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: vscode.ExtensionContext
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
   public async sendResponse(
     response: string,
-    currentChat: string,
+    currentChat: string
   ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
@@ -57,7 +57,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(message: string): Promise<string | undefined> {
+  async generateResponse(message: string, imageBase64?: string): Promise<any> {
     try {
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
       const groq = new Groq({
@@ -69,11 +69,45 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         : [];
 
       if (chatHistory?.length) {
-        chatHistory = [...chatHistory, { role: "user", content: message }];
+        if (imageBase64) {
+          chatHistory = [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: message },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:image/png;base64,${imageBase64}`,
+                  },
+                },
+              ],
+            },
+          ];
+        } else {
+          chatHistory = [...chatHistory, { role: "user", content: message }];
+        }
       }
 
       if (!chatHistory?.length) {
-        chatHistory = [{ role: "user", content: message }];
+        if (imageBase64) {
+          chatHistory = [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: message },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:image/jpeg;base64,${imageBase64}`,
+                  },
+                },
+              ],
+            },
+          ];
+        } else {
+          chatHistory = [{ role: "user", content: message }];
+        }
       }
 
       if (chatHistory?.length > 3) {
@@ -95,9 +129,8 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       console.error(error);
       MemoryCache.set(COMMON.GROQ_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
+        "Model not responding, please resend your question"
       );
-      return;
     }
   }
 }

@@ -20,11 +20,12 @@ export enum COMMON {
   ANTHROPIC_CHAT_HISTORY = "anthropicChatHistory",
   USER_INPUT = "user-input",
   BOT = "bot",
+  IMAGE = "image",
 }
 
 export const GROQ_CONFIG = {
   temperature: 0.1,
-  max_tokens: 5024,
+  max_tokens: 3096,
   top_p: 1,
   stream: false,
   stop: null,
