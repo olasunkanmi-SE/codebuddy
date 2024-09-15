@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as vscode from "vscode";
 import { COMMON } from "../constant";
 import { BaseWebViewProvider } from "./base-web-view-provider";
+import { MemoryCache } from "../services/memory";
 
 type Role = "function" | "user" | "model";
 export interface IHistory {
@@ -38,10 +39,11 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         });
       }
       if (this.chatHistory.length === 2) {
-        const history: IHistory[] | undefined =
-          this._context.workspaceState.get(COMMON.CHAT_HISTORY, []);
-        this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
-          ...history,
+        const chatHistory = MemoryCache.has(COMMON.GEMINI_CHAT_HISTORY)
+          ? MemoryCache.get(COMMON.GEMINI_CHAT_HISTORY)
+          : [];
+        MemoryCache.set(COMMON.GEMINI_CHAT_HISTORY, [
+          ...chatHistory,
           ...this.chatHistory,
         ]);
       }
@@ -50,7 +52,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         message: response,
       });
     } catch (error) {
-      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+      MemoryCache.set(COMMON.GEMINI_CHAT_HISTORY, []);
       console.error(error);
     }
   }
@@ -63,10 +65,9 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     try {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
-      let chatHistory = this._context.workspaceState.get<IHistory[]>(
-        COMMON.CHAT_HISTORY,
-        [],
-      );
+      let chatHistory = MemoryCache.has(COMMON.GEMINI_CHAT_HISTORY)
+        ? MemoryCache.get(COMMON.GEMINI_CHAT_HISTORY)
+        : [];
 
       if (chatHistory?.length) {
         chatHistory = [
@@ -106,7 +107,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       const response = result.response;
       return response.text();
     } catch (error) {
-      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+      MemoryCache.set(COMMON.GEMINI_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );

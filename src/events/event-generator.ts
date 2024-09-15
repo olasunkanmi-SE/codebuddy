@@ -10,7 +10,12 @@ import {
   GroqWebViewProvider,
   IHistory,
 } from "../providers/groq-web-view-provider";
-import { getConfigValue, vscodeErrorMessage } from "../utils";
+import {
+  getConfigValue,
+  getLatestChatHistory,
+  vscodeErrorMessage,
+} from "../utils";
+import { MemoryCache } from "../services/memory";
 
 interface IEventGenerator {
   getApplicationConfig(configKey: string): string | undefined;
@@ -223,10 +228,9 @@ export abstract class EventGenerator implements IEventGenerator {
     generativeAiModel: string,
   ): Promise<string | undefined> {
     try {
-      const chatHistory = this.context.workspaceState.get<IHistory[]>(
-        COMMON.CHAT_HISTORY,
-        [],
-      );
+      const chatHistory = MemoryCache.has(COMMON.ANTHROPIC_CHAT_HISTORY)
+        ? MemoryCache.get(COMMON.GROQ_CHAT_HISTORY)
+        : [];
       const params = {
         messages: [
           ...chatHistory,
@@ -275,12 +279,15 @@ export abstract class EventGenerator implements IEventGenerator {
     }
 
     const response = await this.generateModelResponse(prompt);
-    const model = this.geminiModel;
-    //TODO check the format of the history and ensure it conforms with the current model, else delete the history
+    const model = getConfigValue("generativeAi.option");
+
     if (prompt && response) {
+      let chatHistory;
       switch (model) {
         case generativeAiModel.GEMINI:
-          this.context.workspaceState.update(COMMON.CHAT_HISTORY, [
+          chatHistory = getLatestChatHistory(COMMON.GEMINI_CHAT_HISTORY);
+          MemoryCache.set(COMMON.GEMINI_CHAT_HISTORY, [
+            ...chatHistory,
             {
               role: "user",
               parts: [{ text: prompt }],
@@ -292,7 +299,9 @@ export abstract class EventGenerator implements IEventGenerator {
           ]);
           break;
         case generativeAiModel.GROQ:
-          this.context.workspaceState.update(COMMON.CHAT_HISTORY, [
+          chatHistory = getLatestChatHistory(COMMON.GROQ_CHAT_HISTORY);
+          MemoryCache.set(COMMON.GROQ_CHAT_HISTORY, [
+            ...chatHistory,
             {
               role: "user",
               content: prompt,
@@ -304,7 +313,9 @@ export abstract class EventGenerator implements IEventGenerator {
           ]);
           break;
         case generativeAiModel.ANTHROPIC:
-          this.context.workspaceState.update(COMMON.CHAT_HISTORY, [
+          chatHistory = getLatestChatHistory(COMMON.ANTHROPIC_CHAT_HISTORY);
+          MemoryCache.set(COMMON.ANTHROPIC_CHAT_HISTORY, [
+            ...chatHistory,
             {
               role: "user",
               content: prompt,

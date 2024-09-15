@@ -24,6 +24,7 @@ import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
 import { getConfigValue } from "./utils";
 import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
+import { MemoryCache } from "./services/memory";
 
 const {
   geminiKey,
@@ -36,7 +37,7 @@ const {
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+    MemoryCache.getInstance();
     const {
       comment,
       review,
@@ -171,7 +172,7 @@ export async function activate(context: vscode.ExtensionContext) {
       );
     }
   } catch (error) {
-    context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+    MemoryCache.clear();
     vscode.window.showErrorMessage(
       "An Error occured while setting up generative AI model",
     );

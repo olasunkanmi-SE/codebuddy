@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base-web-view-provider";
 import { COMMON, GROQ_CONFIG } from "../constant";
 import Anthropic from "@anthropic-ai/sdk";
+import { MemoryCache } from "../services/memory";
 
 type Role = "user" | "assistant";
 export interface IHistory {
@@ -39,10 +40,11 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       }
 
       if (this.chatHistory.length === 2) {
-        const history: IHistory[] | undefined =
-          this._context.workspaceState.get(COMMON.CHAT_HISTORY, []);
-        this._context.workspaceState.update(COMMON.CHAT_HISTORY, [
-          ...history,
+        const chatHistory = MemoryCache.has(COMMON.ANTHROPIC_CHAT_HISTORY)
+          ? MemoryCache.get(COMMON.ANTHROPIC_CHAT_HISTORY)
+          : [];
+        MemoryCache.set(COMMON.ANTHROPIC_CHAT_HISTORY, [
+          ...chatHistory,
           ...this.chatHistory,
         ]);
       }
@@ -61,10 +63,9 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       const anthropic = new Anthropic({
         apiKey: this.apiKey,
       });
-      let chatHistory = this._context.workspaceState.get<IHistory[]>(
-        COMMON.CHAT_HISTORY,
-        [],
-      );
+      let chatHistory = MemoryCache.has(COMMON.ANTHROPIC_CHAT_HISTORY)
+        ? MemoryCache.get(COMMON.ANTHROPIC_CHAT_HISTORY)
+        : [];
 
       if (chatHistory?.length) {
         chatHistory = [...chatHistory, { role: "user", content: message }];
@@ -88,7 +89,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       return response;
     } catch (error) {
       console.error(error);
-      this._context.workspaceState.update(COMMON.CHAT_HISTORY, []);
+      MemoryCache.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );
