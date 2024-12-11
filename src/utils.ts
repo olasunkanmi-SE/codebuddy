@@ -1,7 +1,7 @@
 import * as markdownit from "markdown-it";
+import * as vscode from "vscode";
 import { MemoryCache } from "./services/memory";
 import { COMMON, generativeAiModel } from "./constant";
-import { workspace, window, Webview, Uri } from "vscode";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -16,11 +16,11 @@ export const formatText = (text?: string): string => {
 export const getConfigValue: GetConfigValueType<any> = <T>(
   key: string
 ): T | undefined => {
-  return workspace.getConfiguration().get<T>(key);
+  return vscode.workspace.getConfiguration().get<T>(key);
 };
 
 export const vscodeErrorMessage = (error: string, metaData?: any) => {
-  return window.showErrorMessage(error, metaData);
+  return vscode.window.showErrorMessage(error, metaData);
 };
 
 export const getLatestChatHistory = (key: string) => {
@@ -59,11 +59,11 @@ export const resetChatHistory = (model: string) => {
  * @returns A URI pointing to the file/resource
  */
 export function getUri(
-  webview: Webview,
-  extensionUri: Uri,
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
   pathList: string[]
 ) {
-  return webview.asWebviewUri(Uri.joinPath(extensionUri, ...pathList));
+  return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...pathList));
 }
 
 /**
