@@ -1,8 +1,8 @@
-import { chatCss } from "./chat_css";
+// import { chatCss } from "./chat_css";
 import { chatJs } from "./chat_js";
 import * as path from "path";
 
-export const chartComponent = (docs: string[]) => `
+export const chartComponent = (docs: string[]) => /*html*/ `
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -22,9 +22,9 @@ export const chartComponent = (docs: string[]) => `
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@200..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<style>
-${chatCss}
-</style>
+<!-- <style>
+{chatCss}
+</style> -->
 <title>AI</title>
 </head>
 

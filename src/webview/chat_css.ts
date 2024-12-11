@@ -9,85 +9,102 @@ import { nightOwlCss } from "./themes/night-owl";
 import { stackOverFlowCss } from "./themes/stackoverflow";
 import { tokyoNightCss } from "./themes/tokyo-night";
 
-const fontFamily = getConfigValue("font.family");
-const theme = getConfigValue("chatview.theme");
-const fontSize = getConfigValue("chatview.font.size");
+let fontFamilyFromConfig = "";
+let themeFromConfig = "";
+let fontSizeFromConfig = getConfigValue("chatview.font.size");
 
-let selectedTheme = "";
+export const getChatCss = async () => {
+  let fontFamily = getConfigValue("font.family");
+  let theme = getConfigValue("chatview.theme");
+  let fontSize = getConfigValue("chatview.font.size");
 
-switch (theme) {
-  case "Atom One Dark":
-    selectedTheme = oneDarkCss;
-    break;
-  case "Atom One Dark Reasonable":
-    selectedTheme = oneDarkReasonableCss;
-    break;
-  case "Code Pen":
-    selectedTheme = codePenCss;
-    break;
-  case "felipec":
-    selectedTheme = felipecCss;
-    break;
-  case "github dark":
-    selectedTheme = githubDarkDimmed;
-    break;
-  case "ir black":
-    selectedTheme = irBlack;
-    break;
-  case "night owl":
-    selectedTheme = nightOwlCss;
-    break;
-  case "stackoverflow":
-    selectedTheme = stackOverFlowCss;
-    break;
-  case "tokyo night":
-    selectedTheme = tokyoNightCss;
-    break;
-  default:
-    break;
-}
+  if (
+    fontFamilyFromConfig == fontFamily &&
+    themeFromConfig == theme &&
+    fontSizeFromConfig == fontSize
+  ) {
+    return false;
+  } else {
+    fontFamilyFromConfig = fontFamily;
+    themeFromConfig = theme;
+    fontSizeFromConfig = fontSize;
+  }
 
-let selectedFontFamily = "";
+  let selectedTheme = "";
 
-switch (fontFamily) {
-  case "SF Mono":
-    selectedFontFamily = '"SF Mono"';
-    break;
-  case "Montserrat":
-    selectedFontFamily = `'Montserrat', sans-serif`;
-    break;
-  case "Space Mono":
-    selectedFontFamily = "Space Mono";
-    break;
-  case "Fira Code":
-    selectedFontFamily = "Fira Code";
-    break;
-  case "Source Code Pro":
-    selectedFontFamily = "Source Code Pro";
-    break;
-  case "JetBrains Mono":
-    selectedFontFamily = "JetBrains Mono";
-    break;
-  case "Roboto Mono":
-    selectedFontFamily = "Roboto Mono";
-    break;
-  case "Ubuntu Mono":
-    selectedFontFamily = "Ubuntu Mono";
-    break;
-  case "IBM Plex Mono":
-    selectedFontFamily = "IBM Plex Mono";
-    break;
-  case "Inconsolata":
-    selectedFontFamily = "Inconsolata";
-    break;
-  case "JetBrains Mono":
-    selectedFontFamily = "JetBrains Mono";
-    break;
-  default:
-    break;
-}
+  switch (theme) {
+    case "Atom One Dark":
+      selectedTheme = oneDarkCss;
+      break;
+    case "Atom One Dark Reasonable":
+      selectedTheme = oneDarkReasonableCss;
+      break;
+    case "Code Pen":
+      selectedTheme = codePenCss;
+      break;
+    case "felipec":
+      selectedTheme = felipecCss;
+      break;
+    case "github dark":
+      selectedTheme = githubDarkDimmed;
+      break;
+    case "ir black":
+      selectedTheme = irBlack;
+      break;
+    case "night owl":
+      selectedTheme = nightOwlCss;
+      break;
+    case "stackoverflow":
+      selectedTheme = stackOverFlowCss;
+      break;
+    case "tokyo night":
+      selectedTheme = tokyoNightCss;
+      break;
+    default:
+      break;
+  }
 
-export const chatCss: string = `
+  let selectedFontFamily = "";
+
+  switch (fontFamily) {
+    case "SF Mono":
+      selectedFontFamily = '"SF Mono"';
+      break;
+    case "Montserrat":
+      selectedFontFamily = `'Montserrat', sans-serif`;
+      break;
+    case "Space Mono":
+      selectedFontFamily = "Space Mono";
+      break;
+    case "Fira Code":
+      selectedFontFamily = "Fira Code";
+      break;
+    case "Source Code Pro":
+      selectedFontFamily = "Source Code Pro";
+      break;
+    case "JetBrains Mono":
+      selectedFontFamily = "JetBrains Mono";
+      break;
+    case "Roboto Mono":
+      selectedFontFamily = "Roboto Mono";
+      break;
+    case "Ubuntu Mono":
+      selectedFontFamily = "Ubuntu Mono";
+      break;
+    case "IBM Plex Mono":
+      selectedFontFamily = "IBM Plex Mono";
+      break;
+    case "Inconsolata":
+      selectedFontFamily = "Inconsolata";
+      break;
+    case "JetBrains Mono":
+      selectedFontFamily = "JetBrains Mono";
+      break;
+    default:
+      break;
+  }
+
+  const chatCss: string = `
 #chat-container {
     width: 100%;
     max-width: 600px;
@@ -306,3 +323,6 @@ div.code {
 
 ${selectedTheme}
 `;
+
+  return chatCss;
+};
