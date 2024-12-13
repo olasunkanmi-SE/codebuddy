@@ -22,6 +22,8 @@ import {
  * This class is responsible for handling chat-related operations,
  * such as sending and receiving messages, and interacting with the Groq web view provider.
  */
+
+// The chatManager only caters for send to code buddy event. This should be deprecated.
 export class ChatManager {
   private readonly _context: vscode.ExtensionContext;
   private readonly geminiApiKey: string;
