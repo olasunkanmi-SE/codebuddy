@@ -27,23 +27,12 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - Open this in VSCode.
 - Click on run -> start debugging
 - A new instance of VScode will be open to you, this instance contains the latest file you opened on your Vscode
-- You can change the file by clicking on file -> open recent.
-- To access code buddy. Drag the explorer button to the right of the page. A chat interface should be displayed
-Highlight any code and right-click. You should see a list of options for refactoring, optimizing code, etc.
-- Type your instruction, in conjunction with some highlighted code if you will, right-click and click and choose from the available actions
-- you can have a chat-like conversation and it does remember your previous questions because there is support for chat history
 
-## How to use
-- Once installed, drag the Explorer button to the right of the page. A chat interface should be displayed
-- Highlight your code, right-click, and select any of the desired assistant options
-- For generic questions, add your instructions to them, highlight and use the send to CodeBuddy command.
-- The chat button is disabled for now. Help is needed in fixing here https://github.com/olasunkanmi-SE/codebuddy/issues/37
-
-## Requirements
-
-- A Gemini or Groq API key is required.
-- Latest version of Vscode
-- Presently supports Google Gemini and Groq generative AIs.
+## Supported Models
+- Gemini
+- Groq
+- Anthropic
+- XGrok
 
 ## Settings.json
 - "google.gemini.apiKeys": 'Your API Key'. Get Gemini APIKey https://aistudio.google.com/app/apikey
@@ -56,23 +45,6 @@ Highlight any code and right-click. You should see a list of options for refacto
   - On the Vscode Menu, click on run -> start debugging. A new Vscode instance is opened
   - In the new instance, press command/ctrl + shift + p, search for Explorer: Focus on chat view. This opens up a chat webview
   - To ask for help on a piece of code, simply highlight the code and right-click. There are a variety of actions listed to soothe your need
-
-## Release Notes
-
-### 1.0.0
-
-- Initial release of CodeBuddy.
-
-### 1.1.0
-
-- Support for multiple chat view themes, fonts and font size
-
-### 1.1.1
-  
-- Support for Auto-Generated Code Commit Messages, Knowledgebase, Unit Test Generation, copy and auto-Scroll to bottom of Chat, Interview me.
-
-### 1.1.2
-- Create component flow diagrams with Mermaid
 
 ## Contributing
 - Contributions are welcome! If you encounter any issues or have suggestions for improvements, please open an issue or submit a pull request.
