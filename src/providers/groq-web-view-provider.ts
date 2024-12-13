@@ -90,7 +90,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         stop,
       });
       const response = (await chatCompletion).choices[0]?.message?.content;
-      return response;
+      return response ?? undefined;
     } catch (error) {
       console.error(error);
       MemoryCache.set(COMMON.GROQ_CHAT_HISTORY, []);

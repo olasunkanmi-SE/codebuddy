@@ -1,14 +1,20 @@
 import * as vscode from "vscode";
 import {
+  aIProviderConfig,
+  APP_CONFIG,
+  COMMON,
+  generativeAiModel,
+} from "../constant";
+import { AnthropicWebViewProvider } from "../providers/anthropic-web-view-provider";
+import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
+import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
+import {
   formatText,
   getConfigValue,
+  getXGroKBaseURL,
   resetChatHistory,
   vscodeErrorMessage,
 } from "../utils";
-import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
-import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
-import { APP_CONFIG, COMMON, generativeAiModel } from "../constant";
-import { AnthropicWebViewProvider } from "../providers/anthropic-web-view-provider";
 
 /**
  * Manages chat functionality, including registering chat commands,
@@ -25,38 +31,44 @@ export class ChatManager {
   private readonly generativeAi: string;
   private readonly anthropicApiKey: string;
   private readonly anthropicModel: string;
+  private readonly groqApiKey: string;
+  private readonly groqModel: string;
 
   constructor(context: vscode.ExtensionContext) {
     const {
       geminiKey,
       geminiModel,
-      groqKey,
+      groqApiKey,
       groqModel,
       generativeAi,
       anthropicApiKey,
       anthropicModel,
+      grokApiKey,
+      grokModel,
     } = APP_CONFIG;
     this._context = context;
     this.geminiApiKey = getConfigValue(geminiKey);
     this.geminiModel = getConfigValue(geminiModel);
-    this.grokApiKey = getConfigValue(groqKey);
-    this.grokModel = getConfigValue(groqModel);
+    this.groqApiKey = getConfigValue(groqApiKey);
+    this.groqModel = getConfigValue(groqModel);
     this.anthropicApiKey = getConfigValue(anthropicApiKey);
     this.anthropicModel = getConfigValue(anthropicModel);
     this.generativeAi = getConfigValue(generativeAi);
+    this.grokApiKey = getConfigValue(grokApiKey);
+    this.grokModel = getConfigValue(grokModel);
   }
 
   registerChatCommand() {
     return vscode.commands.registerCommand("ola.sendChatMessage", async () => {
       try {
-        vscode.window.showInformationMessage("☕️ Asking Ola for Help");
+        vscode.window.showInformationMessage("☕️ Asking CodeBuddy for Help");
         const selectedText = this.getActiveEditorText();
         const response = await this.generateResponse(selectedText);
         this.sendResponse(selectedText, response);
       } catch (error) {
         console.error(error);
         vscodeErrorMessage(
-          "Failed to generate content. Please try again later.",
+          "Failed to generate content. Please try again later."
         );
       }
     });
@@ -76,54 +88,91 @@ export class ChatManager {
     return activeEditor.document.getText(activeEditor.selection);
   }
 
+  private aiProviderConfig(): Record<generativeAiModel, aIProviderConfig> {
+    return {
+      [generativeAiModel.ANTHROPIC]: {
+        apiKey: this.anthropicApiKey,
+        model: this.anthropicModel,
+        providerName: generativeAiModel.ANTHROPIC,
+      },
+      [generativeAiModel.GEMINI]: {
+        apiKey: this.geminiApiKey,
+        model: this.geminiModel,
+        providerName: generativeAiModel.GEMINI,
+      },
+      [generativeAiModel.GROK]: {
+        apiKey: this.grokApiKey,
+        model: this.grokModel,
+        providerName: generativeAiModel.GROK,
+      },
+      [generativeAiModel.GROQ]: {
+        apiKey: this.groqApiKey,
+        model: this.groqModel,
+        providerName: generativeAiModel.GROQ,
+      },
+    };
+  }
+
+  private handleAiProvider(generativeAi: generativeAiModel): aIProviderConfig {
+    const aiConfig = this.aiProviderConfig();
+    const config = aiConfig[generativeAi];
+    if (!config) {
+      throw new Error(`Configuration not found for ${generativeAi}`);
+    }
+    if (!config.apiKey || !config.model) {
+      ("Configuration not found. Go to settings, search for codingBuddy. Fill up the model and model name");
+    }
+    return config;
+  }
+
   private async generateResponse(message: string): Promise<string | undefined> {
     try {
       const generativeAi: string | undefined = this.getGenerativeAiModel();
-      if (generativeAi === "Groq") {
-        if (!this.grokApiKey || !this.grokModel) {
-          vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
-          );
-        }
+      if (generativeAi === generativeAiModel.GROQ) {
+        const groqAiConfigurations = this.handleAiProvider(
+          generativeAiModel.GROQ
+        );
         const chatViewProvider = new GroqWebViewProvider(
           this._context.extensionUri,
-          this.grokApiKey,
-          this.grokModel,
-          this._context,
+          groqAiConfigurations.apiKey,
+          groqAiConfigurations.model,
+          this._context
         );
         return await chatViewProvider.generateResponse(message);
       }
-      if (generativeAi === "Gemini") {
-        if (!this.geminiApiKey || !this.geminiModel) {
-          vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
-          );
-        }
+      if (generativeAi === generativeAiModel.GEMINI) {
+        const geminiConfigurations = this.handleAiProvider(
+          generativeAiModel.GEMINI
+        );
         const geminiWebViewProvider = new GeminiWebViewProvider(
           this._context.extensionUri,
-          this.geminiApiKey,
-          this.geminiModel,
-          this._context,
+          geminiConfigurations.apiKey,
+          geminiConfigurations.model,
+          this._context
         );
         return await geminiWebViewProvider.generateResponse(
-          this.geminiApiKey,
-          this.geminiModel,
-          message,
+          geminiConfigurations.apiKey,
+          geminiConfigurations.model,
+          message
         );
       }
       if (generativeAi === "Anthropic") {
-        if (!this.anthropicApiKey || !this.anthropicModel) {
-          vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
-          );
-        }
-        const geminiWebViewProvider = new AnthropicWebViewProvider(
-          this._context.extensionUri,
-          this.anthropicApiKey,
-          this.anthropicModel,
-          this._context,
+        const anthropicConfigurations: aIProviderConfig = this.handleAiProvider(
+          generativeAiModel.ANTHROPIC
         );
-        return await geminiWebViewProvider.generateResponse(message);
+        const anthropicWebViewProvider = this.getAnthropicWebViewProvider(
+          anthropicConfigurations
+        );
+        return await anthropicWebViewProvider.generateResponse(message);
+      }
+
+      if (generativeAi === generativeAiModel.GROK) {
+        const grokConfigurations: aIProviderConfig = this.handleAiProvider(
+          generativeAiModel.GROK
+        );
+        const anthropicWebViewProvider =
+          this.getAnthropicWebViewProvider(grokConfigurations);
+        return await anthropicWebViewProvider.generateResponse(message);
       }
     } catch (error) {
       const model = getConfigValue("generativeAi.option");
@@ -137,9 +186,9 @@ export class ChatManager {
       if (this.generativeAi === generativeAiModel.GROQ) {
         const chatViewProvider = new GroqWebViewProvider(
           this._context.extensionUri,
-          this.grokApiKey,
-          this.grokModel,
-          this._context,
+          this.groqApiKey,
+          this.groqModel,
+          this._context
         );
         chatViewProvider.sendResponse(formatText(userInput), COMMON.USER_INPUT);
         chatViewProvider.sendResponse(formatText(response), COMMON.BOT);
@@ -149,24 +198,39 @@ export class ChatManager {
           this._context.extensionUri,
           this.geminiApiKey,
           this.geminiModel,
-          this._context,
+          this._context
         );
         geminiWebViewProvider.sendResponse(
           formatText(userInput),
-          COMMON.USER_INPUT,
+          COMMON.USER_INPUT
         );
         geminiWebViewProvider.sendResponse(formatText(response), COMMON.BOT);
       }
-      if (this.generativeAi === generativeAiModel.ANTHROPIC) {
-        const anthropicWebViewProvider = new AnthropicWebViewProvider(
-          this._context.extensionUri,
-          this.anthropicApiKey,
-          this.anthropicModel,
-          this._context,
+      if (
+        this.generativeAi === generativeAiModel.ANTHROPIC ||
+        this.generativeAi === generativeAiModel.GROK
+      ) {
+        let anthropicConfigurations: aIProviderConfig | undefined;
+        if (this.generativeAi === generativeAiModel.ANTHROPIC) {
+          anthropicConfigurations = this.handleAiProvider(
+            generativeAiModel.ANTHROPIC
+          );
+        }
+        if (this.generativeAi === generativeAiModel.GROK) {
+          anthropicConfigurations = this.handleAiProvider(
+            generativeAiModel.GROK
+          );
+        }
+        if (!anthropicConfigurations) {
+          throw new Error(`Configuration not found for ${this.generativeAi}`);
+        }
+
+        const anthropicWebViewProvider = this.getAnthropicWebViewProvider(
+          anthropicConfigurations
         );
         anthropicWebViewProvider.sendResponse(
           formatText(userInput),
-          COMMON.USER_INPUT,
+          COMMON.USER_INPUT
         );
         anthropicWebViewProvider.sendResponse(formatText(response), COMMON.BOT);
       }
@@ -175,5 +239,21 @@ export class ChatManager {
       if (model) resetChatHistory(model);
       console.error(error);
     }
+  }
+
+  private getAnthropicWebViewProvider(
+    config: aIProviderConfig
+  ): AnthropicWebViewProvider {
+    let xGrokBaseURL;
+    if (getConfigValue(APP_CONFIG.generativeAi) === generativeAiModel.GROK) {
+      xGrokBaseURL = getXGroKBaseURL();
+    }
+    return new AnthropicWebViewProvider(
+      this._context.extensionUri,
+      config.apiKey,
+      config.model,
+      this._context,
+      xGrokBaseURL
+    );
   }
 }

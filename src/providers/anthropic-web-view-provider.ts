@@ -3,6 +3,7 @@ import { BaseWebViewProvider } from "./base-web-view-provider";
 import { COMMON, GROQ_CONFIG } from "../constant";
 import Anthropic from "@anthropic-ai/sdk";
 import { MemoryCache } from "../services/memory";
+import { createAnthropicClient } from "../utils";
 
 type Role = "user" | "assistant";
 export interface IHistory {
@@ -17,13 +18,14 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     apiKey: string,
     generativeAiModel: string,
     context: vscode.ExtensionContext,
+    protected readonly baseUrl?: string
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
   public async sendResponse(
     response: string,
-    currentChat: string,
+    currentChat: string
   ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
@@ -60,9 +62,10 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
   async generateResponse(message: string): Promise<string | undefined> {
     try {
       const { max_tokens } = GROQ_CONFIG;
-      const anthropic = new Anthropic({
-        apiKey: this.apiKey,
-      });
+      const anthropic: Anthropic = createAnthropicClient(
+        this.apiKey,
+        this.baseUrl
+      );
       let chatHistory = MemoryCache.has(COMMON.ANTHROPIC_CHAT_HISTORY)
         ? MemoryCache.get(COMMON.ANTHROPIC_CHAT_HISTORY)
         : [];
@@ -91,9 +94,8 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       console.error(error);
       MemoryCache.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
+        "Model not responding, please resend your question"
       );
-      return;
     }
   }
 }

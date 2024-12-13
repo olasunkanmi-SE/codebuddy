@@ -2,6 +2,7 @@ import * as markdownit from "markdown-it";
 import * as vscode from "vscode";
 import { MemoryCache } from "./services/memory";
 import { COMMON, generativeAiModel } from "./constant";
+import Anthropic from "@anthropic-ai/sdk";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -45,4 +46,20 @@ export const resetChatHistory = (model: string) => {
     default:
       break;
   }
+};
+
+export const getXGroKBaseURL = () => {
+  return "https://api.x.ai/";
+};
+
+export const createAnthropicClient = (apiKey: string, baseURL?: string) => {
+  if (baseURL) {
+    return new Anthropic({
+      apiKey,
+      baseURL,
+    });
+  }
+  return new Anthropic({
+    apiKey,
+  });
 };
