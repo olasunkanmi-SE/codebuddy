@@ -29,10 +29,12 @@ import { MemoryCache } from "./services/memory";
 const {
   geminiKey,
   geminiModel,
-  groqKey,
+  groqApiKey,
   groqModel,
   anthropicApiKey,
   anthropicModel,
+  grokApiKey,
+  grokModel,
 } = APP_CONFIG;
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -145,7 +147,7 @@ export async function activate(context: vscode.ExtensionContext) {
         quickFixCodeAction,
       },
       [generativeAiModel.GROQ]: {
-        key: groqKey,
+        key: groqApiKey,
         model: groqModel,
         webviewProviderClass: GroqWebViewProvider,
         subscriptions,
@@ -154,6 +156,13 @@ export async function activate(context: vscode.ExtensionContext) {
       [generativeAiModel.ANTHROPIC]: {
         key: anthropicApiKey,
         model: anthropicModel,
+        webviewProviderClass: AnthropicWebViewProvider,
+        subscriptions,
+        quickFixCodeAction,
+      },
+      [generativeAiModel.GROK]: {
+        key: grokApiKey,
+        model: grokModel,
         webviewProviderClass: AnthropicWebViewProvider,
         subscriptions,
         quickFixCodeAction,

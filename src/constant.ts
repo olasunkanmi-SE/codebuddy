@@ -33,19 +33,28 @@ export const GROQ_CONFIG = {
 export const APP_CONFIG = {
   geminiKey: "google.gemini.apiKeys",
   geminiModel: "google.gemini.model",
-  groqKey: "groq.llama3.apiKey",
+  groqApiKey: "groq.llama3.apiKey",
   groqModel: "groq.llama3.model",
   generativeAi: "generativeAi.option",
   anthropicModel: "anthropic.model",
   anthropicApiKey: "anthropic.apiKey",
+  grokApiKey: "grok.apiKey",
+  grokModel: "grok.model",
 };
 
 export enum generativeAiModel {
   GEMINI = "Gemini",
   GROQ = "Groq",
   ANTHROPIC = "Anthropic",
+  GROK = "XGrok",
 }
 
 export const MEMORY_CACHE_OPTIONS = {
   sessionTTL: 24 * 60 * 60 * 1000,
+};
+
+export type aIProviderConfig = {
+  apiKey: string;
+  model: string;
+  providerName: string;
 };
