@@ -68,7 +68,7 @@ export class ChatManager {
       } catch (error) {
         console.error(error);
         vscodeErrorMessage(
-          "Failed to generate content. Please try again later."
+          "Failed to generate content. Please try again later.",
         );
       }
     });
@@ -130,45 +130,45 @@ export class ChatManager {
       const generativeAi: string | undefined = this.getGenerativeAiModel();
       if (generativeAi === generativeAiModel.GROQ) {
         const groqAiConfigurations = this.handleAiProvider(
-          generativeAiModel.GROQ
+          generativeAiModel.GROQ,
         );
         const chatViewProvider = new GroqWebViewProvider(
           this._context.extensionUri,
           groqAiConfigurations.apiKey,
           groqAiConfigurations.model,
-          this._context
+          this._context,
         );
         return await chatViewProvider.generateResponse(message);
       }
       if (generativeAi === generativeAiModel.GEMINI) {
         const geminiConfigurations = this.handleAiProvider(
-          generativeAiModel.GEMINI
+          generativeAiModel.GEMINI,
         );
         const geminiWebViewProvider = new GeminiWebViewProvider(
           this._context.extensionUri,
           geminiConfigurations.apiKey,
           geminiConfigurations.model,
-          this._context
+          this._context,
         );
         return await geminiWebViewProvider.generateResponse(
           geminiConfigurations.apiKey,
           geminiConfigurations.model,
-          message
+          message,
         );
       }
       if (generativeAi === "Anthropic") {
         const anthropicConfigurations: aIProviderConfig = this.handleAiProvider(
-          generativeAiModel.ANTHROPIC
+          generativeAiModel.ANTHROPIC,
         );
         const anthropicWebViewProvider = this.getAnthropicWebViewProvider(
-          anthropicConfigurations
+          anthropicConfigurations,
         );
         return await anthropicWebViewProvider.generateResponse(message);
       }
 
       if (generativeAi === generativeAiModel.GROK) {
         const grokConfigurations: aIProviderConfig = this.handleAiProvider(
-          generativeAiModel.GROK
+          generativeAiModel.GROK,
         );
         const anthropicWebViewProvider =
           this.getAnthropicWebViewProvider(grokConfigurations);
@@ -188,7 +188,7 @@ export class ChatManager {
           this._context.extensionUri,
           this.groqApiKey,
           this.groqModel,
-          this._context
+          this._context,
         );
         chatViewProvider.sendResponse(formatText(userInput), COMMON.USER_INPUT);
         chatViewProvider.sendResponse(formatText(response), COMMON.BOT);
@@ -198,11 +198,11 @@ export class ChatManager {
           this._context.extensionUri,
           this.geminiApiKey,
           this.geminiModel,
-          this._context
+          this._context,
         );
         geminiWebViewProvider.sendResponse(
           formatText(userInput),
-          COMMON.USER_INPUT
+          COMMON.USER_INPUT,
         );
         geminiWebViewProvider.sendResponse(formatText(response), COMMON.BOT);
       }
@@ -213,12 +213,12 @@ export class ChatManager {
         let anthropicConfigurations: aIProviderConfig | undefined;
         if (this.generativeAi === generativeAiModel.ANTHROPIC) {
           anthropicConfigurations = this.handleAiProvider(
-            generativeAiModel.ANTHROPIC
+            generativeAiModel.ANTHROPIC,
           );
         }
         if (this.generativeAi === generativeAiModel.GROK) {
           anthropicConfigurations = this.handleAiProvider(
-            generativeAiModel.GROK
+            generativeAiModel.GROK,
           );
         }
         if (!anthropicConfigurations) {
@@ -226,11 +226,11 @@ export class ChatManager {
         }
 
         const anthropicWebViewProvider = this.getAnthropicWebViewProvider(
-          anthropicConfigurations
+          anthropicConfigurations,
         );
         anthropicWebViewProvider.sendResponse(
           formatText(userInput),
-          COMMON.USER_INPUT
+          COMMON.USER_INPUT,
         );
         anthropicWebViewProvider.sendResponse(formatText(response), COMMON.BOT);
       }
@@ -242,7 +242,7 @@ export class ChatManager {
   }
 
   private getAnthropicWebViewProvider(
-    config: aIProviderConfig
+    config: aIProviderConfig,
   ): AnthropicWebViewProvider {
     let xGrokBaseURL;
     if (getConfigValue(APP_CONFIG.generativeAi) === generativeAiModel.GROK) {
@@ -253,7 +253,7 @@ export class ChatManager {
       config.apiKey,
       config.model,
       this._context,
-      xGrokBaseURL
+      xGrokBaseURL,
     );
   }
 }
