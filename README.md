@@ -31,7 +31,7 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 ## Supported Models
 - Gemini
 - Groq
-- Anthropix
+- Anthropic
 - XGrok
 
 ## Settings.json
