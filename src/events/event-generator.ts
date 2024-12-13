@@ -6,10 +6,8 @@ import * as vscode from "vscode";
 import { APP_CONFIG, COMMON, generativeAiModel } from "../constant";
 import { AnthropicWebViewProvider } from "../providers/anthropic-web-view-provider";
 import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
-import {
-  GroqWebViewProvider,
-  IHistory,
-} from "../providers/groq-web-view-provider";
+import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
+import { MemoryCache } from "../services/memory";
 import {
   createAnthropicClient,
   getConfigValue,
@@ -17,7 +15,6 @@ import {
   getXGroKBaseURL,
   vscodeErrorMessage,
 } from "../utils";
-import { MemoryCache } from "../services/memory";
 
 interface IEventGenerator {
   getApplicationConfig(configKey: string): string | undefined;
