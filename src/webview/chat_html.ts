@@ -54,7 +54,7 @@ ${chatCss}
         </select>
     </div>
     <div id="chat-input-container">
-        <input id="chat-input" type="text" placeholder="The text area is diabled. Type in vscode window or highlight code and right click" />
+        <input id="chat-input" type="text" placeholder="Type your question" />
     </div>
     <button id="chat-send">Send</button>
     <div id="loading">
