@@ -4,11 +4,11 @@
   "author": {
     "name": "Oyinlola Olasunkanmi Raymond",
     "email": "oyinolasunkanmi@gmail.com",
-    "url": "https://fiatinnovations.com"
+    "url": "https://olasunkanmi.app"
   },
   "publisher": "fiatinnovations",
   "description": "",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "engines": {
     "vscode": "^1.78.0"
   },

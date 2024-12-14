@@ -2,6 +2,21 @@ import { chatCss } from "./chat_css";
 import { chatJs } from "./chat_js";
 import * as path from "path";
 
+// This function generates a random 32-character string (nonce) using alphanumeric characters
+// A nonce is a unique, random value used for security purposes, typically to prevent replay attacks
+// and ensure script integrity when using Content Security Policy (CSP)
+function getNonce() {
+  let text = "";
+  const possible =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+}
+
+const nonce = getNonce();
+
 export const chartComponent = (docs: string[]) => `
 <html lang="en">
 <head>
@@ -48,7 +63,7 @@ ${chatCss}
     </div>
     <button class="scroll-button" id="scroll-button">&#x2193;</button>
 </div>
-<script>
+<script nonce="${nonce}">
     ${chatJs()}
 </script>
 </body>

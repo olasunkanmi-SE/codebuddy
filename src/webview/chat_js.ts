@@ -1,5 +1,5 @@
-import * as vscode from "vscode";
 export const chatJs = () => `
+const vscode = acquireVsCodeApi();
 const chatContainer = document.getElementById("chat-container");
 const chatMessages = document.getElementById("chat-messages");
 const chatInput = document.getElementById("chat-input");
@@ -10,7 +10,6 @@ const scrollButton = document.getElementById("scroll-button");
 const textArea = document.getElementById("chat-input-container");
 textArea.setAttribute("disabled", "true");
 
-chatSendButton.disabled = true;
 
 scrollButton.addEventListener("click", () => {
   chatMessages.scroll({
@@ -49,6 +48,15 @@ chatSendButton.addEventListener("click", () => {
   }
 });
 
+// document.getElementById('chat-options').addEventListener('change', function() {
+//     const selectedValue = this.value;
+//     // Send the selected document name back to the extension
+//     vscode.postMessage({
+//         type: 'chatOptionSelected',
+//         value: selectedValue
+//     });
+// });
+
 function addChatMessage(sender, message) {
   const messageContainer = document.createElement("div");
   messageContainer.classList.add("chat-message-container");
@@ -69,7 +77,6 @@ function addChatMessage(sender, message) {
 }
 
 function sendChatMessage(message) {
-  const vscode = acquireVsCodeApi();
   vscode.postMessage({ type: "user-input", message: message });
 }
 
