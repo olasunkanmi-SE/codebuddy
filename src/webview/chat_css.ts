@@ -140,18 +140,21 @@ export const chatCss: string = `
     background-color: #0b0b0b;
     color: #fff;
     border: none;
-    font-size: 14px;
+    font-size:17px;
+    font-weight: 400;
 }
 
 #chat-send {
     margin-top: 10px;
     padding: 15px;
     border: none;
-    background-color: #000;
+    background-color:rgb(0, 0, 0);
     color: #fff;
     border-radius: 6px;
     cursor: pointer;
     width: 100%;
+    font-size:17px;
+    font-weight: 400;
 }
 
 #loading {
@@ -170,7 +173,7 @@ export const chatCss: string = `
     top: 60%;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 16px;
+    font-size: 17px;
     color: #666;
 }
 
@@ -184,7 +187,7 @@ body {
     margin: 0;
     padding: 0;
     font-family: ${selectedFontFamily};
-    font-size: 11.3
+    font-size: 17px;
     font-weight: bold
     font-ligatures: true
 }
@@ -236,7 +239,7 @@ div.code {
     color: #fff;
     padding: 5px 10px;
     border-radius: 4px;
-    font-size: 14px;
+    font-size:17px;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s, visibility 0.3s;
