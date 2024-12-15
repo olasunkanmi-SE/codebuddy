@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base-web-view-provider";
 import Groq from "groq-sdk";
 import { COMMON, GROQ_CONFIG } from "../constant";
-import { MemoryCache } from "../services/memory";
+import { Brain } from "../services/memory";
 
 type Role = "user" | "system";
 export interface IHistory {
@@ -16,14 +16,14 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     extensionUri: vscode.Uri,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: vscode.ExtensionContext
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
   public async sendResponse(
     response: string,
-    currentChat: string,
+    currentChat: string
   ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
@@ -39,10 +39,10 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         });
       }
       if (this.chatHistory.length === 2) {
-        const chatHistory = MemoryCache.has(COMMON.GROQ_CHAT_HISTORY)
-          ? MemoryCache.get(COMMON.GROQ_CHAT_HISTORY)
+        const chatHistory = Brain.has(COMMON.GROQ_CHAT_HISTORY)
+          ? Brain.get(COMMON.GROQ_CHAT_HISTORY)
           : [];
-        MemoryCache.set(COMMON.GROQ_CHAT_HISTORY, [
+        Brain.set(COMMON.GROQ_CHAT_HISTORY, [
           ...chatHistory,
           ...this.chatHistory,
         ]);
@@ -57,15 +57,19 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(message: string): Promise<string | undefined> {
+  async generateResponse(
+    apiKey = undefined,
+    name = undefined,
+    message: string
+  ): Promise<string | undefined> {
     try {
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
       const groq = new Groq({
         apiKey: this.apiKey,
       });
 
-      let chatHistory = MemoryCache.has(COMMON.GROQ_CHAT_HISTORY)
-        ? MemoryCache.get(COMMON.GROQ_CHAT_HISTORY)
+      let chatHistory = Brain.has(COMMON.GROQ_CHAT_HISTORY)
+        ? Brain.get(COMMON.GROQ_CHAT_HISTORY)
         : [];
 
       if (chatHistory?.length) {
@@ -93,9 +97,9 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       return response ?? undefined;
     } catch (error) {
       console.error(error);
-      MemoryCache.set(COMMON.GROQ_CHAT_HISTORY, []);
+      Brain.set(COMMON.GROQ_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
+        "Model not responding, please resend your question"
       );
       return;
     }

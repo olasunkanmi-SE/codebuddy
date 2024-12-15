@@ -5,28 +5,28 @@ interface ICacheEntry {
   expiry: number;
 }
 
-export class MemoryCache {
-  private static memCache: Map<string, ICacheEntry>;
-  private static instance: MemoryCache;
+export class Brain {
+  private static memoryBank: Map<string, ICacheEntry>;
+  private static instance: Brain;
 
   constructor() {
-    MemoryCache.memCache = new Map();
+    Brain.memoryBank = new Map();
   }
 
-  public static getInstance(): MemoryCache {
-    if (!MemoryCache.instance) {
-      return (MemoryCache.instance = new MemoryCache());
+  public static getInstance(): Brain {
+    if (!Brain.instance) {
+      return (Brain.instance = new Brain());
     }
-    return MemoryCache.instance;
+    return Brain.instance;
   }
 
   static set(key: string, value: any): Map<string, ICacheEntry> {
     const expiry = Date.now() + MEMORY_CACHE_OPTIONS.sessionTTL;
-    return MemoryCache.memCache.set(key, { value, expiry });
+    return Brain.memoryBank.set(key, { value, expiry });
   }
 
   static get(key: string): any {
-    const entry = MemoryCache.memCache.get(key);
+    const entry = Brain.memoryBank.get(key);
     if (entry && Date.now() < entry.expiry) {
       return entry.value;
     }
@@ -34,26 +34,26 @@ export class MemoryCache {
   }
 
   static delete(key: string): boolean | undefined {
-    const cached = MemoryCache.get(key);
+    const cached = Brain.get(key);
     if (cached) {
-      return MemoryCache.memCache.delete(key);
+      return Brain.memoryBank.delete(key);
     }
     return undefined;
   }
 
   static keys(): string[] {
-    return Array.from(MemoryCache.memCache.keys());
+    return Array.from(Brain.memoryBank.keys());
   }
 
   static values(): ICacheEntry[] {
-    return Array.from(MemoryCache.memCache.values());
+    return Array.from(Brain.memoryBank.values());
   }
 
   static has(key: string): boolean {
-    return MemoryCache.memCache.has(key);
+    return Brain.memoryBank.has(key);
   }
 
   static clear(): void {
-    return MemoryCache.memCache.clear();
+    return Brain.memoryBank.clear();
   }
 }
