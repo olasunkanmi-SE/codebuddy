@@ -42,7 +42,7 @@ export const APP_CONFIG = {
   grokModel: "grok.model",
 };
 
-export enum generativeAiModel {
+export enum generativeAiModels {
   GEMINI = "Gemini",
   GROQ = "Groq",
   ANTHROPIC = "Anthropic",

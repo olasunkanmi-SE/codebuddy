@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
-import { APP_CONFIG, COMMON, generativeAiModel } from "../constant";
+import { APP_CONFIG, COMMON, generativeAiModels } from "../constant";
 import { AnthropicWebViewProvider } from "../providers/anthropic-web-view-provider";
 import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
@@ -38,7 +38,7 @@ export abstract class EventGenerator implements IEventGenerator {
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,
-    errorMessage?: string,
+    errorMessage?: string
   ) {
     this.context = _context;
     this.error = errorMessage;
@@ -76,33 +76,33 @@ export abstract class EventGenerator implements IEventGenerator {
       let modelName = "";
       if (!this.generativeAi) {
         vscodeErrorMessage(
-          "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
+          "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
         );
       }
-      if (this.generativeAi === generativeAiModel.GROQ) {
+      if (this.generativeAi === generativeAiModels.GROQ) {
         const apiKey = this.groqApiKey;
         modelName = this.groqModel;
         if (!apiKey || !modelName) {
           vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
+            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
           );
         }
         model = this.createGroqModel(apiKey);
       }
 
-      if (this.generativeAi === generativeAiModel.GEMINI) {
+      if (this.generativeAi === generativeAiModels.GEMINI) {
         const apiKey = this.geminiApiKey;
         modelName = this.geminiModel;
         model = this.createGeminiModel(apiKey, modelName);
       }
 
-      if (this.generativeAi === generativeAiModel.ANTHROPIC) {
+      if (this.generativeAi === generativeAiModels.ANTHROPIC) {
         const apiKey: string = this.anthropicApiKey;
         modelName = this.anthropicModel;
         model = this.createAnthropicModel(apiKey);
       }
 
-      if (this.generativeAi === generativeAiModel.GROK) {
+      if (this.generativeAi === generativeAiModels.GROK) {
         const apiKey: string = this.xGrokApiKey;
         modelName = this.xGrokModel;
         model = this.createAnthropicModel(apiKey);
@@ -111,7 +111,7 @@ export abstract class EventGenerator implements IEventGenerator {
     } catch (error) {
       console.error("Error creating model:", error);
       vscode.window.showErrorMessage(
-        "An error occurred while creating the model. Please try again.",
+        "An error occurred while creating the model. Please try again."
       );
     }
   }
@@ -139,7 +139,7 @@ export abstract class EventGenerator implements IEventGenerator {
 
   private createAnthropicModel(apiKey: string): Anthropic {
     let xGrokBaseURL;
-    if (getConfigValue(APP_CONFIG.generativeAi) === generativeAiModel.GROK) {
+    if (getConfigValue(APP_CONFIG.generativeAi) === generativeAiModels.GROK) {
       xGrokBaseURL = getXGroKBaseURL();
     }
     return createAnthropicClient(apiKey, xGrokBaseURL);
@@ -150,7 +150,7 @@ export abstract class EventGenerator implements IEventGenerator {
   }
 
   protected async generateModelResponse(
-    text: string,
+    text: string
   ): Promise<string | Anthropic.Messages.Message | undefined> {
     try {
       const activeModel = this.createModel();
@@ -160,7 +160,7 @@ export abstract class EventGenerator implements IEventGenerator {
 
       const { generativeAi, model, modelName } = activeModel;
       //
-      if (!generativeAi || !generativeAiModel) {
+      if (!generativeAi || !generativeAiModels) {
         throw new Error("Model not found. Check your settings.");
       }
       let response;
@@ -178,7 +178,7 @@ export abstract class EventGenerator implements IEventGenerator {
             response = await this.groqResponse(model, text, modelName);
           }
           break;
-        case generativeAiModel.GROK:
+        case generativeAiModels.GROK:
           if (modelName) {
             response = await this.anthropicResponse(model, modelName, text);
           }
@@ -189,7 +189,7 @@ export abstract class EventGenerator implements IEventGenerator {
 
       if (!response) {
         throw new Error(
-          "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly.",
+          "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly."
         );
       }
       if (this.action.includes("chart")) {
@@ -199,7 +199,7 @@ export abstract class EventGenerator implements IEventGenerator {
     } catch (error) {
       console.error("Error generating response:", error);
       vscode.window.showErrorMessage(
-        "An error occurred while generating the response. Please try again.",
+        "An error occurred while generating the response. Please try again."
       );
     }
   }
@@ -213,7 +213,7 @@ export abstract class EventGenerator implements IEventGenerator {
 
   async generateGeminiResponse(
     model: any,
-    text: string,
+    text: string
   ): Promise<string | undefined> {
     const result = await model.generateContent(text);
     return result ? await result.response.text() : undefined;
@@ -222,7 +222,7 @@ export abstract class EventGenerator implements IEventGenerator {
   private async anthropicResponse(
     model: Anthropic,
     generativeAiModel: string,
-    userPrompt: string,
+    userPrompt: string
   ) {
     try {
       const response = await model.messages.create({
@@ -235,7 +235,7 @@ export abstract class EventGenerator implements IEventGenerator {
     } catch (error) {
       console.error("Error generating response:", error);
       vscode.window.showErrorMessage(
-        "An error occurred while generating the response. Please try again.",
+        "An error occurred while generating the response. Please try again."
       );
       return;
     }
@@ -244,7 +244,7 @@ export abstract class EventGenerator implements IEventGenerator {
   private async groqResponse(
     model: Groq,
     prompt: string,
-    generativeAiModel: string,
+    generativeAiModel: string
   ): Promise<string | undefined> {
     try {
       const chatHistory = MemoryCache.has(COMMON.ANTHROPIC_CHAT_HISTORY)
@@ -267,7 +267,7 @@ export abstract class EventGenerator implements IEventGenerator {
     } catch (error) {
       console.error("Error generating response:", error);
       vscode.window.showErrorMessage(
-        "An error occurred while generating the response. Please try again.",
+        "An error occurred while generating the response. Please try again."
       );
       return;
     }
@@ -278,7 +278,7 @@ export abstract class EventGenerator implements IEventGenerator {
   abstract createPrompt(text?: string): any;
 
   async generateResponse(
-    errorMessage?: string,
+    errorMessage?: string
   ): Promise<string | Anthropic.Messages.Message | undefined> {
     this.showInformationMessage();
     let prompt;
@@ -303,7 +303,7 @@ export abstract class EventGenerator implements IEventGenerator {
     if (prompt && response) {
       let chatHistory;
       switch (model) {
-        case generativeAiModel.GEMINI:
+        case generativeAiModels.GEMINI:
           chatHistory = getLatestChatHistory(COMMON.GEMINI_CHAT_HISTORY);
           MemoryCache.set(COMMON.GEMINI_CHAT_HISTORY, [
             ...chatHistory,
@@ -317,7 +317,7 @@ export abstract class EventGenerator implements IEventGenerator {
             },
           ]);
           break;
-        case generativeAiModel.GROQ:
+        case generativeAiModels.GROQ:
           chatHistory = getLatestChatHistory(COMMON.GROQ_CHAT_HISTORY);
           MemoryCache.set(COMMON.GROQ_CHAT_HISTORY, [
             ...chatHistory,
@@ -331,7 +331,7 @@ export abstract class EventGenerator implements IEventGenerator {
             },
           ]);
           break;
-        case generativeAiModel.ANTHROPIC:
+        case generativeAiModels.ANTHROPIC:
           chatHistory = getLatestChatHistory(COMMON.ANTHROPIC_CHAT_HISTORY);
           MemoryCache.set(COMMON.ANTHROPIC_CHAT_HISTORY, [
             ...chatHistory,
@@ -345,7 +345,7 @@ export abstract class EventGenerator implements IEventGenerator {
             },
           ]);
           break;
-        case generativeAiModel.GROK:
+        case generativeAiModels.GROK:
           chatHistory = getLatestChatHistory(COMMON.ANTHROPIC_CHAT_HISTORY);
           MemoryCache.set(COMMON.ANTHROPIC_CHAT_HISTORY, [
             ...chatHistory,
@@ -377,28 +377,28 @@ export abstract class EventGenerator implements IEventGenerator {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
     }
-    if (this.generativeAi === generativeAiModel.GROQ) {
+    if (this.generativeAi === generativeAiModels.GROQ) {
       await GroqWebViewProvider.webView?.webview.postMessage({
         type: "user-input",
         message: formattedResponse,
       });
     }
 
-    if (this.generativeAi === generativeAiModel.GEMINI) {
+    if (this.generativeAi === generativeAiModels.GEMINI) {
       await GeminiWebViewProvider.webView?.webview.postMessage({
         type: "user-input",
         message: formattedResponse,
       });
     }
 
-    if (this.generativeAi === generativeAiModel.ANTHROPIC) {
+    if (this.generativeAi === generativeAiModels.ANTHROPIC) {
       await AnthropicWebViewProvider.webView?.webview.postMessage({
         type: "user-input",
         message: formattedResponse,
       });
     }
 
-    if (this.generativeAi === generativeAiModel.GROK) {
+    if (this.generativeAi === generativeAiModels.GROK) {
       await AnthropicWebViewProvider.webView?.webview.postMessage({
         type: "user-input",
         message: formattedResponse,
