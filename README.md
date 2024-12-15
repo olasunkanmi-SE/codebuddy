@@ -4,6 +4,9 @@ CodeBuddy is a powerful Visual Studio Code extension that integrates various gen
 
 This extension provides a wide range of AI-powered features to assist developers in their daily coding tasks, from code generation and refactoring and to unit test creation.
 
+## Install in Vscode Market Place
+https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy
+
 ## Repository Structure
 
 ```
