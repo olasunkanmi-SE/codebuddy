@@ -1,6 +1,6 @@
 import * as markdownit from "markdown-it";
 import * as vscode from "vscode";
-import { MemoryCache } from "./services/memory";
+import { Brain } from "./services/memory";
 import { COMMON, generativeAiModels } from "./constant";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -15,7 +15,7 @@ export const formatText = (text?: string): string => {
 };
 
 export const getConfigValue: GetConfigValueType<any> = <T>(
-  key: string
+  key: string,
 ): T | undefined => {
   return vscode.workspace.getConfiguration().get<T>(key);
 };
@@ -25,7 +25,7 @@ export const vscodeErrorMessage = (error: string, metaData?: any) => {
 };
 
 export const getLatestChatHistory = (key: string) => {
-  let chatHistory = MemoryCache.has(key) ? MemoryCache.get(key) : [];
+  let chatHistory = Brain.has(key) ? Brain.get(key) : [];
   if (chatHistory?.length > 3) {
     chatHistory = chatHistory.slice(-3);
   }
@@ -35,13 +35,13 @@ export const getLatestChatHistory = (key: string) => {
 export const resetChatHistory = (model: string) => {
   switch (model) {
     case generativeAiModels.ANTHROPIC:
-      MemoryCache.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
+      Brain.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
       break;
     case generativeAiModels.GEMINI:
-      MemoryCache.set(COMMON.GEMINI_CHAT_HISTORY, []);
+      Brain.set(COMMON.GEMINI_CHAT_HISTORY, []);
       break;
     case generativeAiModels.GROQ:
-      MemoryCache.set(COMMON.GROQ_CHAT_HISTORY, []);
+      Brain.set(COMMON.GROQ_CHAT_HISTORY, []);
       break;
     default:
       break;

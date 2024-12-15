@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as vscode from "vscode";
 import { COMMON } from "../constant";
 import { BaseWebViewProvider } from "./base-web-view-provider";
-import { MemoryCache } from "../services/memory";
+import { Brain } from "../services/memory";
 
 type Role = "function" | "user" | "model";
 export interface IHistory {
@@ -39,10 +39,10 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         });
       }
       if (this.chatHistory.length === 2) {
-        const chatHistory = MemoryCache.has(COMMON.GEMINI_CHAT_HISTORY)
-          ? MemoryCache.get(COMMON.GEMINI_CHAT_HISTORY)
+        const chatHistory = Brain.has(COMMON.GEMINI_CHAT_HISTORY)
+          ? Brain.get(COMMON.GEMINI_CHAT_HISTORY)
           : [];
-        MemoryCache.set(COMMON.GEMINI_CHAT_HISTORY, [
+        Brain.set(COMMON.GEMINI_CHAT_HISTORY, [
           ...chatHistory,
           ...this.chatHistory,
         ]);
@@ -52,7 +52,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         message: response,
       });
     } catch (error) {
-      MemoryCache.set(COMMON.GEMINI_CHAT_HISTORY, []);
+      Brain.set(COMMON.GEMINI_CHAT_HISTORY, []);
       console.error(error);
     }
   }
@@ -65,8 +65,8 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     try {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
-      let chatHistory = MemoryCache.has(COMMON.GEMINI_CHAT_HISTORY)
-        ? MemoryCache.get(COMMON.GEMINI_CHAT_HISTORY)
+      let chatHistory = Brain.has(COMMON.GEMINI_CHAT_HISTORY)
+        ? Brain.get(COMMON.GEMINI_CHAT_HISTORY)
         : [];
 
       if (chatHistory?.length) {
@@ -107,7 +107,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       const response = result.response;
       return response.text();
     } catch (error) {
-      MemoryCache.set(COMMON.GEMINI_CHAT_HISTORY, []);
+      Brain.set(COMMON.GEMINI_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );

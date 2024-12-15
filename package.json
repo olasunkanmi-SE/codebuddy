@@ -41,111 +41,111 @@
       "editor/context": [
         {
           "when": "editorHasSelection",
-          "command": "ola.commentCode",
+          "command": "CodeBuddy.commentCode",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "ola.reviewCode",
+          "command": "CodeBuddy.reviewCode",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "ola.codeRefactor",
+          "command": "CodeBuddy.codeRefactor",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "ola.codeOptimize",
+          "command": "CodeBuddy.codeOptimize",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "ola.explain",
+          "command": "CodeBuddy.explain",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "ola.sendChatMessage",
+          "command": "CodeBuddy.sendChatMessage",
           "group": "CodeBuddy"
         },
         {
-          "command": "ola.savePattern",
-          "group": "CodeBuddy"
-        },
-        {
-          "when": "editorHasSelection",
-          "command": "ola.readFromKnowledgeBase",
-          "group": "CodeBuddy"
-        },
-        {
-          "command": "ola.generateCommitMessage",
+          "command": "CodeBuddy.savePattern",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "ola.interviewMe",
+          "command": "CodeBuddy.readFromKnowledgeBase",
+          "group": "CodeBuddy"
+        },
+        {
+          "command": "CodeBuddy.generateCommitMessage",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "ola.generateUnitTest",
+          "command": "CodeBuddy.interviewMe",
           "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
-          "command": "ola.generateCodeChart",
+          "command": "CodeBuddy.generateUnitTest",
+          "group": "CodeBuddy"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "CodeBuddy.generateCodeChart",
           "group": "CodeBuddy"
         }
       ]
     },
     "commands": [
       {
-        "command": "ola.commentCode",
+        "command": "CodeBuddy.commentCode",
         "title": "CodeBuddy. Add comment to selected code."
       },
       {
-        "command": "ola.reviewCode",
+        "command": "CodeBuddy.reviewCode",
         "title": "CodeBuddy. Review these selected code."
       },
       {
-        "command": "ola.codeRefactor",
+        "command": "CodeBuddy.codeRefactor",
         "title": "CodeBuddy. Refactor these selected code."
       },
       {
-        "command": "ola.codeOptimize",
+        "command": "CodeBuddy.codeOptimize",
         "title": "CodeBuddy. Optimize these selected code."
       },
       {
-        "command": "ola.sendChatMessage",
+        "command": "CodeBuddy.sendChatMessage",
         "title": "Send to CodeBuddy"
       },
       {
-        "command": "ola.explain",
+        "command": "CodeBuddy.explain",
         "title": "CodeBuddy. Explain this code"
       },
       {
-        "command": "ola.savePattern",
+        "command": "CodeBuddy.savePattern",
         "title": "CodeBuddy. Save this code pattern"
       },
       {
-        "command": "ola.readFromKnowledgeBase",
+        "command": "CodeBuddy.readFromKnowledgeBase",
         "title": "CodeBuddy. Generate based on knowledgeBase"
       },
       {
-        "command": "ola.generateCommitMessage",
+        "command": "CodeBuddy.generateCommitMessage",
         "title": "CodeBuddy. Generate commit message"
       },
       {
-        "command": "ola.interviewMe",
+        "command": "CodeBuddy.interviewMe",
         "title": "CodeBuddy. Interview Me."
       },
       {
-        "command": "ola.generateUnitTest",
+        "command": "CodeBuddy.generateUnitTest",
         "title": "CodeBuddy. Generate Unit Test."
       },
       {
-        "command": "ola.generateCodeChart",
+        "command": "CodeBuddy.generateCodeChart",
         "title": "CodeBuddy. Generate Code Chart."
       }
     ],

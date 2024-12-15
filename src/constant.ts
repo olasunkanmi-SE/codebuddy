@@ -1,17 +1,17 @@
 export const USER_MESSAGE = " ☕️ Hold on while CodeBuddy ";
 export enum OLA_ACTIONS {
-  comment = "ola.commentCode",
-  review = "ola.reviewCode",
-  refactor = "ola.codeRefactor",
-  optimize = "ola.codeOptimize",
-  fix = "ola.codeFix",
-  explain = "ola.explain",
-  pattern = "ola.savePattern",
-  knowledge = "ola.readFromKnowledgeBase",
-  commitMessage = "ola.generateCommitMessage",
-  interviewMe = "ola.interviewMe",
-  generateUnitTest = "ola.generateUnitTest",
-  generateCodeChart = "ola.generateCodeChart",
+  comment = "CodeBuddy.commentCode",
+  review = "CodeBuddy.reviewCode",
+  refactor = "CodeBuddy.codeRefactor",
+  optimize = "CodeBuddy.codeOptimize",
+  fix = "CodeBuddy.codeFix",
+  explain = "CodeBuddy.explain",
+  pattern = "CodeBuddy.savePattern",
+  knowledge = "CodeBuddy.readFromKnowledgeBase",
+  commitMessage = "CodeBuddy.generateCommitMessage",
+  interviewMe = "CodeBuddy.interviewMe",
+  generateUnitTest = "CodeBuddy.generateUnitTest",
+  generateCodeChart = "CodeBuddy.generateCodeChart",
 }
 
 export enum COMMON {
