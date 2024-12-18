@@ -278,19 +278,23 @@ export abstract class EventGenerator implements IEventGenerator {
   abstract createPrompt(text?: string): any;
 
   async generateResponse(
-    errorMessage?: string,
+    message?: string,
   ): Promise<string | Anthropic.Messages.Message | undefined> {
     this.showInformationMessage();
     let prompt;
     const selectedCode = this.getSelectedWindowArea();
-    if (!errorMessage && !selectedCode) {
+    if (!message && !selectedCode) {
       vscode.window.showErrorMessage("select a piece of code.");
       return;
     }
 
-    errorMessage
-      ? (prompt = await this.createPrompt(errorMessage))
-      : (prompt = await this.createPrompt(selectedCode));
+    if (message && selectedCode) {
+      prompt = await this.createPrompt(`${message} \n ${selectedCode}`);
+    } else {
+      message
+        ? (prompt = await this.createPrompt(message))
+        : (prompt = await this.createPrompt(selectedCode));
+    }
 
     if (!prompt) {
       vscode.window.showErrorMessage("model not reponding, try again later");
@@ -366,8 +370,37 @@ export abstract class EventGenerator implements IEventGenerator {
     return response;
   }
 
-  async execute(errorMessage?: string): Promise<void> {
-    const response = (await this.generateResponse(errorMessage)) as string;
+  async getUserInLineChat(): Promise<string | undefined> {
+    try {
+      const userPrompt = await vscode.window.showInputBox({
+        placeHolder: "Enter instructions for CodeBuddy",
+        ignoreFocusOut: true,
+        validateInput: (text) => {
+          return text === ""
+            ? "Enter instructions for CodeBuddy or press Escape to close chat box"
+            : null;
+        },
+      });
+      if (userPrompt) {
+        Brain.set("inLineChat", true);
+      }
+      return userPrompt;
+    } catch (error) {
+      vscode.window.showInformationMessage(
+        `Error occured while getting user prompt`,
+      );
+      console.log(error);
+    }
+  }
+
+  async execute(message?: string): Promise<void> {
+    const prompt: string | undefined = await this.getUserInLineChat();
+    if (prompt && Brain.has("inLineChat")) {
+      Brain.delete("inLineChat");
+    }
+    const response = (await this.generateResponse(
+      prompt ? prompt : message,
+    )) as string;
     if (!response) {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;

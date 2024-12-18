@@ -12,6 +12,7 @@ export enum OLA_ACTIONS {
   interviewMe = "CodeBuddy.interviewMe",
   generateUnitTest = "CodeBuddy.generateUnitTest",
   generateCodeChart = "CodeBuddy.generateCodeChart",
+  inlineChat = "CodeBuddy.inLineChat",
 }
 
 export enum COMMON {
