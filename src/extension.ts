@@ -25,6 +25,7 @@ import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
 import { getConfigValue } from "./utils";
 import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
 import { Brain } from "./services/memory";
+import { InLineChat } from "./events/inline-chat";
 
 const {
   geminiKey,
@@ -53,9 +54,14 @@ export async function activate(context: vscode.ExtensionContext) {
       interviewMe,
       generateUnitTest,
       generateCodeChart,
+      inlineChat,
     } = OLA_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
+      context,
+    );
+    const getInLineChat = new InLineChat(
+      `${USER_MESSAGE} generates a response...`,
       context,
     );
     const generateOptimizeCode = new OptimizeCode(
@@ -115,6 +121,7 @@ export async function activate(context: vscode.ExtensionContext) {
       [knowledge]: () => knowledgeBase.execute(),
       [commitMessage]: () => generateCommitMessage.execute("hello"),
       [generateCodeChart]: () => codeChartGenerator.execute(),
+      [inlineChat]: () => getInLineChat.execute(),
     };
 
     const subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(

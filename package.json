@@ -83,6 +83,10 @@
           "group": "CodeBuddy"
         },
         {
+          "command": "CodeBuddy.inLineChat",
+          "group":"CodeBuddy"
+        },
+        {
           "when": "editorHasSelection",
           "command": "CodeBuddy.interviewMe",
           "group": "CodeBuddy"
@@ -135,6 +139,10 @@
       {
         "command": "CodeBuddy.generateCommitMessage",
         "title": "CodeBuddy. Generate commit message"
+      },
+      {
+        "command": "CodeBuddy.inLineChat",
+        "title": "CodeBuddy. Inline chat"
       },
       {
         "command": "CodeBuddy.interviewMe",
