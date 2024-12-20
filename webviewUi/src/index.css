@@ -66,3 +66,55 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.dropdown-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 1rem 0;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--vscode-foreground);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+vscode-dropdown {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  margin-top: 4px;
+  border: 1px solid var(--vscode-dropdown-border);
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border-radius: 4px;
+  transition: border-color 0.15s ease-in-out;
+}
+
+vscode-dropdown:hover {
+  border-color: var(--vscode-dropdown-border);
+  cursor: pointer;
+}
+
+vscode-dropdown:focus-within {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 2px var(--vscode-focusBorder);
+}
+
+/* Style for the options */
+vscode-option {
+  padding: 6px 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+vscode-option:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+/* When dropdown is open */
+vscode-dropdown[open] {
+  border-color: var(--vscode-focusBorder);
+}
