@@ -179,20 +179,6 @@ export const chatCss: string = `
 
 
 
-body {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-    padding: 0;
-    font-family: ${selectedFontFamily};
-    font-size: 17px;
-    font-weight: bold
-    font-ligatures: true
-}
-
-
 h1 {
     color: #569cd6;
     font-size: 24px;
