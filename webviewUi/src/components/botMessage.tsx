@@ -1,5 +1,5 @@
 import hljs from "highlight.js";
-import "highlight.js/styles/tokyo-night-dark.min.css";
+// import "highlight.js/styles/tokyo-night-dark.min.css";
 import React, { useEffect, useRef } from "react";
 
 interface CodeBlockProps {
@@ -30,7 +30,7 @@ export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
       </div>
       <pre ref={codeRef} className="code-content">
         <code
-          className="language-html"
+          className="language-typescript"
           dangerouslySetInnerHTML={{ __html: content }}
         />
       </pre>
