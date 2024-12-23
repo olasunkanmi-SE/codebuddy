@@ -159,7 +159,6 @@ export abstract class EventGenerator implements IEventGenerator {
       }
 
       const { generativeAi, model, modelName } = activeModel;
-      //
       if (!generativeAi || !generativeAiModels) {
         throw new Error("Model not found. Check your settings.");
       }
@@ -381,9 +380,6 @@ export abstract class EventGenerator implements IEventGenerator {
             : null;
         },
       });
-      if (userPrompt) {
-        Brain.set("inLineChat", true);
-      }
       return userPrompt;
     } catch (error) {
       vscode.window.showInformationMessage(
@@ -394,10 +390,7 @@ export abstract class EventGenerator implements IEventGenerator {
   }
 
   async execute(message?: string): Promise<void> {
-    const prompt: string | undefined = await this.getUserInLineChat();
-    if (prompt && Brain.has("inLineChat")) {
-      Brain.delete("inLineChat");
-    }
+    let prompt: string | undefined;
     const response = (await this.generateResponse(
       prompt ? prompt : message,
     )) as string;
@@ -412,28 +405,28 @@ export abstract class EventGenerator implements IEventGenerator {
     }
     if (this.generativeAi === generativeAiModels.GROQ) {
       await GroqWebViewProvider.webView?.webview.postMessage({
-        type: "user-input",
+        type: "bot-response",
         message: formattedResponse,
       });
     }
 
     if (this.generativeAi === generativeAiModels.GEMINI) {
       await GeminiWebViewProvider.webView?.webview.postMessage({
-        type: "user-input",
+        type: "bot-response",
         message: formattedResponse,
       });
     }
 
     if (this.generativeAi === generativeAiModels.ANTHROPIC) {
       await AnthropicWebViewProvider.webView?.webview.postMessage({
-        type: "user-input",
+        type: "bot-response",
         message: formattedResponse,
       });
     }
 
     if (this.generativeAi === generativeAiModels.GROK) {
       await AnthropicWebViewProvider.webView?.webview.postMessage({
-        type: "user-input",
+        type: "bot-response",
         message: formattedResponse,
       });
     }

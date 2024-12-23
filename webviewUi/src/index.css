@@ -350,7 +350,7 @@ vscode-button > .codicon {
 .code-content {
   margin: 0;
   padding: 16px;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
   overflow-x: auto;
   background-color: var(--vscode-editor-background);
