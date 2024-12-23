@@ -64,7 +64,7 @@ export abstract class BaseWebViewProvider {
   ): void {
     try {
       _view.webview.onDidReceiveMessage(async (message) => {
-        if (message.type === "user-input") {
+        if (message.command === "user-input") {
           const response = await this.generateResponse(
             apiKey,
             modelName,

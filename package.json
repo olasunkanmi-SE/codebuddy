@@ -291,6 +291,8 @@
     ]
   },
   "scripts": {
+    "dev:webview": "cd webviewUi && npm run dev",
+    "build:webview": "cd webviewUi && npm run build",
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
