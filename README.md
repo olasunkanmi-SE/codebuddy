@@ -14,7 +14,7 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - [ ] Create Code base Documentation.
 - [ ] Orchestrator. Coordinate AI model activities with Agent capabilities, through tools and function calling.
 - [ ] Access to real-time data.
-- [ ] Support for local LLMs like Ollama
+- [ ] Support for local LLMs such as Ollama
 - [ ] Code search. Search code across the entire codebase
 
 ## Repository Structure
