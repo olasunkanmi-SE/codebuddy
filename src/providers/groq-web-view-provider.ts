@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base-web-view-provider";
 import Groq from "groq-sdk";
-import { COMMON, GROQ_CONFIG } from "../constant";
+import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { Brain } from "../services/memory";
 
 type Role = "user" | "system";

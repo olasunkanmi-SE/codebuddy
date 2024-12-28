@@ -1,6 +1,6 @@
 import * as markdownit from "markdown-it";
 import * as vscode from "vscode";
-import { Brain } from "./services/memory";
+import { Brain } from "../services/memory";
 import { COMMON, generativeAiModels } from "./constant";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -87,4 +87,9 @@ export const getNonce = () => {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
   return text;
+};
+
+export const handleError = (error: unknown, message?: string): void => {
+  const errorMessage = error instanceof Error ? error.message : "Unknown Error";
+  vscode.window.showErrorMessage(`${message}, ${errorMessage}`);
 };

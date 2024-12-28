@@ -19,7 +19,7 @@ export interface ITypeScriptCodeMapper {
    */
   extractClassMetaData(
     node: ts.ClassDeclaration,
-    sourceFile: ts.SourceFile
+    sourceFile: ts.SourceFile,
   ): IClassInfo;
 
   /**
@@ -31,7 +31,7 @@ export interface ITypeScriptCodeMapper {
    */
   extractPropertyParameters(
     node: ts.PropertyDeclaration,
-    sourceFile: ts.SourceFile
+    sourceFile: ts.SourceFile,
   ): IProperty;
 
   /**
@@ -43,7 +43,7 @@ export interface ITypeScriptCodeMapper {
    */
   extractFunctionParameters(
     node: ts.FunctionDeclaration | ts.MethodDeclaration,
-    sourceFile: ts.SourceFile
+    sourceFile: ts.SourceFile,
   ): IProperty[];
 
   /**
@@ -55,7 +55,7 @@ export interface ITypeScriptCodeMapper {
    */
   getFunctionDetails(
     node: ts.FunctionDeclaration | ts.MethodDeclaration,
-    sourceFile: ts.SourceFile
+    sourceFile: ts.SourceFile,
   ): IFunctionInfo | null;
 
   /**
@@ -70,7 +70,7 @@ export interface ITypeScriptCodeMapper {
       | ts.MethodDeclaration
       | ts.ParameterDeclaration
       | ts.PropertyDeclaration
-      | ts.PropertySignature
+      | ts.PropertySignature,
   ): string | undefined;
 
   /**
@@ -92,17 +92,8 @@ export interface ITypeScriptCodeMapper {
    */
   getFunctionNodeText(
     node: ts.FunctionDeclaration | ts.MethodDeclaration,
-    sourceFile: ts.SourceFile
+    sourceFile: ts.SourceFile,
   ): string;
-
-  /**
-   * Finds the root directory of a project by searching for a 'package.json' file
-   * starting from the given current directory and traversing up the directory tree.
-   *
-   * @param currentDir The directory to start searching from.
-   * @returns The root directory of the project, or the current working directory if no 'package.json' file is found.
-   */
-  findProjectRoot(currentDir: string): string;
 
   /**
    * Retrieves a list of TypeScript files, excluding test and mock files.
@@ -125,7 +116,7 @@ export interface ITypeScriptCodeMapper {
    */
   extractInterfaceInfo(
     node: ts.InterfaceDeclaration,
-    sourceFile: ts.SourceFile
+    sourceFile: ts.SourceFile,
   ): IInterfaceInfo;
 
   /**
@@ -137,7 +128,7 @@ export interface ITypeScriptCodeMapper {
    */
   extractEnumInfo(
     node: ts.EnumDeclaration,
-    sourceFile: ts.SourceFile
+    sourceFile: ts.SourceFile,
   ): IEnumInfo;
 
   /**

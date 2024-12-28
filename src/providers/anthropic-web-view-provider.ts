@@ -1,13 +1,17 @@
 import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base-web-view-provider";
-import { COMMON, generativeAiModels, GROQ_CONFIG } from "../constant";
+import {
+  COMMON,
+  generativeAiModels,
+  GROQ_CONFIG,
+} from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
 import { Brain } from "../services/memory";
 import {
   createAnthropicClient,
   getGenerativeAiModel,
   getXGroKBaseURL,
-} from "../utils";
+} from "../application/utils";
 
 type Role = "user" | "assistant";
 export interface IHistory {

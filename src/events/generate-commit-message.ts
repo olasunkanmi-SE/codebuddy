@@ -1,7 +1,7 @@
 import simpleGit, { GitError, SimpleGit, SimpleGitOptions } from "simple-git";
 import { EventGenerator } from "./event-generator";
 import * as vscode from "vscode";
-import { formatText } from "../utils";
+import { formatText } from "../application/utils";
 
 export class GenerateCommitMessage extends EventGenerator {
   constructor(action: string, context: vscode.ExtensionContext) {

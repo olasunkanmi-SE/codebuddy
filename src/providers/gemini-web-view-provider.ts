@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as vscode from "vscode";
-import { COMMON } from "../constant";
+import { COMMON } from "../application/constant";
 import { BaseWebViewProvider } from "./base-web-view-provider";
 import { Brain } from "../services/memory";
 

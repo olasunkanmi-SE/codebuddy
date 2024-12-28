@@ -3,7 +3,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
-import { APP_CONFIG, COMMON, generativeAiModels } from "../constant";
+import {
+  APP_CONFIG,
+  COMMON,
+  generativeAiModels,
+} from "../application/constant";
 import { AnthropicWebViewProvider } from "../providers/anthropic-web-view-provider";
 import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
@@ -14,7 +18,7 @@ import {
   getLatestChatHistory,
   getXGroKBaseURL,
   vscodeErrorMessage,
-} from "../utils";
+} from "../application/utils";
 
 interface IEventGenerator {
   getApplicationConfig(configKey: string): string | undefined;

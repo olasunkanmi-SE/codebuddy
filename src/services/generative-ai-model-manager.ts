@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { getConfigValue } from "../utils";
+import { getConfigValue } from "../application/utils";
 import { ChatManager } from "./chat-manager";
 
 export const setUpGenerativeAiModel = (

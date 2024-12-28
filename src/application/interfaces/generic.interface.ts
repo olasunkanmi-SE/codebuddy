@@ -18,7 +18,6 @@ export interface IClassInfo {
   imports?: string;
   interfaces?: IInterfaceInfo[];
   enums?: IEnumInfo[];
-  // constructor?: string //Check for this also
 }
 
 export interface IInterfaceInfo {
@@ -80,14 +79,15 @@ export interface IProperty {
   type?: string;
 }
 
-export enum SomeEnum {
-  MORNING = "morning",
-}
-
 export interface ICodebaseKnowledgeExtractor {}
 
 export interface IFileUploader {
   uploadFile(file: vscode.Uri): Promise<void>;
   getFiles(): Promise<string[]>;
   uploadFileHandler(): Promise<void>;
+}
+
+export interface IWorkspaceInfo {
+  root: vscode.Uri;
+  srcPath: string;
 }
