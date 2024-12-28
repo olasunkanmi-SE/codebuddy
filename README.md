@@ -12,6 +12,8 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - [ ] Context Pinning. Pin directories, and files, (functions, classes, etc.) as persistent context. AI Models to reference these items for every suggestion, across Chat and Commands.
 - [ ] Persistent Context. AI model to use certain context throughout a conversation and across different conversations by configuring the Context.
 - [ ] Create Code base Documentation.
+- [ ] Orchestrator. Coordinate AI model activities with Agent capabilities, through tools and function calling.
+- [ ] Access to real-time data.
 
 ## Repository Structure
 
