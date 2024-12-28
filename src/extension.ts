@@ -8,7 +8,7 @@ import {
 } from "./constant";
 import { Comments } from "./events/comment";
 import { ExplainCode } from "./events/explain";
-import { FileUploader } from "./events/file-uploader";
+import { FileUploader } from "./services/file-uploader";
 import { FixError } from "./events/fixError";
 import { CodeChartGenerator } from "./events/generate-code-chart";
 import { GenerateCommitMessage } from "./events/generate-commit-message";
@@ -26,6 +26,7 @@ import { getConfigValue } from "./utils";
 import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
 import { Brain } from "./services/memory";
 import { InLineChat } from "./events/inline-chat";
+import { TypeScriptCodeMapper } from "./services/code-mapper.service";
 
 const {
   geminiKey,
@@ -41,6 +42,12 @@ const {
 export async function activate(context: vscode.ExtensionContext) {
   try {
     Brain.getInstance();
+    const getKnowledgeBase = async () => {
+      const codeMapper = new TypeScriptCodeMapper(context);
+      const x = await codeMapper.buildCodebaseMap();
+      return x;
+    };
+    getKnowledgeBase();
     const {
       comment,
       review,
