@@ -26,14 +26,14 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     apiKey: string,
     generativeAiModel: string,
     context: vscode.ExtensionContext,
-    protected baseUrl?: string
+    protected baseUrl?: string,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
   public async sendResponse(
     response: string,
-    currentChat: string
+    currentChat: string,
   ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
@@ -70,7 +70,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
   async generateResponse(
     apiKey = undefined,
     name = undefined,
-    message: string
+    message: string,
   ): Promise<string | undefined> {
     try {
       const { max_tokens } = GROQ_CONFIG;
@@ -79,7 +79,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       }
       const anthropic: Anthropic = createAnthropicClient(
         this.apiKey,
-        this.baseUrl
+        this.baseUrl,
       );
       let chatHistory = Brain.has(COMMON.ANTHROPIC_CHAT_HISTORY)
         ? Brain.get(COMMON.ANTHROPIC_CHAT_HISTORY)
@@ -109,7 +109,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       console.error(error);
       Brain.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
-        "Model not responding, please resend your question"
+        "Model not responding, please resend your question",
       );
     }
   }

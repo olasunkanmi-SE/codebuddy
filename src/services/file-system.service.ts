@@ -29,10 +29,10 @@ export class FileSystemService {
         throw Error("root workspace folder not found");
       }
       const directories = await vscode.workspace.fs.readDirectory(
-        workSpaceInfo?.root
+        workSpaceInfo?.root,
       );
       const directory = directories.filter(
-        ([name, type]) => type === vscode.FileType.Directory && name === dir
+        ([name, type]) => type === vscode.FileType.Directory && name === dir,
       );
       if (!directory) {
         throw Error(`${dir} does not exist within this workspace`);
@@ -41,7 +41,7 @@ export class FileSystemService {
         const filePath = path.posix.join(workSpaceInfo.root.path, file);
         const srcUri = vscode.Uri.file(filePath);
         const srcFiles = await vscode.workspace.findFiles(
-          new vscode.RelativePattern(srcUri, pattern)
+          new vscode.RelativePattern(srcUri, pattern),
         );
         return srcFiles.map((file) => file.path);
       });
@@ -50,7 +50,7 @@ export class FileSystemService {
     } catch (error) {
       handleError(
         error,
-        `Error fetching the files from ${dir} with pattern ${pattern}`
+        `Error fetching the files from ${dir} with pattern ${pattern}`,
       );
       throw error;
     }

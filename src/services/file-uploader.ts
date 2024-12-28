@@ -30,11 +30,11 @@ export class FileUploader implements IFileUploader {
       const filePath = path.join(this.fileDir, fileName);
       await fs.promises.writeFile(filePath, content);
       vscode.window.showInformationMessage(
-        `KnowledgeBase uploaded successfully`
+        `KnowledgeBase uploaded successfully`,
       );
     } catch (error: any) {
       vscode.window.showErrorMessage(
-        `Failed to upload pattern: ${error.message}`
+        `Failed to upload pattern: ${error.message}`,
       );
       throw error;
     }
@@ -55,7 +55,7 @@ export class FileUploader implements IFileUploader {
       return content;
     } catch (error: any) {
       vscode.window.showErrorMessage(
-        `Error reading from knowledgeBase: ${error.message}`
+        `Error reading from knowledgeBase: ${error.message}`,
       );
       throw error;
     }
@@ -77,7 +77,7 @@ export class FileUploader implements IFileUploader {
       await Promise.all(deletePromises);
     } catch (error: any) {
       vscode.window.showErrorMessage(
-        `Unable to delete files: ${error.message}`
+        `Unable to delete files: ${error.message}`,
       );
       throw error;
     }
@@ -94,7 +94,7 @@ export class FileUploader implements IFileUploader {
       return files.map((file) => path.join(this.fileDir, file));
     } catch (error: any) {
       vscode.window.showErrorMessage(
-        `Error fetching the files ${error.message}`
+        `Error fetching the files ${error.message}`,
       );
       throw error;
     }
@@ -120,7 +120,7 @@ export class FileUploader implements IFileUploader {
         await this.uploadFile(file[0]);
       } catch (error: any) {
         vscode.window.showErrorMessage(
-          `Failed to upload file: ${error.message}`
+          `Failed to upload file: ${error.message}`,
         );
         throw error;
       }

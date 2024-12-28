@@ -76,7 +76,7 @@ export class MemFS implements vscode.FileSystemProvider {
   writeFile(
     uri: vscode.Uri,
     content: Uint8Array,
-    options: { create: boolean; overwrite: boolean }
+    options: { create: boolean; overwrite: boolean },
   ): void {
     const basename = path.posix.basename(uri.path);
     const parent = this._lookupParentDirectory(uri);
@@ -107,7 +107,7 @@ export class MemFS implements vscode.FileSystemProvider {
   rename(
     oldUri: vscode.Uri,
     newUri: vscode.Uri,
-    options: { overwrite: boolean }
+    options: { overwrite: boolean },
   ): void {
     if (!options.overwrite && this._lookup(newUri, true)) {
       throw vscode.FileSystemError.FileExists(newUri);
@@ -125,7 +125,7 @@ export class MemFS implements vscode.FileSystemProvider {
 
     this._fireSoon(
       { type: vscode.FileChangeType.Deleted, uri: oldUri },
-      { type: vscode.FileChangeType.Created, uri: newUri }
+      { type: vscode.FileChangeType.Created, uri: newUri },
     );
   }
 
@@ -141,7 +141,7 @@ export class MemFS implements vscode.FileSystemProvider {
     parent.size -= 1;
     this._fireSoon(
       { type: vscode.FileChangeType.Changed, uri: dirname },
-      { uri, type: vscode.FileChangeType.Deleted }
+      { uri, type: vscode.FileChangeType.Deleted },
     );
   }
 
@@ -156,7 +156,7 @@ export class MemFS implements vscode.FileSystemProvider {
     parent.size += 1;
     this._fireSoon(
       { type: vscode.FileChangeType.Changed, uri: dirname },
-      { type: vscode.FileChangeType.Created, uri }
+      { type: vscode.FileChangeType.Created, uri },
     );
   }
 
