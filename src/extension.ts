@@ -5,7 +5,7 @@ import {
   generativeAiModels,
   OLA_ACTIONS,
   USER_MESSAGE,
-} from "./constant";
+} from "./application/constant";
 import { Comments } from "./events/comment";
 import { ExplainCode } from "./events/explain";
 import { FileUploader } from "./services/file-uploader";
@@ -22,7 +22,7 @@ import { CodeActionsProvider } from "./providers/code-actions-provider";
 import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
-import { getConfigValue } from "./utils";
+import { getConfigValue } from "./application/utils";
 import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
 import { Brain } from "./services/memory";
 import { InLineChat } from "./events/inline-chat";
@@ -42,10 +42,10 @@ const {
 export async function activate(context: vscode.ExtensionContext) {
   try {
     Brain.getInstance();
+
     const getKnowledgeBase = async () => {
-      const codeMapper = new TypeScriptCodeMapper(context);
-      const x = await codeMapper.buildCodebaseMap();
-      return x;
+      const codeMapper = new TypeScriptCodeMapper();
+      return await codeMapper.buildCodebaseMap();
     };
     getKnowledgeBase();
     const {

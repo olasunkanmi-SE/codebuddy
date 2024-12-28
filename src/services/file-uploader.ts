@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { IFileUploader } from "../interfaces";
+import { IFileUploader } from "../application/interfaces";
 
 export class FileUploader implements IFileUploader {
   fileDir: string;

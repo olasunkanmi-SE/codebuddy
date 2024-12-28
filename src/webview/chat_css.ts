@@ -1,4 +1,4 @@
-import { getConfigValue } from "../utils";
+import { getConfigValue } from "../application/utils";
 import { oneDarkCss } from "./themes/atom-one-dark";
 import { oneDarkReasonableCss } from "./themes/code-highlight_atom-one-dark-reasonable";
 import { codePenCss } from "./themes/code-pen";

@@ -96,15 +96,6 @@ export interface ITypeScriptCodeMapper {
   ): string;
 
   /**
-   * Finds the root directory of a project by searching for a 'package.json' file
-   * starting from the given current directory and traversing up the directory tree.
-   *
-   * @param currentDir The directory to start searching from.
-   * @returns The root directory of the project, or the current working directory if no 'package.json' file is found.
-   */
-  findProjectRoot(currentDir: string): string;
-
-  /**
    * Retrieves a list of TypeScript files, excluding test and mock files.
    * @returns A promise that resolves with a list of TypeScript files.
    */

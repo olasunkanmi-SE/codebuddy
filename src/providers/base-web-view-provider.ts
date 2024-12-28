@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { getWebviewContent } from "../webview/chat";
-import { formatText } from "../utils";
+import { formatText } from "../application/utils";
 import { FileUploader } from "../services/file-uploader";
 
 let _view: vscode.WebviewView | undefined;

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base-web-view-provider";
 import Groq from "groq-sdk";
-import { COMMON, GROQ_CONFIG } from "../constant";
+import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { Brain } from "../services/memory";
 
 type Role = "user" | "system";
@@ -16,14 +16,14 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     extensionUri: vscode.Uri,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: vscode.ExtensionContext
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
   public async sendResponse(
     response: string,
-    currentChat: string,
+    currentChat: string
   ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
@@ -60,7 +60,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
   async generateResponse(
     apiKey = undefined,
     name = undefined,
-    message: string,
+    message: string
   ): Promise<string | undefined> {
     try {
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
@@ -99,7 +99,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       console.error(error);
       Brain.set(COMMON.GROQ_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
+        "Model not responding, please resend your question"
       );
       return;
     }
