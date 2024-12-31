@@ -17,9 +17,10 @@ export class InLineChat extends EventGenerator {
     return formatText(comment);
   }
 
-  createPrompt(selectedCode: string): string {
+  async createPrompt(selectedCode: string): Promise<string> {
+    const inlinePrompt = await this.getUserInLineChat();
     let context = this.getCurrentActiveEditorCode() ?? "";
-    const fullPrompt = `${selectedCode} \n Here is the code context ${context}`;
+    const fullPrompt = `${inlinePrompt} ${selectedCode} \n Here is the code context ${context}`;
     return fullPrompt;
   }
 }

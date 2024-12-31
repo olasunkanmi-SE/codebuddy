@@ -381,9 +381,6 @@ export abstract class EventGenerator implements IEventGenerator {
             : null;
         },
       });
-      if (userPrompt) {
-        Brain.set("inLineChat", true);
-      }
       return userPrompt;
     } catch (error) {
       vscode.window.showInformationMessage(
@@ -394,13 +391,7 @@ export abstract class EventGenerator implements IEventGenerator {
   }
 
   async execute(message?: string): Promise<void> {
-    const prompt: string | undefined = await this.getUserInLineChat();
-    if (prompt && Brain.has("inLineChat")) {
-      Brain.delete("inLineChat");
-    }
-    const response = (await this.generateResponse(
-      prompt ? prompt : message,
-    )) as string;
+    const response = (await this.generateResponse(message)) as string;
     if (!response) {
       vscode.window.showErrorMessage("model not reponding, try again later");
       return;
