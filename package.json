@@ -7,7 +7,7 @@
     "url": "https://olasunkanmi.app"
   },
   "publisher": "fiatinnovations",
-  "description": "",
+  "description": "CodeBuddy is an AI-powered coding assistant that helps developers write, review, and optimize code.",
   "version": "1.1.7",
   "engines": {
     "vscode": "^1.78.0"
@@ -16,16 +16,32 @@
     "type": "git",
     "url": "https://github.com/olasunkanmi-SE/codebuddy"
   },
-  "gallery": {
-    "icon": "codebuddy.png"
-  },
+  "icon": "./images/codebuddylogo.png",
   "categories": [
-    "Other"
+    "Programming Languages",
+    "Debuggers",
+    "Linters",
+    "Coding Assistant",
+    "Co Pilot",
+    "AI",
+    "Chat",
+    "Machine Learning",
+    "Education",
+    "Snippets"
   ],
   "activationEvents": [
     "onLanguage:javascript",
     "onLanguage:typescript"
   ],
+  "keywords": [
+    "ai",
+    "code assistant",
+    "code review",
+    "code optimization",
+    "developer tools",
+    "productivity"
+  ],
+  "homepage":   "https://github.com/olasunkanmi-SE/codebuddy#readme",
   "main": "./out/extension.js",
   "contributes": {
     "views": {
@@ -328,5 +344,6 @@
     "readable-stream": "^4.5.2",
     "simple-git": "^3.25.0",
     "sinon": "^17.0.1"
-  }
+  },
+  "license": "MIT"
 }
