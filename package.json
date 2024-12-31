@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "CodeBuddy is an AI-powered coding assistant that helps developers write, review, and optimize code.",
-  "version": "1.1.7",
+  "version": "1.2.3",
   "engines": {
     "vscode": "^1.78.0"
   },
@@ -16,13 +16,11 @@
     "type": "git",
     "url": "https://github.com/olasunkanmi-SE/codebuddy"
   },
-  "icon": "./images/codebuddylogo.png",
+  "icon": "images/codebuddylogo.png",
   "categories": [
     "Programming Languages",
     "Debuggers",
     "Linters",
-    "Coding Assistant",
-    "Co Pilot",
     "AI",
     "Chat",
     "Machine Learning",
