@@ -1,4 +1,4 @@
-import { getConfigValue } from "../utils";
+import { getConfigValue } from "../application/utils";
 import { oneDarkCss } from "./themes/atom-one-dark";
 import { oneDarkReasonableCss } from "./themes/code-highlight_atom-one-dark-reasonable";
 import { codePenCss } from "./themes/code-pen";
@@ -177,20 +177,6 @@ export const chatCss: string = `
     color: #666;
 }
 
-
-
-body {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-    padding: 0;
-    font-family: ${selectedFontFamily};
-    font-size: 17px;
-    font-weight: bold
-    font-ligatures: true
-}
 
 
 h1 {

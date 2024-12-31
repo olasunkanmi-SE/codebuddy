@@ -1,4 +1,4 @@
-import { MEMORY_CACHE_OPTIONS } from "../constant";
+import { MEMORY_CACHE_OPTIONS } from "../application/constant";
 
 interface ICacheEntry {
   value: any;

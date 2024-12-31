@@ -59,3 +59,9 @@ export type aIProviderConfig = {
   model: string;
   providerName: string;
 };
+
+export enum FSPROPS {
+  SRC_DIRECTORY = "src",
+  TS_FILE_PATTERN = "**/*.ts",
+  TSCONFIG_FILE = "tsconfig.json",
+}

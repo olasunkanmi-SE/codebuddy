@@ -4,7 +4,7 @@ import {
   APP_CONFIG,
   COMMON,
   generativeAiModels,
-} from "../constant";
+} from "../application/constant";
 import { AnthropicWebViewProvider } from "../providers/anthropic-web-view-provider";
 import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
@@ -15,7 +15,7 @@ import {
   getXGroKBaseURL,
   resetChatHistory,
   vscodeErrorMessage,
-} from "../utils";
+} from "../application/utils";
 
 /**
  * Manages chat functionality, including registering chat commands,

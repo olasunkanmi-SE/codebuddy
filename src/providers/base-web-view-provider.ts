@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { getWebviewContent } from "../webview/chat";
-import { formatText } from "../utils";
-import { FileUploader } from "../events/file-uploader";
+import { formatText } from "../application/utils";
+import { FileUploader } from "../services/file-uploader";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider {
@@ -26,7 +26,11 @@ export abstract class BaseWebViewProvider {
 
     const webviewOptions: vscode.WebviewOptions = {
       enableScripts: true,
-      localResourceRoots: [this._extensionUri],
+      localResourceRoots: [
+        this._extensionUri,
+        vscode.Uri.joinPath(this._extensionUri, "out"),
+        vscode.Uri.joinPath(this._extensionUri, "webviewUi/dist"),
+      ],
     };
     webviewView.webview.options = webviewOptions;
 
@@ -46,8 +50,11 @@ export abstract class BaseWebViewProvider {
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
     const codepatterns: FileUploader = new FileUploader(this._context);
-    const knowledgeBaseDocs: string[] = await codepatterns.getFiles();
-    view.webview.html = getWebviewContent(knowledgeBaseDocs);
+    // const knowledgeBaseDocs: string[] = await codepatterns.getFiles();
+    view.webview.html = getWebviewContent(
+      this.currentWebView?.webview!,
+      this._extensionUri,
+    );
   }
 
   private setupMessageHandler(
@@ -57,7 +64,7 @@ export abstract class BaseWebViewProvider {
   ): void {
     try {
       _view.webview.onDidReceiveMessage(async (message) => {
-        if (message.type === "user-input") {
+        if (message.command === "user-input") {
           const response = await this.generateResponse(
             apiKey,
             modelName,

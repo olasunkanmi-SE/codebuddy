@@ -84,7 +84,7 @@
         },
         {
           "command": "CodeBuddy.inLineChat",
-          "group":"CodeBuddy"
+          "group": "CodeBuddy"
         },
         {
           "when": "editorHasSelection",
@@ -291,6 +291,8 @@
     ]
   },
   "scripts": {
+    "dev:webview": "cd webviewUi && npm run dev",
+    "build:webview": "cd webviewUi && npm run build",
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
@@ -300,7 +302,6 @@
     "format": "prettier --write \"**/*.ts\""
   },
   "devDependencies": {
-    "@types/glob": "^8.1.0",
     "@types/markdown-it": "^13.0.7",
     "@types/mocha": "^10.0.1",
     "@types/node": "20.2.5",
@@ -312,7 +313,6 @@
     "@vscode/test-cli": "^0.0.8",
     "@vscode/test-electron": "^2.3.2",
     "eslint": "^8.41.0",
-    "glob": "^8.1.0",
     "mocha": "^10.2.0",
     "typescript": "^5.4.3"
   },

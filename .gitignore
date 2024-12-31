@@ -7,3 +7,4 @@ node_modules
 .sentryclirc
 config.ts
 patterns
+webviewUi/dist

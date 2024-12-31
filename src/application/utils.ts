@@ -1,6 +1,6 @@
 import * as markdownit from "markdown-it";
 import * as vscode from "vscode";
-import { Brain } from "./services/memory";
+import { Brain } from "../services/memory";
 import { COMMON, generativeAiModels } from "./constant";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -66,4 +66,30 @@ export const createAnthropicClient = (apiKey: string, baseURL?: string) => {
 
 export const getGenerativeAiModel = (): string | undefined => {
   return getConfigValue("generativeAi.option");
+};
+
+export function getUri(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  pathList: string[],
+) {
+  return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...pathList));
+}
+
+// This function generates a random 32-character string (nonce) using alphanumeric characters
+// A nonce is a unique, random value used for security purposes, typically to prevent replay attacks
+// and ensure script integrity when using Content Security Policy (CSP)
+export const getNonce = () => {
+  let text = "";
+  const possible =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+};
+
+export const handleError = (error: unknown, message?: string): void => {
+  const errorMessage = error instanceof Error ? error.message : "Unknown Error";
+  vscode.window.showErrorMessage(`${message}, ${errorMessage}`);
 };

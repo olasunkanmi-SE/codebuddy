@@ -5,10 +5,10 @@ import {
   generativeAiModels,
   OLA_ACTIONS,
   USER_MESSAGE,
-} from "./constant";
+} from "./application/constant";
 import { Comments } from "./events/comment";
 import { ExplainCode } from "./events/explain";
-import { FileUploader } from "./events/file-uploader";
+import { FileUploader } from "./services/file-uploader";
 import { FixError } from "./events/fixError";
 import { CodeChartGenerator } from "./events/generate-code-chart";
 import { GenerateCommitMessage } from "./events/generate-commit-message";
@@ -22,10 +22,11 @@ import { CodeActionsProvider } from "./providers/code-actions-provider";
 import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
 import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
-import { getConfigValue } from "./utils";
+import { getConfigValue } from "./application/utils";
 import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
 import { Brain } from "./services/memory";
 import { InLineChat } from "./events/inline-chat";
+import { TypeScriptCodeMapper } from "./services/code-mapper.service";
 
 const {
   geminiKey,
@@ -41,6 +42,12 @@ const {
 export async function activate(context: vscode.ExtensionContext) {
   try {
     Brain.getInstance();
+
+    const getKnowledgeBase = async () => {
+      const codeMapper = new TypeScriptCodeMapper();
+      return await codeMapper.buildCodebaseMap();
+    };
+    getKnowledgeBase();
     const {
       comment,
       review,
@@ -142,37 +149,27 @@ export async function activate(context: vscode.ExtensionContext) {
         key: string;
         model: string;
         webviewProviderClass: any;
-        subscriptions: vscode.Disposable[];
-        quickFixCodeAction: vscode.Disposable;
       };
     } = {
       [generativeAiModels.GEMINI]: {
         key: geminiKey,
         model: geminiModel,
         webviewProviderClass: GeminiWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
       [generativeAiModels.GROQ]: {
         key: groqApiKey,
         model: groqModel,
         webviewProviderClass: GroqWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
       [generativeAiModels.ANTHROPIC]: {
         key: anthropicApiKey,
         model: anthropicModel,
         webviewProviderClass: AnthropicWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
       [generativeAiModels.GROK]: {
         key: grokApiKey,
         model: grokModel,
         webviewProviderClass: AnthropicWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
     };
     if (selectedGenerativeAiModel in modelConfigurations) {

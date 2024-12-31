@@ -1,12 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-
-interface IFileUploader {
-  uploadFile(file: vscode.Uri): Promise<void>;
-  getFiles(): Promise<string[]>;
-  uploadFileHandler(): Promise<void>;
-}
+import { IFileUploader } from "../application/interfaces";
 
 export class FileUploader implements IFileUploader {
   fileDir: string;
