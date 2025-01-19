@@ -91,3 +91,54 @@ export interface IWorkspaceInfo {
   root: vscode.Uri;
   srcPath: string;
 }
+
+export interface IFunctionData {
+  className: string;
+  path: string;
+  name: string;
+  compositeText: string;
+  content: string;
+  description?: string;
+  processedAt?: string;
+  embedding?: number[];
+  returnType?: string;
+  dependencies?: string[];
+}
+
+export interface IFunctionParameter {
+  name: string;
+  type: string;
+}
+
+export interface ICodeClass {
+  name: string;
+  functions: IMappedFunction[];
+}
+
+export interface ICodeEntry {
+  path: string;
+  classes: ICodeClass[];
+  functions?: IMappedFunction[];
+  dependencies: string[];
+}
+
+export interface ICodeMap {
+  [key: string]: any;
+}
+
+export interface IMappedFunction {
+  name: string;
+  comments?: string;
+  description?: string;
+  content?: string;
+  parameters: IFunctionParameter[];
+  returnType: string;
+  compositeText?: string;
+}
+
+export interface IMappedCode {
+  path: string;
+  functions?: IMappedFunction[];
+  className?: string;
+  dependencies?: string[];
+}

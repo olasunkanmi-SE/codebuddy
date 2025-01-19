@@ -15,7 +15,7 @@ export const formatText = (text?: string): string => {
 };
 
 export const getConfigValue: GetConfigValueType<any> = <T>(
-  key: string,
+  key: string
 ): T | undefined => {
   return vscode.workspace.getConfiguration().get<T>(key);
 };
@@ -71,7 +71,7 @@ export const getGenerativeAiModel = (): string | undefined => {
 export function getUri(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
-  pathList: string[],
+  pathList: string[]
 ) {
   return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...pathList));
 }
@@ -92,4 +92,8 @@ export const getNonce = () => {
 export const handleError = (error: unknown, message?: string): void => {
   const errorMessage = error instanceof Error ? error.message : "Unknown Error";
   vscode.window.showErrorMessage(`${message}, ${errorMessage}`);
+};
+
+export const showInfoMessage = (message?: string): void => {
+  vscode.window.showErrorMessage(`${message}`);
 };
