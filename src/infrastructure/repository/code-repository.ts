@@ -46,7 +46,7 @@ export class CodeRepository implements ICodeRepository {
 
   async searchSimilarFunctions(
     queryEmbeddings: number[],
-    limit: number
+    limit: number,
   ): Promise<Row[] | undefined> {
     try {
       const query = selectFunctionProps();
