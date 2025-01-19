@@ -7,6 +7,16 @@ This extension provides a wide range of AI-powered features to assist developers
 ## Install in Vscode Market Place
 https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy
 
+## Roadmap
+- [ ] Local codebase indexing. Perform retrieval-augmented generation (RAG) on the codebase.
+- [ ] Context Pinning. Pin directories, and files, (functions, classes, etc.) as persistent context. AI Models to reference these items for every suggestion, across Chat and Commands.
+- [ ] Persistent Context. AI model to use certain context throughout a conversation and across different conversations by configuring the Context.
+- [ ] Create Code base Documentation.
+- [ ] Orchestrator. Coordinate AI model activities with Agent capabilities, through tools and function calling.
+- [ ] Access to real-time data.
+- [ ] Support for local LLMs such as Ollama
+- [ ] Code search. Search code across the entire codebase
+
 ## Repository Structure
 
 ```
