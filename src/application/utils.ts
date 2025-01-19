@@ -93,3 +93,7 @@ export const handleError = (error: unknown, message?: string): void => {
   const errorMessage = error instanceof Error ? error.message : "Unknown Error";
   vscode.window.showErrorMessage(`${message}, ${errorMessage}`);
 };
+
+export const showInfoMessage = (message?: string): void => {
+  vscode.window.showErrorMessage(`${message}`);
+};

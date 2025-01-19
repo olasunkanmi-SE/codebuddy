@@ -19,7 +19,7 @@ import { handleError } from "../application/utils";
 import { FileSystemService } from "./file-system.service";
 import { FSPROPS } from "../application/constant";
 
-export class TypeScriptCodeMapper implements ITypeScriptCodeMapper {
+export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private program: ts.Program | undefined;
   private typeChecker: ts.TypeChecker | undefined;
   private fsService: FileSystemService | undefined;

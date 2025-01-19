@@ -1,32 +1,32 @@
 import * as vscode from "vscode";
 import {
   APP_CONFIG,
-  COMMON,
   generativeAiModels,
   OLA_ACTIONS,
   USER_MESSAGE,
 } from "./application/constant";
+import { getConfigValue } from "./application/utils";
 import { Comments } from "./events/comment";
 import { ExplainCode } from "./events/explain";
-import { FileUploader } from "./services/file-uploader";
 import { FixError } from "./events/fixError";
 import { CodeChartGenerator } from "./events/generate-code-chart";
 import { GenerateCommitMessage } from "./events/generate-commit-message";
 import { GenerateUnitTest } from "./events/generate-unit-test";
+import { InLineChat } from "./events/inline-chat";
 import { InterviewMe } from "./events/interview-me";
 import { ReadFromKnowledgeBase } from "./events/knowledge-base";
 import { OptimizeCode } from "./events/optimize";
 import { RefactorCode } from "./events/refactor";
 import { ReviewCode } from "./events/review";
+import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
 import { CodeActionsProvider } from "./providers/code-actions-provider";
 import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
 import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
+import { FileUploader } from "./services/file-uploader";
 import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
-import { getConfigValue } from "./application/utils";
-import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
 import { Brain } from "./services/memory";
-import { InLineChat } from "./events/inline-chat";
-import { TypeScriptCodeMapper } from "./services/code-mapper.service";
+import { TypeScriptAtsMapper } from "./services/typescript-ats.service";
+import { CodeStructureMapper } from "./services/code-structure.mapper.service";
 
 const {
   geminiKey,
@@ -44,8 +44,13 @@ export async function activate(context: vscode.ExtensionContext) {
     Brain.getInstance();
 
     const getKnowledgeBase = async () => {
-      const codeMapper = new TypeScriptCodeMapper();
-      return await codeMapper.buildCodebaseMap();
+      const codeMapper = new TypeScriptAtsMapper();
+      const mappedCode = await codeMapper.buildCodebaseMap();
+      const ats = Object.values(mappedCode).flatMap((repo) =>
+        Object.values(repo.modules),
+      );
+      const mapper = new CodeStructureMapper(ats);
+      return mapper.normalizeData();
     };
     getKnowledgeBase();
     const {

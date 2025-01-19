@@ -2,8 +2,13 @@ import * as vscode from "vscode";
 import { FSPROPS } from "../application/constant";
 import { IWorkspaceInfo } from "../application/interfaces";
 import { handleError } from "../application/utils";
+import { Logger } from "../infrastructure/logger/logger";
 
 export class FileSystemService {
+  private logger: Logger;
+  constructor() {
+    this.logger = new Logger("FileSystemService");
+  }
   getWorkspaceInfo(dir: string): IWorkspaceInfo | undefined {
     try {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -15,7 +20,7 @@ export class FileSystemService {
         srcPath: vscode.Uri.joinPath(workspaceFolder.uri, dir).fsPath,
       };
     } catch (error) {
-      handleError(error, `Unable to get workspace ${dir} `);
+      this.logger.error("Unable to get workspace ${dir}", error);
       throw error;
     }
   }
