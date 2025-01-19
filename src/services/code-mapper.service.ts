@@ -415,7 +415,7 @@ export class TypeScriptCodeMapper implements ITypeScriptCodeMapper {
     relativePath: string,
   ): IModuleInfo {
     return {
-      path: relativePath,
+      path: path.normalize(relativePath),
       classes: [],
       functions: [],
       interfaces: [],
@@ -476,8 +476,9 @@ export class TypeScriptCodeMapper implements ITypeScriptCodeMapper {
   async buildCodebaseMap(): Promise<ICodebaseMap> {
     try {
       const rootDir: string = process.cwd();
+      const normalizedRootDir = path.normalize(rootDir);
       const codebaseMap: ICodebaseMap = {};
-      const repoNames: string = path.basename(rootDir);
+      const repoNames: string = path.basename(normalizedRootDir);
       codebaseMap[repoNames] = { modules: {} };
 
       const tsFiles: string[] | undefined =
@@ -485,8 +486,11 @@ export class TypeScriptCodeMapper implements ITypeScriptCodeMapper {
           FSPROPS.SRC_DIRECTORY,
           FSPROPS.TS_FILE_PATTERN,
         );
-      tsFiles!.forEach((filePath) => {
-        const moduleRalativePath = path.relative(rootDir, filePath);
+      if (!tsFiles?.length) {
+        throw Error(`No Typescript files found`);
+      }
+      tsFiles.forEach((filePath) => {
+        const moduleRalativePath = path.relative(normalizedRootDir, filePath);
         const sourceFile = this.getSourceFile(filePath);
 
         if (!sourceFile) {
