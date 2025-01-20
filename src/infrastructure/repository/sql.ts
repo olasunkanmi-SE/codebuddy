@@ -1,4 +1,4 @@
-export const createTableQuery = (values: string) => {
+export const createTableQuery = () => {
   return [
     "DROP TABLE IF EXISTS code_functions",
     `CREATE TABLE IF NOT EXISTS code_functions (
@@ -9,8 +9,13 @@ export const createTableQuery = (values: string) => {
       embedding F32_BLOB(768) NOT NULL
     )`,
     "CREATE INDEX IF NOT EXISTS code_functions_idx ON code_functions (libsql_vector_idx(embedding))",
+  ];
+};
+
+export const insertDataQuery = (values: string) => {
+  return [
     `INSERT INTO code_functions (class_name, function_name, file_path, created_at, embedding) 
-     VALUES ${values}`,
+          VALUES ${values}`,
   ];
 };
 
