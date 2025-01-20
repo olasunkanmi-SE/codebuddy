@@ -5,7 +5,7 @@ import { handleError } from "../application/utils";
 import { Logger } from "../infrastructure/logger/logger";
 
 export class FileSystemService {
-  private logger: Logger;
+  readonly logger: Logger;
   constructor() {
     this.logger = new Logger("FileSystemService");
   }
@@ -72,12 +72,10 @@ export class FileSystemService {
       const rootUri = this.getRootUri();
       let fileUri: vscode.Uri;
 
-      switch (fileName) {
-        case FSPROPS.TSCONFIG_FILE:
-          fileUri = vscode.Uri.joinPath(rootUri, FSPROPS.TSCONFIG_FILE);
-          break;
-        default:
-          throw Error("Unknown fileName");
+      if (fileName === FSPROPS.TSCONFIG_FILE) {
+        fileUri = vscode.Uri.joinPath(rootUri, FSPROPS.TSCONFIG_FILE);
+      } else {
+        throw Error("Unknown fileName");
       }
 
       const fileContent = await vscode.workspace.fs.readFile(fileUri);

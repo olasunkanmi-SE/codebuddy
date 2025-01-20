@@ -106,7 +106,7 @@ export class CodeStructureMapper {
         description: "",
         parameters: func.parameters ?? [],
         returnType: func.returnType,
-        content: (func.content ?? "").replace(/[\s\r\n]+/g, ""),
+        content: (func.content ?? "").replace(/\s+/g, ""),
         compositeText: this.createCompositeText(
           func,
           codeEntry?.dependencies && codeEntry?.dependencies.length > 0

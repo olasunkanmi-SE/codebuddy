@@ -1,7 +1,7 @@
-import * as fs from "fs";
 import * as path from "path";
 import * as ts from "typescript";
 import * as vscode from "vscode";
+import { FSPROPS } from "../application/constant";
 import {
   DeclarationFunctionNode,
   DeclarationOrFunctionNode,
@@ -17,7 +17,6 @@ import {
 import { ITypeScriptCodeMapper } from "../application/interfaces/ts.code.mapper.interface";
 import { handleError } from "../application/utils";
 import { FileSystemService } from "./file-system.service";
-import { FSPROPS } from "../application/constant";
 
 export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private program: ts.Program | undefined;
