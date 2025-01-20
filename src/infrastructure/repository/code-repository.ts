@@ -1,5 +1,5 @@
-import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
 import { Client, createClient, ResultSet, Row } from "@libsql/client";
+import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
 import { Logger } from "../logger/logger";
 import { createTableQuery, insertDataQuery, selectFunctionProps } from "./sql";
 
@@ -74,10 +74,7 @@ export class CodeRepository implements ICodeRepository {
     }
   }
 
-  async searchSimilarFunctions(
-    queryEmbeddings: number[],
-    limit: number
-  ): Promise<Row[] | undefined> {
+  async searchSimilarFunctions(queryEmbeddings: number[], limit: number): Promise<Row[] | undefined> {
     try {
       const query = selectFunctionProps();
       const result: ResultSet | undefined = await this.client?.execute({
