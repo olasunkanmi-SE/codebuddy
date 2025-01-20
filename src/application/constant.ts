@@ -65,3 +65,12 @@ export enum FSPROPS {
   TS_FILE_PATTERN = "**/*.ts",
   TSCONFIG_FILE = "tsconfig.json",
 }
+
+export const EmbeddingsConfig = {
+  batchSize: 5,
+  maxRetries: 3,
+  retryDelay: 1000,
+  rateLimit: 1500,
+  embeddingModel: "Xenova/all-MiniLM-L6-v2",
+  textModel: "gemini-1.5-flash",
+};

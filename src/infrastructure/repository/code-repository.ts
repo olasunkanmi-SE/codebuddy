@@ -1,7 +1,7 @@
 import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
 import { Client, createClient, ResultSet, Row } from "@libsql/client";
 import { Logger } from "../logger/logger";
-import { createTableQuery, selectFunctionProps } from "./sql";
+import { createTableQuery, insertDataQuery, selectFunctionProps } from "./sql";
 
 export class CodeRepository implements ICodeRepository {
   private client: Client | undefined;
@@ -30,9 +30,23 @@ export class CodeRepository implements ICodeRepository {
     return CodeRepository.instance;
   }
 
-  async CreateTable(values: string): Promise<ResultSet[] | undefined> {
+  async CreateTable(): Promise<ResultSet[] | undefined> {
     try {
-      const query = createTableQuery(values);
+      const query = createTableQuery();
+      const table = await this.client?.batch(query, "write");
+      if (table) {
+        this.logger.info("Database initialized successfully");
+      }
+      return table;
+    } catch (error) {
+      this.logger.error("Failed to initialize database", error);
+      throw error;
+    }
+  }
+
+  async InsertData(values: string) {
+    try {
+      const query = insertDataQuery(values);
       const table = await this.client?.batch(query, "write");
       if (table) {
         this.logger.info("Database initialized successfully");
@@ -46,7 +60,7 @@ export class CodeRepository implements ICodeRepository {
 
   async searchSimilarFunctions(
     queryEmbeddings: number[],
-    limit: number,
+    limit: number
   ): Promise<Row[] | undefined> {
     try {
       const query = selectFunctionProps();
