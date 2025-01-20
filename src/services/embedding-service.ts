@@ -21,8 +21,7 @@ interface BatchProcessResult {
 }
 
 export class EmbeddingService {
-  private static readonly DEFAULT_OPTIONS: Required<EmbeddingServiceOptions> =
-    EmbeddingsConfig;
+  private static readonly DEFAULT_OPTIONS: Required<EmbeddingServiceOptions> = EmbeddingsConfig;
 
   private readonly options: Required<EmbeddingServiceOptions>;
   private readonly requestInterval: number;
@@ -52,10 +51,7 @@ export class EmbeddingService {
   private async generateEmbedding(text: string): Promise<number[]> {
     try {
       const { pipeline } = await import("@xenova/transformers");
-      const extractor: FeatureExtractionPipeline = await pipeline(
-        "feature-extraction",
-        this.options.embeddingModel
-      );
+      const extractor: FeatureExtractionPipeline = await pipeline("feature-extraction", this.options.embeddingModel);
       const result = await extractor(text, {
         pooling: "mean",
         normalize: true,
@@ -100,9 +96,7 @@ export class EmbeddingService {
     `.trim();
   }
 
-  private async generateFunctionEmbeddings(
-    item: IFunctionData
-  ): Promise<IFunctionData> {
+  private async generateFunctionEmbeddings(item: IFunctionData): Promise<IFunctionData> {
     try {
       const embedding = await this.generateEmbedding(item.compositeText);
       return {
@@ -136,19 +130,17 @@ export class EmbeddingService {
         }
 
         if (forEmbedding) {
-          const embeddings = await Promise.all(
-            batch.map((item) => this.generateFunctionEmbeddings(item))
-          );
+          const embeddings = await Promise.all(batch.map((item) => this.generateFunctionEmbeddings(item)));
           generateEmbeddings.push(...embeddings.filter(Boolean));
         } else {
           const comments = await Promise.all(
-            batch.map((item) => (item.content ? this.generateText(item) : null))
+            batch.map((item) => {
+              if (!item.description) {
+                return item.content ? this.generateText(item) : null;
+              }
+            })
           );
-          generateComments.push(
-            ...comments.filter(
-              (comment): comment is IFunctionData => comment !== null
-            )
-          );
+          generateComments.push(...comments.filter((comment): comment is IFunctionData => comment !== null));
         }
 
         return {
@@ -172,10 +164,7 @@ export class EmbeddingService {
     return { generateEmbeddings: [], generateComments: [] };
   }
 
-  public async processFunctions(
-    data: IFunctionData[],
-    forEmbedding = false
-  ): Promise<IFunctionData[]> {
+  public async processFunctions(data: IFunctionData[], forEmbedding = false): Promise<IFunctionData[]> {
     try {
       const result = await this.processWithRateLimit(data, forEmbedding);
 
@@ -207,17 +196,9 @@ export class EmbeddingService {
 
       try {
         await this.delay(60000);
-        const result = await this.processBatchWithRetry(
-          batch,
-          lastRequestTime,
-          forEmbedding
-        );
+        const result = await this.processBatchWithRetry(batch, lastRequestTime, forEmbedding);
 
-        successful.push(
-          ...(forEmbedding
-            ? result.generateEmbeddings
-            : result.generateComments)
-        );
+        successful.push(...(forEmbedding ? result.generateEmbeddings : result.generateComments));
         lastRequestTime = Date.now();
 
         this.logger.info(`Batch processed`, { startIndex: i });
@@ -226,9 +207,7 @@ export class EmbeddingService {
           startIndex: i,
           error,
         });
-        failed.push(
-          ...batch.map((item) => ({ ...item, error: error as Error }))
-        );
+        failed.push(...batch.map((item) => ({ ...item, error: error as Error })));
       }
     }
 

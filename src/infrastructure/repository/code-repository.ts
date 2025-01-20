@@ -1,15 +1,22 @@
-import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
 import { Client, createClient, ResultSet, Row } from "@libsql/client";
+import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
 import { Logger } from "../logger/logger";
 import { createTableQuery, insertDataQuery, selectFunctionProps } from "./sql";
 
 export class CodeRepository implements ICodeRepository {
   private client: Client | undefined;
   private static instance: CodeRepository;
-  private logger: Logger;
+  private readonly logger: Logger;
   private constructor() {
     this.logger = new Logger("CodeRepository");
-    this.connectDB();
+  }
+
+  public static async createInstance(): Promise<CodeRepository> {
+    if (!CodeRepository.instance) {
+      CodeRepository.instance = new CodeRepository();
+      await CodeRepository.instance.init();
+    }
+    return CodeRepository.instance;
   }
 
   private async connectDB(): Promise<Client> {
@@ -17,6 +24,15 @@ export class CodeRepository implements ICodeRepository {
       return (this.client = createClient({
         url: "file:dev.db",
       }));
+    } catch (error) {
+      this.logger.error("Failed to initialize database", error);
+      throw error;
+    }
+  }
+
+  private async init(): Promise<void> {
+    try {
+      this.client = await this.connectDB();
     } catch (error) {
       this.logger.error("Failed to initialize database", error);
       throw error;
@@ -58,10 +74,7 @@ export class CodeRepository implements ICodeRepository {
     }
   }
 
-  async searchSimilarFunctions(
-    queryEmbeddings: number[],
-    limit: number
-  ): Promise<Row[] | undefined> {
+  async searchSimilarFunctions(queryEmbeddings: number[], limit: number): Promise<Row[] | undefined> {
     try {
       const query = selectFunctionProps();
       const result: ResultSet | undefined = await this.client?.execute({

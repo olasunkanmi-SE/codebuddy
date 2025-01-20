@@ -12,20 +12,16 @@ export interface ExtensionMessage {
   payload: any;
 }
 
-import {
-  VSCodeButton,
-  VSCodeDropdown,
-  VSCodeOption,
-  VSCodeTextArea,
-} from "@vscode/webview-ui-toolkit/react";
+import { VSCodeButton, VSCodeDropdown, VSCodeOption, VSCodeTextArea } from "@vscode/webview-ui-toolkit/react";
 import { useEffect, useState } from "react";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 
 const vscode = (() => {
-  if (typeof acquireVsCodeApi === "function") {
-    return acquireVsCodeApi();
+  if (typeof window !== "undefined" && "acquireVsCodeApi" in window) {
+    return (window as any).acquireVsCodeApi();
   }
+  // Fallback for non-VSCode environments
   return {
     postMessage: (message: any) => {
       console.log("Message to VS Code:", message);
@@ -121,28 +117,16 @@ export const WebviewUI = () => {
           <div>
             {messsages?.map((msg, index) =>
               msg.type === "bot" ? (
-                <BotMessage
-                  key={index}
-                  language={msg.language}
-                  content={msg.content}
-                />
+                <BotMessage key={index} language={msg.language} content={msg.content} />
               ) : (
-                <UserMessage
-                  key={index}
-                  message={msg.content}
-                  alias={msg.alias}
-                />
+                <UserMessage key={index} message={msg.content} alias={msg.alias} />
               )
             )}
             {isLoading && <div className="loading">Processing...</div>}
           </div>
         </div>
         <div className="business">
-          <VSCodeDropdown
-            value={selectedModel}
-            id="my-dropdown"
-            onChange={handleDropdownChange}
-          >
+          <VSCodeDropdown value={selectedModel} id="my-dropdown" onChange={handleDropdownChange}>
             <VSCodeOption value="">Select a Model</VSCodeOption>
             <VSCodeOption value="Anthropic">Anthropic</VSCodeOption>
             <VSCodeOption value="Claude">Claude</VSCodeOption>
