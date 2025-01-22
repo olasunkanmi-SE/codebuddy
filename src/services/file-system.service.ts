@@ -32,9 +32,13 @@ export class FileSystemService {
         throw Error("root workspace folder not found");
       }
 
-      const directories = await vscode.workspace.fs.readDirectory(workSpaceInfo.root);
+      const directories = await vscode.workspace.fs.readDirectory(
+        workSpaceInfo.root,
+      );
 
-      const directory = directories.filter(([name, type]) => type === vscode.FileType.Directory && name === dir);
+      const directory = directories.filter(
+        ([name, type]) => type === vscode.FileType.Directory && name === dir,
+      );
 
       if (!directory) {
         throw Error(`${dir} does not exist within this workspace`);
@@ -42,14 +46,19 @@ export class FileSystemService {
 
       const directoryFiles = directory.map(async ([file]) => {
         const srcUri = vscode.Uri.joinPath(workSpaceInfo.root, file);
-        const srcFiles = await vscode.workspace.findFiles(new vscode.RelativePattern(srcUri, pattern));
+        const srcFiles = await vscode.workspace.findFiles(
+          new vscode.RelativePattern(srcUri, pattern),
+        );
         return srcFiles.map((file) => file.fsPath);
       });
 
       const srcFilePaths = await Promise.all(directoryFiles);
       return srcFilePaths.flat();
     } catch (error) {
-      handleError(error, `Error fetching the files from ${dir} with pattern ${pattern}`);
+      handleError(
+        error,
+        `Error fetching the files from ${dir} with pattern ${pattern}`,
+      );
       throw error;
     }
   }
@@ -60,7 +69,9 @@ export class FileSystemService {
       let fileUri: vscode.Uri | undefined;
 
       if (fileName === FSPROPS.TSCONFIG_FILE) {
-        const tsconfigFiles = await vscode.workspace.findFiles(new vscode.RelativePattern(rootUri, "**tsconfig.json"));
+        const tsconfigFiles = await vscode.workspace.findFiles(
+          new vscode.RelativePattern(rootUri, "**tsconfig.json"),
+        );
         if (tsconfigFiles?.length > 0) {
           fileUri = tsconfigFiles[0];
         }

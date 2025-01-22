@@ -56,7 +56,9 @@ export class CodeIndexingService {
       if (!mappedCode) {
         throw new Error("Failed to build codebase map");
       }
-      const ats = Object.values(mappedCode).flatMap((repo) => Object.values(repo.modules));
+      const ats = Object.values(mappedCode).flatMap((repo) =>
+        Object.values(repo.modules),
+      );
       const mapper = new CodeStructureMapper(ats);
       return mapper.normalizeData();
     } catch (error) {
@@ -71,7 +73,8 @@ export class CodeIndexingService {
    */
   async generateFunctionDescription(): Promise<IFunctionData[]> {
     try {
-      const functions = (await this.buildFunctionStructureMap()) as IFunctionData[];
+      const functions =
+        (await this.buildFunctionStructureMap()) as IFunctionData[];
       if (!functions?.length) {
         throw new Error("failed to generate ATS");
       }
@@ -93,7 +96,10 @@ export class CodeIndexingService {
         item.compositeText = `Description: ${item.description} Function: ${item.name} ${item.returnType} Dependencies: ${(item.dependencies ?? []).join(", ")}`;
       }
     });
-    const functionWithEmbeddings = await this.embeddingService.processFunctions(functionsWithDescription, true);
+    const functionWithEmbeddings = await this.embeddingService.processFunctions(
+      functionsWithDescription,
+      true,
+    );
     return functionWithEmbeddings;
   }
 
@@ -112,7 +118,7 @@ export class CodeIndexingService {
       const valuesString = dataToInsert
         .map(
           (value) =>
-            `('${value.className}', '${value.name}', '${value.path}', '${value.processedAt}', vector32('[${(value.embedding ?? []).join(",")}]'))`
+            `('${value.className}', '${value.name}', '${value.path}', '${value.processedAt}', vector32('[${(value.embedding ?? []).join(",")}]'))`,
         )
         .join(",");
       const result = await this.codeRepository?.insertFunctions(valuesString);

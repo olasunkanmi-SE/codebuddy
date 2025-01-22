@@ -1,5 +1,10 @@
 import * as vscode from "vscode";
-import { APP_CONFIG, generativeAiModels, OLA_ACTIONS, USER_MESSAGE } from "./application/constant";
+import {
+  APP_CONFIG,
+  generativeAiModels,
+  OLA_ACTIONS,
+  USER_MESSAGE,
+} from "./application/constant";
 import { getConfigValue, getGeminiAPIKey } from "./application/utils";
 import { Comments } from "./events/comment";
 import { ExplainCode } from "./events/explain";
@@ -25,11 +30,21 @@ import { dbManager } from "./infrastructure/repository/data-base-manager";
 import { CodeRepository } from "./infrastructure/repository/code-repository";
 import { EmbeddingService } from "./services/embedding-service";
 
-const { geminiKey, geminiModel, groqApiKey, groqModel, anthropicApiKey, anthropicModel, grokApiKey, grokModel } =
-  APP_CONFIG;
+const {
+  geminiKey,
+  geminiModel,
+  groqApiKey,
+  groqModel,
+  anthropicApiKey,
+  anthropicModel,
+  grokApiKey,
+  grokModel,
+} = APP_CONFIG;
 
 const connectDB = async () => {
-  await dbManager.connect("file:/Users/olasunkanmi/Documents/Github/codebuddy/patterns/dev.db");
+  await dbManager.connect(
+    "file:/Users/olasunkanmi/Documents/Github/codebuddy/patterns/dev.db",
+  );
 };
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -67,19 +82,52 @@ export async function activate(context: vscode.ExtensionContext) {
       generateCodeChart,
       inlineChat,
     } = OLA_ACTIONS;
-    const getComment = new Comments(`${USER_MESSAGE} generates the code comments...`, context);
-    const getInLineChat = new InLineChat(`${USER_MESSAGE} generates a response...`, context);
-    const generateOptimizeCode = new OptimizeCode(`${USER_MESSAGE} optimizes the code...`, context);
-    const generateRefactoredCode = new RefactorCode(`${USER_MESSAGE} refactors the code...`, context);
-    const explainCode = new ExplainCode(`${USER_MESSAGE} explains the code...`, context);
-    const generateReview = new ReviewCode(`${USER_MESSAGE} reviews the code...`, context);
-    const codeChartGenerator = new CodeChartGenerator(`${USER_MESSAGE} creates the code chart...`, context);
+    const getComment = new Comments(
+      `${USER_MESSAGE} generates the code comments...`,
+      context,
+    );
+    const getInLineChat = new InLineChat(
+      `${USER_MESSAGE} generates a response...`,
+      context,
+    );
+    const generateOptimizeCode = new OptimizeCode(
+      `${USER_MESSAGE} optimizes the code...`,
+      context,
+    );
+    const generateRefactoredCode = new RefactorCode(
+      `${USER_MESSAGE} refactors the code...`,
+      context,
+    );
+    const explainCode = new ExplainCode(
+      `${USER_MESSAGE} explains the code...`,
+      context,
+    );
+    const generateReview = new ReviewCode(
+      `${USER_MESSAGE} reviews the code...`,
+      context,
+    );
+    const codeChartGenerator = new CodeChartGenerator(
+      `${USER_MESSAGE} creates the code chart...`,
+      context,
+    );
     const codePattern = fileUpload;
-    const knowledgeBase = new ReadFromKnowledgeBase(`${USER_MESSAGE} generate your code pattern...`, context);
-    const generateCommitMessage = new GenerateCommitMessage(`${USER_MESSAGE} generates a commit message...`, context);
-    const generateInterviewQuestions = new InterviewMe(`${USER_MESSAGE} generates interview questions...`, context);
+    const knowledgeBase = new ReadFromKnowledgeBase(
+      `${USER_MESSAGE} generate your code pattern...`,
+      context,
+    );
+    const generateCommitMessage = new GenerateCommitMessage(
+      `${USER_MESSAGE} generates a commit message...`,
+      context,
+    );
+    const generateInterviewQuestions = new InterviewMe(
+      `${USER_MESSAGE} generates interview questions...`,
+      context,
+    );
 
-    const generateUnitTests = new GenerateUnitTest(`${USER_MESSAGE} generates unit tests...`, context);
+    const generateUnitTests = new GenerateUnitTest(
+      `${USER_MESSAGE} generates unit tests...`,
+      context,
+    );
 
     const actionMap = {
       [comment]: () => getComment.execute(),
@@ -89,7 +137,11 @@ export async function activate(context: vscode.ExtensionContext) {
       [interviewMe]: () => generateInterviewQuestions.execute(),
       [generateUnitTest]: () => generateUnitTests.execute(),
       [fix]: (errorMessage: string) =>
-        new FixError(`${USER_MESSAGE} finds a solution to the error...`, context, errorMessage).execute(errorMessage),
+        new FixError(
+          `${USER_MESSAGE} finds a solution to the error...`,
+          context,
+          errorMessage,
+        ).execute(errorMessage),
       [explain]: () => explainCode.execute(),
       [pattern]: () => codePattern.uploadFileHandler(),
       [knowledge]: () => knowledgeBase.execute(),
@@ -98,17 +150,18 @@ export async function activate(context: vscode.ExtensionContext) {
       [inlineChat]: () => getInLineChat.execute(),
     };
 
-    const subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(([action, handler]) =>
-      vscode.commands.registerCommand(action, handler)
+    const subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
+      ([action, handler]) => vscode.commands.registerCommand(action, handler),
     );
 
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
 
     const quickFix = new CodeActionsProvider();
-    const quickFixCodeAction: vscode.Disposable = vscode.languages.registerCodeActionsProvider(
-      { scheme: "file", language: "*" },
-      quickFix
-    );
+    const quickFixCodeAction: vscode.Disposable =
+      vscode.languages.registerCodeActionsProvider(
+        { scheme: "file", language: "*" },
+        quickFix,
+      );
 
     const modelConfigurations: {
       [key: string]: {
@@ -141,11 +194,20 @@ export async function activate(context: vscode.ExtensionContext) {
     if (selectedGenerativeAiModel in modelConfigurations) {
       const modelConfig = modelConfigurations[selectedGenerativeAiModel];
       const { key, model, webviewProviderClass } = modelConfig;
-      setUpGenerativeAiModel(context, model, key, webviewProviderClass, subscriptions, quickFixCodeAction);
+      setUpGenerativeAiModel(
+        context,
+        model,
+        key,
+        webviewProviderClass,
+        subscriptions,
+        quickFixCodeAction,
+      );
     }
   } catch (error) {
     Brain.clear();
-    vscode.window.showErrorMessage("An Error occured while setting up generative AI model");
+    vscode.window.showErrorMessage(
+      "An Error occured while setting up generative AI model",
+    );
     console.log(error);
   }
 }
