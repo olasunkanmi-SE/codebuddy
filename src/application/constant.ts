@@ -71,6 +71,6 @@ export const EmbeddingsConfig = {
   maxRetries: 3,
   retryDelay: 1000,
   rateLimit: 1500,
-  embeddingModel: "Xenova/all-MiniLM-L6-v2",
+  embeddingModel: "text-embedding-004",
   textModel: "gemini-1.5-flash",
 };
