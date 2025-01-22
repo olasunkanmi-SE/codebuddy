@@ -2,7 +2,12 @@ import { Client, ResultSet, Row } from "@libsql/client";
 import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
 import { Logger } from "../logger/logger";
 import { dbManager } from "./data-base-manager";
-import { createIndex, createTableQuery, insertDataQuery, selectFunctionProps } from "./sql";
+import {
+  createIndex,
+  createTableQuery,
+  insertDataQuery,
+  selectFunctionProps,
+} from "./sql";
 
 export class CodeRepository implements ICodeRepository {
   private readonly client: Client | undefined;
@@ -13,7 +18,7 @@ export class CodeRepository implements ICodeRepository {
     this.client = dbManager.getClient();
   }
 
-  public static async getInstance(): Promise<CodeRepository> {
+  public static getInstance(): CodeRepository {
     if (!CodeRepository.instance) {
       CodeRepository.instance = new CodeRepository();
     }
@@ -68,19 +73,26 @@ export class CodeRepository implements ICodeRepository {
           await new Promise((resolve) => setTimeout(resolve, retryDelay));
         } else {
           this.logger.error("Failed to initialize database", error);
-          throw new Error(`Failed to insert into table after ${maxRetries} retries`);
+          throw new Error(
+            `Failed to insert into table after ${maxRetries} retries`,
+          );
         }
       }
     }
   }
 
-  async searchSimilarFunctions(queryEmbeddings: number[], limit: number): Promise<Row[] | undefined> {
+  async searchSimilarFunctions(
+    queryEmbeddings: number[],
+    limit: number,
+  ): Promise<Row[] | undefined> {
     try {
       const query = selectFunctionProps();
-      const result: ResultSet | undefined = await this.client?.execute({
-        sql: query,
-        args: [JSON.stringify(queryEmbeddings), limit],
-      });
+      const result: ResultSet | undefined = await this.client?.execute(
+        `SELECT class_name,
+          function_name,
+          file_path,
+          created_at FROM vector_top_k('code_functions_idx', '${JSON.stringify(queryEmbeddings)}', ${limit}) JOIN code_functions ON code_functions.rowid = id`,
+      );
       return result ? result.rows : undefined;
     } catch (error) {
       this.logger.error("Failed to search similar code functions", error);

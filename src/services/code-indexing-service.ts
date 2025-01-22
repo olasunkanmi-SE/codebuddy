@@ -1,7 +1,7 @@
 import { ResultSet } from "@libsql/client/.";
 import { APP_CONFIG } from "../application/constant";
 import { IFunctionData } from "../application/interfaces";
-import { getConfigValue } from "../application/utils";
+import { getConfigValue, getGeminiAPIKey } from "../application/utils";
 import { Logger } from "../infrastructure/logger/logger";
 import { CodeRepository } from "../infrastructure/repository/code-repository";
 import { CodeStructureMapper } from "./code-structure.mapper.service";
@@ -19,7 +19,7 @@ export class CodeIndexingService {
   private static instance: CodeIndexingService;
   constructor() {
     this.logger = new Logger("CodeIndexingService");
-    const apiKey = this.getAPIKey();
+    const apiKey = getGeminiAPIKey();
     this.embeddingService = new EmbeddingService(apiKey);
   }
 
@@ -43,20 +43,6 @@ export class CodeIndexingService {
   }
 
   /**
-   * Retrieves the Gemini API key from the application configuration, which is required for code indexing.
-   * @returns {string} The API key.
-   */
-  getAPIKey(): string {
-    const { geminiKey } = APP_CONFIG;
-    const apiKey = getConfigValue(geminiKey);
-    if (!apiKey) {
-      this.logger.info("Gemini API Key is required for code indexing");
-      throw new Error("Gemini API Key is required for code indexing");
-    }
-    return apiKey;
-  }
-
-  /**
    * Builds a function structure map using the TypeScript ATS mapper and CodeStructureMapper services.
    * @returns {Promise<Partial<IFunctionData>[]>} A promise that resolves with an array of function data.
    */
@@ -70,7 +56,9 @@ export class CodeIndexingService {
       if (!mappedCode) {
         throw new Error("Failed to build codebase map");
       }
-      const ats = Object.values(mappedCode).flatMap((repo) => Object.values(repo.modules));
+      const ats = Object.values(mappedCode).flatMap((repo) =>
+        Object.values(repo.modules),
+      );
       const mapper = new CodeStructureMapper(ats);
       return mapper.normalizeData();
     } catch (error) {
@@ -85,7 +73,8 @@ export class CodeIndexingService {
    */
   async generateFunctionDescription(): Promise<IFunctionData[]> {
     try {
-      const functions = (await this.buildFunctionStructureMap()) as IFunctionData[];
+      const functions =
+        (await this.buildFunctionStructureMap()) as IFunctionData[];
       if (!functions?.length) {
         throw new Error("failed to generate ATS");
       }
@@ -107,7 +96,10 @@ export class CodeIndexingService {
         item.compositeText = `Description: ${item.description} Function: ${item.name} ${item.returnType} Dependencies: ${(item.dependencies ?? []).join(", ")}`;
       }
     });
-    const functionWithEmbeddings = await this.embeddingService.processFunctions(functionsWithDescription, true);
+    const functionWithEmbeddings = await this.embeddingService.processFunctions(
+      functionsWithDescription,
+      true,
+    );
     return functionWithEmbeddings;
   }
 
@@ -126,7 +118,7 @@ export class CodeIndexingService {
       const valuesString = dataToInsert
         .map(
           (value) =>
-            `('${value.className}', '${value.name}', '${value.path}', '${value.processedAt}', vector32('[${(value.embedding ?? []).join(",")}]'))`
+            `('${value.className}', '${value.name}', '${value.path}', '${value.processedAt}', vector32('[${(value.embedding ?? []).join(",")}]'))`,
         )
         .join(",");
       const result = await this.codeRepository?.insertFunctions(valuesString);

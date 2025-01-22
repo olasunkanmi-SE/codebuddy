@@ -1,7 +1,7 @@
 import * as markdownit from "markdown-it";
 import * as vscode from "vscode";
 import { Brain } from "../services/memory";
-import { COMMON, generativeAiModels } from "./constant";
+import { APP_CONFIG, COMMON, generativeAiModels } from "./constant";
 import Anthropic from "@anthropic-ai/sdk";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
@@ -14,7 +14,9 @@ export const formatText = (text?: string): string => {
   return "";
 };
 
-export const getConfigValue: GetConfigValueType<any> = <T>(key: string): T | undefined => {
+export const getConfigValue: GetConfigValueType<any> = <T>(
+  key: string,
+): T | undefined => {
   return vscode.workspace.getConfiguration().get<T>(key);
 };
 
@@ -66,7 +68,11 @@ export const getGenerativeAiModel = (): string | undefined => {
   return getConfigValue("generativeAi.option");
 };
 
-export function getUri(webview: vscode.Webview, extensionUri: vscode.Uri, pathList: string[]) {
+export function getUri(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  pathList: string[],
+) {
   return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...pathList));
 }
 
@@ -75,7 +81,8 @@ export function getUri(webview: vscode.Webview, extensionUri: vscode.Uri, pathLi
 // and ensure script integrity when using Content Security Policy (CSP)
 export const getNonce = () => {
   let text = "";
-  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const possible =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
@@ -89,4 +96,18 @@ export const handleError = (error: unknown, message?: string): void => {
 
 export const showInfoMessage = (message?: string): void => {
   vscode.window.showInformationMessage(`${message}`);
+};
+
+/**
+ * Retrieves the Gemini API key from the application configuration, which is required for code indexing.
+ * @returns {string} The API key.
+ */
+export const getGeminiAPIKey = (): string => {
+  const { geminiKey } = APP_CONFIG;
+  const apiKey = getConfigValue(geminiKey);
+  if (!apiKey) {
+    console.error("Gemini API Key is required for code indexing");
+    throw new Error("Gemini API Key is required for code indexing");
+  }
+  return apiKey;
 };

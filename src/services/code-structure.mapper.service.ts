@@ -54,7 +54,7 @@ export class CodeStructureMapper {
    */
   private getMappedFunctions(
     codeEntry: ICodeEntry,
-    primaryClass: ICodeClass | null
+    primaryClass: ICodeClass | null,
   ): IMappedFunction[] {
     try {
       const sourceFunctions = this.getSourceFunctions(codeEntry, primaryClass);
@@ -77,7 +77,7 @@ export class CodeStructureMapper {
    */
   private getSourceFunctions(
     codeEntry: ICodeEntry,
-    primaryClass: ICodeClass | null
+    primaryClass: ICodeClass | null,
   ): IMappedFunction[] | undefined {
     try {
       return (codeEntry.functions?.length ?? 0) > 0
@@ -97,7 +97,7 @@ export class CodeStructureMapper {
    */
   private mapFunctions(
     functions: IMappedFunction[],
-    codeEntry?: ICodeEntry
+    codeEntry?: ICodeEntry,
   ): IMappedFunction[] {
     try {
       return functions.map((func) => ({
@@ -111,7 +111,7 @@ export class CodeStructureMapper {
           func,
           codeEntry?.dependencies && codeEntry?.dependencies.length > 0
             ? codeEntry.dependencies
-            : undefined
+            : undefined,
         ),
       }));
     } catch (error) {
@@ -122,7 +122,7 @@ export class CodeStructureMapper {
 
   private createCompositeText(
     functionProps: IMappedFunction,
-    dependencies: string[] = []
+    dependencies: string[] = [],
   ): string {
     if (!this.createDescriptionText(functionProps)) {
       return "";
