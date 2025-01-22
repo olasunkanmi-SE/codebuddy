@@ -1,7 +1,7 @@
 import { ResultSet } from "@libsql/client/.";
 import { APP_CONFIG } from "../application/constant";
 import { IFunctionData } from "../application/interfaces";
-import { getConfigValue } from "../application/utils";
+import { getConfigValue, getGeminiAPIKey } from "../application/utils";
 import { Logger } from "../infrastructure/logger/logger";
 import { CodeRepository } from "../infrastructure/repository/code-repository";
 import { CodeStructureMapper } from "./code-structure.mapper.service";
@@ -19,7 +19,7 @@ export class CodeIndexingService {
   private static instance: CodeIndexingService;
   constructor() {
     this.logger = new Logger("CodeIndexingService");
-    const apiKey = this.getAPIKey();
+    const apiKey = getGeminiAPIKey();
     this.embeddingService = new EmbeddingService(apiKey);
   }
 
@@ -40,20 +40,6 @@ export class CodeIndexingService {
    */
   async getCodeRepository() {
     this.codeRepository = await CodeRepository.getInstance();
-  }
-
-  /**
-   * Retrieves the Gemini API key from the application configuration, which is required for code indexing.
-   * @returns {string} The API key.
-   */
-  getAPIKey(): string {
-    const { geminiKey } = APP_CONFIG;
-    const apiKey = getConfigValue(geminiKey);
-    if (!apiKey) {
-      this.logger.info("Gemini API Key is required for code indexing");
-      throw new Error("Gemini API Key is required for code indexing");
-    }
-    return apiKey;
   }
 
   /**

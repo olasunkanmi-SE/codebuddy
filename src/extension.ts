@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { APP_CONFIG, generativeAiModels, OLA_ACTIONS, USER_MESSAGE } from "./application/constant";
-import { getConfigValue } from "./application/utils";
+import { getConfigValue, getGeminiAPIKey } from "./application/utils";
 import { Comments } from "./events/comment";
 import { ExplainCode } from "./events/explain";
 import { FixError } from "./events/fixError";
@@ -22,6 +22,8 @@ import { FileUploader } from "./services/file-uploader";
 import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
 import { Brain } from "./services/memory";
 import { dbManager } from "./infrastructure/repository/data-base-manager";
+import { CodeRepository } from "./infrastructure/repository/code-repository";
+import { EmbeddingService } from "./services/embedding-service";
 
 const { geminiKey, geminiModel, groqApiKey, groqModel, anthropicApiKey, anthropicModel, grokApiKey, grokModel } =
   APP_CONFIG;
@@ -33,16 +35,22 @@ const connectDB = async () => {
 export async function activate(context: vscode.ExtensionContext) {
   try {
     Brain.getInstance();
-    await connectDB();
+    // await connectDB();
+    // const x = CodeRepository.getInstance();
+    // const apiKey = getGeminiAPIKey();
+    // const embeddingService = new EmbeddingService(apiKey);
+    // const embedding = await embeddingService.generateEmbedding("is jwt web token used withnin this app ?");
+    // const y = await x.searchSimilarFunctions(embedding, 2);
+    // console.log(y);
     const fileUpload = new FileUploader(context);
-    await fileUpload.createFile("allx.db");
+    // await fileUpload.createFile("allx.db");
 
-    const files = await fileUpload.getFiles();
-    const names = await fileUpload.getFileNames();
-    console.log(files, names);
+    // const files = await fileUpload.getFiles();
+    // const names = await fileUpload.getFileNames();
+    // console.log(files, names);
 
     const index = CodeIndexingService.createInstance();
-    const result = index.insertFunctionsinDB();
+    const result = index.buildFunctionStructureMap();
     console.log(result);
     const {
       comment,
