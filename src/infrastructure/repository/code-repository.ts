@@ -1,76 +1,76 @@
-import { Client, createClient, ResultSet, Row } from "@libsql/client";
+import { Client, ResultSet, Row } from "@libsql/client";
 import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
 import { Logger } from "../logger/logger";
-import { createTableQuery, insertDataQuery, selectFunctionProps } from "./sql";
+import { dbManager } from "./data-base-manager";
+import { createIndex, createTableQuery, insertDataQuery, selectFunctionProps } from "./sql";
 
 export class CodeRepository implements ICodeRepository {
-  private client: Client | undefined;
+  private readonly client: Client | undefined;
   private static instance: CodeRepository;
   private readonly logger: Logger;
   private constructor() {
     this.logger = new Logger("CodeRepository");
+    this.client = dbManager.getClient();
   }
 
-  public static async createInstance(): Promise<CodeRepository> {
-    if (!CodeRepository.instance) {
-      CodeRepository.instance = new CodeRepository();
-      await CodeRepository.instance.init();
-    }
-    return CodeRepository.instance;
-  }
-
-  private async connectDB(): Promise<Client> {
-    try {
-      return (this.client = createClient({
-        url: "file:dev.db",
-      }));
-    } catch (error) {
-      this.logger.error("Failed to initialize database", error);
-      throw error;
-    }
-  }
-
-  private async init(): Promise<void> {
-    try {
-      this.client = await this.connectDB();
-    } catch (error) {
-      this.logger.error("Failed to initialize database", error);
-      throw error;
-    }
-  }
-
-  public static getInstance(): CodeRepository {
+  public static async getInstance(): Promise<CodeRepository> {
     if (!CodeRepository.instance) {
       CodeRepository.instance = new CodeRepository();
     }
     return CodeRepository.instance;
   }
 
-  async CreateTable(): Promise<ResultSet[] | undefined> {
+  async createFunctionsTable(): Promise<ResultSet | undefined> {
+    let transaction;
     try {
-      const query = createTableQuery();
-      const table = await this.client?.batch(query, "write");
+      transaction = await this.client?.transaction();
+      const table = await transaction?.execute(createTableQuery());
       if (table) {
         this.logger.info("Database initialized successfully");
       }
+      await transaction?.execute(createIndex());
+      await transaction?.commit();
       return table;
     } catch (error) {
+      if (transaction) {
+        await transaction.rollback();
+      }
       this.logger.error("Failed to initialize database", error);
       throw error;
+    } finally {
+      if (transaction) {
+        transaction.close();
+      }
     }
   }
 
-  async InsertData(values: string) {
+  async insertFunctions(values: string): Promise<ResultSet | undefined> {
+    let retries = 0;
+    const maxRetries = 5;
+    const retryDelay = 100;
     try {
-      const query = insertDataQuery(values);
-      const table = await this.client?.batch(query, "write");
-      if (table) {
-        this.logger.info("Database initialized successfully");
-      }
-      return table;
+      await this.createFunctionsTable();
     } catch (error) {
-      this.logger.error("Failed to initialize database", error);
+      this.logger.error("Failed to create table", error);
       throw error;
+    }
+    while (retries < maxRetries) {
+      try {
+        const query = insertDataQuery(values);
+        const result = await this.client?.execute(query);
+        if (result) {
+          this.logger.info("Database initialized successfully");
+        }
+        return result;
+      } catch (error: any) {
+        if (error.code === "SQLITE_BUSY") {
+          retries++;
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        } else {
+          this.logger.error("Failed to initialize database", error);
+          throw new Error(`Failed to insert into table after ${maxRetries} retries`);
+        }
+      }
     }
   }
 
@@ -84,25 +84,6 @@ export class CodeRepository implements ICodeRepository {
       return result ? result.rows : undefined;
     } catch (error) {
       this.logger.error("Failed to search similar code functions", error);
-      throw error;
-    }
-  }
-
-  async healthCheck(): Promise<boolean> {
-    try {
-      return Boolean(await this.client?.execute("SELECT 1"));
-    } catch (error) {
-      this.logger.error("Failed to connect to database", error);
-      return false;
-    }
-  }
-
-  async close(): Promise<void> {
-    try {
-      await this.client?.close();
-      this.logger.info("Database connection closed");
-    } catch (error) {
-      this.logger.error("Failed to close database connection", error);
       throw error;
     }
   }

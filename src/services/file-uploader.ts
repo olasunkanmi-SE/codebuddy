@@ -24,18 +24,15 @@ export class FileUploader implements IFileUploader {
       const content = await fs.promises.readFile(file.fsPath, "utf8");
       const fileName = path.basename(file.fsPath);
       const files = await this.getFiles();
-      if (files.length > 0) {
-        await this.deleteFiles(files);
-      }
+      // if (files.length > 0) {
+      //   await this.deleteFiles(files);
+      // }
+      // Create a global state this.context.globalState
       const filePath = path.join(this.fileDir, fileName);
       await fs.promises.writeFile(filePath, content);
-      vscode.window.showInformationMessage(
-        `KnowledgeBase uploaded successfully`,
-      );
+      vscode.window.showInformationMessage(`KnowledgeBase uploaded successfully`);
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Failed to upload pattern: ${error.message}`,
-      );
+      vscode.window.showErrorMessage(`Failed to upload pattern: ${error.message}`);
       throw error;
     }
   }
@@ -54,9 +51,7 @@ export class FileUploader implements IFileUploader {
       const content = await fs.promises.readFile(fullPath, "utf8");
       return content;
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Error reading from knowledgeBase: ${error.message}`,
-      );
+      vscode.window.showErrorMessage(`Error reading from knowledgeBase: ${error.message}`);
       throw error;
     }
   }
@@ -76,9 +71,7 @@ export class FileUploader implements IFileUploader {
       });
       await Promise.all(deletePromises);
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Unable to delete files: ${error.message}`,
-      );
+      vscode.window.showErrorMessage(`Unable to delete files: ${error.message}`);
       throw error;
     }
   }
@@ -93,9 +86,7 @@ export class FileUploader implements IFileUploader {
       const files = await fs.promises.readdir(this.fileDir);
       return files.map((file) => path.join(this.fileDir, file));
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Error fetching the files ${error.message}`,
-      );
+      vscode.window.showErrorMessage(`Error fetching the files ${error.message}`);
       throw error;
     }
   }
@@ -119,11 +110,35 @@ export class FileUploader implements IFileUploader {
       try {
         await this.uploadFile(file[0]);
       } catch (error: any) {
-        vscode.window.showErrorMessage(
-          `Failed to upload file: ${error.message}`,
-        );
+        vscode.window.showErrorMessage(`Failed to upload file: ${error.message}`);
         throw error;
       }
+    }
+  }
+
+  /**
+   * Creates a new file asynchronously.
+   * This function checks if the file exists, and if not, creates it.
+   * @param filename - The name of the file to create
+   * @param content - The content to write to the file
+   * @throws {Error} If the file cannot be created
+   */
+  async createFile(filename: string): Promise<boolean> {
+    try {
+      let created = false;
+      const filePath = path.join(this.fileDir, filename);
+      if (!fs.existsSync(filePath)) {
+        await fs.promises.writeFile(filePath, "");
+        vscode.window.showInformationMessage(`File ${filename} created successfully`);
+        created = true;
+      } else {
+        created = false;
+        vscode.window.showInformationMessage(`File ${filename} already exists`);
+      }
+      return created;
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to create file: ${error.message}`);
+      throw error;
     }
   }
 }
