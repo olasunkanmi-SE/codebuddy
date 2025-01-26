@@ -12,11 +12,19 @@ export interface IHistory {
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
   chatHistory: IHistory[] = [];
-  constructor(extensionUri: vscode.Uri, apiKey: string, generativeAiModel: string, context: vscode.ExtensionContext) {
+  constructor(
+    extensionUri: vscode.Uri,
+    apiKey: string,
+    generativeAiModel: string,
+    context: vscode.ExtensionContext,
+  ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
-  async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  async sendResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -31,8 +39,13 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         });
       }
       if (this.chatHistory.length === 2) {
-        const chatHistory = Brain.has(COMMON.GEMINI_CHAT_HISTORY) ? Brain.get(COMMON.GEMINI_CHAT_HISTORY) : [];
-        Brain.set(COMMON.GEMINI_CHAT_HISTORY, [...chatHistory, ...this.chatHistory]);
+        const chatHistory = Brain.has(COMMON.GEMINI_CHAT_HISTORY)
+          ? Brain.get(COMMON.GEMINI_CHAT_HISTORY)
+          : [];
+        Brain.set(COMMON.GEMINI_CHAT_HISTORY, [
+          ...chatHistory,
+          ...this.chatHistory,
+        ]);
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -44,11 +57,17 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(apiKey: string, name: string, message: string): Promise<string | undefined> {
+  async generateResponse(
+    apiKey: string,
+    name: string,
+    message: string,
+  ): Promise<string | undefined> {
     try {
       const genAi = new GoogleGenerativeAI(apiKey);
       const model = genAi.getGenerativeModel({ model: name });
-      let chatHistory = Brain.has(COMMON.GEMINI_CHAT_HISTORY) ? Brain.get(COMMON.GEMINI_CHAT_HISTORY) : [];
+      let chatHistory = Brain.has(COMMON.GEMINI_CHAT_HISTORY)
+        ? Brain.get(COMMON.GEMINI_CHAT_HISTORY)
+        : [];
 
       if (chatHistory?.length) {
         chatHistory = [
@@ -89,7 +108,9 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       return response.text();
     } catch (error) {
       Brain.set(COMMON.GEMINI_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage("Model not responding, please resend your question");
+      vscode.window.showErrorMessage(
+        "Model not responding, please resend your question",
+      );
       console.error(error);
       return;
     }

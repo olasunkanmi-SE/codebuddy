@@ -1,9 +1,17 @@
 import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base";
-import { COMMON, generativeAiModels, GROQ_CONFIG } from "../application/constant";
+import {
+  COMMON,
+  generativeAiModels,
+  GROQ_CONFIG,
+} from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
 import { Brain } from "../services/brain";
-import { createAnthropicClient, getGenerativeAiModel, getXGroKBaseURL } from "../application/utils";
+import {
+  createAnthropicClient,
+  getGenerativeAiModel,
+  getXGroKBaseURL,
+} from "../application/utils";
 
 type Role = "user" | "assistant";
 export interface IHistory {
@@ -18,12 +26,15 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     apiKey: string,
     generativeAiModel: string,
     context: vscode.ExtensionContext,
-    protected baseUrl?: string
+    protected baseUrl?: string,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
-  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  public async sendResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -39,8 +50,13 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       }
 
       if (this.chatHistory.length === 2) {
-        const chatHistory = Brain.has(COMMON.ANTHROPIC_CHAT_HISTORY) ? Brain.get(COMMON.ANTHROPIC_CHAT_HISTORY) : [];
-        Brain.set(COMMON.ANTHROPIC_CHAT_HISTORY, [...chatHistory, ...this.chatHistory]);
+        const chatHistory = Brain.has(COMMON.ANTHROPIC_CHAT_HISTORY)
+          ? Brain.get(COMMON.ANTHROPIC_CHAT_HISTORY)
+          : [];
+        Brain.set(COMMON.ANTHROPIC_CHAT_HISTORY, [
+          ...chatHistory,
+          ...this.chatHistory,
+        ]);
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -51,14 +67,23 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(apiKey = undefined, name = undefined, message: string): Promise<string | undefined> {
+  async generateResponse(
+    apiKey = undefined,
+    name = undefined,
+    message: string,
+  ): Promise<string | undefined> {
     try {
       const { max_tokens } = GROQ_CONFIG;
       if (getGenerativeAiModel() === generativeAiModels.GROK) {
         this.baseUrl = getXGroKBaseURL();
       }
-      const anthropic: Anthropic = createAnthropicClient(this.apiKey, this.baseUrl);
-      let chatHistory = Brain.has(COMMON.ANTHROPIC_CHAT_HISTORY) ? Brain.get(COMMON.ANTHROPIC_CHAT_HISTORY) : [];
+      const anthropic: Anthropic = createAnthropicClient(
+        this.apiKey,
+        this.baseUrl,
+      );
+      let chatHistory = Brain.has(COMMON.ANTHROPIC_CHAT_HISTORY)
+        ? Brain.get(COMMON.ANTHROPIC_CHAT_HISTORY)
+        : [];
 
       if (chatHistory?.length) {
         chatHistory = [...chatHistory, { role: "user", content: message }];
@@ -83,7 +108,9 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     } catch (error) {
       console.error(error);
       Brain.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage("Model not responding, please resend your question");
+      vscode.window.showErrorMessage(
+        "Model not responding, please resend your question",
+      );
     }
   }
 }
