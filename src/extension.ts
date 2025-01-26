@@ -5,19 +5,20 @@ import {
   OLA_ACTIONS,
   USER_MESSAGE,
 } from "./application/constant";
-import { getConfigValue, getGeminiAPIKey } from "./application/utils";
-import { Comments } from "./events/comment";
-import { ExplainCode } from "./events/explain";
-import { FixError } from "./events/fixError";
-import { CodeChartGenerator } from "./events/generate-code-chart";
-import { GenerateCommitMessage } from "./events/generate-commit-message";
-import { GenerateUnitTest } from "./events/generate-unit-test";
-import { InLineChat } from "./events/inline-chat";
-import { InterviewMe } from "./events/interview-me";
-import { ReadFromKnowledgeBase } from "./events/knowledge-base";
-import { OptimizeCode } from "./events/optimize";
-import { RefactorCode } from "./events/refactor";
-import { ReviewCode } from "./events/review";
+import { getConfigValue } from "./application/utils";
+import { Comments } from "./commands/comment";
+import { ExplainCode } from "./commands/explain";
+import { FixError } from "./commands/fixError";
+import { CodeChartGenerator } from "./commands/generate-code-chart";
+import { GenerateCommitMessage } from "./commands/generate-commit-message";
+import { GenerateUnitTest } from "./commands/generate-unit-test";
+import { InLineChat } from "./commands/inline-chat";
+import { InterviewMe } from "./commands/interview-me";
+import { ReadFromKnowledgeBase } from "./commands/knowledge-base";
+import { OptimizeCode } from "./commands/optimize";
+import { RefactorCode } from "./commands/refactor";
+import { ReviewCode } from "./commands/review";
+import { dbManager } from "./infrastructure/repository/data-base-manager";
 import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
 import { CodeActionsProvider } from "./providers/code-actions-provider";
 import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
@@ -26,9 +27,6 @@ import { CodeIndexingService } from "./services/code-indexing-service";
 import { FileUploader } from "./services/file-uploader";
 import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
 import { Brain } from "./services/memory";
-import { dbManager } from "./infrastructure/repository/data-base-manager";
-import { CodeRepository } from "./infrastructure/repository/code-repository";
-import { EmbeddingService } from "./services/embedding-service";
 
 const {
   geminiKey,
