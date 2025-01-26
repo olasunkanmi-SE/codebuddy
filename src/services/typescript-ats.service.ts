@@ -16,7 +16,7 @@ import {
 } from "../application/interfaces";
 import { ITypeScriptCodeMapper } from "../application/interfaces/ts.code.mapper.interface";
 import { handleError } from "../application/utils";
-import { FileSystemService } from "./file-system.service";
+import { FileSystemService } from "./file-system";
 
 export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private program: ts.Program | undefined;
@@ -63,17 +63,13 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
       const { string, filePath } = fileContent;
       const configFile = ts.readConfigFile(filePath, () => string);
 
-      const compilerOptions: ts.ParsedCommandLine =
-        ts.parseJsonConfigFileContent(
-          configFile.config,
-          ts.sys,
-          this.fsService?.getRootFilePath(),
-        );
-
-      this.program = ts.createProgram(
-        compilerOptions.fileNames,
-        compilerOptions.options,
+      const compilerOptions: ts.ParsedCommandLine = ts.parseJsonConfigFileContent(
+        configFile.config,
+        ts.sys,
+        this.fsService?.getRootFilePath()
       );
+
+      this.program = ts.createProgram(compilerOptions.fileNames, compilerOptions.options);
 
       this.typeChecker = this.getTypeChecker();
     } catch (error: any) {
@@ -96,10 +92,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    * @param sourceFile The source file containing the class declaration.
    * @returns An IClassInfo object containing the name, methods, properties, interfaces, and enums of the class.
    */
-  extractClassMetaData(
-    node: ts.ClassDeclaration,
-    sourceFile: ts.SourceFile,
-  ): IClassInfo {
+  extractClassMetaData(node: ts.ClassDeclaration, sourceFile: ts.SourceFile): IClassInfo {
     try {
       const className: string | undefined = node?.name?.getText(sourceFile);
       const classInfo: IClassInfo = {
@@ -123,10 +116,9 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private aggregateFunctions(
     node: DeclarationFunctionNode,
     sourceFile: ts.SourceFile,
-    info: IClassInfo | IModuleInfo,
+    info: IClassInfo | IModuleInfo
   ): void {
-    const functionInfo: IFunctionInfo | null =
-      this.getFunctionDetails(node, sourceFile) ?? null;
+    const functionInfo: IFunctionInfo | null = this.getFunctionDetails(node, sourceFile) ?? null;
     if (functionInfo) {
       info?.functions?.push(functionInfo);
     }
@@ -137,11 +129,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    * to the class or module information object if valid. This aggregation helps build
    * a complete representation of the class/module structure.
    */
-  private aggergateProperties(
-    node: ts.PropertyDeclaration,
-    sourceFile: ts.SourceFile,
-    info: IClassInfo | IModuleInfo,
-  ) {
+  private aggergateProperties(node: ts.PropertyDeclaration, sourceFile: ts.SourceFile, info: IClassInfo | IModuleInfo) {
     const propertyInfo = this.extractPropertyParameters(node, sourceFile);
     if (propertyInfo) {
       info?.properties?.push(propertyInfo);
@@ -156,7 +144,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private aggregateInterfaces(
     node: ts.InterfaceDeclaration,
     sourceFile: ts.SourceFile,
-    info: IClassInfo | IModuleInfo,
+    info: IClassInfo | IModuleInfo
   ) {
     const interfaceInfo = this.extractInterfaceInfo(node, sourceFile);
     if (interfaceInfo) {
@@ -169,11 +157,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    * class or module information object. Helps maintain a complete type system
    * representation within the code structure.
    */
-  private aggregateEnums(
-    node: ts.EnumDeclaration,
-    sourceFile: ts.SourceFile,
-    info: IClassInfo | IModuleInfo,
-  ) {
+  private aggregateEnums(node: ts.EnumDeclaration, sourceFile: ts.SourceFile, info: IClassInfo | IModuleInfo) {
     const enumInfo = this.extractEnumInfo(node, sourceFile);
     if (enumInfo) {
       info?.enums?.push(enumInfo);
@@ -194,7 +178,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
     node: ts.ClassDeclaration,
     sourceFile: ts.SourceFile,
     info: IClassInfo | IModuleInfo,
-    member?: ts.ClassElement,
+    member?: ts.ClassElement
   ): void {
     try {
       const currentElement = member ? member : node;
@@ -234,10 +218,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    * @param sourceFile
    * @returns An object with 'name' and 'type' properties.
    */
-  extractPropertyParameters(
-    node: ts.PropertyDeclaration,
-    sourceFile: ts.SourceFile,
-  ): IProperty {
+  extractPropertyParameters(node: ts.PropertyDeclaration, sourceFile: ts.SourceFile): IProperty {
     try {
       const name: string = node.name.getText(sourceFile);
       let type;
@@ -245,11 +226,8 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
       if (node.type) {
         type = this.getTypeAtLocation(node);
       } else {
-        const inferredType: ts.Type | undefined =
-          this.typeChecker?.getTypeAtLocation(node);
-        type = inferredType
-          ? this.typeChecker?.typeToString(inferredType)
-          : undefined;
+        const inferredType: ts.Type | undefined = this.typeChecker?.getTypeAtLocation(node);
+        type = inferredType ? this.typeChecker?.typeToString(inferredType) : undefined;
       }
       const property = {
         name,
@@ -271,7 +249,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    */
   extractFunctionParameters(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction,
-    sourceFile: ts.SourceFile,
+    sourceFile: ts.SourceFile
   ): IProperty[] {
     try {
       const properties = node.parameters.map((param) => {
@@ -289,10 +267,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
     }
   }
 
-  extractArrowFunctionParameters(
-    node: ts.ArrowFunction,
-    sourceFile: ts.SourceFile,
-  ): IProperty[] {
+  extractArrowFunctionParameters(node: ts.ArrowFunction, sourceFile: ts.SourceFile): IProperty[] {
     const properties = node.parameters.map((param) => {
       const name = param.name.getText(sourceFile);
       const type = param.type ? this.getTypeAtLocation(param) : undefined;
@@ -313,7 +288,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    */
   getFunctionDetails(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction,
-    sourceFile: ts.SourceFile,
+    sourceFile: ts.SourceFile
   ): IFunctionInfo | null {
     try {
       if (!node.name) {
@@ -322,17 +297,9 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
 
       const name: string = node.name.getText(sourceFile);
       const content: string = this.getFunctionNodeText(node, sourceFile);
-      const parameters: IProperty[] = this.extractFunctionParameters(
-        node,
-        sourceFile,
-      );
+      const parameters: IProperty[] = this.extractFunctionParameters(node, sourceFile);
 
-      const details = this.functionDetailsMapper(
-        name,
-        content,
-        parameters,
-        node,
-      );
+      const details = this.functionDetailsMapper(name, content, parameters, node);
       return details;
     } catch (error: any) {
       handleError(error, "unable to get function details");
@@ -354,7 +321,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
     name: string,
     content: string,
     parameters: IProperty[],
-    node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction,
+    node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction
   ) {
     return {
       name,
@@ -372,9 +339,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    * @returns A string representation of the function or method type, or undefined if type checking is unavailable.
    */
   getTypeAtLocation(node: DeclarationOrFunctionNode): string | undefined {
-    const type = this.typeChecker?.typeToString(
-      this.typeChecker.getTypeAtLocation(node),
-    );
+    const type = this.typeChecker?.typeToString(this.typeChecker.getTypeAtLocation(node));
     return type;
   }
 
@@ -402,7 +367,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    */
   getFunctionNodeText(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction,
-    sourceFile: ts.SourceFile,
+    sourceFile: ts.SourceFile
   ) {
     try {
       const printer: ts.Printer = ts.createPrinter({
@@ -423,10 +388,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    * @param relativePath The relative path of the module.
    * @returns The module information.
    */
-  private extractModuleInfo(
-    sourceFile: ts.SourceFile,
-    relativePath: string,
-  ): IModuleInfo {
+  private extractModuleInfo(sourceFile: ts.SourceFile, relativePath: string): IModuleInfo {
     return {
       path: path.normalize(relativePath),
       classes: [],
@@ -494,11 +456,10 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
       const repoNames: string = path.basename(normalizedRootDir);
       codebaseMap[repoNames] = { modules: {} };
 
-      const tsFiles: string[] | undefined =
-        await this.fsService?.getFilesFromDirectory(
-          FSPROPS.SRC_DIRECTORY,
-          FSPROPS.TS_FILE_PATTERN,
-        );
+      const tsFiles: string[] | undefined = await this.fsService?.getFilesFromDirectory(
+        FSPROPS.SRC_DIRECTORY,
+        FSPROPS.TS_FILE_PATTERN
+      );
       if (!tsFiles?.length) {
         throw Error(`No Typescript files found`);
       }
@@ -510,10 +471,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
           throw Error(`No source file found for ${filePath}`);
         }
 
-        const moduleInfo: IModuleInfo = this.extractModuleInfo(
-          sourceFile,
-          moduleRalativePath,
-        );
+        const moduleInfo: IModuleInfo = this.extractModuleInfo(sourceFile, moduleRalativePath);
         ts.forEachChild(sourceFile, (node) => {
           if (ts.isClassDeclaration(node)) {
             const classInfo = this.extractClassMetaData(node, sourceFile);
@@ -552,20 +510,15 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
     }
   }
 
-  extractInterfaceInfo(
-    node: ts.InterfaceDeclaration,
-    sourceFile: ts.SourceFile,
-  ): IInterfaceInfo {
+  extractInterfaceInfo(node: ts.InterfaceDeclaration, sourceFile: ts.SourceFile): IInterfaceInfo {
     try {
       const interfaceName: string = node.name.getText(sourceFile);
 
-      const properties: IProperty[] = node.members
-        .filter(ts.isPropertySignature)
-        .map((prop) => {
-          const name = prop.name.getText(sourceFile);
-          const type = prop.type ? this.getTypeAtLocation(prop) : "any";
-          return { name, type };
-        });
+      const properties: IProperty[] = node.members.filter(ts.isPropertySignature).map((prop) => {
+        const name = prop.name.getText(sourceFile);
+        const type = prop.type ? this.getTypeAtLocation(prop) : "any";
+        return { name, type };
+      });
 
       return {
         name: interfaceName,
@@ -578,16 +531,11 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
     }
   }
 
-  extractEnumInfo(
-    node: ts.EnumDeclaration,
-    sourceFile: ts.SourceFile,
-  ): IEnumInfo {
+  extractEnumInfo(node: ts.EnumDeclaration, sourceFile: ts.SourceFile): IEnumInfo {
     const enumName = node.name.getText(sourceFile);
     const members = node.members.map((member) => {
       const name = member.name.getText(sourceFile);
-      const value = member.initializer
-        ? member.initializer.getText(sourceFile)
-        : undefined;
+      const value = member.initializer ? member.initializer.getText(sourceFile) : undefined;
       return { name, value };
     });
 
@@ -601,9 +549,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   buildDependencyGraph(sourceFile: ts.SourceFile): string[] {
     const imports = sourceFile.statements.filter(ts.isImportDeclaration);
     return imports.map((i) => {
-      return ts
-        .createPrinter()
-        .printNode(ts.EmitHint.Unspecified, i, sourceFile);
+      return ts.createPrinter().printNode(ts.EmitHint.Unspecified, i, sourceFile);
     });
   }
 }
