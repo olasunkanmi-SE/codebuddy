@@ -1,11 +1,10 @@
 import { ResultSet } from "@libsql/client/.";
-import { APP_CONFIG } from "../application/constant";
 import { IFunctionData } from "../application/interfaces";
-import { getConfigValue, getGeminiAPIKey } from "../application/utils";
+import { getGeminiAPIKey } from "../application/utils";
 import { Logger } from "../infrastructure/logger/logger";
-import { CodeRepository } from "../infrastructure/repository/code-repository";
-import { CodeStructureMapper } from "./code-structure.mapper.service";
-import { EmbeddingService } from "./embedding-service";
+import { CodeRepository } from "../infrastructure/repository/code";
+import { CodeStructureMapper } from "./code-structure.mapper";
+import { EmbeddingService } from "./embedding";
 import { TypeScriptAtsMapper } from "./typescript-ats.service";
 
 /**

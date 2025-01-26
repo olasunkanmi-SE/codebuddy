@@ -16,7 +16,7 @@ import {
 } from "../application/interfaces";
 import { ITypeScriptCodeMapper } from "../application/interfaces/ts.code.mapper.interface";
 import { handleError } from "../application/utils";
-import { FileSystemService } from "./file-system.service";
+import { FileSystemService } from "./file-system";
 
 export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private program: ts.Program | undefined;

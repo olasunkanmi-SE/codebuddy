@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
-import { BaseWebViewProvider } from "./base-web-view-provider";
+import { BaseWebViewProvider } from "./base";
 import {
   COMMON,
   generativeAiModels,
   GROQ_CONFIG,
 } from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
-import { Brain } from "../services/memory";
+import { Brain } from "../services/brain";
 import {
   createAnthropicClient,
   getGenerativeAiModel,

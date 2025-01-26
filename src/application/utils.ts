@@ -1,6 +1,6 @@
 import * as markdownit from "markdown-it";
 import * as vscode from "vscode";
-import { Brain } from "../services/memory";
+import { Brain } from "../services/brain";
 import { APP_CONFIG, COMMON, generativeAiModels } from "./constant";
 import Anthropic from "@anthropic-ai/sdk";
 

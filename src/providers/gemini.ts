@@ -1,8 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as vscode from "vscode";
 import { COMMON } from "../application/constant";
-import { BaseWebViewProvider } from "./base-web-view-provider";
-import { Brain } from "../services/memory";
+import { BaseWebViewProvider } from "./base";
+import { Brain } from "../services/brain";
 
 type Role = "function" | "user" | "model";
 export interface IHistory {

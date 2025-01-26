@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
-import { BaseWebViewProvider } from "./base-web-view-provider";
+import { BaseWebViewProvider } from "./base";
 import Groq from "groq-sdk";
 import { COMMON, GROQ_CONFIG } from "../application/constant";
-import { Brain } from "../services/memory";
+import { Brain } from "../services/brain";
 
 type Role = "user" | "system";
 export interface IHistory {

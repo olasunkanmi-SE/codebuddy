@@ -5,9 +5,9 @@ import {
   COMMON,
   generativeAiModels,
 } from "../application/constant";
-import { AnthropicWebViewProvider } from "../providers/anthropic-web-view-provider";
-import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
-import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
+import { AnthropicWebViewProvider } from "../providers/anthropic";
+import { GeminiWebViewProvider } from "../providers/gemini";
+import { GroqWebViewProvider } from "../providers/groq";
 import {
   formatText,
   getConfigValue,

@@ -19,14 +19,14 @@ import { OptimizeCode } from "./commands/optimize";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
 import { dbManager } from "./infrastructure/repository/data-base-manager";
-import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
-import { CodeActionsProvider } from "./providers/code-actions-provider";
-import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
-import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
-import { CodeIndexingService } from "./services/code-indexing-service";
+import { AnthropicWebViewProvider } from "./providers/anthropic";
+import { CodeActionsProvider } from "./providers/code-actions";
+import { GeminiWebViewProvider } from "./providers/gemini";
+import { GroqWebViewProvider } from "./providers/groq";
+import { CodeIndexingService } from "./services/code-indexing";
 import { FileUploader } from "./services/file-uploader";
 import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
-import { Brain } from "./services/memory";
+import { Brain } from "./services/brain";
 
 const {
   geminiKey,
