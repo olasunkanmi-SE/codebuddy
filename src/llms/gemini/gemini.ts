@@ -5,9 +5,9 @@ import {
   GoogleGenerativeAI,
 } from "@google/generative-ai";
 import { BaseLLM } from "../base";
-import { GeminiModelResponse, ILlmConfig } from "../interface";
+import { GeminiModelResponseType, ILlmConfig } from "../interface";
 
-export class GeminiLLM extends BaseLLM<GeminiModelResponse> {
+export class GeminiLLM extends BaseLLM<GeminiModelResponseType> {
   private readonly generativeAi: GoogleGenerativeAI;
   private response: EmbedContentResponse | GenerateContentResult | undefined;
 
@@ -44,11 +44,10 @@ export class GeminiLLM extends BaseLLM<GeminiModelResponse> {
 
   private getModel(): GenerativeModel {
     try {
-      const model: GenerativeModel | undefined =
-        this.generativeAi.getGenerativeModel({
-          model: this.config.model,
-          tools: this.config.tools,
-        });
+      const model: GenerativeModel | undefined = this.generativeAi.getGenerativeModel({
+        model: this.config.model,
+        tools: this.config.tools,
+      });
       if (!model) {
         throw new Error(`Error retrieving model ${this.config.model}`);
       }
@@ -59,7 +58,7 @@ export class GeminiLLM extends BaseLLM<GeminiModelResponse> {
     }
   }
 
-  public createSnapShot(data?: any): GeminiModelResponse {
+  public createSnapShot(data?: any): GeminiModelResponseType {
     return { ...this.response, ...data };
   }
 
