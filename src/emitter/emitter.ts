@@ -5,9 +5,12 @@ export class BaseEmitter<EventMap> {
   constructor() {
     this.logger = new Logger("BaseEmitter");
   }
-  private readonly emitters: Map<keyof EventMap, vscode.EventEmitter<any>> = new Map();
+  private readonly emitters: Map<keyof EventMap, vscode.EventEmitter<any>> =
+    new Map();
 
-  protected createEvent<K extends keyof EventMap>(name: K): vscode.Event<EventMap[K]> {
+  protected createEvent<K extends keyof EventMap>(
+    name: K,
+  ): vscode.Event<EventMap[K]> {
     try {
       const emitter = new vscode.EventEmitter<EventMap[K]>();
       this.emitters.set(name, emitter);
