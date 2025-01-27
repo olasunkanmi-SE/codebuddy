@@ -1,4 +1,4 @@
-import { getUri } from "../application/utils";
+import { getUri } from "../utils/utils";
 import { chatCss } from "./chat_css";
 import { chatJs } from "./chat_js";
 import * as path from "path";

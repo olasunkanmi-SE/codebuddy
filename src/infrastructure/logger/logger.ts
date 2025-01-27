@@ -1,4 +1,4 @@
-import { showInfoMessage } from "../../application/utils";
+import { showInfoMessage } from "../../utils/utils";
 
 export class Logger {
   constructor(private readonly context: string) {}

@@ -18,7 +18,7 @@ import {
   getLatestChatHistory,
   getXGroKBaseURL,
   vscodeErrorMessage,
-} from "../application/utils";
+} from "../utils/utils";
 
 interface IEventGenerator {
   getApplicationConfig(configKey: string): string | undefined;

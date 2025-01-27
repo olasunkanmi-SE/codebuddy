@@ -15,7 +15,7 @@ import {
   getXGroKBaseURL,
   resetChatHistory,
   vscodeErrorMessage,
-} from "../application/utils";
+} from "../utils/utils";
 
 /**
  * Manages chat functionality, including registering chat commands,

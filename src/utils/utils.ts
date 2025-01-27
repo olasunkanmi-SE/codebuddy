@@ -1,7 +1,11 @@
 import * as markdownit from "markdown-it";
 import * as vscode from "vscode";
 import { Brain } from "../services/brain";
-import { APP_CONFIG, COMMON, generativeAiModels } from "./constant";
+import {
+  APP_CONFIG,
+  COMMON,
+  generativeAiModels,
+} from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;

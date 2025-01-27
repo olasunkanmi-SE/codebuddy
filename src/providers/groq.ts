@@ -47,7 +47,8 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
           ...this.chatHistory,
         ]);
       }
-
+      // Once the agent task is done, map the memory into the llm brain.
+      // Send the final answer to the webview here.
       return await this.currentWebView?.webview.postMessage({
         type,
         message: response,
@@ -75,7 +76,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       if (chatHistory?.length) {
         chatHistory = [...chatHistory, { role: "user", content: message }];
       }
-
+      // TODO This line isnt necessary you can spread an empty array;
       if (!chatHistory?.length) {
         chatHistory = [{ role: "user", content: message }];
       }
