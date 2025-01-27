@@ -5,7 +5,7 @@ import {
   OLA_ACTIONS,
   USER_MESSAGE,
 } from "./application/constant";
-import { getConfigValue } from "./application/utils";
+import { getConfigValue } from "./utils/utils";
 import { Comments } from "./commands/comment";
 import { ExplainCode } from "./commands/explain";
 import { FixError } from "./commands/fixError";

@@ -15,7 +15,7 @@ import {
   TNode,
 } from "../application/interfaces";
 import { ITypeScriptCodeMapper } from "../application/interfaces/ts.code.mapper.interface";
-import { handleError } from "../application/utils";
+import { handleError } from "../utils/utils";
 import { FileSystemService } from "./file-system";
 
 export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {

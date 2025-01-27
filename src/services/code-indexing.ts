@@ -1,6 +1,6 @@
 import { ResultSet } from "@libsql/client/.";
 import { IFunctionData } from "../application/interfaces";
-import { getGeminiAPIKey } from "../application/utils";
+import { getGeminiAPIKey } from "../utils/utils";
 import { Logger } from "../infrastructure/logger/logger";
 import { CodeRepository } from "../infrastructure/repository/code";
 import { CodeStructureMapper } from "./code-structure.mapper";

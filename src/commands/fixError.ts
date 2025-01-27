@@ -1,4 +1,4 @@
-import { formatText } from "../application/utils";
+import { formatText } from "../utils/utils";
 import { EventGenerator } from "./event-generator";
 import * as vscode from "vscode";
 

@@ -11,7 +11,7 @@ import {
   createAnthropicClient,
   getGenerativeAiModel,
   getXGroKBaseURL,
-} from "../application/utils";
+} from "../utils/utils";
 
 type Role = "user" | "assistant";
 export interface IHistory {

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { FSPROPS } from "../application/constant";
 import { IWorkspaceInfo } from "../application/interfaces";
-import { handleError } from "../application/utils";
+import { handleError } from "../utils/utils";
 import { Logger } from "../infrastructure/logger/logger";
 
 export class FileSystemService {
