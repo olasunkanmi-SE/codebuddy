@@ -63,9 +63,9 @@ Key Files:
 
 ### Getting Started
 
-1. Open a JavaScript or TypeScript file in VS Code.
-2. Right-click on selected code to access CodeBuddy features in the context menu.
-3. Use the CodeBuddy panel in the Activity Bar to access the chat interface.
+1. Open a Vscode workspace/file containing some code
+2. Right-click on the selected code to access CodeBuddy features in the context menu.
+3. Access the chat interface via the CodeBuddy panel in the Activity Bar.
 
 ### Features
 
@@ -74,31 +74,9 @@ Key Files:
 - Code Refactoring: Automatically refactor selected code.
 - Code Optimization: Optimize your code for better performance.
 - Code Explanation: Get detailed explanations of complex code snippets.
-- Unit Test Generation: Automatically generate unit tests for your code.
 - Commit Message Generation: Create meaningful commit messages based on your changes.
-- Interview Question Generation: Generate interview questions based on your code.
+- Inline chat for a quick conversation with the Codebuddy
 - Code Chart Generation: Create visual representations of your code structure.
-
-### Common Use Cases
-
-1. Generate comments for a complex function:
-
-   - Select the function in your code editor.
-   - Right-click and choose "CodeBuddy. Add comment to selected code."
-
-2. Get a code review:
-
-   - Select a block of code or an entire file.
-   - Right-click and select "CodeBuddy. Review these selected code."
-
-3. Generate a unit test:
-
-   - Select the function or class you want to test.
-   - Right-click and choose "CodeBuddy. Generate Unit Test."
-
-4. Ask CodeBuddy a question:
-   - Open the CodeBuddy chat panel from the Activity Bar.
-   - Type your question and press Enter.
 
 ### Troubleshooting
 
@@ -128,12 +106,12 @@ To enable debug mode:
 
 When a user interacts with CodeBuddy, the following data flow occurs:
 
-1. User Input: The user selects code or enters a query in the CodeBuddy chat panel.
-2. Extension Processing: The `extension.ts` file handles the user's action and routes it to the appropriate event handler in the `events/` directory.
-3. AI Model Integration: The selected AI model (Gemini, Groq, Anthropic, or XGrok) is invoked through the corresponding provider in the `providers/` directory.
-4. API Request: The provider sends a request to the AI service's API with the user's input and any necessary context.
-5. Response Processing: The AI service's response is received and processed by the provider.
-6. User Interface Update: The processed response is sent back to the user interface, either updating the code editor or the chat panel.
+1. User Input: The user selects a code or enters a query in the CodeBuddy chat panel.
+2. Extension Processing: The `extension.ts` file manages the user's action and directs it to the appropriate event handler in the `events/` directory.
+3. AI Model Integration: The chosen AI model (Gemini, Groq, Anthropic, or XGrok) is activated through the respective provider in the `providers/` directory.
+4. API Request: The provider requests the AI service's API using the user's input and any necessary context.
+5. Response Processing: The provider receives and processes the AI service's response.
+6. User Interface Update: The processed response is relayed back to the user interface, updating either the code editor or the chat panel.
 
 ```
 [User Input] -> [Extension] -> [Event Handler] -> [AI Provider] -> [AI API]
