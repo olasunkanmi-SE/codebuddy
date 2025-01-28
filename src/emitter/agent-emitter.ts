@@ -8,7 +8,7 @@ import {
 import * as vscode from "vscode";
 
 export class AgentEventEmitter extends BaseEmitter<IAgentEventMap> {
-  onStatus: vscode.Event<IStatusEvent> = this.createEvent("onStatus");
+  onStatusChange: vscode.Event<IStatusEvent> = this.createEvent("onStatus");
   onError: vscode.Event<IErrorEvent> = this.createEvent("onError");
 
   public emitError(message: string, code: string) {
@@ -27,5 +27,9 @@ export class AgentEventEmitter extends BaseEmitter<IAgentEventMap> {
       message,
       timestamp: Date.now(),
     });
+  }
+
+  public dispose(): void {
+    super.dispose();
   }
 }

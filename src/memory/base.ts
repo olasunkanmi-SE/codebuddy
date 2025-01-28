@@ -1,12 +1,7 @@
 import { MEMORY_CACHE_OPTIONS } from "../application/constant";
 
-interface ICacheEntry {
-  value: any;
-  expiry: number;
-}
-
 export class Memory {
-  private static bank: Map<string, ICacheEntry>;
+  private static bank: Map<string, any>;
   private static instance: Memory;
 
   constructor() {
@@ -20,7 +15,7 @@ export class Memory {
     return Memory.instance;
   }
 
-  static set(key: string, value: any): Map<string, ICacheEntry> {
+  static set(key: string, value: any): Map<string, any> {
     const expiry = Date.now() + MEMORY_CACHE_OPTIONS.sessionTTL;
     return Memory.bank.set(key, { value, expiry });
   }
@@ -45,7 +40,7 @@ export class Memory {
     return Array.from(Memory.bank.keys());
   }
 
-  static values(): ICacheEntry[] {
+  static values(): any[] {
     return Array.from(Memory.bank.values());
   }
 

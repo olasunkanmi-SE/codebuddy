@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { getConfigValue } from "../utils/utils";
 import { ChatManager } from "./chat-manager";
+import { AgentEventEmitter } from "../emitter/agent-emitter";
 
 export const setUpGenerativeAiModel = (
   context: vscode.ExtensionContext,
@@ -9,6 +10,7 @@ export const setUpGenerativeAiModel = (
   webViewProviderClass: any,
   subscriptions: vscode.Disposable[],
   quickFixCodeAction: vscode.Disposable,
+  agentEventEmmitter: AgentEventEmitter,
 ) => {
   try {
     const apiKey = getConfigValue(key);
@@ -34,6 +36,7 @@ export const setUpGenerativeAiModel = (
       quickFixCodeAction,
       registerWebViewProvider,
       chatWithCodeBuddy,
+      agentEventEmmitter,
     );
   } catch (error) {
     vscode.window.showErrorMessage(
