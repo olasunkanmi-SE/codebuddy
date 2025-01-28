@@ -12,11 +12,19 @@ export interface IHistory {
 
 export class GroqWebViewProvider extends BaseWebViewProvider {
   chatHistory: IHistory[] = [];
-  constructor(extensionUri: vscode.Uri, apiKey: string, generativeAiModel: string, context: vscode.ExtensionContext) {
+  constructor(
+    extensionUri: vscode.Uri,
+    apiKey: string,
+    generativeAiModel: string,
+    context: vscode.ExtensionContext,
+  ) {
     super(extensionUri, apiKey, generativeAiModel, context);
   }
 
-  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  public async sendResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -31,8 +39,13 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         });
       }
       if (this.chatHistory.length === 2) {
-        const chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY) ? Memory.get(COMMON.GROQ_CHAT_HISTORY) : [];
-        Memory.set(COMMON.GROQ_CHAT_HISTORY, [...chatHistory, ...this.chatHistory]);
+        const chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
+          ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
+          : [];
+        Memory.set(COMMON.GROQ_CHAT_HISTORY, [
+          ...chatHistory,
+          ...this.chatHistory,
+        ]);
       }
       // Once the agent task is done, map the memory into the llm brain.
       // Send the final answer to the webview here.
@@ -45,14 +58,20 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(message: string, apiKey?: string, name?: string): Promise<string | undefined> {
+  async generateResponse(
+    message: string,
+    apiKey?: string,
+    name?: string,
+  ): Promise<string | undefined> {
     try {
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
       const groq = new Groq({
         apiKey: this.apiKey,
       });
 
-      let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY) ? Memory.get(COMMON.GROQ_CHAT_HISTORY) : [];
+      let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
+        ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
+        : [];
 
       if (chatHistory?.length) {
         chatHistory = [...chatHistory, { role: "user", content: message }];
@@ -80,7 +99,9 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     } catch (error) {
       console.error(error);
       Memory.set(COMMON.GROQ_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage("Model not responding, please resend your question");
+      vscode.window.showErrorMessage(
+        "Model not responding, please resend your question",
+      );
       return;
     }
   }

@@ -7,7 +7,7 @@ export class Orchestrator implements vscode.Disposable {
 
   constructor(private readonly aiAgent: BaseAiAgent) {
     this.disposables.push(
-      this.aiAgent.onStatus(this.handleStatus.bind(this)),
+      this.aiAgent.onStatusChange(this.handleStatus.bind(this)),
       this.aiAgent.onError(this.handleError.bind(this)),
     );
   }
