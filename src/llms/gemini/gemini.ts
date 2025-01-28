@@ -44,10 +44,11 @@ export class GeminiLLM extends BaseLLM<GeminiModelResponseType> {
 
   private getModel(): GenerativeModel {
     try {
-      const model: GenerativeModel | undefined = this.generativeAi.getGenerativeModel({
-        model: this.config.model,
-        tools: this.config.tools,
-      });
+      const model: GenerativeModel | undefined =
+        this.generativeAi.getGenerativeModel({
+          model: this.config.model,
+          tools: this.config.tools,
+        });
       if (!model) {
         throw new Error(`Error retrieving model ${this.config.model}`);
       }

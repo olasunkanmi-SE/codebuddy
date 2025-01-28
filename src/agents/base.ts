@@ -1,7 +1,10 @@
 import * as vscode from "vscode";
-import { AIAgentEmitter } from "../emitter/agent-emitter";
+import { AgentEventEmitter } from "../emitter/agent-emitter";
 
-export class BaseAiAgent extends AIAgentEmitter implements vscode.Disposable {
+export class BaseAiAgent
+  extends AgentEventEmitter
+  implements vscode.Disposable
+{
   constructor() {
     super();
   }
@@ -10,7 +13,10 @@ export class BaseAiAgent extends AIAgentEmitter implements vscode.Disposable {
     try {
       this.emitStatus("processing", input);
     } catch (error) {
-      this.emitError(error instanceof Error ? error.message : "Unknown Error", "process failed");
+      this.emitError(
+        error instanceof Error ? error.message : "Unknown Error",
+        "process failed",
+      );
     } finally {
       this.emitStatus("completed", "Processing complete");
     }

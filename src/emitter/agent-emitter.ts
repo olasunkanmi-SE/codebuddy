@@ -1,8 +1,13 @@
 import { BaseEmitter } from "./emitter";
-import { EventState, IAgentEventMap, IErrorEvent, IStatusEvent } from "./interface";
+import {
+  EventState,
+  IAgentEventMap,
+  IErrorEvent,
+  IStatusEvent,
+} from "./interface";
 import * as vscode from "vscode";
 
-export class AIAgentEmitter extends BaseEmitter<IAgentEventMap> {
+export class AgentEventEmitter extends BaseEmitter<IAgentEventMap> {
   onStatus: vscode.Event<IStatusEvent> = this.createEvent("onStatus");
   onError: vscode.Event<IErrorEvent> = this.createEvent("onError");
 

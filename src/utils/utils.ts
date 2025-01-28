@@ -1,12 +1,8 @@
 import * as markdownit from "markdown-it";
 import * as vscode from "vscode";
-import { Brain } from "../services/brain";
-import {
-  APP_CONFIG,
-  COMMON,
-  generativeAiModels,
-} from "../application/constant";
+import { APP_CONFIG, COMMON, generativeAiModels } from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
+import { Memory } from "../memory/base";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -18,9 +14,7 @@ export const formatText = (text?: string): string => {
   return "";
 };
 
-export const getConfigValue: GetConfigValueType<any> = <T>(
-  key: string,
-): T | undefined => {
+export const getConfigValue: GetConfigValueType<any> = <T>(key: string): T | undefined => {
   return vscode.workspace.getConfiguration().get<T>(key);
 };
 
@@ -29,7 +23,7 @@ export const vscodeErrorMessage = (error: string, metaData?: any) => {
 };
 
 export const getLatestChatHistory = (key: string) => {
-  let chatHistory = Brain.has(key) ? Brain.get(key) : [];
+  let chatHistory = Memory.has(key) ? Memory.get(key) : [];
   if (chatHistory?.length > 3) {
     chatHistory = chatHistory.slice(-3);
   }
@@ -39,13 +33,13 @@ export const getLatestChatHistory = (key: string) => {
 export const resetChatHistory = (model: string) => {
   switch (model) {
     case generativeAiModels.ANTHROPIC:
-      Brain.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
+      Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
       break;
     case generativeAiModels.GEMINI:
-      Brain.set(COMMON.GEMINI_CHAT_HISTORY, []);
+      Memory.set(COMMON.GEMINI_CHAT_HISTORY, []);
       break;
     case generativeAiModels.GROQ:
-      Brain.set(COMMON.GROQ_CHAT_HISTORY, []);
+      Memory.set(COMMON.GROQ_CHAT_HISTORY, []);
       break;
     default:
       break;
@@ -72,11 +66,7 @@ export const getGenerativeAiModel = (): string | undefined => {
   return getConfigValue("generativeAi.option");
 };
 
-export function getUri(
-  webview: vscode.Webview,
-  extensionUri: vscode.Uri,
-  pathList: string[],
-) {
+export function getUri(webview: vscode.Webview, extensionUri: vscode.Uri, pathList: string[]) {
   return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...pathList));
 }
 
@@ -85,8 +75,7 @@ export function getUri(
 // and ensure script integrity when using Content Security Policy (CSP)
 export const getNonce = () => {
   let text = "";
-  const possible =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }

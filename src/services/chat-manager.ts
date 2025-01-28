@@ -140,11 +140,7 @@ export class ChatManager {
           groqAiConfigurations.model,
           this._context,
         );
-        return await chatViewProvider.generateResponse(
-          undefined,
-          undefined,
-          message,
-        );
+        return await chatViewProvider.generateResponse(message);
       }
       if (generativeAi === generativeAiModels.GEMINI) {
         const geminiConfigurations = this.handleAiProvider(
@@ -169,11 +165,7 @@ export class ChatManager {
         const anthropicWebViewProvider = this.getAnthropicWebViewProvider(
           anthropicConfigurations,
         );
-        return await anthropicWebViewProvider.generateResponse(
-          undefined,
-          undefined,
-          message,
-        );
+        return await anthropicWebViewProvider.generateResponse(message);
       }
 
       if (generativeAi === generativeAiModels.GROK) {
@@ -182,11 +174,7 @@ export class ChatManager {
         );
         const anthropicWebViewProvider =
           this.getAnthropicWebViewProvider(grokConfigurations);
-        return await anthropicWebViewProvider.generateResponse(
-          undefined,
-          undefined,
-          message,
-        );
+        return await anthropicWebViewProvider.generateResponse(message);
       }
     } catch (error) {
       const model = getConfigValue("generativeAi.option");
