@@ -13,9 +13,11 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - [ ] Persistent Context. AI model to use certain context throughout a conversation and across different conversations by configuring the Context.
 - [ ] Create Code base Documentation.
 - [ ] Orchestrator. Coordinate AI model activities with Agent capabilities, through tools and function calling.
+- [ ] Reactive AI agent with reasoning capabilities.
 - [ ] Access to real-time data.
 - [ ] Support for local LLMs such as Ollama
 - [ ] Code search. Search code across the entire codebase
+- [ ] Support for deepseek model
 
 ## Repository Structure
 
