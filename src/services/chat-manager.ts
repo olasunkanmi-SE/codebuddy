@@ -4,10 +4,10 @@ import {
   APP_CONFIG,
   COMMON,
   generativeAiModels,
-} from "../constant";
-import { AnthropicWebViewProvider } from "../providers/anthropic-web-view-provider";
-import { GeminiWebViewProvider } from "../providers/gemini-web-view-provider";
-import { GroqWebViewProvider } from "../providers/groq-web-view-provider";
+} from "../application/constant";
+import { AnthropicWebViewProvider } from "../providers/anthropic";
+import { GeminiWebViewProvider } from "../providers/gemini";
+import { GroqWebViewProvider } from "../providers/groq";
 import {
   formatText,
   getConfigValue,
@@ -15,7 +15,7 @@ import {
   getXGroKBaseURL,
   resetChatHistory,
   vscodeErrorMessage,
-} from "../utils";
+} from "../utils/utils";
 
 /**
  * Manages chat functionality, including registering chat commands,
@@ -140,11 +140,7 @@ export class ChatManager {
           groqAiConfigurations.model,
           this._context,
         );
-        return await chatViewProvider.generateResponse(
-          undefined,
-          undefined,
-          message,
-        );
+        return await chatViewProvider.generateResponse(message);
       }
       if (generativeAi === generativeAiModels.GEMINI) {
         const geminiConfigurations = this.handleAiProvider(
@@ -169,11 +165,7 @@ export class ChatManager {
         const anthropicWebViewProvider = this.getAnthropicWebViewProvider(
           anthropicConfigurations,
         );
-        return await anthropicWebViewProvider.generateResponse(
-          undefined,
-          undefined,
-          message,
-        );
+        return await anthropicWebViewProvider.generateResponse(message);
       }
 
       if (generativeAi === generativeAiModels.GROK) {
@@ -182,11 +174,7 @@ export class ChatManager {
         );
         const anthropicWebViewProvider =
           this.getAnthropicWebViewProvider(grokConfigurations);
-        return await anthropicWebViewProvider.generateResponse(
-          undefined,
-          undefined,
-          message,
-        );
+        return await anthropicWebViewProvider.generateResponse(message);
       }
     } catch (error) {
       const model = getConfigValue("generativeAi.option");
