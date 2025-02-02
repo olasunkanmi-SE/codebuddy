@@ -36,6 +36,7 @@ export const WebviewUI = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    console.log(selectedModel);
     const messageHandler = (event: any) => {
       const message = event.data;
 
@@ -111,41 +112,39 @@ export const WebviewUI = () => {
   };
 
   return (
-    <>
-      <div className="container">
-        <div className="dropdown-container">
-          <div>
-            {messsages?.map((msg, index) =>
-              msg.type === "bot" ? (
-                <BotMessage key={index} language={msg.language} content={msg.content} />
-              ) : (
-                <UserMessage key={index} message={msg.content} alias={msg.alias} />
-              )
-            )}
-            {isLoading && <div className="loading">Processing...</div>}
-          </div>
-        </div>
-        <div className="business">
-          <VSCodeDropdown value={selectedModel} id="my-dropdown" onChange={handleDropdownChange}>
-            <VSCodeOption value="">Select a Model</VSCodeOption>
-            <VSCodeOption value="Anthropic">Anthropic</VSCodeOption>
-            <VSCodeOption value="Claude">Claude</VSCodeOption>
-            <VSCodeOption value="Grok">Grok</VSCodeOption>
-          </VSCodeDropdown>
-          <div className="textarea-container">
-            <VSCodeTextArea
-              value={userInput}
-              onInput={handleTextChange}
-              placeholder="Ask a question or enter '/' for quick actions"
-            />
-          </div>
-          <div className="dropdown-container">
-            <VSCodeButton appearance="secondary" onClick={handleSend}>
-              Send
-            </VSCodeButton>
-          </div>
+    <div className="container">
+      <div className="dropdown-container">
+        <div>
+          {messsages?.map((msg, index) =>
+            msg.type === "bot" ? (
+              <BotMessage key={index} language={msg.language} content={msg.content} />
+            ) : (
+              <UserMessage key={index} message={msg.content} alias={msg.alias} />
+            )
+          )}
+          {isLoading && <div className="loading">Processing...</div>}
         </div>
       </div>
-    </>
+      <div className="business">
+        <VSCodeDropdown value={selectedModel} id="my-dropdown" onChange={handleDropdownChange}>
+          <VSCodeOption value="">Select a Model</VSCodeOption>
+          <VSCodeOption value="Anthropic">Anthropic</VSCodeOption>
+          <VSCodeOption value="Claude">Claude</VSCodeOption>
+          <VSCodeOption value="Grok">Grok</VSCodeOption>
+        </VSCodeDropdown>
+        <div className="textarea-container">
+          <VSCodeTextArea
+            value={userInput}
+            onInput={handleTextChange}
+            placeholder="Ask a question or enter '/' for quick actions"
+          />
+        </div>
+        <div className="dropdown-container">
+          <VSCodeButton appearance="secondary" onClick={handleSend}>
+            Send
+          </VSCodeButton>
+        </div>
+      </div>
+    </div>
   );
 };

@@ -16,7 +16,7 @@ export class AgentEventEmitter extends BaseEmitter<IAgentEventMap> {
       type: "error",
       message,
       code,
-      timestamp: Date.now(),
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -25,7 +25,7 @@ export class AgentEventEmitter extends BaseEmitter<IAgentEventMap> {
       type: "status",
       state,
       message,
-      timestamp: Date.now(),
+      timestamp: new Date().toISOString(),
     });
   }
 
