@@ -3,6 +3,7 @@ import { BaseAiAgent } from "./base";
 import { IErrorEvent, IStatusEvent } from "../emitter/interface";
 
 export class Orchestrator implements vscode.Disposable {
+  private static instance: Orchestrator;
   private readonly disposables: vscode.Disposable[] = [];
 
   constructor(private readonly aiAgent: BaseAiAgent) {
@@ -12,11 +13,20 @@ export class Orchestrator implements vscode.Disposable {
     );
   }
 
-  private handleStatus(event: IStatusEvent) {
-    console.log(`Status: ${event.state} - ${event.message}`);
+  static getInstance(aiAgent: BaseAiAgent) {
+    if (!Orchestrator.instance) {
+      Orchestrator.instance = new Orchestrator(aiAgent);
+    }
+    return Orchestrator.instance;
   }
 
-  private handleError(event: IErrorEvent) {
+  public handleStatus(event: IStatusEvent) {
+    console.log(
+      `Status: ${event.state} - ${event.message} - ${JSON.stringify(event)}`,
+    );
+  }
+
+  public handleError(event: IErrorEvent) {
     console.error(`Error: ${event.message} (Code: ${event.code})`);
   }
 

@@ -2,9 +2,13 @@ import * as vscode from "vscode";
 import { getWebviewContent } from "../webview/chat";
 import { formatText } from "../utils/utils";
 import { FileUploader } from "../services/file-uploader";
+import { Orchestrator } from "../agents/orchestrator";
+import { TextAnalysisAgent } from "../agents/text";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider {
+  private readonly orchestrator: Orchestrator;
+  private readonly textAgent: TextAnalysisAgent;
   public static readonly viewId = "chatView";
   static webView: vscode.WebviewView | undefined;
   public currentWebView: vscode.WebviewView | undefined = _view;
@@ -17,6 +21,8 @@ export abstract class BaseWebViewProvider {
     context: vscode.ExtensionContext,
   ) {
     this._context = context;
+    this.textAgent = new TextAnalysisAgent();
+    this.orchestrator = Orchestrator.getInstance(this.textAgent);
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -66,9 +72,9 @@ export abstract class BaseWebViewProvider {
       _view.webview.onDidReceiveMessage(async (message) => {
         if (message.command === "user-input") {
           const response = await this.generateResponse(
+            formatText(message.message),
             apiKey,
             modelName,
-            formatText(message.message),
           );
           if (response) {
             this.sendResponse(formatText(response), "bot");
@@ -81,13 +87,21 @@ export abstract class BaseWebViewProvider {
   }
 
   abstract generateResponse(
+    message?: string,
     apiKey?: string,
     name?: string,
-    message?: string,
   ): Promise<string | undefined>;
 
   abstract sendResponse(
     response: string,
     currentChat?: string,
   ): Promise<boolean | undefined>;
+
+  public async processUserInput(input: string) {
+    try {
+      await this.textAgent.performTask(input);
+    } catch (error) {
+      vscode.window.showErrorMessage("Processing failed");
+    }
+  }
 }

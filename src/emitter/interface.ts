@@ -1,5 +1,5 @@
 interface IBaseEmitter {
-  timestamp: number;
+  timestamp: string;
 }
 
 export interface IErrorEvent extends IBaseEmitter {

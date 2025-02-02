@@ -24,7 +24,7 @@ import { GeminiWebViewProvider } from "./providers/gemini";
 import { GroqWebViewProvider } from "./providers/groq";
 import { CodeIndexingService } from "./services/code-indexing";
 import { FileUploader } from "./services/file-uploader";
-import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
+import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { getConfigValue } from "./utils/utils";
 import { Memory } from "./memory/base";
 import { AgentEventEmitter } from "./emitter/agent-emitter";
@@ -197,7 +197,7 @@ export async function activate(context: vscode.ExtensionContext) {
     if (selectedGenerativeAiModel in modelConfigurations) {
       const modelConfig = modelConfigurations[selectedGenerativeAiModel];
       const { key, model, webviewProviderClass } = modelConfig;
-      setUpGenerativeAiModel(
+      initializeGenerativeAiEnvironment(
         context,
         model,
         key,

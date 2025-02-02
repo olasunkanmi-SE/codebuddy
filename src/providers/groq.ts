@@ -1,8 +1,8 @@
-import * as vscode from "vscode";
-import { BaseWebViewProvider } from "./base";
 import Groq from "groq-sdk";
+import * as vscode from "vscode";
 import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { Memory } from "../memory/base";
+import { BaseWebViewProvider } from "./base";
 
 type Role = "user" | "system";
 export interface IHistory {
@@ -23,11 +23,11 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
 
   public async sendResponse(
     response: string,
-    currentChat: string,
+    participant: string,
   ): Promise<boolean | undefined> {
     try {
-      const type = currentChat === "bot" ? "bot-response" : "user-input";
-      if (currentChat === "bot") {
+      const type = participant === "bot" ? "bot-response" : "user-input";
+      if (participant === "bot") {
         this.chatHistory.push({
           role: "system",
           content: response,
@@ -64,6 +64,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     name?: string,
   ): Promise<string | undefined> {
     try {
+      this.processUserInput(message);
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
       const groq = new Groq({
         apiKey: this.apiKey,
