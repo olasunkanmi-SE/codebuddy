@@ -7,6 +7,10 @@ This extension provides a wide range of AI-powered features to assist developers
 ## Install in Vscode Market Place
 https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy
 
+## Highlevel Architecture
+![Screenshot 2025-01-28 at 4 00 10 PM](https://github.com/user-attachments/assets/99d610f9-3e88-4f43-9198-61629fed5eaf)
+
+
 ## Roadmap
 - [ ] Local codebase indexing. Perform retrieval-augmented generation (RAG) on the codebase.
 - [ ] Context Pinning. Pin directories, and files, (functions, classes, etc.) as persistent context. AI Models to reference these items for every suggestion, across Chat and Commands.
