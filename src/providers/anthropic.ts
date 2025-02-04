@@ -93,9 +93,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         chatHistory = [{ role: "user", content: message }];
       }
 
-      if (chatHistory?.length > 3) {
-        chatHistory = chatHistory.slice(-3);
-      }
+      Memory.removeItems(COMMON.ANTHROPIC_CHAT_HISTORY);
 
       const chatCompletion = await anthropic.messages.create({
         messages: [...chatHistory],

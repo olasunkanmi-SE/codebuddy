@@ -82,9 +82,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         chatHistory = [{ role: "user", content: message }];
       }
 
-      if (chatHistory?.length > 3) {
-        chatHistory = chatHistory.slice(-3);
-      }
+      Memory.removeItems(COMMON.GROQ_CHAT_HISTORY);
 
       const chatCompletion = groq.chat.completions.create({
         messages: [...chatHistory],

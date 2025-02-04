@@ -1,6 +1,7 @@
 import { MEMORY_CACHE_OPTIONS } from "../application/constant";
 
 export class Memory {
+  private static readonly MAX_MEMORY_ITEMS = 3;
   private static bank: Map<string, any>;
   private static instance: Memory;
 
@@ -58,5 +59,13 @@ export class Memory {
 
   static loadSnapShot(snapShot: Memory): void {
     Object.assign(this, snapShot);
+  }
+
+  static removeItems(key: string) {
+    let content = Memory.get(key);
+    if (Array.isArray(content) && content?.length > 3) {
+      content = content.slice(-Memory.MAX_MEMORY_ITEMS);
+    }
+    return content;
   }
 }
