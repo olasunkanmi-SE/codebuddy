@@ -96,9 +96,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         ];
       }
 
-      if (chatHistory?.length > 3) {
-        chatHistory = chatHistory.slice(-3);
-      }
+      Memory.removeItems(COMMON.GEMINI_CHAT_HISTORY);
 
       const chat = model.startChat({
         history: [...chatHistory],
