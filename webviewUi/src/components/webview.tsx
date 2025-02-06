@@ -106,6 +106,7 @@ export const WebviewUI = () => {
     vscode.postMessage({
       command: "user-input",
       message: userInput,
+      tags: ["file", "index", "search"],
     });
 
     setUserInput("");

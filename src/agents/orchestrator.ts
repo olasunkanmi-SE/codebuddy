@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { BaseAiAgent } from "./base";
-import { IErrorEvent, IStatusEvent } from "../emitter/interface";
+import { IErrorEvent, IPromptEvent, IStatusEvent } from "../emitter/interface";
 
 export class Orchestrator implements vscode.Disposable {
   private static instance: Orchestrator;
@@ -10,6 +10,7 @@ export class Orchestrator implements vscode.Disposable {
     this.disposables.push(
       this.aiAgent.onStatusChange(this.handleStatus.bind(this)),
       this.aiAgent.onError(this.handleError.bind(this)),
+      this.aiAgent.onQuery(this.handleQuery.bind(this))
     );
   }
 
@@ -21,13 +22,15 @@ export class Orchestrator implements vscode.Disposable {
   }
 
   public handleStatus(event: IStatusEvent) {
-    console.log(
-      `Status: ${event.state} - ${event.message} - ${JSON.stringify(event)}`,
-    );
+    console.log(`Status: ${event.status} - ${event.message} - ${JSON.stringify(event)}`);
   }
 
   public handleError(event: IErrorEvent) {
     console.error(`Error: ${event.message} (Code: ${event.code})`);
+  }
+
+  public handleQuery(event: IPromptEvent) {
+    console.error(`Error: ${event.message} (Code: ${JSON.stringify(event.metaData)})`);
   }
 
   public dispose(): void {
