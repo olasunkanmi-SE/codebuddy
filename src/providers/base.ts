@@ -3,12 +3,12 @@ import { getWebviewContent } from "../webview/chat";
 import { formatText } from "../utils/utils";
 import { FileUploader } from "../services/file-uploader";
 import { Orchestrator } from "../agents/orchestrator";
-import { TextAnalysisAgent } from "../agents/text";
+import { CodeBuddy } from "../agents/agent";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider {
   private readonly orchestrator: Orchestrator;
-  private readonly textAgent: TextAnalysisAgent;
+  protected readonly agent: CodeBuddy;
   public static readonly viewId = "chatView";
   static webView: vscode.WebviewView | undefined;
   public currentWebView: vscode.WebviewView | undefined = _view;
@@ -18,11 +18,11 @@ export abstract class BaseWebViewProvider {
     private readonly _extensionUri: vscode.Uri,
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: vscode.ExtensionContext
   ) {
     this._context = context;
-    this.textAgent = new TextAnalysisAgent();
-    this.orchestrator = Orchestrator.getInstance(this.textAgent);
+    this.agent = new CodeBuddy();
+    this.orchestrator = Orchestrator.getInstance(this.agent);
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -41,41 +41,31 @@ export abstract class BaseWebViewProvider {
     webviewView.webview.options = webviewOptions;
 
     if (!this.apiKey) {
-      vscode.window.showErrorMessage(
-        "API key not configured. Check your settings.",
-      );
+      vscode.window.showErrorMessage("API key not configured. Check your settings.");
       return;
     }
     this.setWebviewHtml(this.currentWebView);
-    this.setupMessageHandler(
-      this.apiKey,
-      this.generativeAiModel,
-      this.currentWebView,
-    );
+    this.setupMessageHandler(this.apiKey, this.generativeAiModel, this.currentWebView);
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
     const codepatterns: FileUploader = new FileUploader(this._context);
     // const knowledgeBaseDocs: string[] = await codepatterns.getFiles();
-    view.webview.html = getWebviewContent(
-      this.currentWebView?.webview!,
-      this._extensionUri,
-    );
+    view.webview.html = getWebviewContent(this.currentWebView?.webview!, this._extensionUri);
   }
 
-  private setupMessageHandler(
-    apiKey: string,
-    modelName: string,
-    _view: vscode.WebviewView,
-  ): void {
+  private async setupMessageHandler(apiKey: string, modelName: string, _view: vscode.WebviewView): Promise<void> {
     try {
       _view.webview.onDidReceiveMessage(async (message) => {
+        // await this.textAgent.analyzeText("hello tue tue");
+        let response;
         if (message.command === "user-input") {
-          const response = await this.generateResponse(
-            formatText(message.message),
-            apiKey,
-            modelName,
-          );
+          if (message.tags?.length > 0) {
+            this.processInput(message.message, message.tags);
+          } else {
+            response = await this.generateResponse(message.message, apiKey, modelName);
+          }
+
           if (response) {
             this.sendResponse(formatText(response), "bot");
           }
@@ -86,22 +76,9 @@ export abstract class BaseWebViewProvider {
     }
   }
 
-  abstract generateResponse(
-    message?: string,
-    apiKey?: string,
-    name?: string,
-  ): Promise<string | undefined>;
+  abstract generateResponse(message?: string, apiKey?: string, name?: string): Promise<string | undefined>;
 
-  abstract sendResponse(
-    response: string,
-    currentChat?: string,
-  ): Promise<boolean | undefined>;
+  abstract sendResponse(response: string, currentChat?: string): Promise<boolean | undefined>;
 
-  public async processUserInput(input: string) {
-    try {
-      await this.textAgent.performTask(input);
-    } catch (error) {
-      vscode.window.showErrorMessage("Processing failed");
-    }
-  }
+  abstract processInput(query: string, metaData?: Record<string, any>): any;
 }

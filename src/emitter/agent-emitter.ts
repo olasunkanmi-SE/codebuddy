@@ -1,17 +1,13 @@
 import { BaseEmitter } from "./emitter";
-import {
-  EventState,
-  IAgentEventMap,
-  IErrorEvent,
-  IStatusEvent,
-} from "./interface";
+import { EventState, IAgentEventMap, IErrorEvent, IPromptEvent, IStatusEvent } from "./interface";
 import * as vscode from "vscode";
 
 export class AgentEventEmitter extends BaseEmitter<IAgentEventMap> {
   onStatusChange: vscode.Event<IStatusEvent> = this.createEvent("onStatus");
   onError: vscode.Event<IErrorEvent> = this.createEvent("onError");
+  onQuery: vscode.Event<IPromptEvent> = this.createEvent("onPrompt");
 
-  public emitError(message: string, code: string) {
+  protected emitError(message: string, code: string) {
     this.emit("onError", {
       type: "error",
       message,
@@ -20,11 +16,21 @@ export class AgentEventEmitter extends BaseEmitter<IAgentEventMap> {
     });
   }
 
-  public emitStatus(state: EventState, message: string) {
+  protected emitStatus(status: EventState, message: string) {
     this.emit("onStatus", {
       type: "status",
-      state,
+      status,
       message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  protected onPrompt(status: EventState, message: string) {
+    this.emit("onPrompt", {
+      type: "prompt",
+      status,
+      message,
+      metaData: { tags: [] },
       timestamp: new Date().toISOString(),
     });
   }
