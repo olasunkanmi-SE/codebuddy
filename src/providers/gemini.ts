@@ -133,7 +133,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       const generateContentResponse: GenerateContentResult =
         await this.model.generateContent(prompt);
       const { text, usageMetadata } = generateContentResponse.response;
-      const parsedResponse = this.agent.parseResponse(text());
+      const parsedResponse = this.orchestrator.parseResponse(text());
       const extractedQueries = parsedResponse.queries;
       const extractedThought = parsedResponse.thought;
       const tokenCount = usageMetadata?.totalTokenCount ?? 0;
@@ -143,10 +143,10 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         prompt: userInput,
         thought: extractedThought,
       };
-      this.agent.emitEvent("onStatus", JSON.stringify(result));
+      this.orchestrator.emitEvent("onStatus", JSON.stringify(result));
       return result;
     } catch (error: any) {
-      this.agent.emitEvent("onError", error);
+      this.orchestrator.emitEvent("onError", error);
       vscode.window.showErrorMessage("Error processing user query");
       this.logger.error(
         "Error generating, queries, thoughts from user query",

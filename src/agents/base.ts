@@ -50,6 +50,4 @@ export abstract class BaseAiAgent
       return;
     }
   }
-
-  abstract run(event: IEventPayload): any;
 }

@@ -1,22 +1,20 @@
 import * as vscode from "vscode";
-import { CodeBuddyAgent } from "../agents/agent";
 import { Orchestrator } from "../agents/orchestrator";
+import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { FileUploader } from "../services/file-uploader";
 import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
-import { IEventPayload } from "../emitter/interface";
-import { ProcessInputResult } from "../application/interfaces/agent.interface";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider {
-  private readonly orchestrator: Orchestrator;
-  protected readonly agent: CodeBuddyAgent;
+  protected readonly orchestrator: Orchestrator;
   public static readonly viewId = "chatView";
   static webView: vscode.WebviewView | undefined;
   public currentWebView: vscode.WebviewView | undefined = _view;
   _context: vscode.ExtensionContext;
   protected readonly logger: Logger;
+  private readonly disposables: vscode.Disposable[] = [];
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -25,10 +23,11 @@ export abstract class BaseWebViewProvider {
     context: vscode.ExtensionContext,
   ) {
     this._context = context;
-    this.agent = new CodeBuddyAgent();
-    this.orchestrator = Orchestrator.getInstance(this.agent);
+    this.orchestrator = Orchestrator.getInstance();
     this.logger = new Logger("BaseWebViewProvider");
-    this.agent.onUpdate(this.subscribeToUpdate.bind(this));
+    this.disposables.push(
+      this.orchestrator.onUpdate(this.subscribeToUpdate.bind(this)),
+    );
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -110,7 +109,7 @@ export abstract class BaseWebViewProvider {
     try {
       const response = await this.generateContent(message.message);
       if (response) {
-        this.agent.emitEvent("onQuery", JSON.stringify(response));
+        this.orchestrator.emitEvent("onQuery", JSON.stringify(response));
       }
     } catch (error) {
       this.logger.error("Unable to publish generateContentEvent", error);
@@ -130,4 +129,8 @@ export abstract class BaseWebViewProvider {
   ): Promise<boolean | undefined>;
 
   abstract generateContent(userInput: string): any;
+
+  public dispose(): void {
+    this.disposables.forEach((d) => d.dispose());
+  }
 }
