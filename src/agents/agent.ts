@@ -1,19 +1,44 @@
+import { GenerativeModel } from "@google/generative-ai";
+import * as vscode from "vscode";
+import {
+  LLMs,
+  ProcessInputResult,
+} from "../application/interfaces/agent.interface";
+import { createPrompt } from "../utils/prompt";
 import { BaseAiAgent } from "./base";
 
-export class CodeBuddy extends BaseAiAgent {
+export class CodeBuddyAgent extends BaseAiAgent {
   constructor() {
     super();
   }
 
-  public async analyzeText(text: string) {
+  run(
+    input: string,
+    model: LLMs,
+    metaData?: Record<string, any>,
+  ): Promise<Partial<ProcessInputResult | undefined>> {
+    const result = this.processInput(input, model, metaData);
+    return result;
+  }
+
+  async processInput(
+    userInput: string,
+    model: LLMs,
+    metaData?: Record<string, any>,
+  ): Promise<Partial<ProcessInputResult | undefined>> {
     try {
-      this.emitStatus("query", `Analyzing text: ${text}`);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const result = `Analyzed: ${text.toUpperCase()}`;
-      this.emitStatus("completed", result);
-      return result;
+      let response;
+      // TODO generateContent should move to the BaseAiAgent
+      if (model instanceof GenerativeModel) {
+        response = await this.gemini(userInput, model, metaData);
+      }
+      return response;
     } catch (error) {
-      this.emitError(error instanceof Error ? error.message : "Text analysis failed", "ANALYSIS_ERROR");
+      vscode.window.showErrorMessage("Error processing user query");
+      this.logger.error(
+        "Error generating, queries, thoughts from user query",
+        error,
+      );
       throw error;
     }
   }

@@ -1,5 +1,11 @@
 import { BaseEmitter } from "./emitter";
-import { EventState, IAgentEventMap, IErrorEvent, IPromptEvent, IStatusEvent } from "./interface";
+import {
+  EventState,
+  IAgentEventMap,
+  IErrorEvent,
+  IPromptEvent,
+  IStatusEvent,
+} from "./interface";
 import * as vscode from "vscode";
 
 export class AgentEventEmitter extends BaseEmitter<IAgentEventMap> {
