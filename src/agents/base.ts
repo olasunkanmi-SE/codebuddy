@@ -1,11 +1,6 @@
 import * as vscode from "vscode";
 import { AgentEventEmitter } from "../emitter/agent-emitter";
-import {
-  LLMs,
-  ProcessInputResult,
-} from "../application/interfaces/agent.interface";
-import { GenerateContentResult, GenerativeModel } from "@google/generative-ai";
-import { createPrompt } from "../utils/prompt";
+import { IEventPayload } from "../emitter/interface";
 
 export abstract class BaseAiAgent
   extends AgentEventEmitter
@@ -14,8 +9,6 @@ export abstract class BaseAiAgent
   constructor() {
     super();
   }
-
-  abstract run(input: string, model: LLMs, metaData?: Record<string, any>): any;
 
   public dispose(): void {
     this.dispose();
@@ -58,37 +51,5 @@ export abstract class BaseAiAgent
     }
   }
 
-  async gemini(
-    userInput: string,
-    model: LLMs,
-    metaData?: Record<string, any>,
-  ): Promise<Partial<ProcessInputResult>> {
-    try {
-      const prompt = createPrompt(userInput);
-      // TODO generateContent should move to the BaseAiAgent
-      if (!(model instanceof GenerativeModel)) {
-        throw new Error("Model is not an instance of GenerativeModel");
-      }
-      const generateContentResponse: GenerateContentResult =
-        await model.generateContent(prompt);
-      const { text, usageMetadata } = generateContentResponse.response;
-      const parsedResponse = this.parseResponse(text());
-      const extractedQueries = parsedResponse.queries;
-      const extractedThought = parsedResponse.thought;
-      const tokenCount = usageMetadata?.totalTokenCount ?? 0;
-      return {
-        queries: extractedQueries,
-        tokens: tokenCount,
-        prompt: userInput,
-        thought: extractedThought,
-      };
-    } catch (error) {
-      vscode.window.showErrorMessage("Error processing user query");
-      this.logger.error(
-        "Error generating, queries, thoughts from user query",
-        error,
-      );
-      throw error;
-    }
-  }
+  abstract run(event: IEventPayload): any;
 }

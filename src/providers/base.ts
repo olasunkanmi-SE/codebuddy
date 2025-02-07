@@ -1,10 +1,12 @@
 import * as vscode from "vscode";
-import { getWebviewContent } from "../webview/chat";
-import { formatText } from "../utils/utils";
-import { FileUploader } from "../services/file-uploader";
-import { Orchestrator } from "../agents/orchestrator";
 import { CodeBuddyAgent } from "../agents/agent";
+import { Orchestrator } from "../agents/orchestrator";
 import { Logger } from "../infrastructure/logger/logger";
+import { FileUploader } from "../services/file-uploader";
+import { formatText } from "../utils/utils";
+import { getWebviewContent } from "../webview/chat";
+import { IEventPayload } from "../emitter/interface";
+import { ProcessInputResult } from "../application/interfaces/agent.interface";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider {
@@ -26,6 +28,7 @@ export abstract class BaseWebViewProvider {
     this.agent = new CodeBuddyAgent();
     this.orchestrator = Orchestrator.getInstance(this.agent);
     this.logger = new Logger("BaseWebViewProvider");
+    this.agent.onUpdate(this.subscribeToUpdate.bind(this));
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -76,7 +79,7 @@ export abstract class BaseWebViewProvider {
         let response;
         if (message.command === "user-input") {
           if (message.tags?.length > 0) {
-            this.processInput(message.message, { tags: message.tags });
+            this.publishEvent(message);
           } else {
             response = await this.generateResponse(
               message.message,
@@ -91,7 +94,27 @@ export abstract class BaseWebViewProvider {
         }
       });
     } catch (error) {
+      this.logger.error("Message handler failed", error);
       console.error(error);
+    }
+  }
+
+  public subscribeToUpdate(event: IEventPayload) {
+    this.sendResponse(JSON.stringify(event));
+    console.error(
+      `Error: ${event.message} (Code: ${JSON.stringify(event.data)})`,
+    );
+  }
+
+  public async publishEvent(message: any) {
+    try {
+      const response = await this.generateContent(message.message);
+      if (response) {
+        this.agent.emitEvent("onQuery", JSON.stringify(response));
+      }
+    } catch (error) {
+      this.logger.error("Unable to publish generateContentEvent", error);
+      throw error;
     }
   }
 
@@ -106,5 +129,5 @@ export abstract class BaseWebViewProvider {
     currentChat?: string,
   ): Promise<boolean | undefined>;
 
-  abstract processInput(input: string, metaData?: Record<string, any>): any;
+  abstract generateContent(userInput: string): any;
 }
