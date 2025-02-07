@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { BaseEmitter } from "./emitter";
 import { IAgentEventMap, IEventPayload } from "./interface";
 
-export class AgentEventEmitter extends BaseEmitter<IAgentEventMap> {
+export class EventEmitter extends BaseEmitter<IAgentEventMap> {
   onStatusChange: vscode.Event<IEventPayload> = this.createEvent("onStatus");
   onError: vscode.Event<IEventPayload> = this.createEvent("onError");
   onUpdate: vscode.Event<IEventPayload> = this.createEvent("onUpdate");
@@ -16,7 +16,7 @@ export class AgentEventEmitter extends BaseEmitter<IAgentEventMap> {
    * @param {string} message The message associated with the event (optional).
 
    */
-  emitEvent(eventName: keyof IAgentEventMap, message?: string, data?: any) {
+  publish(eventName: keyof IAgentEventMap, message?: string, data?: any) {
     const payload: IEventPayload = {
       type: eventName,
       message,

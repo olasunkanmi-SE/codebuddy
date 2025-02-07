@@ -27,7 +27,7 @@ import { FileUploader } from "./services/file-uploader";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { getConfigValue } from "./utils/utils";
 import { Memory } from "./memory/base";
-import { AgentEventEmitter } from "./emitter/agent-emitter";
+import { EventEmitter } from "./emitter/agent-emitter";
 
 const {
   geminiKey,
@@ -47,7 +47,7 @@ const connectDB = async () => {
 };
 
 let quickFixCodeAction: vscode.Disposable;
-let agentEventEmmitter: AgentEventEmitter;
+let agentEventEmmitter: EventEmitter;
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
@@ -147,7 +147,7 @@ export async function activate(context: vscode.ExtensionContext) {
       [explain]: () => explainCode.execute(),
       [pattern]: () => codePattern.uploadFileHandler(),
       [knowledge]: () => knowledgeBase.execute(),
-      [commitMessage]: () => generateCommitMessage.execute("hello"),
+      [commitMessage]: () => generateCommitMessage.execute("commitMessage"),
       [generateCodeChart]: () => codeChartGenerator.execute(),
       [inlineChat]: () => getInLineChat.execute(),
     };
@@ -164,7 +164,7 @@ export async function activate(context: vscode.ExtensionContext) {
       quickFix,
     );
 
-    agentEventEmmitter = new AgentEventEmitter();
+    agentEventEmmitter = new EventEmitter();
 
     const modelConfigurations: {
       [key: string]: {
