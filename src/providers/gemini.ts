@@ -1,8 +1,14 @@
-import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  GenerateContentResult,
+  GenerativeModel,
+  GoogleGenerativeAI,
+} from "@google/generative-ai";
 import * as vscode from "vscode";
 import { COMMON } from "../application/constant";
 import { Memory } from "../memory/base";
 import { BaseWebViewProvider } from "./base";
+import { createPrompt } from "../utils/prompt";
+import { ProcessInputResult } from "../application/interfaces/agent.interface";
 
 type Role = "function" | "user" | "model";
 export interface IHistory {
@@ -14,6 +20,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
   chatHistory: IHistory[] = [];
   readonly genAI: GoogleGenerativeAI;
   readonly model: GenerativeModel;
+  readonly metaData?: Record<string, any>;
   constructor(
     extensionUri: vscode.Uri,
     apiKey: string,
@@ -118,12 +125,33 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async processInput(input: string, metaData?: Record<string, any>) {
+  async generateContent(
+    userInput: string,
+  ): Promise<Partial<ProcessInputResult>> {
     try {
-      const model = this.model;
-      await this.agent.run(input, model, metaData);
-    } catch (error) {
-      this.logger.error("Processing failed", error);
+      const prompt = createPrompt(userInput);
+      const generateContentResponse: GenerateContentResult =
+        await this.model.generateContent(prompt);
+      const { text, usageMetadata } = generateContentResponse.response;
+      const parsedResponse = this.agent.parseResponse(text());
+      const extractedQueries = parsedResponse.queries;
+      const extractedThought = parsedResponse.thought;
+      const tokenCount = usageMetadata?.totalTokenCount ?? 0;
+      const result = {
+        queries: extractedQueries,
+        tokens: tokenCount,
+        prompt: userInput,
+        thought: extractedThought,
+      };
+      this.agent.emitEvent("onStatus", JSON.stringify(result));
+      return result;
+    } catch (error: any) {
+      this.agent.emitEvent("onError", error);
+      vscode.window.showErrorMessage("Error processing user query");
+      this.logger.error(
+        "Error generating, queries, thoughts from user query",
+        error,
+      );
       throw error;
     }
   }

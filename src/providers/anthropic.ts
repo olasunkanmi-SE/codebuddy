@@ -110,13 +110,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async processInput(input: string, metaData?: Record<string, any>) {
-    try {
-      const model = this.model;
-      await this.agent.run(input, model, metaData);
-    } catch (error) {
-      this.logger.error("Processing failed", error);
-      throw error;
-    }
+  generateContent(userInput: string) {
+    return userInput;
   }
 }
