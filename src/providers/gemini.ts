@@ -1,8 +1,8 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import * as vscode from "vscode";
 import { COMMON } from "../application/constant";
-import { BaseWebViewProvider } from "./base";
 import { Memory } from "../memory/base";
+import { BaseWebViewProvider } from "./base";
 
 type Role = "function" | "user" | "model";
 export interface IHistory {
@@ -12,11 +12,25 @@ export interface IHistory {
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
   chatHistory: IHistory[] = [];
-  constructor(extensionUri: vscode.Uri, apiKey: string, generativeAiModel: string, context: vscode.ExtensionContext) {
+  readonly genAI: GoogleGenerativeAI;
+  readonly model: GenerativeModel;
+  constructor(
+    extensionUri: vscode.Uri,
+    apiKey: string,
+    generativeAiModel: string,
+    context: vscode.ExtensionContext,
+  ) {
     super(extensionUri, apiKey, generativeAiModel, context);
+    this.genAI = new GoogleGenerativeAI(this.apiKey);
+    this.model = this.genAI.getGenerativeModel({
+      model: this.generativeAiModel,
+    });
   }
 
-  async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  async sendResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -31,8 +45,13 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         });
       }
       if (this.chatHistory.length === 2) {
-        const chatHistory = Memory.has(COMMON.GEMINI_CHAT_HISTORY) ? Memory.get(COMMON.GEMINI_CHAT_HISTORY) : [];
-        Memory.set(COMMON.GEMINI_CHAT_HISTORY, [...chatHistory, ...this.chatHistory]);
+        const chatHistory = Memory.has(COMMON.GEMINI_CHAT_HISTORY)
+          ? Memory.get(COMMON.GEMINI_CHAT_HISTORY)
+          : [];
+        Memory.set(COMMON.GEMINI_CHAT_HISTORY, [
+          ...chatHistory,
+          ...this.chatHistory,
+        ]);
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -44,11 +63,15 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(apiKey: string, name: string, message: string): Promise<string | undefined> {
+  async generateResponse(
+    apiKey: string,
+    name: string,
+    message: string,
+  ): Promise<string | undefined> {
     try {
-      const genAi = new GoogleGenerativeAI(apiKey);
-      const model = genAi.getGenerativeModel({ model: name });
-      let chatHistory = Memory.has(COMMON.GEMINI_CHAT_HISTORY) ? Memory.get(COMMON.GEMINI_CHAT_HISTORY) : [];
+      let chatHistory = Memory.has(COMMON.GEMINI_CHAT_HISTORY)
+        ? Memory.get(COMMON.GEMINI_CHAT_HISTORY)
+        : [];
 
       if (chatHistory?.length) {
         chatHistory = [
@@ -79,7 +102,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
 
       Memory.removeItems(COMMON.GEMINI_CHAT_HISTORY);
 
-      const chat = model.startChat({
+      const chat = this.model.startChat({
         history: [...chatHistory],
       });
       const result = await chat.sendMessage(message);
@@ -87,17 +110,21 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       return response.text();
     } catch (error) {
       Memory.set(COMMON.GEMINI_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage("Model not responding, please resend your question");
+      vscode.window.showErrorMessage(
+        "Model not responding, please resend your question",
+      );
       console.error(error);
       return;
     }
   }
 
-  async processInput(input: string) {
+  async processInput(input: string, metaData?: Record<string, any>) {
     try {
-      await this.agent.performTask(input);
+      const model = this.model;
+      await this.agent.run(input, model, metaData);
     } catch (error) {
-      vscode.window.showErrorMessage("Processing failed");
+      this.logger.error("Processing failed", error);
+      throw error;
     }
   }
 }

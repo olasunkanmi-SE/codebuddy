@@ -10,7 +10,7 @@ export class Orchestrator implements vscode.Disposable {
     this.disposables.push(
       this.aiAgent.onStatusChange(this.handleStatus.bind(this)),
       this.aiAgent.onError(this.handleError.bind(this)),
-      this.aiAgent.onQuery(this.handleQuery.bind(this))
+      this.aiAgent.onQuery(this.handleQuery.bind(this)),
     );
   }
 
@@ -22,7 +22,9 @@ export class Orchestrator implements vscode.Disposable {
   }
 
   public handleStatus(event: IStatusEvent) {
-    console.log(`Status: ${event.status} - ${event.message} - ${JSON.stringify(event)}`);
+    console.log(
+      `Status: ${event.status} - ${event.message} - ${JSON.stringify(event)}`,
+    );
   }
 
   public handleError(event: IErrorEvent) {
@@ -30,7 +32,9 @@ export class Orchestrator implements vscode.Disposable {
   }
 
   public handleQuery(event: IPromptEvent) {
-    console.error(`Error: ${event.message} (Code: ${JSON.stringify(event.metaData)})`);
+    console.error(
+      `Error: ${event.message} (Code: ${JSON.stringify(event.metaData)})`,
+    );
   }
 
   public dispose(): void {

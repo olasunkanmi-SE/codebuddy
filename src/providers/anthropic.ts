@@ -1,8 +1,16 @@
 import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base";
-import { COMMON, generativeAiModels, GROQ_CONFIG } from "../application/constant";
+import {
+  COMMON,
+  generativeAiModels,
+  GROQ_CONFIG,
+} from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
-import { createAnthropicClient, getGenerativeAiModel, getXGroKBaseURL } from "../utils/utils";
+import {
+  createAnthropicClient,
+  getGenerativeAiModel,
+  getXGroKBaseURL,
+} from "../utils/utils";
 import { Memory } from "../memory/base";
 
 type Role = "user" | "assistant";
@@ -13,17 +21,22 @@ export interface IHistory {
 
 export class AnthropicWebViewProvider extends BaseWebViewProvider {
   chatHistory: IHistory[] = [];
+  readonly model: Anthropic;
   constructor(
     extensionUri: vscode.Uri,
     apiKey: string,
     generativeAiModel: string,
     context: vscode.ExtensionContext,
-    protected baseUrl?: string
+    protected baseUrl?: string,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
+    this.model = createAnthropicClient(this.apiKey, this.baseUrl);
   }
 
-  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  public async sendResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -39,8 +52,13 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       }
 
       if (this.chatHistory.length === 2) {
-        const chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY) ? Memory.get(COMMON.ANTHROPIC_CHAT_HISTORY) : [];
-        Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, [...chatHistory, ...this.chatHistory]);
+        const chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY)
+          ? Memory.get(COMMON.ANTHROPIC_CHAT_HISTORY)
+          : [];
+        Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, [
+          ...chatHistory,
+          ...this.chatHistory,
+        ]);
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -51,14 +69,19 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(message: string, apiKey?: string, name?: string): Promise<string | undefined> {
+  async generateResponse(
+    message: string,
+    apiKey?: string,
+    name?: string,
+  ): Promise<string | undefined> {
     try {
       const { max_tokens } = GROQ_CONFIG;
       if (getGenerativeAiModel() === generativeAiModels.GROK) {
         this.baseUrl = getXGroKBaseURL();
       }
-      const anthropic: Anthropic = createAnthropicClient(this.apiKey, this.baseUrl);
-      let chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY) ? Memory.get(COMMON.ANTHROPIC_CHAT_HISTORY) : [];
+      let chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY)
+        ? Memory.get(COMMON.ANTHROPIC_CHAT_HISTORY)
+        : [];
 
       if (chatHistory?.length) {
         chatHistory = [...chatHistory, { role: "user", content: message }];
@@ -70,7 +93,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
 
       Memory.removeItems(COMMON.ANTHROPIC_CHAT_HISTORY);
 
-      const chatCompletion = await anthropic.messages.create({
+      const chatCompletion = await this.model.messages.create({
         messages: [...chatHistory],
         model: this.generativeAiModel,
         max_tokens,
@@ -81,15 +104,19 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     } catch (error) {
       console.error(error);
       Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage("Model not responding, please resend your question");
+      vscode.window.showErrorMessage(
+        "Model not responding, please resend your question",
+      );
     }
   }
 
-  async processInput(input: string) {
+  async processInput(input: string, metaData?: Record<string, any>) {
     try {
-      await this.agent.performTask(input);
+      const model = this.model;
+      await this.agent.run(input, model, metaData);
     } catch (error) {
-      vscode.window.showErrorMessage("Processing failed");
+      this.logger.error("Processing failed", error);
+      throw error;
     }
   }
 }
