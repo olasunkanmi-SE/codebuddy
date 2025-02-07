@@ -7,7 +7,7 @@ import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
 
 let _view: vscode.WebviewView | undefined;
-export abstract class BaseWebViewProvider {
+export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected readonly orchestrator: Orchestrator;
   public static readonly viewId = "chatView";
   static webView: vscode.WebviewView | undefined;
@@ -109,7 +109,7 @@ export abstract class BaseWebViewProvider {
     try {
       const response = await this.generateContent(message.message);
       if (response) {
-        this.orchestrator.emitEvent("onQuery", JSON.stringify(response));
+        this.orchestrator.publish("onQuery", JSON.stringify(response));
       }
     } catch (error) {
       this.logger.error("Unable to publish generateContentEvent", error);

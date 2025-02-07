@@ -143,10 +143,10 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         prompt: userInput,
         thought: extractedThought,
       };
-      this.orchestrator.emitEvent("onStatus", JSON.stringify(result));
+      this.orchestrator.publish("onStatus", JSON.stringify(result));
       return result;
     } catch (error: any) {
-      this.orchestrator.emitEvent("onError", error);
+      this.orchestrator.publish("onError", error);
       vscode.window.showErrorMessage("Error processing user query");
       this.logger.error(
         "Error generating, queries, thoughts from user query",

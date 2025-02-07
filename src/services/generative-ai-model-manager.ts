@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { getConfigValue } from "../utils/utils";
-import { AgentEventEmitter } from "../emitter/agent-emitter";
+import { EventEmitter } from "../emitter/agent-emitter";
 
 export const initializeGenerativeAiEnvironment = async (
   context: vscode.ExtensionContext,
@@ -9,7 +9,7 @@ export const initializeGenerativeAiEnvironment = async (
   webViewProviderClass: any,
   subscriptions: vscode.Disposable[],
   quickFixCodeAction: vscode.Disposable,
-  agentEventEmmitter: AgentEventEmitter,
+  agentEventEmmitter: EventEmitter,
 ) => {
   try {
     const apiKey = getConfigValue(key);

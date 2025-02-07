@@ -1,9 +1,8 @@
 import * as vscode from "vscode";
-import { AgentEventEmitter } from "../emitter/agent-emitter";
-import { IEventPayload } from "../emitter/interface";
+import { EventEmitter } from "../emitter/agent-emitter";
 
 export abstract class BaseAiAgent
-  extends AgentEventEmitter
+  extends EventEmitter
   implements vscode.Disposable
 {
   constructor() {

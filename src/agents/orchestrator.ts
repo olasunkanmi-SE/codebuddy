@@ -23,7 +23,7 @@ export class Orchestrator extends BaseAiAgent implements vscode.Disposable {
   }
 
   public handleStatus(event: IEventPayload) {
-    this.emitEvent("onQuery", JSON.stringify(event));
+    this.publish("onQuery", JSON.stringify(event));
     console.log(` ${event.message} - ${JSON.stringify(event)}`);
   }
 
