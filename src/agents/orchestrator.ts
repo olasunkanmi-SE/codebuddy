@@ -2,32 +2,32 @@ import * as vscode from "vscode";
 import { BaseAiAgent } from "./base";
 import { IEventPayload } from "../emitter/interface";
 
-export class Orchestrator implements vscode.Disposable {
+export class Orchestrator extends BaseAiAgent implements vscode.Disposable {
   private static instance: Orchestrator;
   private readonly disposables: vscode.Disposable[] = [];
 
-  constructor(private readonly aiAgent: BaseAiAgent) {
+  constructor() {
+    super();
     this.disposables.push(
-      this.aiAgent.onStatusChange(this.handleStatus.bind(this)),
-      this.aiAgent.onPrompt(this.handleQuery.bind(this)),
-      this.aiAgent.onError(this.handleError.bind(this)),
+      this.onStatusChange(this.handleStatus.bind(this)),
+      this.onPrompt(this.handleQuery.bind(this)),
+      this.onError(this.handleError.bind(this)),
     );
   }
 
-  static getInstance(aiAgent: BaseAiAgent) {
+  static getInstance() {
     if (!Orchestrator.instance) {
-      Orchestrator.instance = new Orchestrator(aiAgent);
+      Orchestrator.instance = new Orchestrator();
     }
     return Orchestrator.instance;
   }
 
   public handleStatus(event: IEventPayload) {
-    this.aiAgent.emitEvent("onQuery", JSON.stringify(event));
+    this.emitEvent("onQuery", JSON.stringify(event));
     console.log(` ${event.message} - ${JSON.stringify(event)}`);
   }
 
   public handleQuery(event: IEventPayload) {
-    this.aiAgent.run(event);
     console.error(`Error: ${event.message})`);
   }
 
