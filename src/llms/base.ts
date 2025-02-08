@@ -21,12 +21,16 @@ export abstract class BaseLLM<T extends Record<string, any>>
   abstract loadSnapShot(snapshot: T): void;
 
   private validateConfig() {
-    const llmConfig = this.config;
-    const validationErrors = validateLlmConfig(llmConfig);
-    if (validationErrors?.length > 0) {
+    try {
+      const llmConfig = this.config;
+      const validationErrors = validateLlmConfig(llmConfig);
+      if (validationErrors?.length > 0) {
+        validationErrors.forEach((error) => this.logger.info(`${error}`));
+        this.logger.info("LLM configuration is invalid");
+      }
+    } catch (error) {
       this.logger.error("LLM configuration is invalid", error);
-      validationErrors.forEach((error) => this.logger.info(`${error}`));
-      throw new Error("LLM configuration is invalid");
+      throw error;
     }
   }
 }

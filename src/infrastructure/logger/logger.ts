@@ -1,4 +1,4 @@
-import { showInfoMessage } from "../../utils/utils";
+import { handleError, showInfoMessage } from "../../utils/utils";
 
 export class Logger {
   constructor(private readonly context: string) {}
@@ -10,6 +10,6 @@ export class Logger {
 
   error(message: string, error: any) {
     console.error(`[${this.context}] ERROR:`, message, error);
-    showInfoMessage(message);
+    handleError(error, message);
   }
 }

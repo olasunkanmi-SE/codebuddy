@@ -18,10 +18,9 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     context: vscode.ExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
-    this.gemini = new GeminiLLM({
+    this.gemini = GeminiLLM.getInstance({
       apiKey: this.apiKey,
       model: this.generativeAiModel,
-      tools: [],
     });
     this.model = this.gemini.getModel();
   }
@@ -73,7 +72,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     try {
       if (metaData) {
         this.orchestrator.publish("onThinking", "...thinking");
-        await this.gemini.generateContent(message);
+        await this.gemini.generateContent(JSON.stringify(message));
         return;
       }
       const userMessage = Message.of({
