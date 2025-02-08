@@ -1,8 +1,11 @@
 import {
+  ChatSession,
   EmbedContentResponse,
+  FunctionCallingMode,
   GenerateContentResult,
   GenerativeModel,
   GoogleGenerativeAI,
+  Tool,
 } from "@google/generative-ai";
 import * as vscode from "vscode";
 import { Orchestrator } from "../../agents/orchestrator";
@@ -10,6 +13,9 @@ import { ProcessInputResult } from "../../application/interfaces/agent.interface
 import { createPrompt } from "../../utils/prompt";
 import { BaseLLM } from "../base";
 import { GeminiModelResponseType, ILlmConfig } from "../interface";
+import { IMessageInput, Message } from "../message";
+import { Memory } from "../../memory/base";
+import { COMMON } from "../../application/constant";
 
 export class GeminiLLM
   extends BaseLLM<GeminiModelResponseType>
@@ -19,6 +25,7 @@ export class GeminiLLM
   private response: EmbedContentResponse | GenerateContentResult | undefined;
   protected readonly orchestrator: Orchestrator;
   private readonly disposables: vscode.Disposable[] = [];
+  private static instance: GeminiLLM | undefined;
 
   constructor(config: ILlmConfig) {
     super(config);
@@ -26,6 +33,13 @@ export class GeminiLLM
     this.generativeAi = new GoogleGenerativeAI(this.config.apiKey);
     this.response = undefined;
     this.orchestrator = Orchestrator.getInstance();
+  }
+
+  static getInstance(config: ILlmConfig) {
+    if (!GeminiLLM.instance) {
+      GeminiLLM.instance = new GeminiLLM(config);
+    }
+    return GeminiLLM.instance;
   }
 
   public async generateEmbeddings(text: string): Promise<number[]> {
@@ -52,12 +66,14 @@ export class GeminiLLM
     }
   }
 
-  getModel(): GenerativeModel {
+  getModel(modelParams?: Partial<ILlmConfig>): GenerativeModel {
     try {
       const model: GenerativeModel | undefined =
         this.generativeAi.getGenerativeModel({
           model: this.config.model,
-          tools: this.config.tools,
+          tools: modelParams?.tools ?? this.config.tools,
+          systemInstruction:
+            modelParams?.systemInstruction ?? this.config.systemInstruction,
         });
       if (!model) {
         throw new Error(`Error retrieving model ${this.config.model}`);
@@ -73,10 +89,19 @@ export class GeminiLLM
     userInput: string,
   ): Promise<Partial<ProcessInputResult>> {
     try {
+      await this.buildChatHistory(userInput);
       const prompt = createPrompt(userInput);
-      const model = this.getModel();
+      const contents = Memory.get(COMMON.GEMINI_CHAT_HISTORY);
+      const tools: Tool[] = [];
+      const model = this.getModel({ tools, systemInstruction: prompt });
       const generateContentResponse: GenerateContentResult =
-        await model.generateContent(prompt);
+        await model.generateContent({
+          contents,
+          toolConfig: {
+            functionCallingConfig: { mode: FunctionCallingMode.AUTO },
+          },
+        });
+      this.response = generateContentResponse;
       const { text, usageMetadata } = generateContentResponse.response;
       const parsedResponse = this.orchestrator.parseResponse(text());
       const extractedQueries = parsedResponse.queries;
@@ -99,6 +124,49 @@ export class GeminiLLM
       );
       throw error;
     }
+  }
+
+  private async buildChatHistory(
+    userQuery: string,
+    functionCall?: any,
+    functionResponse?: any,
+    chat?: ChatSession,
+  ): Promise<any> {
+    Memory.removeItems(COMMON.GEMINI_CHAT_HISTORY);
+    const userMessage = Message.of({
+      role: "user",
+      parts: [
+        {
+          text: userQuery,
+        },
+      ],
+    });
+
+    let chatHistory: IMessageInput[] = Memory.has(COMMON.GEMINI_CHAT_HISTORY)
+      ? Memory.get(COMMON.GEMINI_CHAT_HISTORY)
+      : [userMessage];
+
+    if (functionCall) {
+      chatHistory.push(
+        Message.of({
+          role: "model",
+          parts: [{ functionCall }],
+        }),
+      );
+    }
+
+    if (chat && functionResponse) {
+      const observationResult = await chat.sendMessage(
+        `Tool result: ${JSON.stringify(functionResponse)}`,
+      );
+      chatHistory.push(
+        Message.of({
+          role: "user",
+          parts: [{ text: observationResult.response.text() }],
+        }),
+      );
+    }
+    Memory.set(COMMON.GEMINI_CHAT_HISTORY, chatHistory);
   }
 
   public createSnapShot(data?: any): GeminiModelResponseType {
