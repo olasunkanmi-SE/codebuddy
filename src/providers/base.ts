@@ -26,7 +26,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.orchestrator = Orchestrator.getInstance();
     this.logger = new Logger("BaseWebViewProvider");
     this.disposables.push(
-      this.orchestrator.onUpdate(this.subscribeToUpdate.bind(this)),
+      this.orchestrator.onResponse(this.handleModelResponseEvent.bind(this)),
+      this.orchestrator.onThinking(this.handleThinkingEvent.bind(this)),
     );
   }
 
@@ -75,16 +76,15 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   ): Promise<void> {
     try {
       _view.webview.onDidReceiveMessage(async (message) => {
-        let response;
+        let response: any;
         if (message.command === "user-input") {
           if (message.tags?.length > 0) {
-            this.publishEvent(message);
-          } else {
             response = await this.generateResponse(
               message.message,
-              apiKey,
-              modelName,
+              message.tags,
             );
+          } else {
+            response = await this.generateResponse(message.message);
           }
 
           if (response) {
@@ -98,37 +98,23 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
   }
 
-  public subscribeToUpdate(event: IEventPayload) {
-    this.sendResponse(JSON.stringify(event));
-    console.error(
-      `Error: ${event.message} (Code: ${JSON.stringify(event.data)})`,
-    );
+  public handleModelResponseEvent(event: IEventPayload) {
+    this.sendResponse(formatText(event.message), "bot");
   }
 
-  public async publishEvent(message: any) {
-    try {
-      const response = await this.generateContent(message.message);
-      if (response) {
-        this.orchestrator.publish("onQuery", JSON.stringify(response));
-      }
-    } catch (error) {
-      this.logger.error("Unable to publish generateContentEvent", error);
-      throw error;
-    }
+  public handleThinkingEvent(event: IEventPayload) {
+    this.sendResponse(formatText(event.message), "bot");
   }
 
   abstract generateResponse(
     message?: string,
-    apiKey?: string,
-    name?: string,
+    metaData?: Record<string, any>,
   ): Promise<string | undefined>;
 
   abstract sendResponse(
     response: string,
     currentChat?: string,
   ): Promise<boolean | undefined>;
-
-  abstract generateContent(userInput: string): any;
 
   public dispose(): void {
     this.disposables.forEach((d) => d.dispose());

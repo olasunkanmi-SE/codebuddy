@@ -3,15 +3,10 @@ import * as vscode from "vscode";
 import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { Memory } from "../memory/base";
 import { BaseWebViewProvider } from "./base";
-
-type Role = "user" | "system";
-export interface IHistory {
-  role: Role;
-  content: string;
-}
+import { IMessageInput, Message } from "../llms/message";
 
 export class GroqWebViewProvider extends BaseWebViewProvider {
-  chatHistory: IHistory[] = [];
+  chatHistory: IMessageInput[] = [];
   readonly model: Groq;
   constructor(
     extensionUri: vscode.Uri,
@@ -33,15 +28,19 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     try {
       const type = participant === "bot" ? "bot-response" : "user-input";
       if (participant === "bot") {
-        this.chatHistory.push({
-          role: "system",
-          content: response,
-        });
+        this.chatHistory.push(
+          Message.of({
+            role: "system",
+            content: response,
+          }),
+        );
       } else {
-        this.chatHistory.push({
-          role: "user",
-          content: response,
-        });
+        this.chatHistory.push(
+          Message.of({
+            role: "user",
+            content: response,
+          }),
+        );
       }
       if (this.chatHistory.length === 2) {
         const chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
@@ -63,25 +62,15 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(
-    message: string,
-    apiKey?: string,
-    name?: string,
-  ): Promise<string | undefined> {
+  async generateResponse(message: string): Promise<string | undefined> {
     try {
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
-
+      const userMessage = Message.of({ role: "user", content: message });
       let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
         ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
-        : [];
+        : [userMessage];
 
-      if (chatHistory?.length) {
-        chatHistory = [...chatHistory, { role: "user", content: message }];
-      }
-      // TODO This line isnt necessary you can spread an empty array;
-      if (!chatHistory?.length) {
-        chatHistory = [{ role: "user", content: message }];
-      }
+      chatHistory = [...chatHistory, userMessage];
 
       Memory.removeItems(COMMON.GROQ_CHAT_HISTORY);
 

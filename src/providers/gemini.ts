@@ -1,26 +1,16 @@
-import {
-  GenerateContentResult,
-  GenerativeModel,
-  GoogleGenerativeAI,
-} from "@google/generative-ai";
+import { GenerativeModel } from "@google/generative-ai";
 import * as vscode from "vscode";
 import { COMMON } from "../application/constant";
+import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
+import { GeminiLLM } from "./../llms/gemini/gemini";
 import { BaseWebViewProvider } from "./base";
-import { createPrompt } from "../utils/prompt";
-import { ProcessInputResult } from "../application/interfaces/agent.interface";
-
-type Role = "function" | "user" | "model";
-export interface IHistory {
-  role: Role;
-  parts: { text: string }[];
-}
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
-  chatHistory: IHistory[] = [];
-  readonly genAI: GoogleGenerativeAI;
+  chatHistory: IMessageInput[] = [];
   readonly model: GenerativeModel;
   readonly metaData?: Record<string, any>;
+  private readonly gemini: GeminiLLM;
   constructor(
     extensionUri: vscode.Uri,
     apiKey: string,
@@ -28,10 +18,12 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     context: vscode.ExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
-    this.genAI = new GoogleGenerativeAI(this.apiKey);
-    this.model = this.genAI.getGenerativeModel({
+    this.gemini = new GeminiLLM({
+      apiKey: this.apiKey,
       model: this.generativeAiModel,
+      tools: [],
     });
+    this.model = this.gemini.getModel();
   }
 
   async sendResponse(
@@ -41,15 +33,19 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
-        this.chatHistory.push({
-          role: "model",
-          parts: [{ text: response }],
-        });
+        this.chatHistory.push(
+          Message.of({
+            role: "model",
+            parts: [{ text: response }],
+          }),
+        );
       } else {
-        this.chatHistory.push({
-          role: "user",
-          parts: [{ text: response }],
-        });
+        this.chatHistory.push(
+          Message.of({
+            role: "user",
+            parts: [{ text: response }],
+          }),
+        );
       }
       if (this.chatHistory.length === 2) {
         const chatHistory = Memory.has(COMMON.GEMINI_CHAT_HISTORY)
@@ -71,41 +67,28 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
   }
 
   async generateResponse(
-    apiKey: string,
-    name: string,
     message: string,
+    metaData?: any,
   ): Promise<string | undefined> {
     try {
+      if (metaData) {
+        this.orchestrator.publish("onThinking", "...thinking");
+        await this.gemini.generateContent(message);
+        return;
+      }
+      const userMessage = Message.of({
+        role: "user",
+        parts: [
+          {
+            text: message,
+          },
+        ],
+      });
       let chatHistory = Memory.has(COMMON.GEMINI_CHAT_HISTORY)
         ? Memory.get(COMMON.GEMINI_CHAT_HISTORY)
-        : [];
+        : [userMessage];
 
-      if (chatHistory?.length) {
-        chatHistory = [
-          ...chatHistory,
-          {
-            role: "user",
-            parts: [
-              {
-                text: message,
-              },
-            ],
-          },
-        ];
-      }
-
-      if (!chatHistory?.length) {
-        chatHistory = [
-          {
-            role: "user",
-            parts: [
-              {
-                text: message,
-              },
-            ],
-          },
-        ];
-      }
+      chatHistory = [...chatHistory, userMessage];
 
       Memory.removeItems(COMMON.GEMINI_CHAT_HISTORY);
 
@@ -122,37 +105,6 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       );
       console.error(error);
       return;
-    }
-  }
-
-  async generateContent(
-    userInput: string,
-  ): Promise<Partial<ProcessInputResult>> {
-    try {
-      const prompt = createPrompt(userInput);
-      const generateContentResponse: GenerateContentResult =
-        await this.model.generateContent(prompt);
-      const { text, usageMetadata } = generateContentResponse.response;
-      const parsedResponse = this.orchestrator.parseResponse(text());
-      const extractedQueries = parsedResponse.queries;
-      const extractedThought = parsedResponse.thought;
-      const tokenCount = usageMetadata?.totalTokenCount ?? 0;
-      const result = {
-        queries: extractedQueries,
-        tokens: tokenCount,
-        prompt: userInput,
-        thought: extractedThought,
-      };
-      this.orchestrator.publish("onStatus", JSON.stringify(result));
-      return result;
-    } catch (error: any) {
-      this.orchestrator.publish("onError", error);
-      vscode.window.showErrorMessage("Error processing user query");
-      this.logger.error(
-        "Error generating, queries, thoughts from user query",
-        error,
-      );
-      throw error;
     }
   }
 }
