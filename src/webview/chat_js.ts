@@ -8,7 +8,7 @@ const KnowledgeBaseDropDown = document.getElementById("chat-options");
 const scrollButton = document.getElementById("scroll-button");
 
 const textArea = document.getElementById("chat-input-container");
-textArea.setAttribute("disabled", "true");
+
 
 
 scrollButton.addEventListener("click", () => {
@@ -133,5 +133,4 @@ KnowledgeBaseDropDown.addEventListener("change", (event) => {
     });
   }
 });
-
 `;
