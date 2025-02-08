@@ -2,11 +2,13 @@ import * as vscode from "vscode";
 import { BaseEmitter } from "./emitter";
 import { IAgentEventMap, IEventPayload } from "./interface";
 
-export class EventEmitter extends BaseEmitter<IAgentEventMap> {
+export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onStatusChange: vscode.Event<IEventPayload> = this.createEvent("onStatus");
   onError: vscode.Event<IEventPayload> = this.createEvent("onError");
   onUpdate: vscode.Event<IEventPayload> = this.createEvent("onUpdate");
-  onPrompt: vscode.Event<IEventPayload> = this.createEvent("onQuery");
+  onPromptGenerated: vscode.Event<IEventPayload> = this.createEvent("onQuery");
+  onThinking: vscode.Event<IEventPayload> = this.createEvent("onThinking");
+  onResponse: vscode.Event<IEventPayload> = this.createEvent("onResponse");
 
   /**
    * Emits a generic event with specified status, message, and optional data.

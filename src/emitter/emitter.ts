@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { Logger } from "../infrastructure/logger/logger";
-export class BaseEmitter<EventMap extends Record<string, any>> {
+import { IEventPayload } from "./interface";
+export class BaseEmitter<EventMap extends Record<string, IEventPayload>> {
   protected logger: Logger;
   constructor() {
     this.logger = new Logger("BaseEmitter");

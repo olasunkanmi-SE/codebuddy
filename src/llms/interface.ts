@@ -9,7 +9,7 @@ export interface ILlmConfig {
   model: string;
   tools?: any[];
   apiKey: string;
-  baseUrl: string;
+  baseUrl?: string;
   systemInstruction?: string;
   cachedContent?: any;
   additionalConfig?: Record<string, any>;

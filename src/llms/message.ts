@@ -17,7 +17,7 @@ export class Message {
   constructor(
     readonly role: Role,
     readonly content: string = "",
-    readonly parts: Part[] = []
+    readonly parts: Part[] = [],
   ) {}
 
   static of({ role, content, parts }: IMessageInput) {

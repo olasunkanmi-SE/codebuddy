@@ -16,6 +16,8 @@ export interface IAgentEventMap {
   onError: IEventPayload;
   onUpdate: IEventPayload;
   onQuery: IEventPayload;
+  onResponse: IEventPayload;
+  onThinking: IEventPayload;
 }
 
 export interface IEventPayload {
