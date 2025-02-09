@@ -21,7 +21,7 @@ export class GoogleSearchTool {
       });
 
       if (Array.isArray(response?.data?.items)) {
-        response.data.items.map((item) => ({
+        response.data.items.forEach((item) => ({
           title: item.title ?? "",
           description: item.snippet ?? "",
           url: item.link ?? "",
