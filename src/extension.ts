@@ -1,31 +1,33 @@
 import * as vscode from "vscode";
 import {
   APP_CONFIG,
-  COMMON,
   generativeAiModels,
   OLA_ACTIONS,
   USER_MESSAGE,
-} from "./constant";
-import { Comments } from "./events/comment";
-import { ExplainCode } from "./events/explain";
-import { FileUploader } from "./events/file-uploader";
-import { FixError } from "./events/fixError";
-import { CodeChartGenerator } from "./events/generate-code-chart";
-import { GenerateCommitMessage } from "./events/generate-commit-message";
-import { GenerateUnitTest } from "./events/generate-unit-test";
-import { InterviewMe } from "./events/interview-me";
-import { ReadFromKnowledgeBase } from "./events/knowledge-base";
-import { OptimizeCode } from "./events/optimize";
-import { RefactorCode } from "./events/refactor";
-import { ReviewCode } from "./events/review";
-import { CodeActionsProvider } from "./providers/code-actions-provider";
-import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
-import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
-import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
-import { getConfigValue } from "./utils";
-import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
-import { Brain } from "./services/memory";
-import { InLineChat } from "./events/inline-chat";
+} from "./application/constant";
+import { Comments } from "./commands/comment";
+import { ExplainCode } from "./commands/explain";
+import { FixError } from "./commands/fixError";
+import { CodeChartGenerator } from "./commands/generate-code-chart";
+import { GenerateCommitMessage } from "./commands/generate-commit-message";
+import { GenerateUnitTest } from "./commands/generate-unit-test";
+import { InLineChat } from "./commands/inline-chat";
+import { InterviewMe } from "./commands/interview-me";
+import { ReadFromKnowledgeBase } from "./commands/knowledge-base";
+import { OptimizeCode } from "./commands/optimize";
+import { RefactorCode } from "./commands/refactor";
+import { ReviewCode } from "./commands/review";
+import { dbManager } from "./infrastructure/repository/data-base-manager";
+import { AnthropicWebViewProvider } from "./providers/anthropic";
+import { CodeActionsProvider } from "./providers/code-actions";
+import { GeminiWebViewProvider } from "./providers/gemini";
+import { GroqWebViewProvider } from "./providers/groq";
+import { CodeIndexingService } from "./services/code-indexing";
+import { FileUploader } from "./services/file-uploader";
+import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
+import { getConfigValue } from "./utils/utils";
+import { Memory } from "./memory/base";
+import { EventEmitter } from "./emitter/agent-emitter";
 
 const {
   geminiKey,
@@ -38,9 +40,35 @@ const {
   grokModel,
 } = APP_CONFIG;
 
+const connectDB = async () => {
+  await dbManager.connect(
+    "file:/Users/olasunkanmi/Documents/Github/codebuddy/patterns/dev.db",
+  );
+};
+
+let quickFixCodeAction: vscode.Disposable;
+let agentEventEmmitter: EventEmitter;
+
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    Brain.getInstance();
+    Memory.getInstance();
+    await connectDB();
+    // const x = CodeRepository.getInstance();
+    // const apiKey = getGeminiAPIKey();
+    // const embeddingService = new EmbeddingService(apiKey);
+    // const embedding = await embeddingService.generateEmbedding("is jwt web token used withnin this app ?");
+    // const y = await x.searchSimilarFunctions(embedding, 2);
+    // console.log(y);
+    const fileUpload = new FileUploader(context);
+    // await fileUpload.createFile("allx.db");
+
+    // const files = await fileUpload.getFiles();
+    // const names = await fileUpload.getFileNames();
+    // console.log(files, names);
+
+    const index = CodeIndexingService.createInstance();
+    const result = index.buildFunctionStructureMap();
+    console.log(result);
     const {
       comment,
       review,
@@ -84,7 +112,7 @@ export async function activate(context: vscode.ExtensionContext) {
       `${USER_MESSAGE} creates the code chart...`,
       context,
     );
-    const codePattern = new FileUploader(context);
+    const codePattern = fileUpload;
     const knowledgeBase = new ReadFromKnowledgeBase(
       `${USER_MESSAGE} generate your code pattern...`,
       context,
@@ -119,7 +147,7 @@ export async function activate(context: vscode.ExtensionContext) {
       [explain]: () => explainCode.execute(),
       [pattern]: () => codePattern.uploadFileHandler(),
       [knowledge]: () => knowledgeBase.execute(),
-      [commitMessage]: () => generateCommitMessage.execute("hello"),
+      [commitMessage]: () => generateCommitMessage.execute("commitMessage"),
       [generateCodeChart]: () => codeChartGenerator.execute(),
       [inlineChat]: () => getInLineChat.execute(),
     };
@@ -131,64 +159,56 @@ export async function activate(context: vscode.ExtensionContext) {
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
 
     const quickFix = new CodeActionsProvider();
-    const quickFixCodeAction: vscode.Disposable =
-      vscode.languages.registerCodeActionsProvider(
-        { scheme: "file", language: "*" },
-        quickFix,
-      );
+    quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
+      { scheme: "file", language: "*" },
+      quickFix,
+    );
+
+    agentEventEmmitter = new EventEmitter();
 
     const modelConfigurations: {
       [key: string]: {
         key: string;
         model: string;
         webviewProviderClass: any;
-        subscriptions: vscode.Disposable[];
-        quickFixCodeAction: vscode.Disposable;
       };
     } = {
       [generativeAiModels.GEMINI]: {
         key: geminiKey,
         model: geminiModel,
         webviewProviderClass: GeminiWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
       [generativeAiModels.GROQ]: {
         key: groqApiKey,
         model: groqModel,
         webviewProviderClass: GroqWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
       [generativeAiModels.ANTHROPIC]: {
         key: anthropicApiKey,
         model: anthropicModel,
         webviewProviderClass: AnthropicWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
       [generativeAiModels.GROK]: {
         key: grokApiKey,
         model: grokModel,
         webviewProviderClass: AnthropicWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
     };
     if (selectedGenerativeAiModel in modelConfigurations) {
       const modelConfig = modelConfigurations[selectedGenerativeAiModel];
       const { key, model, webviewProviderClass } = modelConfig;
-      setUpGenerativeAiModel(
+      initializeGenerativeAiEnvironment(
         context,
         model,
         key,
         webviewProviderClass,
         subscriptions,
         quickFixCodeAction,
+        agentEventEmmitter,
       );
     }
   } catch (error) {
-    Brain.clear();
+    Memory.clear();
     vscode.window.showErrorMessage(
       "An Error occured while setting up generative AI model",
     );
@@ -197,6 +217,7 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate(context: vscode.ExtensionContext) {
-  //TODO once the application is rewritten in React, delete the pattern file on deactivate
+  quickFixCodeAction.dispose();
+  agentEventEmmitter.dispose();
   context.subscriptions.forEach((subscription) => subscription.dispose());
 }
