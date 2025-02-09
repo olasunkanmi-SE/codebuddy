@@ -3,23 +3,24 @@ import { ContextRetriever } from "../services/context-retriever";
 import { CodeBuddyTool } from "../tools/base";
 import { TOOL_CONFIGS } from "../tools/database/search-tool";
 
-type Retriever = Pick<ContextRetriever, "retrieveContext">;
-
 export class ToolFactory {
   private readonly tools: Map<string, IToolConfig> = new Map();
-  constructor(private readonly contextRetriever: Retriever) {
+  private readonly contextRetriever: ContextRetriever;
+  constructor() {
+    this.contextRetriever = ContextRetriever.initialize();
     for (const [name, { tool, useContextRetriever }] of Object.entries(
       TOOL_CONFIGS,
     )) {
+      const toolConfig = tool.prototype.config();
       this.register({
-        ...tool.prototype.config,
+        ...toolConfig,
         name,
         createInstance: useContextRetriever
           ? (_, contextRetriever) => {
               if (!contextRetriever) {
                 throw new Error(`Context retriever is needed for ${name}`);
               }
-              return new tool(contextRetriever);
+              return new tool(this.contextRetriever);
             }
           : () => new tool(),
       });
@@ -31,9 +32,11 @@ export class ToolFactory {
   }
 
   getInstances(): CodeBuddyTool[] {
-    return Array.from(Object.values(this.tools)).map((tool) =>
+    const y = this.tools.entries();
+    const x = Array.from(y).map(([_, tool]) =>
       tool.createInstance(tool, this.contextRetriever),
     );
+    return x;
   }
 }
 
@@ -42,15 +45,13 @@ export class CodeBuddyToolProvider {
 
   private static instance: CodeBuddyToolProvider | undefined;
 
-  private constructor(contextRetriever: Retriever) {
-    this.factory = new ToolFactory(contextRetriever);
+  private constructor() {
+    this.factory = new ToolFactory();
   }
 
-  public static initialize(contextRetriever: Retriever) {
+  public static initialize() {
     if (!CodeBuddyToolProvider.instance) {
-      CodeBuddyToolProvider.instance = new CodeBuddyToolProvider(
-        contextRetriever,
-      );
+      CodeBuddyToolProvider.instance = new CodeBuddyToolProvider();
     }
   }
 

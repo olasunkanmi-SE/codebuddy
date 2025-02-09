@@ -28,8 +28,5 @@ export interface ICodeBuddyToolConfig {
 }
 
 export interface IToolConfig extends ICodeBuddyToolConfig {
-  createInstance: (
-    config: ICodeBuddyToolConfig,
-    retriever?: any,
-  ) => CodeBuddyTool;
+  createInstance: (config: ICodeBuddyToolConfig, retriever?: any) => any;
 }

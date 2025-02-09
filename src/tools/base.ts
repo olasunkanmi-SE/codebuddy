@@ -1,7 +1,7 @@
-import { ICodeBuddyToolConfig } from "../application/interfaces/agent.interface";
-
 export abstract class CodeBuddyTool {
-  constructor(public readonly config: ICodeBuddyToolConfig) {}
+  constructor() {}
 
   abstract execute(query: string): any;
+
+  abstract config(): any;
 }

@@ -52,7 +52,7 @@ let agentEventEmmitter: EventEmitter;
 export async function activate(context: vscode.ExtensionContext) {
   try {
     Memory.getInstance();
-    // await connectDB();
+    await connectDB();
     // const x = CodeRepository.getInstance();
     // const apiKey = getGeminiAPIKey();
     // const embeddingService = new EmbeddingService(apiKey);
