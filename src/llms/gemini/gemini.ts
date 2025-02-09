@@ -5,17 +5,16 @@ import {
   GenerateContentResult,
   GenerativeModel,
   GoogleGenerativeAI,
-  Tool,
 } from "@google/generative-ai";
 import * as vscode from "vscode";
 import { Orchestrator } from "../../agents/orchestrator";
-import { ProcessInputResult } from "../../application/interfaces/agent.interface";
+import { COMMON } from "../../application/constant";
+import { Memory } from "../../memory/base";
+import { CodeBuddyToolProvider } from "../../providers/tool";
 import { createPrompt } from "../../utils/prompt";
 import { BaseLLM } from "../base";
 import { GeminiModelResponseType, ILlmConfig } from "../interface";
 import { IMessageInput, Message } from "../message";
-import { Memory } from "../../memory/base";
-import { COMMON } from "../../application/constant";
 
 export class GeminiLLM
   extends BaseLLM<GeminiModelResponseType>
@@ -33,6 +32,7 @@ export class GeminiLLM
     this.generativeAi = new GoogleGenerativeAI(this.config.apiKey);
     this.response = undefined;
     this.orchestrator = Orchestrator.getInstance();
+    CodeBuddyToolProvider.initialize();
   }
 
   static getInstance(config: ILlmConfig) {
@@ -85,15 +85,13 @@ export class GeminiLLM
     }
   }
 
-  async generateContent(
-    userInput: string,
-  ): Promise<Partial<ProcessInputResult>> {
+  async generateContent(userInput: string): Promise<any> {
     try {
       await this.buildChatHistory(userInput);
       const prompt = createPrompt(userInput);
       const contents = Memory.get(COMMON.GEMINI_CHAT_HISTORY);
-      const tools: Tool[] = [];
-      const model = this.getModel({ tools, systemInstruction: prompt });
+      const tools: any = this.getTools();
+      const model = this.getModel({ systemInstruction: prompt, tools });
       const generateContentResponse: GenerateContentResult =
         await model.generateContent({
           contents,
@@ -103,18 +101,12 @@ export class GeminiLLM
         });
       this.response = generateContentResponse;
       const { text, usageMetadata } = generateContentResponse.response;
-      const parsedResponse = this.orchestrator.parseResponse(text());
-      const extractedQueries = parsedResponse.queries;
-      const extractedThought = parsedResponse.thought;
       const tokenCount = usageMetadata?.totalTokenCount ?? 0;
-      const result = {
-        queries: extractedQueries,
-        tokens: tokenCount,
-        prompt: userInput,
-        thought: extractedThought,
-      };
-      this.orchestrator.publish("onQuery", JSON.stringify(result));
-      return result;
+      this.orchestrator.publish(
+        "onQuery",
+        JSON.stringify("making function call"),
+      );
+      return this.response;
     } catch (error: any) {
       this.orchestrator.publish("onError", error);
       vscode.window.showErrorMessage("Error processing user query");
@@ -167,6 +159,13 @@ export class GeminiLLM
       );
     }
     Memory.set(COMMON.GEMINI_CHAT_HISTORY, chatHistory);
+  }
+
+  getTools() {
+    const tools = CodeBuddyToolProvider.getTools();
+    return {
+      functionDeclarations: tools.map((t) => t.config()),
+    };
   }
 
   public createSnapShot(data?: any): GeminiModelResponseType {

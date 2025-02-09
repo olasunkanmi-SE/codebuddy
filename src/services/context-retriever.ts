@@ -9,11 +9,19 @@ export class ContextRetriever {
   private readonly embeddingService: EmbeddingService;
   private static readonly SEARCH_RESULT_COUNT = 2;
   private readonly logger: Logger;
+  private static instance: ContextRetriever;
   constructor() {
     this.codeRepository = CodeRepository.getInstance();
     const geminiApiKey = getGeminiAPIKey();
     this.embeddingService = new EmbeddingService(geminiApiKey);
     this.logger = new Logger("ContextRetriever");
+  }
+
+  static initialize() {
+    if (!ContextRetriever.instance) {
+      ContextRetriever.instance = new ContextRetriever();
+    }
+    return ContextRetriever.instance;
   }
 
   async retrieveContext(input: string): Promise<Row[] | undefined> {

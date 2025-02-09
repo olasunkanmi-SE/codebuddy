@@ -1,15 +1,15 @@
-import { ContextRetriever } from "../../services/context-retriever";
-import { CodeBuddyTool } from "../base";
 import { SchemaType } from "@google/generative-ai";
+import { ContextRetriever } from "../../services/context-retriever";
 
-class SearchTool extends CodeBuddyTool {
-  constructor(
-    private readonly contextRetriever?: Pick<
-      ContextRetriever,
-      "retrieveContext"
-    >,
-  ) {
-    super({
+class SearchTool {
+  constructor(private readonly contextRetriever?: ContextRetriever) {}
+
+  public async execute(query: string) {
+    return await this.contextRetriever?.retrieveContext(query);
+  }
+
+  config() {
+    return {
       name: "search_vector_db",
       description:
         "Perform a similarity search in the vector database based on user input",
@@ -25,11 +25,7 @@ class SearchTool extends CodeBuddyTool {
         example: ["How was authentication implemented within this codebase"],
         required: ["query"],
       },
-    });
-  }
-
-  public async execute(query: string) {
-    return await this.contextRetriever?.retrieveContext(query);
+    };
   }
 }
 
