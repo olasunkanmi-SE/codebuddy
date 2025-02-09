@@ -8,9 +8,7 @@ export class ToolFactory {
   private readonly contextRetriever: ContextRetriever;
   constructor() {
     this.contextRetriever = ContextRetriever.initialize();
-    for (const [name, { tool, useContextRetriever }] of Object.entries(
-      TOOL_CONFIGS,
-    )) {
+    for (const [name, { tool, useContextRetriever }] of Object.entries(TOOL_CONFIGS)) {
       const toolConfig = tool.prototype.config();
       this.register({
         ...toolConfig,
@@ -32,11 +30,7 @@ export class ToolFactory {
   }
 
   getInstances(): CodeBuddyTool[] {
-    const y = this.tools.entries();
-    const x = Array.from(y).map(([_, tool]) =>
-      tool.createInstance(tool, this.contextRetriever),
-    );
-    return x;
+    return Array.from(this.tools.values()).map((tool) => tool.createInstance(tool, this.contextRetriever));
   }
 }
 
