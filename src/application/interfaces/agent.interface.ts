@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel } from "@google/generative-ai";
 import Groq from "groq-sdk";
-import { CodeBuddyTool } from "../../tools/base";
 
 export interface ProcessInputResult {
   queries: string[];
@@ -29,4 +28,15 @@ export interface ICodeBuddyToolConfig {
 
 export interface IToolConfig extends ICodeBuddyToolConfig {
   createInstance: (config: ICodeBuddyToolConfig, retriever?: any) => any;
+}
+
+export interface IFileToolConfig {
+  class_name: string;
+  function_name: string;
+  file_path: string;
+}
+
+export interface IFileToolResponse {
+  function: string;
+  content: string;
 }

@@ -16,12 +16,12 @@ import {
 } from "../application/interfaces";
 import { ITypeScriptCodeMapper } from "../application/interfaces/ts.code.mapper.interface";
 import { handleError } from "../utils/utils";
-import { FileSystemService } from "./file-system";
+import { FileService } from "./file-system";
 
 export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private program: ts.Program | undefined;
   private typeChecker: ts.TypeChecker | undefined;
-  private fsService: FileSystemService | undefined;
+  private fsService: FileService | undefined;
   private static instance: TypeScriptAtsMapper;
   constructor() {
     if (!this.fsService) {
@@ -42,7 +42,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   }
 
   fileSysService() {
-    return (this.fsService = new FileSystemService());
+    return (this.fsService = new FileService());
   }
 
   /**
@@ -54,7 +54,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private async initializeTypescriptProgram(): Promise<void> {
     try {
       if (!this.fsService) {
-        this.fsService = new FileSystemService();
+        this.fsService = new FileService();
       }
       const fileContent = await this.fsService?.readFile(FSPROPS.TSCONFIG_FILE);
       if (!fileContent) {

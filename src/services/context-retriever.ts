@@ -3,10 +3,17 @@ import { CodeRepository } from "../infrastructure/repository/code";
 import { getGeminiAPIKey } from "../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { Logger } from "../infrastructure/logger/logger";
+import { FileService } from "./file-system";
+import {
+  IFileToolConfig,
+  IFileToolResponse,
+} from "../application/interfaces/agent.interface";
+import * as vscode from "vscode";
 
 export class ContextRetriever {
   private readonly codeRepository: CodeRepository;
   private readonly embeddingService: EmbeddingService;
+  private readonly fileService: FileService;
   private static readonly SEARCH_RESULT_COUNT = 2;
   private readonly logger: Logger;
   private static instance: ContextRetriever;
@@ -15,6 +22,7 @@ export class ContextRetriever {
     const geminiApiKey = getGeminiAPIKey();
     this.embeddingService = new EmbeddingService(geminiApiKey);
     this.logger = new Logger("ContextRetriever");
+    this.fileService = new FileService();
   }
 
   static initialize() {
@@ -34,6 +42,28 @@ export class ContextRetriever {
       );
     } catch (error) {
       this.logger.error("Unable to retrieve context", error);
+      throw error;
+    }
+  }
+
+  async readFiles(
+    fileConfigs: IFileToolConfig[],
+  ): Promise<IFileToolResponse[]> {
+    const filecontentsPromises = fileConfigs.map(async (file) => ({
+      function: file.function_name,
+      content: await this.readFileContent(file.file_path ?? ""),
+    }));
+    const fileContents = await Promise.all(filecontentsPromises);
+    return fileContents;
+  }
+
+  async readFileContent(filePath: string): Promise<string> {
+    try {
+      const uri = vscode.Uri.file(filePath);
+      const fileContent = await vscode.workspace.fs.readFile(uri);
+      return Buffer.from(fileContent).toString("utf-8");
+    } catch (error) {
+      console.error("Error reading file:", error);
       throw error;
     }
   }
