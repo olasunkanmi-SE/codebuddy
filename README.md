@@ -12,17 +12,16 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 
 
 ## Roadmap
-- [ ] Local codebase indexing. Perform retrieval-augmented generation (RAG) on the codebase.
-- [ ] Code search. Search code across the entire codebase
+- [ ] Codebase Understanding: Comprehensive local codebase indexing with Retrieval-Augmented Generation (RAG) capabilities.
+- [ ] Code search: Search code across the entire codebase
 - [ ] Rewrite the Webview UI with React
-- [ ] Context Pinning. Pin directories, and files, (functions, classes, etc.) as persistent context. AI Models to reference these items for every suggestion, across Chat and Commands.
-- [ ] Persistent Context. By configuring the context, an AI model can use a certain context throughout and across different conversations.
-- [ ] Create Code base Documentation.
-- [ ] Orchestration. Coordinate AI model activities with Agent capabilities, through tools and function calling.
-- [ ] Reactive AI agent with reasoning capabilities.
+- [ ] Incorporate AI agents for seamless interaction with external resources and APIs.
+- [ ] Context Pinning: Allow users to pin specific directories, files, and code elements (functions, classes, etc.) as persistent context for AI models.
+- [ ] Automated Documentation Generation: Generate comprehensive and up-to-date codebase documentation.
+- [ ] Intelligent Orchestration: Orchestrate AI model activities with agent capabilities through advanced tools and function calling for complex tasks.
 - [ ] Access to real-time data.
 - [ ] Support for local LLMs such as Ollama
-- [ ] Support for deepseek model
+- [ ] Support for Deepseek model
 
 ## Repository Structure
 
