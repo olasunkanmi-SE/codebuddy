@@ -119,12 +119,6 @@ When a user interacts with CodeBuddy, the following data flow occurs:
 5. Response Processing: The provider receives and processes the AI service's response.
 6. User Interface Update: The processed response is relayed back to the user interface, updating either the code editor or the chat panel.
 
-```
-[User Input] -> [Extension] -> [Event Handler] -> [AI Provider] -> [AI API]
-                                                                      |
-[User Interface] <- [Extension] <- [Event Handler] <- [AI Provider] <-'
-```
-
 Note: The chat history and other session data are managed by the `ChatManager` service to maintain context across interactions.
 
 ## Deployment
