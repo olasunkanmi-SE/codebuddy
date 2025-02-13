@@ -18,7 +18,7 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - [ ] Incorporate AI agents for seamless interaction with external resources and APIs.
 - [ ] Context Pinning: Allow users to pin specific directories, files, and code elements (functions, classes, etc.) as persistent context for AI models.
 - [ ] Automated Documentation Generation: Generate comprehensive and up-to-date codebase documentation.
-- [ ] Intelligent Orchestration: Orchestrate AI model activities with agent capabilities through advanced tools and function calling for complex tasks.
+- [ ] Intelligent Orchestration: Orchestrate ReAct models activities through advanced tools and function calling.
 - [ ] Access to real-time data.
 - [ ] Support for local LLMs such as Ollama
 - [ ] Support for Deepseek model
