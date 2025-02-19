@@ -4,7 +4,7 @@ import { IWorkspaceInfo } from "../application/interfaces";
 import { handleError } from "../utils/utils";
 import { Logger } from "../infrastructure/logger/logger";
 
-export class FileSystemService {
+export class FileService {
   readonly logger: Logger;
   constructor() {
     this.logger = new Logger("FileSystemService");

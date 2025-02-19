@@ -1,5 +1,6 @@
 import { SchemaType } from "@google/generative-ai";
 import { ContextRetriever } from "../../services/context-retriever";
+import { IFileToolConfig } from "../../application/interfaces/agent.interface";
 
 class SearchTool {
   constructor(private readonly contextRetriever?: ContextRetriever) {}
@@ -29,6 +30,53 @@ class SearchTool {
   }
 }
 
+export class FileTool {
+  constructor(private readonly contextRetriever?: ContextRetriever) {}
+
+  public async execute(fileConfigs: IFileToolConfig[]) {
+    return await this.contextRetriever?.readFiles(fileConfigs);
+  }
+  config() {
+    return {
+      name: "analyze_files_for_question",
+      description:
+        "Analyze the contents of specified files to determine which best answers a given question",
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          files: {
+            type: SchemaType.ARRAY,
+            description: SchemaType.STRING,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                class_name: {
+                  type: SchemaType.STRING,
+                  description:
+                    "The class containing the function that may be responsible for the user query.",
+                },
+                function_name: {
+                  type: SchemaType.STRING,
+                  description:
+                    "The function that may be responsible for the user query",
+                },
+                file_path: {
+                  type: SchemaType.STRING,
+                  description:
+                    "The file path to the class that contains the function,",
+                },
+              },
+              required: ["class_name", "function_name", "file_path"],
+            },
+          },
+        },
+        required: ["files"],
+      },
+    };
+  }
+}
+
 export const TOOL_CONFIGS = {
   SearchTool: { tool: SearchTool, useContextRetriever: true },
+  FileTool: { tool: FileTool, useContextRetriever: true },
 };

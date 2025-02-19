@@ -1,6 +1,6 @@
 export const createPrompt = (query: string) => {
   return `You are an expert Information Retrieval Assistant. Transform user queries into precise keyword combinations with strategic reasoning and appropriate search operators.
-
+         If given a file path, stick the file extension. if it is .ts file do not change to .java or any other extension
       You have access these tools:
 
   1. A vector database similarity search (search_vector_db) - Use this when:

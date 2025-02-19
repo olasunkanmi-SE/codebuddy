@@ -17,17 +17,17 @@ import { ReadFromKnowledgeBase } from "./commands/knowledge-base";
 import { OptimizeCode } from "./commands/optimize";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
+import { EventEmitter } from "./emitter/agent-emitter";
 import { dbManager } from "./infrastructure/repository/data-base-manager";
+import { Memory } from "./memory/base";
 import { AnthropicWebViewProvider } from "./providers/anthropic";
 import { CodeActionsProvider } from "./providers/code-actions";
 import { GeminiWebViewProvider } from "./providers/gemini";
 import { GroqWebViewProvider } from "./providers/groq";
-import { CodeIndexingService } from "./services/code-indexing";
 import { FileUploader } from "./services/file-uploader";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
+import { Credentials } from "./services/github-authentication";
 import { getConfigValue } from "./utils/utils";
-import { Memory } from "./memory/base";
-import { EventEmitter } from "./emitter/agent-emitter";
 
 const {
   geminiKey,
@@ -51,6 +51,13 @@ let agentEventEmmitter: EventEmitter;
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    const credentials = new Credentials();
+    await credentials.initialize(context);
+    const session: vscode.AuthenticationSession | undefined =
+      await credentials.getSession();
+    vscode.window.showInformationMessage(
+      `Logged into GitHub as ${session?.account.label}`,
+    );
     Memory.getInstance();
     await connectDB();
     // const x = CodeRepository.getInstance();
@@ -66,9 +73,9 @@ export async function activate(context: vscode.ExtensionContext) {
     // const names = await fileUpload.getFileNames();
     // console.log(files, names);
 
-    const index = CodeIndexingService.createInstance();
-    const result = index.buildFunctionStructureMap();
-    console.log(result);
+    // const index = CodeIndexingService.createInstance();
+    // const result = index.buildFunctionStructureMap();
+    // console.log(result);
     const {
       comment,
       review,
@@ -132,24 +139,25 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     const actionMap = {
-      [comment]: () => getComment.execute(),
-      [review]: () => generateReview.execute(),
-      [refactor]: () => generateRefactoredCode.execute(),
-      [optimize]: () => generateOptimizeCode.execute(),
-      [interviewMe]: () => generateInterviewQuestions.execute(),
-      [generateUnitTest]: () => generateUnitTests.execute(),
+      [comment]: async () => await getComment.execute(),
+      [review]: async () => await generateReview.execute(),
+      [refactor]: async () => await generateRefactoredCode.execute(),
+      [optimize]: async () => await generateOptimizeCode.execute(),
+      [interviewMe]: async () => await generateInterviewQuestions.execute(),
+      [generateUnitTest]: async () => await generateUnitTests.execute(),
       [fix]: (errorMessage: string) =>
         new FixError(
           `${USER_MESSAGE} finds a solution to the error...`,
           context,
           errorMessage,
         ).execute(errorMessage),
-      [explain]: () => explainCode.execute(),
-      [pattern]: () => codePattern.uploadFileHandler(),
-      [knowledge]: () => knowledgeBase.execute(),
-      [commitMessage]: () => generateCommitMessage.execute("commitMessage"),
-      [generateCodeChart]: () => codeChartGenerator.execute(),
-      [inlineChat]: () => getInLineChat.execute(),
+      [explain]: async () => await explainCode.execute(),
+      [pattern]: async () => await codePattern.uploadFileHandler(),
+      [knowledge]: async () => await knowledgeBase.execute(),
+      [commitMessage]: async () =>
+        await generateCommitMessage.execute("commitMessage"),
+      [generateCodeChart]: async () => await codeChartGenerator.execute(),
+      [inlineChat]: async () => await getInLineChat.execute(),
     };
 
     const subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(

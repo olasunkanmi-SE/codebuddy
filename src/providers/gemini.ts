@@ -72,7 +72,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     try {
       if (metaData) {
         this.orchestrator.publish("onThinking", "...thinking");
-        await this.gemini.generateContent(JSON.stringify(message));
+        await this.gemini.run(JSON.stringify(message));
         return;
       }
       const userMessage = Message.of({

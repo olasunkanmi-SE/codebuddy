@@ -19,7 +19,7 @@ interface MessageInput {
   parts?: Part[];
 }
 
-type MessageOutput = { role: Role; content?: string; parts?: Part[] };
+export type MessageOutput = { role: Role; content?: string; parts?: Part[] };
 
 export class Message {
   readonly role: Role;

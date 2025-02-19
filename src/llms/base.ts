@@ -14,7 +14,7 @@ export abstract class BaseLLM<T extends Record<string, any>>
 
   abstract generateEmbeddings(text: string): Promise<number[]>;
 
-  abstract generateText(prompt: string): Promise<string>;
+  abstract generateText(prompt: string, instruction?: string): Promise<string>;
 
   abstract createSnapShot(): T;
 
