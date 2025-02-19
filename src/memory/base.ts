@@ -61,9 +61,9 @@ export class Memory {
     Object.assign(this, snapShot);
   }
 
-  static removeItems(key: string) {
+  static removeItems(key: string, count: number = 3) {
     let content = Memory.get(key);
-    if (Array.isArray(content) && content?.length > 3) {
+    if (Array.isArray(content) && content?.length > count) {
       content = content.slice(-Memory.MAX_MEMORY_ITEMS);
     }
     return content;

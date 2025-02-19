@@ -21,6 +21,7 @@ export enum COMMON {
   ANTHROPIC_CHAT_HISTORY = "anthropicChatHistory",
   USER_INPUT = "user-input",
   BOT = "bot",
+  GEMINI_SNAPSHOT = "GeminiSnapshot",
 }
 
 export const GROQ_CONFIG = {

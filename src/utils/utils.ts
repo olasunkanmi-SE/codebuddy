@@ -98,6 +98,10 @@ export const handleError = (error: unknown, message?: string): void => {
   vscode.window.showErrorMessage(`${message}, ${errorMessage}`);
 };
 
+export const handleWarning = (message?: string, args?: string): void => {
+  vscode.window.showWarningMessage(`${message}, ${args}`);
+};
+
 export const showInfoMessage = (message?: string): void => {
   vscode.window.showInformationMessage(`${message}`);
 };

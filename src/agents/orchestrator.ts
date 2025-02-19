@@ -32,7 +32,7 @@ export class Orchestrator extends BaseAiAgent implements vscode.Disposable {
   }
 
   public handleError(event: IEventPayload) {
-    console.error(`Error: ${event.message}`);
+    console.log(`Error: ${event.message}`);
   }
 
   public dispose(): void {

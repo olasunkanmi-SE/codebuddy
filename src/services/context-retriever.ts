@@ -49,11 +49,17 @@ export class ContextRetriever {
   async readFiles(
     fileConfigs: IFileToolConfig[],
   ): Promise<IFileToolResponse[]> {
-    const filecontentsPromises = fileConfigs.map(async (file) => ({
-      function: file.function_name,
-      content: await this.readFileContent(file.file_path ?? ""),
-    }));
-    const fileContents = await Promise.all(filecontentsPromises);
+    const files = fileConfigs.flatMap((file) => file);
+    const fileContents: IFileToolResponse[] = [];
+    for (const file of files) {
+      const content = await this.readFileContent(file.file_path ?? "");
+      if (content) {
+        fileContents.push({
+          function: file.function_name,
+          content: content,
+        });
+      }
+    }
     return fileContents;
   }
 

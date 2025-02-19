@@ -9,7 +9,11 @@ export class Credentials {
   }
 
   async getSession(): Promise<vscode.AuthenticationSession | undefined> {
-    const session = await vscode.authentication.getSession(GITHUB_AUTH_PROVIDER_ID, SCOPES, { createIfNone: false });
+    const session = await vscode.authentication.getSession(
+      GITHUB_AUTH_PROVIDER_ID,
+      SCOPES,
+      { createIfNone: false },
+    );
     return session;
   }
 
@@ -19,7 +23,7 @@ export class Credentials {
         if (e.provider.id === GITHUB_AUTH_PROVIDER_ID) {
           await this.getSession();
         }
-      })
+      }),
     );
   }
 }
