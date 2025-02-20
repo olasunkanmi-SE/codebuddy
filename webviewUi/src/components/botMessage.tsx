@@ -1,24 +1,18 @@
-import hljs from "highlight.js";
-// import "highlight.js/styles/tokyo-night-dark.min.css";
-import React, { useEffect, useRef } from "react";
+import DOMPurify from "dompurify";
+import React from "react";
 
 interface CodeBlockProps {
   language?: string;
   content: string;
+  isLoading?: boolean;
 }
 
 export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
-  const codeRef = useRef<HTMLPreElement>(null);
-
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
   };
 
-  useEffect(() => {
-    if (codeRef.current) {
-      hljs.highlightBlock(codeRef.current);
-    }
-  }, [content, language]);
+  const sanitizedContent = DOMPurify.sanitize(content);
 
   return (
     <div className="code-block">
@@ -28,12 +22,7 @@ export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
           <span className="copy-icon">⎘</span> Copy
         </button>
       </div>
-      <pre ref={codeRef} className="code-content">
-        <code
-          className="language-typescript"
-          dangerouslySetInnerHTML={{ __html: content }}
-        />
-      </pre>
+      <div className="doc-content" dangerouslySetInnerHTML={{ __html: sanitizedContent }} />
     </div>
   );
 };

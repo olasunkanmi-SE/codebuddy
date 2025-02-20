@@ -21,7 +21,7 @@
   width: 100%;
   padding: 20px;
   box-sizing: border-box;
-  width: 100%;
+  max-width: 650px;
   display: flex;
   flex-direction: column;
   border-radius: 10px;
@@ -32,14 +32,16 @@
   margin-top: 30px;
 }
 
-.business{
+.business {
   height: 30%;
 }
 
 .dropdown-container {
-  width: 100%;
-  height: 70%;
+  height: 650px;
   overflow-y: scroll;
+  padding: 10px;
+  max-width: 100%;
+  font-size: 14px;
 }
 
 .textarea-container {
@@ -61,6 +63,7 @@ a {
   color: #646cff;
   text-decoration: inherit;
 }
+
 a:hover {
   color: #535bf2;
 }
@@ -81,9 +84,11 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
 button:hover {
   border-color: #646cff;
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
@@ -94,9 +99,11 @@ button:focus-visible {
     color: #213547;
     background-color: #ffffff;
   }
+
   a:hover {
     color: #747bff;
   }
+
   button {
     background-color: #f9f9f9;
   }
@@ -119,7 +126,8 @@ vscode-dropdown {
   width: 100%;
   max-width: 300px;
   margin: 10px;
-  border: 1px solid var(--vscode-editor-background);;
+  border: 1px solid var(--vscode-editor-background);
+  ;
   background: var(--vscode-dropdown-background);
   color: var(--vscode-dropdown-foreground);
   border-radius: 4px;
@@ -257,7 +265,7 @@ vscode-button[disabled] {
 }
 
 /* Icon support if needed */
-vscode-button > .codicon {
+vscode-button>.codicon {
   margin-right: 6px;
 }
 
@@ -265,7 +273,7 @@ vscode-button > .codicon {
   display: flex;
   gap: 16px;
   padding: 20px;
-  
+
   background-color: var(--vscode-editor-background);
   border-radius: 8px;
   width: 100%;
@@ -360,4 +368,140 @@ vscode-button > .codicon {
 code {
   font-family: inherit;
   background-color: transparent;
+}
+
+.doc-content {
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-editor-foreground);
+  line-height: 1.6;
+  padding: 16px;
+  text-align: left;
+}
+
+/* Inline code styling (e.g., <code> within <p>) */
+.doc-content code {
+  background-color: var(--vscode-textCodeBlock-background, #2d2d2d);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  /* Light gray for readability */
+}
+
+/* Code block styling (e.g., <pre><code>) */
+.doc-content pre {
+  background-color: var(--vscode-textCodeBlock-background, #1E1E1E);
+  /* Dark background like VS Code */
+  padding: 16px;
+  border-radius: 6px;
+  margin: 12px 0;
+  overflow-x: auto;
+  /* Handle long lines */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  /* Subtle shadow */
+  border: 1px solid var(--vscode-editor-lineHighlightBorder, #2a2d2e);
+  /* Border for definition */
+  font-family: var(--vscode-editor-font-family, "Consolas", "Courier New", monospace);
+  /* Monospaced font */
+}
+
+.doc-content pre code {
+  background-color: transparent;
+  /* Remove inline code background within pre */
+  padding: 0;
+  /* Reset padding */
+  border-radius: 0;
+  /* Reset border-radius */
+  font-size: 0.95em;
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  /* Default text color (light gray) */
+  display: block;
+  /* Ensure proper block behavior */
+  white-space: pre-wrap;
+  /* Preserve whitespace and wrap long lines if needed */
+}
+
+/* Approximate syntax highlighting for TypeScript (CSS-only approximation) */
+.doc-content pre code[class*="language-typescript"] {
+  /* Default text color for identifiers/variables */
+  color: #d4d4d4;
+}
+
+/* Keywords (e.g., async, const, return, if) - Blue */
+.doc-content pre code[class*="language-typescript"] .keyword,
+.doc-content pre code[class*="language-typescript"] .keyword-operator {
+  color: #569cd6;
+  /* VS Code keyword color */
+}
+
+/* Strings (e.g., "I'm") - Cyan */
+.doc-content pre code[class*="language-typescript"] .string {
+  color: #ce9178;
+  /* VS Code string color */
+}
+
+/* Comments (if present) - Green */
+.doc-content pre code[class*="language-typescript"] .comment {
+  color: #6a9955;
+  /* VS Code comment color */
+}
+
+/* Punctuation (e.g., {}, (), ;) - Default or slightly lighter */
+.doc-content pre code[class*="language-typescript"] .punctuation {
+  color: #d4d4d4;
+  /* Match default text color */
+}
+
+/* Target specific keywords manually (limited due to CSS constraints) */
+.doc-content pre code[class*="language-typescript"] span:where(:not(.string, .comment)[class*="keyword"]) {
+  color: #569cd6;
+  /* Blue for keywords like async, const */
+}
+
+/* Fallback for dynamic keywords - Use classes or manual wrapping if possible */
+.doc-content pre code[class*="language-typescript"] span:where(:not(.string, .comment):contains("async")),
+.doc-content pre code[class*="language-typescript"] span:where(:not(.string, .comment):contains("const")),
+.doc-content pre code[class*="language-typescript"] span:where(:not(.string, .comment):contains("return")) {
+  color: #569cd6;
+  /* Blue for known keywords */
+}
+
+/* Strings - Use quotes to target */
+.doc-content pre code[class*="language-typescript"] span:where(:not(.keyword, .comment):contains('"')) {
+  color: #ce9178;
+  /* Cyan for strings */
+}
+
+/* Strong text styling */
+.doc-content strong {
+  color: var(--vscode-foreground, #d4d4d4);
+  font-weight: 600;
+}
+
+/* List styling */
+.doc-content ul,
+.doc-content ol {
+  padding-left: 24px;
+  margin: 12px 0;
+}
+
+.doc-content ul ul,
+.doc-content ol ol {
+  margin: 6px 0;
+}
+
+.doc-content li {
+  margin: 6px 0;
+}
+
+/* Paragraph styling */
+.doc-content p {
+  margin: 12px 0;
+}
+
+/* Ensure nested lists within paragraphs are styled correctly */
+.doc-content p ol,
+.doc-content p ul {
+  margin: 8px 0;
 }
