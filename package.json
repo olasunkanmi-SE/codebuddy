@@ -316,6 +316,7 @@
     "format": "prettier --write \"**/*.ts\""
   },
   "devDependencies": {
+    "@types/jsdom": "^21.1.7",
     "@types/markdown-it": "^13.0.7",
     "@types/mocha": "^10.0.1",
     "@types/node": "20.2.5",
@@ -335,11 +336,14 @@
     "@google/generative-ai": "^0.21.0",
     "@googleapis/customsearch": "^3.2.0",
     "@libsql/client": "^0.14.0",
+    "@mozilla/readability": "^0.4.1",
     "@types/node-fetch": "^2.6.11",
     "@xenova/transformers": "^2.17.2",
+    "axios": "^1.7.9",
     "dompurify": "^3.2.4",
     "dotenv": "^16.1.4",
     "groq-sdk": "^0.3.3",
+    "jsdom": "^26.0.0",
     "markdown-it": "^14.1.0",
     "node-fetch": "^3.3.2",
     "prettier": "^3.2.5",
