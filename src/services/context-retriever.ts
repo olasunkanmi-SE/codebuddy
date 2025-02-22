@@ -1,19 +1,17 @@
 import { Row } from "@libsql/client/.";
-import { CodeRepository } from "../infrastructure/repository/code";
-import { getGeminiAPIKey } from "../utils/utils";
-import { EmbeddingService } from "./embedding";
-import { Logger } from "../infrastructure/logger/logger";
-import { FileService } from "./file-system";
+import * as vscode from "vscode";
 import {
   IFileToolConfig,
   IFileToolResponse,
 } from "../application/interfaces/agent.interface";
-import * as vscode from "vscode";
+import { Logger } from "../infrastructure/logger/logger";
+import { CodeRepository } from "../infrastructure/repository/code";
+import { getGeminiAPIKey } from "../utils/utils";
+import { EmbeddingService } from "./embedding";
 
 export class ContextRetriever {
   private readonly codeRepository: CodeRepository;
   private readonly embeddingService: EmbeddingService;
-  private readonly fileService: FileService;
   private static readonly SEARCH_RESULT_COUNT = 2;
   private readonly logger: Logger;
   private static instance: ContextRetriever;
@@ -22,7 +20,6 @@ export class ContextRetriever {
     const geminiApiKey = getGeminiAPIKey();
     this.embeddingService = new EmbeddingService(geminiApiKey);
     this.logger = new Logger("ContextRetriever");
-    this.fileService = new FileService();
   }
 
   static initialize() {
@@ -50,17 +47,21 @@ export class ContextRetriever {
     fileConfigs: IFileToolConfig[],
   ): Promise<IFileToolResponse[]> {
     const files = fileConfigs.flatMap((file) => file);
-    const fileContents: IFileToolResponse[] = [];
-    for (const file of files) {
-      const content = await this.readFileContent(file.file_path ?? "");
-      if (content) {
-        fileContents.push({
-          function: file.function_name,
-          content: content,
-        });
+    const promises = files.map(async (file) => {
+      try {
+        if (file.file_path) {
+          const content = await this.readFileContent(file.file_path);
+          return { function: file.function_name, content: content };
+        }
+      } catch (error) {
+        this.logger.error(`Error reading file ${file.file_path}:`, error);
+        throw new Error(`Error reading file ${file.file_path}: ${error}`);
       }
-    }
-    return fileContents;
+    });
+    const results = await Promise.all(promises);
+    return results.filter(
+      (result): result is IFileToolResponse => result !== undefined,
+    );
   }
 
   async readFileContent(filePath: string): Promise<string> {
@@ -73,4 +74,6 @@ export class ContextRetriever {
       throw error;
     }
   }
+
+  async webSearch() {}
 }

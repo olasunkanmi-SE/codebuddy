@@ -28,6 +28,7 @@ import { FileUploader } from "./services/file-uploader";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { Credentials } from "./services/github-authentication";
 import { getConfigValue } from "./utils/utils";
+import { WebSearchService } from "./services/web-search-service";
 
 const {
   geminiKey,
@@ -60,6 +61,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     Memory.getInstance();
     await connectDB();
+    const web = WebSearchService.getInstance();
     // const x = CodeRepository.getInstance();
     // const apiKey = getGeminiAPIKey();
     // const embeddingService = new EmbeddingService(apiKey);

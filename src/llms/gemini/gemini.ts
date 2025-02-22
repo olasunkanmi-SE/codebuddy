@@ -285,6 +285,7 @@ export class GeminiLLM
       if (!finalResult) {
         throw new Error("No final result generated after function calls");
       }
+      // Should I clear the memory at this point or retry.
       const snapshot = Memory.get(COMMON.GEMINI_SNAPSHOT);
       if (snapshot?.length > 0) {
         Memory.removeItems(

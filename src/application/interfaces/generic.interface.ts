@@ -1,5 +1,6 @@
 import * as ts from "typescript";
 import * as vscode from "vscode";
+import * as https from "https";
 
 export interface IFunctionInfo {
   name: string;
@@ -141,4 +142,30 @@ export interface IMappedCode {
   functions?: IMappedFunction[];
   className?: string;
   dependencies?: string[];
+}
+
+export interface IRequestOptions {
+  hostname: string;
+  path: string;
+  method: string;
+  headers?: any;
+  jwtToken?: string;
+}
+
+export interface HttpRequestOptions extends https.RequestOptions {
+  timeout?: number;
+  headers?: Record<string, string>;
+}
+
+export interface SearchResult {
+  url: string;
+  title: string;
+  snippet: string;
+}
+
+export interface ExtractedContent {
+  title: string;
+  content: string;
+  url: string;
+  excerpt?: string;
 }
