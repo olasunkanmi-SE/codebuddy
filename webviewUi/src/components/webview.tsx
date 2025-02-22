@@ -33,7 +33,6 @@ export const WebviewUI = () => {
   const [selectedModel, setSelectedModel] = useState("");
   const [userInput, setUserInput] = useState("");
   const [messsages, setMessages] = useState<Message[]>();
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     console.log(selectedModel);
@@ -51,13 +50,12 @@ export const WebviewUI = () => {
               language: "Typescript",
             },
           ]);
-          setIsLoading(false);
+
           break;
         case "error":
           // TODO Handle Error, send a vscode.postMessage.
           // The extension can give a feed back with showinfoMessage
           console.error("Extension error", message.payload);
-          setIsLoading(false);
           break;
         case "modelUpdate":
           // TODO Handle Model update
@@ -101,8 +99,6 @@ export const WebviewUI = () => {
       },
     ]);
 
-    setIsLoading(true);
-
     vscode.postMessage({
       command: "user-input",
       message: userInput,
@@ -118,12 +114,12 @@ export const WebviewUI = () => {
         <div>
           {messsages?.map((msg, index) =>
             msg.type === "bot" ? (
-              <BotMessage key={index} language={msg.language} content={msg.content} />
+              <BotMessage key={index} content={msg.content} />
             ) : (
               <UserMessage key={index} message={msg.content} alias={msg.alias} />
             )
           )}
-          {isLoading && <div className="loading">Processing...</div>}
+          {/* {isLoading && <div className="loading">Processing...</div>} */}
         </div>
       </div>
       <div className="business">

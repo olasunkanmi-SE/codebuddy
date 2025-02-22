@@ -28,7 +28,7 @@ export class Orchestrator extends BaseAiAgent implements vscode.Disposable {
 
   public handlePromptGeneratedEvent(event: IEventPayload) {
     console.error(`Error: ${event.message})`);
-    this.publish("onResponse", JSON.stringify(event));
+    this.publish("onResponse", event.message);
   }
 
   public handleError(event: IEventPayload) {

@@ -160,6 +160,13 @@ export class GeminiLLM
     const complexityFactor = Math.min(1 + Math.floor(queryLength / 100), 3);
     return baseLimit * complexityFactor;
   }
+
+  private async handleTimeout<T>(promise: Promise<T>): Promise<T> {
+    const timeoutPromise = new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout Exceeded")), this.timeOutMs),
+    );
+    return Promise.race([promise, timeoutPromise]);
+  }
   async processUserQuery(
     userInput: string,
   ): Promise<string | GenerateContentResult | undefined> {
@@ -196,14 +203,6 @@ export class GeminiLLM
             promptFeedback,
           } = result.response;
           const tokenCount = usageMetadata?.totalTokenCount ?? 0;
-          this.orchestrator.publish(
-            "onQuery",
-            JSON.stringify({
-              status: "making function call",
-              callCount,
-              tokenCount,
-            }),
-          );
           const toolCalls = functionCalls ? functionCalls() : [];
           const currentCallSignatures = toolCalls
             ? toolCalls
@@ -219,10 +218,14 @@ export class GeminiLLM
               userQuery,
               "Rewrite the user query to more clearly and effectively express the user's underlying intent. The goal is to enable the system to retrieve and utilize the available tools more accurately. Identify the core information need and rephrase the query to highlight it. Consider what information the tools need to function optimally and ensure the query provides it.",
             );
-            console.log(regeneratedQuery);
+            this.orchestrator.publish(
+              "onQuery",
+              JSON.stringify(regeneratedQuery),
+            );
             let answer = await this.processUserQuery(regeneratedQuery);
             if (typeof answer === "string") {
               finalResult = answer;
+              this.orchestrator.publish("onQuery", JSON.stringify(answer));
             }
             break;
           }
@@ -270,7 +273,8 @@ export class GeminiLLM
             }
           } else {
             finalResult = text();
-            console.log(finalResult);
+            this.orchestrator.publish("onQuery", String(finalResult));
+            console.log();
             break;
           }
           if (callCount >= this.calculateDynamicCallLimit(userQuery)) {
