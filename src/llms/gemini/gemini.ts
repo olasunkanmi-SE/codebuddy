@@ -61,16 +61,6 @@ export class GeminiLLM
     return GeminiLLM.instance;
   }
 
-  private ensureModel(): GenerativeModel {
-    if (!this.model) {
-      this.model = this.getModel();
-      if (!this.model) {
-        throw new Error(`Model ${this.config.model} is not initialized`);
-      }
-    }
-    return this.model;
-  }
-
   public async generateEmbeddings(text: string): Promise<number[]> {
     try {
       const model: GenerativeModel = this.getModel();
@@ -161,12 +151,6 @@ export class GeminiLLM
     return baseLimit * complexityFactor;
   }
 
-  private async handleTimeout<T>(promise: Promise<T>): Promise<T> {
-    const timeoutPromise = new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout Exceeded")), this.timeOutMs),
-    );
-    return Promise.race([promise, timeoutPromise]);
-  }
   async processUserQuery(
     userInput: string,
   ): Promise<string | GenerateContentResult | undefined> {
@@ -296,7 +280,10 @@ export class GeminiLLM
 
       return finalResult;
     } catch (error: any) {
-      this.orchestrator.publish("onError", error);
+      this.orchestrator.publish(
+        "onError",
+        "Model not responding at this time, please try again",
+      );
       vscode.window.showErrorMessage("Error processing user query");
       this.logger.error(
         "Error generating, queries, thoughts from user query",

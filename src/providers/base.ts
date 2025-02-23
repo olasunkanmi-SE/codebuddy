@@ -27,7 +27,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.logger = new Logger("BaseWebViewProvider");
     this.disposables.push(
       this.orchestrator.onResponse(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onThinking(this.handleThinkingEvent.bind(this)),
+      this.orchestrator.onThinking(this.handleModelResponseEvent.bind(this)),
+      this.orchestrator.onUpdate(this.handleModelResponseEvent.bind(this)),
+      this.orchestrator.onError(this.handleModelResponseEvent.bind(this)),
     );
   }
 

@@ -3,6 +3,7 @@ import axios from "axios";
 import { JSDOM } from "jsdom";
 import { generateQuerySting, WEB_SEARCH_CONFIG } from "../application/constant";
 import { Logger } from "../infrastructure/logger/logger";
+import { Orchestrator } from "../agents/orchestrator";
 
 interface ArticleContent {
   url: string;
@@ -10,6 +11,7 @@ interface ArticleContent {
 }
 
 export class WebSearchService {
+  protected readonly orchestrator: Orchestrator;
   private static instance: WebSearchService;
   private readonly baseUrl = WEB_SEARCH_CONFIG.baseUrl;
   private readonly logger: Logger;
@@ -17,6 +19,7 @@ export class WebSearchService {
 
   private constructor(logger: Logger) {
     this.logger = logger;
+    this.orchestrator = Orchestrator.getInstance();
   }
 
   public static getInstance(): WebSearchService {
@@ -67,6 +70,9 @@ export class WebSearchService {
         .slice(0, 10);
 
       this.logger.info(`Extracted URLs: ${urls.join(", ")}`);
+      if (urls?.length) {
+        this.orchestrator.publish("onUpdate", urls.join("\n\n"));
+      }
       return urls;
     } catch (error: any) {
       this.logger.error(
@@ -77,7 +83,7 @@ export class WebSearchService {
     }
   }
 
-  public async execute(query: string): Promise<string> {
+  public async run(query: string): Promise<string> {
     if (!query || query.trim().length < 2) {
       return "Query too short or invalid.";
     }
@@ -92,7 +98,9 @@ export class WebSearchService {
         return `No web results found for "${query}" on Startpage.`;
       }
 
-      const contextPromises = urls.map((url) => this.fetchArticleContent(url));
+      const contextPromises = urls
+        .slice(0, 5)
+        .map((url) => this.fetchArticleContent(url));
       const contextResults = await Promise.all(contextPromises);
       const combinedContext = contextResults
         .map((result) => result.content)
@@ -104,8 +112,8 @@ export class WebSearchService {
 
       return combinedContext;
     } catch (error: any) {
-      this.logger.error(`Startpage search error: ${error.message}`, error);
-      return `Error searching Startpage: ${error.message}`;
+      this.logger.error(`search error: ${error.message}`, error);
+      return `Error searching the web: ${error.message}`;
     }
   }
 }
