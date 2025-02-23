@@ -1,6 +1,6 @@
 import { SchemaType } from "@google/generative-ai";
-import { ContextRetriever } from "../../services/context-retriever";
-import { IFileToolConfig } from "../../application/interfaces/agent.interface";
+import { ContextRetriever } from "../services/context-retriever";
+import { IFileToolConfig } from "../application/interfaces/agent.interface";
 
 class SearchTool {
   constructor(private readonly contextRetriever?: ContextRetriever) {}
@@ -24,6 +24,36 @@ class SearchTool {
           },
         },
         example: ["How was authentication implemented within this codebase"],
+        required: ["query"],
+      },
+    };
+  }
+}
+
+export class WebTool {
+  constructor(private readonly contextRetriever?: ContextRetriever) {}
+
+  public async execute(query: string) {
+    return await this.contextRetriever?.webSearch(query);
+  }
+
+  config() {
+    return {
+      name: "web_search",
+      description:
+        "Search the web for additional information and extract relevant content",
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          query: {
+            type: SchemaType.STRING,
+            description:
+              "The search query to find relevant information on the web",
+          },
+        },
+        example: [
+          "What is the general guideline on handling user session in software development",
+        ],
         required: ["query"],
       },
     };
@@ -79,4 +109,5 @@ export class FileTool {
 export const TOOL_CONFIGS = {
   SearchTool: { tool: SearchTool, useContextRetriever: true },
   FileTool: { tool: FileTool, useContextRetriever: true },
+  WebTool: { tool: WebTool, useContextRetriever: true },
 };

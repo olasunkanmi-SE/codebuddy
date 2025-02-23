@@ -8,6 +8,7 @@ import { Logger } from "../infrastructure/logger/logger";
 import { CodeRepository } from "../infrastructure/repository/code";
 import { getGeminiAPIKey } from "../utils/utils";
 import { EmbeddingService } from "./embedding";
+import { WebSearchService } from "./web-search-service";
 
 export class ContextRetriever {
   private readonly codeRepository: CodeRepository;
@@ -15,11 +16,13 @@ export class ContextRetriever {
   private static readonly SEARCH_RESULT_COUNT = 2;
   private readonly logger: Logger;
   private static instance: ContextRetriever;
+  private readonly webSearchService: WebSearchService;
   constructor() {
     this.codeRepository = CodeRepository.getInstance();
     const geminiApiKey = getGeminiAPIKey();
     this.embeddingService = new EmbeddingService(geminiApiKey);
     this.logger = new Logger("ContextRetriever");
+    this.webSearchService = WebSearchService.getInstance();
   }
 
   static initialize() {
@@ -70,10 +73,18 @@ export class ContextRetriever {
       const fileContent = await vscode.workspace.fs.readFile(uri);
       return Buffer.from(fileContent).toString("utf-8");
     } catch (error) {
-      console.error("Error reading file:", error);
+      this.logger.error("Error reading file:", error);
       throw error;
     }
   }
 
-  async webSearch() {}
+  async webSearch(query: string) {
+    try {
+      const x = Array.isArray(query) ? query.join("") : query;
+      return await this.webSearchService.run(x);
+    } catch (error) {
+      this.logger.error("Error reading file:", error);
+      throw error;
+    }
+  }
 }
