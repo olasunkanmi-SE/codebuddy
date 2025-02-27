@@ -12,7 +12,7 @@ export class Credentials {
     const session = await vscode.authentication.getSession(
       GITHUB_AUTH_PROVIDER_ID,
       SCOPES,
-      { createIfNone: false },
+      { createIfNone: true },
     );
     return session;
   }

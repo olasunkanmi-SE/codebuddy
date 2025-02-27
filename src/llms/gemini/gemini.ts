@@ -83,7 +83,7 @@ export class GeminiLLM
       this.response = result;
       return result.response.text();
     } catch (error) {
-      this.logger.error("Failed to generate text", { error, prompt });
+      this.logger.error("Failed to generate text", error);
       throw new Error("Text generation failed");
     }
   }

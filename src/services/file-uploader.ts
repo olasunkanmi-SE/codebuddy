@@ -139,6 +139,7 @@ export class FileUploader implements IFileUploader {
     try {
       let created = false;
       const filePath = path.join(this.fileDir, filename);
+      //TODO After upload sace the file url in a long term memory config DB. This application should have a long term memory.
       if (!fs.existsSync(filePath)) {
         await fs.promises.writeFile(filePath, "");
         vscode.window.showInformationMessage(
