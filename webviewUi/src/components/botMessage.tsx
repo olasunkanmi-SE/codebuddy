@@ -13,16 +13,28 @@ export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
   };
 
   const sanitizedContent = DOMPurify.sanitize(content);
+  const action = "thinking...";
 
   return (
-    <div className="code-block">
-      <div className="code-header">
-        <span className="language-label">{language}</span>
-        <button className="copy-button" onClick={handleCopy}>
-          <span className="copy-icon">⎘</span> Copy
-        </button>
-      </div>
-      <div className="doc-content" dangerouslySetInnerHTML={{ __html: sanitizedContent }} />
-    </div>
+    <>
+      {content.includes("thinking") ? (
+        <div className="doc-content">
+          <p>{action}</p>
+        </div>
+      ) : (
+        <div className="code-block">
+          <div className="code-header">
+            <span className="language-label">{language}</span>
+            <button className="copy-button" onClick={handleCopy}>
+              Copy
+            </button>
+          </div>
+          <div
+            className="doc-content"
+            dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+          />
+        </div>
+      )}
+    </>
   );
 };

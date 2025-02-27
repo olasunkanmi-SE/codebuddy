@@ -17,11 +17,10 @@
 
 
 .container {
-  height: 100%;
   width: 100%;
   padding: 20px;
   box-sizing: border-box;
-  max-width: 650px;
+  max-width: 800px;
   display: flex;
   flex-direction: column;
   border-radius: 10px;
@@ -30,11 +29,9 @@
   left: 50%;
   transform: translate(-50%, -50%);
   margin-top: 30px;
+  position: fixed;
 }
 
-.business {
-  height: 30%;
-}
 
 .dropdown-container {
   height: 650px;
@@ -44,13 +41,8 @@
   font-size: 14px;
 }
 
-.textarea-container {
-  width: 100%;
-}
-
-vscode-text-area {
-  width: 100%;
-  height: 100%;
+.currenFile{
+  margin: 5px;
 }
 
 vscode-dropdown {
@@ -328,7 +320,7 @@ vscode-button>.codicon {
   color: var(--vscode-descriptionForeground);
   font-size: 14px;
 }
-
+/* 
 .copy-button {
   display: flex;
   align-items: center;
@@ -349,7 +341,7 @@ vscode-button>.codicon {
 
 .copy-button:active {
   background-color: var(--vscode-button-secondaryBackground);
-}
+} */
 
 .copy-icon {
   font-size: 16px;
@@ -385,7 +377,7 @@ code {
   border-radius: 4px;
   font-family: var(--vscode-editor-font-family);
   font-size: 0.9em;
-  color: var(--vscode-editor-foreground, #d4d4d4);
+  color: var(--vscode-editor-foreground, #bb9af7);
   /* Light gray for readability */
 }
 
@@ -414,7 +406,7 @@ code {
   border-radius: 0;
   /* Reset border-radius */
   font-size: 0.95em;
-  color: var(--vscode-editor-foreground, #d4d4d4);
+  color: var(--vscode-editor-foreground, #bb9af7);
   /* Default text color (light gray) */
   display: block;
   /* Ensure proper block behavior */
@@ -437,7 +429,7 @@ code {
 
 /* Strings (e.g., "I'm") - Cyan */
 .doc-content pre code[class*="language-typescript"] .string {
-  color: #ce9178;
+  color: #fff;
   /* VS Code string color */
 }
 
@@ -449,7 +441,7 @@ code {
 
 /* Punctuation (e.g., {}, (), ;) - Default or slightly lighter */
 .doc-content pre code[class*="language-typescript"] .punctuation {
-  color: #d4d4d4;
+  color: #bb9af7;
   /* Match default text color */
 }
 
@@ -469,13 +461,13 @@ code {
 
 /* Strings - Use quotes to target */
 .doc-content pre code[class*="language-typescript"] span:where(:not(.keyword, .comment):contains('"')) {
-  color: #ce9178;
+  color: #fff;
   /* Cyan for strings */
 }
 
 /* Strong text styling */
 .doc-content strong {
-  color: var(--vscode-foreground, #d4d4d4);
+  color: var(--vscode-foreground, #a77bf9);
   font-weight: 600;
 }
 
@@ -504,4 +496,216 @@ code {
 .doc-content p ol,
 .doc-content p ul {
   margin: 8px 0;
+}
+
+/* body {
+  background-color: #1a1b26;
+  color: #a9b1d6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  line-height: 1.6;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+} */
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: #7aa2f7;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+/* Paragraphs and text */
+p {
+  margin-bottom: 1.2rem;
+  color: #c0caf5;
+}
+
+/* Links */
+a {
+  color: #7dcfff;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: #bb9af7;
+  text-decoration: underline;
+}
+
+/* Code blocks */
+pre {
+  background-color: #24283b;
+  border-radius: 6px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  border: 1px solid #414868;
+}
+
+code {
+  font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, 'Andale Mono', monospace;
+  font-size: 0.9em;
+}
+
+/* Inline code */
+p code, li code {
+  background-color: #24283b;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  color: #9ece6a;
+}
+
+/* Lists */
+ul, ol {
+  padding-left: 2rem;
+  margin-bottom: 1.5rem;
+  color: #c0caf5;
+}
+
+li {
+  margin-bottom: 0.5rem;
+}
+
+/* Strong and emphasis */
+strong {
+  color: #f7768e;
+  font-weight: 600;
+}
+
+em {
+  color: #bb9af7;
+  font-style: italic;
+}
+
+/* File paths and commands */
+.language-bash {
+  color: #9ece6a;
+}
+
+/* Important notes and warnings */
+blockquote {
+  border-left: 4px solid #f7768e;
+  margin: 1.5rem 0;
+  padding: 0.5rem 1rem;
+  background-color: #24283b;
+  color: #a9b1d6;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+th, td {
+  padding: 0.75rem;
+  border: 1px solid #414868;
+  text-align: left;
+}
+
+th {
+  background-color: #24283b;
+  color: #7aa2f7;
+}
+
+/* Section separators */
+hr {
+  border: none;
+  border-top: 1px solid #414868;
+  margin: 2rem 0;
+}
+
+/* File extensions and important terms */
+.file-ext {
+  color: #ff9e64;
+}
+
+/* Security notes */
+.security-note {
+  background-color: #24283b;
+  border-left: 4px solid #e0af68;
+  padding: 1rem;
+  margin: 1.5rem 0;
+  border-radius: 0 6px 6px 0;
+}
+
+vscode-dropdown {
+  max-width: 100px;
+}
+
+.horizontal-stack {
+  display: flex;
+  justify-content: left;
+  gap: 20px;
+}
+
+/* New Attachment Icon Styles */
+.attachment-icon {
+  padding: 10px; /* Matches button padding for size consistency */
+  cursor: pointer;
+  color: rgb(120, 124, 153); /* Matches button background as default color */
+  transition: color 0.3s ease;
+}
+
+.attachment-icon.active {
+  color: rgb(97, 101, 126) 
+}
+
+.attachment-icon:hover {
+  color:  rgb(97, 101, 126)
+}
+
+.textarea-container {
+  width: 90%;
+}
+
+.url-container {
+  background: linear-gradient(to bottom, #2d2d2d, #3a3a3a);
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 12px;
+  max-width: 600px;
+  width: 100%;
+}
+
+.url-link {
+  color: #007bff;
+  font-size: 16px;
+  font-family: 'Roboto', sans-serif;
+  line-height: 1.5;
+  text-decoration: none;
+  word-wrap: break-word;
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.url-link:hover {
+  color: #0056b3;
+  transform: scale(1.02);
+}
+
+.copy-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #6c757d;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 12px;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.copy-button:hover {
+  background: #494f69;
+  border-color: #494f69;
+  color: white;
+}
+
+.app-container {
+  padding: 20px;
+  background-color: #1a1a1a;
+  min-height: 100vh;
 }

@@ -29,6 +29,7 @@ import { initializeGenerativeAiEnvironment } from "./services/generative-ai-mode
 import { Credentials } from "./services/github-authentication";
 import { getConfigValue } from "./utils/utils";
 import { WebSearchService } from "./services/web-search-service";
+import { CodeIndexingService } from "./services/code-indexing";
 
 const {
   geminiKey,
@@ -43,7 +44,7 @@ const {
 
 const connectDB = async () => {
   await dbManager.connect(
-    "file:/Users/olasunkanmi/Documents/Github/codebuddy/patterns/dev.db",
+    "file:/Users/olasunkanmioyinlola/Documents/Apps/codebuddy/patterns/aii.db",
   );
 };
 
@@ -61,7 +62,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     Memory.getInstance();
     await connectDB();
-    const web = WebSearchService.getInstance();
+    // const web = WebSearchService.getInstance();
     // const x = CodeRepository.getInstance();
     // const apiKey = getGeminiAPIKey();
     // const embeddingService = new EmbeddingService(apiKey);
@@ -69,14 +70,15 @@ export async function activate(context: vscode.ExtensionContext) {
     // const y = await x.searchSimilarFunctions(embedding, 2);
     // console.log(y);
     const fileUpload = new FileUploader(context);
-    // await fileUpload.createFile("allx.db");
+    // await fileUpload.createFile("aiix.db");
 
     // const files = await fileUpload.getFiles();
     // const names = await fileUpload.getFileNames();
     // console.log(files, names);
 
     // const index = CodeIndexingService.createInstance();
-    // const result = index.buildFunctionStructureMap();
+    // const result = await index.buildFunctionStructureMap();
+    // await index.insertFunctionsinDB();
     // console.log(result);
     const {
       comment,
