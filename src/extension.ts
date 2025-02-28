@@ -24,12 +24,11 @@ import { AnthropicWebViewProvider } from "./providers/anthropic";
 import { CodeActionsProvider } from "./providers/code-actions";
 import { GeminiWebViewProvider } from "./providers/gemini";
 import { GroqWebViewProvider } from "./providers/groq";
+import { CodeIndexingService } from "./services/code-indexing";
 import { FileUploader } from "./services/file-uploader";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { Credentials } from "./services/github-authentication";
 import { getConfigValue } from "./utils/utils";
-import { WebSearchService } from "./services/web-search-service";
-import { CodeIndexingService } from "./services/code-indexing";
 
 const {
   geminiKey,
