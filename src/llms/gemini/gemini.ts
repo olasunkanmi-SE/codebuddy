@@ -280,6 +280,7 @@ export class GeminiLLM
 
       return finalResult;
     } catch (error: any) {
+      // Note. Use this approach to return error messages back to the FE
       this.orchestrator.publish(
         "onError",
         "Model not responding at this time, please try again",

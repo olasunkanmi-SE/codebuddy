@@ -103,11 +103,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   public handleModelResponseEvent(event: IEventPayload) {
     this.sendResponse(formatText(event.message), "bot");
   }
-
-  public handleThinkingEvent(event: IEventPayload) {
-    this.sendResponse(formatText(event.message), "bot");
-  }
-
   abstract generateResponse(
     message?: string,
     metaData?: Record<string, any>,

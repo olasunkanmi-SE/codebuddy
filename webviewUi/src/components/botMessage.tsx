@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import DOMPurify from "dompurify";
-import React from "react";
+import React, { useEffect } from "react";
 
 interface CodeBlockProps {
   language?: string;
@@ -8,13 +9,20 @@ interface CodeBlockProps {
 }
 
 export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
+  useEffect(() => {
+    const msgHandler = (event: any) => {
+      if (event) {
+        console.log("ee", event);
+      }
+    };
+    window.addEventListener("message", msgHandler);
+  }, []);
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
   };
 
   const sanitizedContent = DOMPurify.sanitize(content);
-  const action = "thinking...";
-
+  const action = "Researching...";
   return (
     <>
       {content.includes("thinking") ? (
@@ -29,10 +37,7 @@ export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
               Copy
             </button>
           </div>
-          <div
-            className="doc-content"
-            dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-          />
+          <div className="doc-content" dangerouslySetInnerHTML={{ __html: sanitizedContent }} />
         </div>
       )}
     </>

@@ -21,12 +21,10 @@ import { FileService } from "./file-system";
 export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private program: ts.Program | undefined;
   private typeChecker: ts.TypeChecker | undefined;
-  private fsService: FileService | undefined;
+  private readonly fsService: FileService;
   private static instance: TypeScriptAtsMapper;
   constructor() {
-    if (!this.fsService) {
-      this.fileSysService();
-    }
+    this.fsService = FileService.getInstance();
   }
 
   public async init() {
@@ -36,13 +34,10 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   public static async getInstance(): Promise<TypeScriptAtsMapper> {
     if (!TypeScriptAtsMapper.instance) {
       TypeScriptAtsMapper.instance = new TypeScriptAtsMapper();
+      // TODO remove this init flow at this point
       await TypeScriptAtsMapper.instance.init();
     }
     return TypeScriptAtsMapper.instance;
-  }
-
-  fileSysService() {
-    return (this.fsService = new FileService());
   }
 
   /**
@@ -53,10 +48,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   // Users may have mono repos or may open the folder at an higher level folder
   private async initializeTypescriptProgram(): Promise<void> {
     try {
-      if (!this.fsService) {
-        this.fsService = new FileService();
-      }
-      const fileContent = await this.fsService?.readFile(FSPROPS.TSCONFIG_FILE);
+      const fileContent = await this.fsService.readFile(FSPROPS.TSCONFIG_FILE);
       if (!fileContent) {
         throw Error;
       }
@@ -124,12 +116,13 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
     node: DeclarationFunctionNode,
     sourceFile: ts.SourceFile,
     info: IClassInfo | IModuleInfo,
-  ): void {
+  ): IFunctionInfo | null {
     const functionInfo: IFunctionInfo | null =
       this.getFunctionDetails(node, sourceFile) ?? null;
     if (functionInfo) {
       info?.functions?.push(functionInfo);
     }
+    return functionInfo;
   }
 
   /**
@@ -162,6 +155,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
     if (interfaceInfo) {
       info?.interfaces?.push(interfaceInfo);
     }
+    return interfaceInfo;
   }
 
   /**
@@ -195,15 +189,20 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
     sourceFile: ts.SourceFile,
     info: IClassInfo | IModuleInfo,
     member?: ts.ClassElement,
-  ): void {
+  ): IFunctionInfo | null {
     try {
-      const currentElement = member ? member : node;
+      let classFunctions = null;
+      const currentElement = member ?? node;
       if (
         ts.isMethodDeclaration(currentElement) ||
         ts.isFunctionDeclaration(currentElement) ||
         ts.isArrowFunction(currentElement)
       ) {
-        this.aggregateFunctions(currentElement, sourceFile, info);
+        classFunctions = this.aggregateFunctions(
+          currentElement,
+          sourceFile,
+          info,
+        );
       }
 
       if (ts.isPropertyDeclaration(currentElement)) {
@@ -217,6 +216,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
       if (ts.isEnumDeclaration(node)) {
         this.aggregateEnums(node, sourceFile, info);
       }
+      return classFunctions;
     } catch (error) {
       handleError(error, `Unable to process class members`);
       throw error;
@@ -486,19 +486,19 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    * Builds a hierarchical map of the codebase by traversing TypeScript files
    * and extracting module and class information.
    */
-  async buildCodebaseMap(): Promise<ICodebaseMap> {
+  async buildCodebaseMap(): Promise<Map<string, string>> {
     try {
-      const rootDir: string = process.cwd();
+      const filesMap = new Map<string, string>();
+      const rootDir: string = this.fsService.getRootFilePath();
       const normalizedRootDir = path.normalize(rootDir);
       const codebaseMap: ICodebaseMap = {};
       const repoNames: string = path.basename(normalizedRootDir);
       codebaseMap[repoNames] = { modules: {} };
 
-      const tsFiles: string[] | undefined =
-        await this.fsService?.getFilesFromDirectory(
-          FSPROPS.SRC_DIRECTORY,
-          FSPROPS.TS_FILE_PATTERN,
-        );
+      const tsFiles = await this.fsService.getFilesFromDirectory(
+        rootDir,
+        FSPROPS.TS_FILE_PATTERN,
+      );
       if (!tsFiles?.length) {
         throw Error(`No Typescript files found`);
       }
@@ -516,11 +516,25 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
         );
         ts.forEachChild(sourceFile, (node) => {
           if (ts.isClassDeclaration(node)) {
-            const classInfo = this.extractClassMetaData(node, sourceFile);
+            const classInfo: IClassInfo = this.extractClassMetaData(
+              node,
+              sourceFile,
+            );
+
             if (classInfo) {
+              if (classInfo.name) {
+                filesMap.set(classInfo.name, moduleRalativePath);
+              }
               moduleInfo?.classes?.push(classInfo);
             }
-            this.processClassMembers(node, sourceFile, moduleInfo);
+            const functionInfo: IFunctionInfo | null = this.processClassMembers(
+              node,
+              sourceFile,
+              moduleInfo,
+            );
+            if (functionInfo?.name) {
+              filesMap.set(functionInfo.name, moduleRalativePath);
+            }
           }
 
           if (
@@ -528,7 +542,14 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
             ts.isFunctionDeclaration(node) ||
             (ts.isVariableDeclaration(node) && ts.isArrowFunction(node))
           ) {
-            this.aggregateFunctions(node, sourceFile, moduleInfo);
+            const functionInfo = this.aggregateFunctions(
+              node,
+              sourceFile,
+              moduleInfo,
+            );
+            if (functionInfo?.name) {
+              filesMap.set(functionInfo.name, moduleRalativePath);
+            }
           }
 
           if (ts.isPropertyDeclaration(node)) {
@@ -536,7 +557,12 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
           }
 
           if (ts.isInterfaceDeclaration(node)) {
-            this.aggregateInterfaces(node, sourceFile, moduleInfo);
+            const interfaceInfo = this.aggregateInterfaces(
+              node,
+              sourceFile,
+              moduleInfo,
+            );
+            filesMap.set(interfaceInfo.name, moduleRalativePath);
           }
 
           if (ts.isEnumDeclaration(node)) {
@@ -545,7 +571,8 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
           codebaseMap[repoNames].modules[moduleRalativePath] = moduleInfo;
         });
       });
-      return codebaseMap;
+      //For Code Indexing return codebaseMap
+      return filesMap;
     } catch (error) {
       handleError(error, "Error fetching the files");
       throw Error;

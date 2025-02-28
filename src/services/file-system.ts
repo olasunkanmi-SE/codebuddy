@@ -6,9 +6,18 @@ import { Logger } from "../infrastructure/logger/logger";
 
 export class FileService {
   readonly logger: Logger;
+  private static instance: FileService;
   constructor() {
     this.logger = new Logger("FileSystemService");
   }
+
+  static getInstance() {
+    if (!FileService.instance) {
+      FileService.instance = new FileService();
+    }
+    return FileService.instance;
+  }
+
   getWorkspaceInfo(dir: string): IWorkspaceInfo | undefined {
     try {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -35,25 +44,29 @@ export class FileService {
       const directories = await vscode.workspace.fs.readDirectory(
         workSpaceInfo.root,
       );
+      const tsFilePaths: string[] = [];
+      for (const [name, type] of directories) {
+        if (type === vscode.FileType.Directory) {
+          const dirUri = vscode.Uri.joinPath(workSpaceInfo.root, name);
+          const tsConfigUrl = vscode.Uri.joinPath(
+            dirUri,
+            FSPROPS.TSCONFIG_FILE,
+          );
 
-      const directory = directories.filter(
-        ([name, type]) => type === vscode.FileType.Directory && name === dir,
-      );
-
-      if (!directory) {
-        throw Error(`${dir} does not exist within this workspace`);
+          const tsConfigExists =
+            (await Promise.resolve(vscode.workspace.fs.stat(tsConfigUrl)).catch(
+              () => null,
+            )) !== null;
+          if (tsConfigExists) {
+            const tsFiles = await vscode.workspace.findFiles(
+              new vscode.RelativePattern(dirUri, pattern),
+              FSPROPS.NODE_MODULES_PATTERN,
+            );
+            tsFilePaths.push(...tsFiles.map((file) => file.fsPath));
+          }
+        }
       }
-
-      const directoryFiles = directory.map(async ([file]) => {
-        const srcUri = vscode.Uri.joinPath(workSpaceInfo.root, file);
-        const srcFiles = await vscode.workspace.findFiles(
-          new vscode.RelativePattern(srcUri, pattern),
-        );
-        return srcFiles.map((file) => file.fsPath);
-      });
-
-      const srcFilePaths = await Promise.all(directoryFiles);
-      return srcFilePaths.flat();
+      return tsFilePaths;
     } catch (error) {
       handleError(
         error,
