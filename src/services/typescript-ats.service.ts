@@ -1,6 +1,7 @@
 import * as path from "path";
 import * as ts from "typescript";
 import * as vscode from "vscode";
+import { Orchestrator } from "../agents/orchestrator";
 import { FSPROPS } from "../application/constant";
 import {
   DeclarationFunctionNode,
@@ -17,14 +18,17 @@ import {
 import { ITypeScriptCodeMapper } from "../application/interfaces/ts.code.mapper.interface";
 import { handleError } from "../utils/utils";
 import { FileService } from "./file-system";
+import { Memory } from "../memory/base";
 
 export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private program: ts.Program | undefined;
   private typeChecker: ts.TypeChecker | undefined;
   private readonly fsService: FileService;
   private static instance: TypeScriptAtsMapper;
+  protected readonly orchestrator: Orchestrator;
   constructor() {
     this.fsService = FileService.getInstance();
+    this.orchestrator = Orchestrator.getInstance();
   }
 
   public async init() {
@@ -571,7 +575,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
           codebaseMap[repoNames].modules[moduleRalativePath] = moduleInfo;
         });
       });
-      //For Code Indexing return codebaseMap
+      Memory.set("codeIndex", filesMap);
       return filesMap;
     } catch (error) {
       handleError(error, "Error fetching the files");

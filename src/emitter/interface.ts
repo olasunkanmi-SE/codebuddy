@@ -18,6 +18,8 @@ export interface IAgentEventMap {
   onQuery: IEventPayload;
   onResponse: IEventPayload;
   onThinking: IEventPayload;
+  onSecretChange: IEventPayload;
+  onBootstrap: IEventPayload;
 }
 
 export interface IEventPayload {
