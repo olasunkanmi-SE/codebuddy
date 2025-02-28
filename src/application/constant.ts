@@ -65,6 +65,7 @@ export enum FSPROPS {
   SRC_DIRECTORY = "src",
   TS_FILE_PATTERN = "**/*.ts",
   TSCONFIG_FILE = "tsconfig.json",
+  NODE_MODULES_PATTERN = "**/node_modules/**",
 }
 
 export const EmbeddingsConfig = {

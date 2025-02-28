@@ -47,6 +47,7 @@ export class CodeIndexingService {
    */
   async buildFunctionStructureMap(): Promise<Partial<IFunctionData>[]> {
     try {
+      // TODO Get all the typescript project compilers information
       const codeATS = await TypeScriptAtsMapper.getInstance();
       if (!codeATS) {
         throw new Error("Failed to get TypeScriptAtsMapper instance");

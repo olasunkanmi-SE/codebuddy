@@ -9,6 +9,7 @@ import { CodeRepository } from "../infrastructure/repository/code";
 import { getGeminiAPIKey } from "../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { WebSearchService } from "./web-search-service";
+import { Orchestrator } from "../agents/orchestrator";
 
 export class ContextRetriever {
   private readonly codeRepository: CodeRepository;
@@ -17,12 +18,14 @@ export class ContextRetriever {
   private readonly logger: Logger;
   private static instance: ContextRetriever;
   private readonly webSearchService: WebSearchService;
+  protected readonly orchestrator: Orchestrator;
   constructor() {
     this.codeRepository = CodeRepository.getInstance();
     const geminiApiKey = getGeminiAPIKey();
     this.embeddingService = new EmbeddingService(geminiApiKey);
     this.logger = new Logger("ContextRetriever");
     this.webSearchService = WebSearchService.getInstance();
+    this.orchestrator = Orchestrator.getInstance();
   }
 
   static initialize() {
@@ -36,6 +39,7 @@ export class ContextRetriever {
     try {
       const embedding = await this.embeddingService.generateEmbedding(input);
       this.logger.info("Retrieving context from DB");
+      // this.orchestrator.publish("onUpdate", "Retrieving context from DB");
       return this.codeRepository.searchSimilarFunctions(
         embedding,
         ContextRetriever.SEARCH_RESULT_COUNT,
@@ -80,8 +84,8 @@ export class ContextRetriever {
 
   async webSearch(query: string) {
     try {
-      const x = Array.isArray(query) ? query.join("") : query;
-      return await this.webSearchService.run(x);
+      const text = Array.isArray(query) ? query.join("") : query;
+      return await this.webSearchService.run(text);
     } catch (error) {
       this.logger.error("Error reading file:", error);
       throw error;

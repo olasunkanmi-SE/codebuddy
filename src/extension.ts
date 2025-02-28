@@ -44,7 +44,7 @@ const {
 
 const connectDB = async () => {
   await dbManager.connect(
-    "file:/Users/olasunkanmioyinlola/Documents/Apps/codebuddy/patterns/aii.db",
+    "file:/Users/olasunkanmi/Documents/Github/codebuddy/patterns/dev.db",
   );
 };
 
@@ -76,10 +76,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // const names = await fileUpload.getFileNames();
     // console.log(files, names);
 
-    // const index = CodeIndexingService.createInstance();
-    // const result = await index.buildFunctionStructureMap();
+    const index = CodeIndexingService.createInstance();
+    // Get each of the folders and call the next line for each
+    const result = await index.buildFunctionStructureMap();
     // await index.insertFunctionsinDB();
-    // console.log(result);
+    console.log(result);
     const {
       comment,
       review,

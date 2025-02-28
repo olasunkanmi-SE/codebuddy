@@ -105,7 +105,7 @@ export interface ITypeScriptCodeMapper {
    * Builds a hierarchical map of the codebase by traversing TypeScript files
    * and extracting module and class information.
    */
-  buildCodebaseMap(): Promise<ICodebaseMap>;
+  buildCodebaseMap(): Promise<Map<string, string>>;
 
   /**
    * Extracts interface information from a TypeScript interface declaration.

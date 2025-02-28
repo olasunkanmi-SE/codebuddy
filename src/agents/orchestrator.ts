@@ -11,7 +11,7 @@ export class Orchestrator extends BaseAiAgent implements vscode.Disposable {
     this.disposables.push(
       this.onStatusChange(this.handleStatus.bind(this)),
       this.onPromptGenerated(this.handlePromptGeneratedEvent.bind(this)),
-      this.onError(this.handleError.bind(this)),
+      // this.onError(this.handleError.bind(this)),
     );
   }
 
@@ -31,9 +31,9 @@ export class Orchestrator extends BaseAiAgent implements vscode.Disposable {
     this.publish("onResponse", event.message);
   }
 
-  public handleError(event: IEventPayload) {
-    console.log(`Error: ${event.message}`);
-  }
+  // public handleError(event: IEventPayload) {
+  //   console.log(`Error: ${event.message}`);
+  // }
 
   public dispose(): void {
     this.disposables.forEach((d) => d.dispose());
