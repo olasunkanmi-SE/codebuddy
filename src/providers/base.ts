@@ -3,8 +3,9 @@ import { Orchestrator } from "../agents/orchestrator";
 import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { FileUploader } from "../services/file-uploader";
-import { formatText } from "../utils/utils";
+import { formatText, getConfigValue } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
+import { getChatCss } from "../webview/chat_css";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -63,6 +64,34 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.generativeAiModel,
       this.currentWebView,
     );
+
+    setTimeout(() => {
+      this.currentWebView?.webview.postMessage({ type: "updateStyles", payload: getChatCss()});
+      this.currentWebView?.webview.postMessage({ type: "modelUpdate", payload: { model: getConfigValue("generativeAi.option")} });
+    }, 500);
+
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      console.log("onDidChangeConfiguration event details is: ");
+      console.dir(event);
+
+      let chatViewThemeChange = event.affectsConfiguration("chatview.theme");
+      let chatViewFontSizeChange = event.affectsConfiguration("chatview.font.size");
+      let fontFamilyChange = event.affectsConfiguration("font.family");
+      console.log("Checking if extension config changes are made to chatview.theme: ", chatViewThemeChange);
+      console.log("Checking if extension config changes are made to chatview.font.size: ", chatViewFontSizeChange);
+      console.log("Checking if extension config changes are made to font.family: ", fontFamilyChange);
+
+      if(chatViewThemeChange || chatViewFontSizeChange || fontFamilyChange) {
+        this.currentWebView?.webview.postMessage({type: "updateStyles", payload: getChatCss()});
+      }
+
+      let selectedGenerativeAiModelChange = event.affectsConfiguration("generativeAi.option");
+      console.log("Checking if extension config changes are made to chatview.theme: ", selectedGenerativeAiModelChange);
+
+      if(selectedGenerativeAiModelChange) {
+        this.currentWebView?.webview.postMessage({ type: "modelUpdate", payload: { model: getConfigValue("generativeAi.option")} });
+      }
+    })
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {

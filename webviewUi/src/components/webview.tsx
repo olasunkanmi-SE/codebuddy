@@ -22,6 +22,9 @@ import AttachmentIcon from "./attachmentIcon";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
+import type hljs from "highlight.js";
+
+const hljsApi = window["hljs" as any] as unknown as typeof hljs
 
 const vsCode = (() => {
   if (typeof window !== "undefined" && "acquireVsCodeApi" in window) {
@@ -42,6 +45,47 @@ export const WebviewUI = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [isBotLoading, setIsBotLoading] = useState(false); // New state
+  const [forceUpdate, setForceUpdate] = useState(0);
+
+  const updateStyles = (data: any) => {
+    const existingStyle = document.getElementById("dynamic-chat-css");
+
+    if (existingStyle) {
+      console.log("Removing existing extension css style.");
+      existingStyle.remove();
+    }
+
+    // Inject the new stylesheet
+    const styleElement = document.createElement("style");
+    styleElement.id = "dynamic-chat-css";
+    styleElement.innerHTML = data;
+    document.head.appendChild(styleElement);
+    console.log("Updating extension css style.");
+
+    setForceUpdate(() => forceUpdate + 1);
+  }
+
+  // useEffect(() => {
+  //   hljs.highlightAll(); // Ensure highlight.js runs after rendering
+  // }, [messages]); // Runs every time messages updates
+
+  useEffect(() => {
+    const highlightCodeBlocks = () => {
+      if (!hljsApi || !messages || messages.length === 0) return;
+  
+      document.querySelectorAll("pre code").forEach((block) => {
+        // Auto-detect language
+        const detected = hljsApi.highlightAuto(block.textContent || "").language;
+        console.log("Detected language:", detected); // Debugging
+        if(detected != undefined) {
+          block.setHTMLUnsafe(hljsApi.highlight(block.getHTML(), {language: detected}).value);
+        }
+      });
+    };
+  
+    highlightCodeBlocks();
+  }, [messages]); // Runs every time messages update
+  
 
   useEffect(() => {
     const messageHandler = (event: any) => {
@@ -65,6 +109,9 @@ export const WebviewUI = () => {
         case "modelUpdate":
           setSelectedModel(message.payload.model);
           break;
+        case "updateStyles":
+          updateStyles(message.payload);
+          break;
         case "modeUpdate":
           setSelectedCodeBuddyMode(message.payload.model);
           break;
@@ -76,7 +123,7 @@ export const WebviewUI = () => {
     return () => {
       window.removeEventListener("message", messageHandler);
     };
-  }, []);
+  });
 
   const handleModelChange = (e: any) => {
     const newValue = e.target.value;
