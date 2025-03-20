@@ -182,7 +182,7 @@
     },
     "configuration": [
       {
-        "title": "CodeBuddy, Ola",
+        "title": "CodeBuddy",
         "properties": {
           "generativeAi.option": {
             "type": "string",

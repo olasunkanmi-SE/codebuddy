@@ -310,7 +310,6 @@ vscode-button>.codicon {
   justify-content: space-between;
   align-items: center;
   padding: 8px 16px;
-  background-color: var(--vscode-titleBar-activeBackground);
   border-bottom: 1px solid var(--vscode-panel-border);
   border-top-left-radius: 6px;
   border-top-right-radius: 6px;
@@ -383,7 +382,7 @@ code {
 
 /* Code block styling (e.g., <pre><code>) */
 .doc-content pre {
-  background-color: var(--vscode-textCodeBlock-background, #1E1E1E);
+  background-color: #000;
   /* Dark background like VS Code */
   padding: 16px;
   border-radius: 6px;
@@ -391,11 +390,6 @@ code {
   overflow-x: auto;
   /* Handle long lines */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  /* Subtle shadow */
-  border: 1px solid var(--vscode-editor-lineHighlightBorder, #2a2d2e);
-  /* Border for definition */
-  font-family: var(--vscode-editor-font-family, "Consolas", "Courier New", monospace);
-  /* Monospaced font */
 }
 
 .doc-content pre code {
@@ -405,7 +399,7 @@ code {
   /* Reset padding */
   border-radius: 0;
   /* Reset border-radius */
-  font-size: 0.95em;
+  font-size: 1em;
   color: var(--vscode-editor-foreground, #bb9af7);
   /* Default text color (light gray) */
   display: block;
@@ -414,56 +408,7 @@ code {
   /* Preserve whitespace and wrap long lines if needed */
 }
 
-/* Approximate syntax highlighting for TypeScript (CSS-only approximation) */
-.doc-content pre code[class*="language-typescript"] {
-  /* Default text color for identifiers/variables */
-  color: #d4d4d4;
-}
 
-/* Keywords (e.g., async, const, return, if) - Blue */
-.doc-content pre code[class*="language-typescript"] .keyword,
-.doc-content pre code[class*="language-typescript"] .keyword-operator {
-  color: #569cd6;
-  /* VS Code keyword color */
-}
-
-/* Strings (e.g., "I'm") - Cyan */
-.doc-content pre code[class*="language-typescript"] .string {
-  color: #fff;
-  /* VS Code string color */
-}
-
-/* Comments (if present) - Green */
-.doc-content pre code[class*="language-typescript"] .comment {
-  color: #6a9955;
-  /* VS Code comment color */
-}
-
-/* Punctuation (e.g., {}, (), ;) - Default or slightly lighter */
-.doc-content pre code[class*="language-typescript"] .punctuation {
-  color: #bb9af7;
-  /* Match default text color */
-}
-
-/* Target specific keywords manually (limited due to CSS constraints) */
-.doc-content pre code[class*="language-typescript"] span:where(:not(.string, .comment)[class*="keyword"]) {
-  color: #569cd6;
-  /* Blue for keywords like async, const */
-}
-
-/* Fallback for dynamic keywords - Use classes or manual wrapping if possible */
-.doc-content pre code[class*="language-typescript"] span:where(:not(.string, .comment):contains("async")),
-.doc-content pre code[class*="language-typescript"] span:where(:not(.string, .comment):contains("const")),
-.doc-content pre code[class*="language-typescript"] span:where(:not(.string, .comment):contains("return")) {
-  color: #569cd6;
-  /* Blue for known keywords */
-}
-
-/* Strings - Use quotes to target */
-.doc-content pre code[class*="language-typescript"] span:where(:not(.keyword, .comment):contains('"')) {
-  color: #fff;
-  /* Cyan for strings */
-}
 
 /* Strong text styling */
 .doc-content strong {
@@ -534,55 +479,6 @@ a:hover {
   text-decoration: underline;
 }
 
-/* Code blocks */
-pre {
-  background-color: #24283b;
-  border-radius: 6px;
-  padding: 1rem;
-  overflow-x: auto;
-  margin: 1.5rem 0;
-  border: 1px solid #414868;
-}
-
-code {
-  font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, 'Andale Mono', monospace;
-  font-size: 0.9em;
-}
-
-/* Inline code */
-p code, li code {
-  background-color: #24283b;
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  color: #9ece6a;
-}
-
-/* Lists */
-ul, ol {
-  padding-left: 2rem;
-  margin-bottom: 1.5rem;
-  color: #c0caf5;
-}
-
-li {
-  margin-bottom: 0.5rem;
-}
-
-/* Strong and emphasis */
-strong {
-  color: #f7768e;
-  font-weight: 600;
-}
-
-em {
-  color: #bb9af7;
-  font-style: italic;
-}
-
-/* File paths and commands */
-.language-bash {
-  color: #9ece6a;
-}
 
 /* Important notes and warnings */
 blockquote {
@@ -688,14 +584,14 @@ vscode-dropdown {
 }
 
 .copy-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid #6c757d;
+  border: 1px solid #a738c0;
   border-radius: 8px;
   padding: 4px 8px;
   font-size: 12px;
   cursor: pointer;
   margin-left: 12px;
   transition: background 0.3s ease, border-color 0.3s ease;
+  display: flex
 }
 
 .copy-button:hover {

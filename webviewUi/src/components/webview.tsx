@@ -16,12 +16,17 @@ import {
   VSCodeProgressRing,
   VSCodeTextArea,
 } from "@vscode/webview-ui-toolkit/react";
+import type hljs from "highlight.js";
 import { useEffect, useState } from "react";
 import { codeBuddyMode, modelOptions } from "../constants/constant";
+import { highlightCodeBlocks } from "../utils/highlightCode";
 import AttachmentIcon from "./attachmentIcon";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
+import { updateStyles } from "../utils/dynamicCss";
+
+const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
 const vsCode = (() => {
   if (typeof window !== "undefined" && "acquireVsCodeApi" in window) {
@@ -41,7 +46,11 @@ export const WebviewUI = () => {
   const [userInput, setUserInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeItem, setActiveItem] = useState<string | null>(null);
-  const [isBotLoading, setIsBotLoading] = useState(false); // New state
+  const [isBotLoading, setIsBotLoading] = useState(false);
+
+  useEffect(() => {
+    highlightCodeBlocks(hljsApi, messages);
+  }, [messages]);
 
   useEffect(() => {
     const messageHandler = (event: any) => {
@@ -65,6 +74,9 @@ export const WebviewUI = () => {
         case "modelUpdate":
           setSelectedModel(message.payload.model);
           break;
+        case "updateStyles":
+          updateStyles(message.payload);
+          break;
         case "modeUpdate":
           setSelectedCodeBuddyMode(message.payload.model);
           break;
@@ -76,7 +88,7 @@ export const WebviewUI = () => {
     return () => {
       window.removeEventListener("message", messageHandler);
     };
-  }, []);
+  });
 
   const handleModelChange = (e: any) => {
     const newValue = e.target.value;
