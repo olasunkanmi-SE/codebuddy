@@ -16,15 +16,17 @@ import {
   VSCodeProgressRing,
   VSCodeTextArea,
 } from "@vscode/webview-ui-toolkit/react";
+import type hljs from "highlight.js";
 import { useEffect, useState } from "react";
 import { codeBuddyMode, modelOptions } from "../constants/constant";
+import { highlightCodeBlocks } from "../utils/highlightCode";
 import AttachmentIcon from "./attachmentIcon";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
-import type hljs from "highlight.js";
+import { updateStyles } from "../utils/dynamicCss";
 
-const hljsApi = window["hljs" as any] as unknown as typeof hljs
+const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
 const vsCode = (() => {
   if (typeof window !== "undefined" && "acquireVsCodeApi" in window) {
@@ -44,48 +46,11 @@ export const WebviewUI = () => {
   const [userInput, setUserInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeItem, setActiveItem] = useState<string | null>(null);
-  const [isBotLoading, setIsBotLoading] = useState(false); // New state
-  const [forceUpdate, setForceUpdate] = useState(0);
-
-  const updateStyles = (data: any) => {
-    const existingStyle = document.getElementById("dynamic-chat-css");
-
-    if (existingStyle) {
-      console.log("Removing existing extension css style.");
-      existingStyle.remove();
-    }
-
-    // Inject the new stylesheet
-    const styleElement = document.createElement("style");
-    styleElement.id = "dynamic-chat-css";
-    styleElement.innerHTML = data;
-    document.head.appendChild(styleElement);
-    console.log("Updating extension css style.");
-
-    setForceUpdate(() => forceUpdate + 1);
-  }
-
-  // useEffect(() => {
-  //   hljs.highlightAll(); // Ensure highlight.js runs after rendering
-  // }, [messages]); // Runs every time messages updates
+  const [isBotLoading, setIsBotLoading] = useState(false);
 
   useEffect(() => {
-    const highlightCodeBlocks = () => {
-      if (!hljsApi || !messages || messages.length === 0) return;
-  
-      document.querySelectorAll("pre code").forEach((block) => {
-        // Auto-detect language
-        const detected = hljsApi.highlightAuto(block.textContent || "").language;
-        console.log("Detected language:", detected); // Debugging
-        if(detected != undefined) {
-          block.setHTMLUnsafe(hljsApi.highlight(block.getHTML(), {language: detected}).value);
-        }
-      });
-    };
-  
-    highlightCodeBlocks();
-  }, [messages]); // Runs every time messages update
-  
+    highlightCodeBlocks(hljsApi, messages);
+  }, [messages]);
 
   useEffect(() => {
     const messageHandler = (event: any) => {

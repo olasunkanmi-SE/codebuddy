@@ -270,7 +270,6 @@ div.code {
     align-items: center;
     margin-bottom: -15px;
     padding: 5px 10px;
-    background-color: #222;
     color: #fff;
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
