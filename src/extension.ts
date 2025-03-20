@@ -1,31 +1,34 @@
 import * as vscode from "vscode";
 import {
   APP_CONFIG,
-  COMMON,
   generativeAiModels,
   OLA_ACTIONS,
   USER_MESSAGE,
-} from "./constant";
-import { Comments } from "./events/comment";
-import { ExplainCode } from "./events/explain";
-import { FileUploader } from "./events/file-uploader";
-import { FixError } from "./events/fixError";
-import { CodeChartGenerator } from "./events/generate-code-chart";
-import { GenerateCommitMessage } from "./events/generate-commit-message";
-import { GenerateUnitTest } from "./events/generate-unit-test";
-import { InterviewMe } from "./events/interview-me";
-import { ReadFromKnowledgeBase } from "./events/knowledge-base";
-import { OptimizeCode } from "./events/optimize";
-import { RefactorCode } from "./events/refactor";
-import { ReviewCode } from "./events/review";
-import { CodeActionsProvider } from "./providers/code-actions-provider";
-import { GeminiWebViewProvider } from "./providers/gemini-web-view-provider";
-import { GroqWebViewProvider } from "./providers/groq-web-view-provider";
-import { setUpGenerativeAiModel } from "./services/generative-ai-model-manager";
-import { getConfigValue } from "./utils";
-import { AnthropicWebViewProvider } from "./providers/anthropic-web-view-provider";
-import { Brain } from "./services/memory";
-import { InLineChat } from "./events/inline-chat";
+} from "./application/constant";
+import { Comments } from "./commands/comment";
+import { ExplainCode } from "./commands/explain";
+import { FixError } from "./commands/fixError";
+import { CodeChartGenerator } from "./commands/generate-code-chart";
+import { GenerateCommitMessage } from "./commands/generate-commit-message";
+import { GenerateUnitTest } from "./commands/generate-unit-test";
+import { InLineChat } from "./commands/inline-chat";
+import { InterviewMe } from "./commands/interview-me";
+import { ReadFromKnowledgeBase } from "./commands/knowledge-base";
+import { OptimizeCode } from "./commands/optimize";
+import { RefactorCode } from "./commands/refactor";
+import { ReviewCode } from "./commands/review";
+import { EventEmitter } from "./emitter/agent-emitter";
+import { dbManager } from "./infrastructure/repository/data-base-manager";
+import { Memory } from "./memory/base";
+import { AnthropicWebViewProvider } from "./providers/anthropic";
+import { CodeActionsProvider } from "./providers/code-actions";
+import { GeminiWebViewProvider } from "./providers/gemini";
+import { GroqWebViewProvider } from "./providers/groq";
+import { CodeIndexingService } from "./services/code-indexing";
+import { FileUploader } from "./services/file-uploader";
+import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
+import { Credentials } from "./services/github-authentication";
+import { getConfigValue } from "./utils/utils";
 
 const {
   geminiKey,
@@ -38,9 +41,45 @@ const {
   grokModel,
 } = APP_CONFIG;
 
+const connectDB = async () => {
+  await dbManager.connect(
+    "file:/Users/olasunkanmioyinlola/Documents/Apps/codebuddy/patterns/aii.db"
+  );
+};
+
+let quickFixCodeAction: vscode.Disposable;
+let agentEventEmmitter: EventEmitter;
+
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    Brain.getInstance();
+    const credentials = new Credentials();
+    await credentials.initialize(context);
+    const session: vscode.AuthenticationSession | undefined =
+      await credentials.getSession();
+    vscode.window.showInformationMessage(
+      `Logged into GitHub as ${session?.account.label}`
+    );
+    Memory.getInstance();
+    await connectDB();
+    // const web = WebSearchService.getInstance();
+    // const x = CodeRepository.getInstance();
+    // const apiKey = getGeminiAPIKey();
+    // const embeddingService = new EmbeddingService(apiKey);
+    // const embedding = await embeddingService.generateEmbedding("is jwt web token used withnin this app ?");
+    // const y = await x.searchSimilarFunctions(embedding, 2);
+    // console.log(y);
+    const fileUpload = new FileUploader(context);
+    // await fileUpload.createFile("aiix.db");
+
+    // const files = await fileUpload.getFiles();
+    // const names = await fileUpload.getFileNames();
+    // console.log(files, names);
+
+    // const index = CodeIndexingService.createInstance();
+    // Get each of the folders and call the next line for each
+    // const result = await index.buildFunctionStructureMap();
+    // await index.insertFunctionsinDB();
+    // console.log(result);
     const {
       comment,
       review,
@@ -58,145 +97,139 @@ export async function activate(context: vscode.ExtensionContext) {
     } = OLA_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
-      context,
+      context
     );
     const getInLineChat = new InLineChat(
       `${USER_MESSAGE} generates a response...`,
-      context,
+      context
     );
     const generateOptimizeCode = new OptimizeCode(
       `${USER_MESSAGE} optimizes the code...`,
-      context,
+      context
     );
     const generateRefactoredCode = new RefactorCode(
       `${USER_MESSAGE} refactors the code...`,
-      context,
+      context
     );
     const explainCode = new ExplainCode(
       `${USER_MESSAGE} explains the code...`,
-      context,
+      context
     );
     const generateReview = new ReviewCode(
       `${USER_MESSAGE} reviews the code...`,
-      context,
+      context
     );
     const codeChartGenerator = new CodeChartGenerator(
       `${USER_MESSAGE} creates the code chart...`,
-      context,
+      context
     );
-    const codePattern = new FileUploader(context);
+    const codePattern = fileUpload;
     const knowledgeBase = new ReadFromKnowledgeBase(
       `${USER_MESSAGE} generate your code pattern...`,
-      context,
+      context
     );
     const generateCommitMessage = new GenerateCommitMessage(
       `${USER_MESSAGE} generates a commit message...`,
-      context,
+      context
     );
     const generateInterviewQuestions = new InterviewMe(
       `${USER_MESSAGE} generates interview questions...`,
-      context,
+      context
     );
 
     const generateUnitTests = new GenerateUnitTest(
       `${USER_MESSAGE} generates unit tests...`,
-      context,
+      context
     );
 
     const actionMap = {
-      [comment]: () => getComment.execute(),
-      [review]: () => generateReview.execute(),
-      [refactor]: () => generateRefactoredCode.execute(),
-      [optimize]: () => generateOptimizeCode.execute(),
-      [interviewMe]: () => generateInterviewQuestions.execute(),
-      [generateUnitTest]: () => generateUnitTests.execute(),
+      [comment]: async () => await getComment.execute(),
+      [review]: async () => await generateReview.execute(),
+      [refactor]: async () => await generateRefactoredCode.execute(),
+      [optimize]: async () => await generateOptimizeCode.execute(),
+      [interviewMe]: async () => await generateInterviewQuestions.execute(),
+      [generateUnitTest]: async () => await generateUnitTests.execute(),
       [fix]: (errorMessage: string) =>
         new FixError(
           `${USER_MESSAGE} finds a solution to the error...`,
           context,
-          errorMessage,
+          errorMessage
         ).execute(errorMessage),
-      [explain]: () => explainCode.execute(),
-      [pattern]: () => codePattern.uploadFileHandler(),
-      [knowledge]: () => knowledgeBase.execute(),
-      [commitMessage]: () => generateCommitMessage.execute("hello"),
-      [generateCodeChart]: () => codeChartGenerator.execute(),
-      [inlineChat]: () => getInLineChat.execute(),
+      [explain]: async () => await explainCode.execute(),
+      [pattern]: async () => await codePattern.uploadFileHandler(),
+      [knowledge]: async () => await knowledgeBase.execute(),
+      [commitMessage]: async () =>
+        await generateCommitMessage.execute("commitMessage"),
+      [generateCodeChart]: async () => await codeChartGenerator.execute(),
+      [inlineChat]: async () => await getInLineChat.execute(),
     };
 
     const subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
-      ([action, handler]) => vscode.commands.registerCommand(action, handler),
+      ([action, handler]) => vscode.commands.registerCommand(action, handler)
     );
 
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
 
     const quickFix = new CodeActionsProvider();
-    const quickFixCodeAction: vscode.Disposable =
-      vscode.languages.registerCodeActionsProvider(
-        { scheme: "file", language: "*" },
-        quickFix,
-      );
+    quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
+      { scheme: "file", language: "*" },
+      quickFix
+    );
+
+    agentEventEmmitter = new EventEmitter();
 
     const modelConfigurations: {
       [key: string]: {
         key: string;
         model: string;
         webviewProviderClass: any;
-        subscriptions: vscode.Disposable[];
-        quickFixCodeAction: vscode.Disposable;
       };
     } = {
       [generativeAiModels.GEMINI]: {
         key: geminiKey,
         model: geminiModel,
         webviewProviderClass: GeminiWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
       [generativeAiModels.GROQ]: {
         key: groqApiKey,
         model: groqModel,
         webviewProviderClass: GroqWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
       [generativeAiModels.ANTHROPIC]: {
         key: anthropicApiKey,
         model: anthropicModel,
         webviewProviderClass: AnthropicWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
       [generativeAiModels.GROK]: {
         key: grokApiKey,
         model: grokModel,
         webviewProviderClass: AnthropicWebViewProvider,
-        subscriptions,
-        quickFixCodeAction,
       },
     };
     if (selectedGenerativeAiModel in modelConfigurations) {
       const modelConfig = modelConfigurations[selectedGenerativeAiModel];
       const { key, model, webviewProviderClass } = modelConfig;
-      setUpGenerativeAiModel(
+      initializeGenerativeAiEnvironment(
         context,
         model,
         key,
         webviewProviderClass,
         subscriptions,
         quickFixCodeAction,
+        agentEventEmmitter
       );
     }
   } catch (error) {
-    Brain.clear();
+    Memory.clear();
     vscode.window.showErrorMessage(
-      "An Error occured while setting up generative AI model",
+      "An Error occured while setting up generative AI model"
     );
     console.log(error);
   }
 }
 
 export function deactivate(context: vscode.ExtensionContext) {
-  //TODO once the application is rewritten in React, delete the pattern file on deactivate
+  quickFixCodeAction.dispose();
+  agentEventEmmitter.dispose();
   context.subscriptions.forEach((subscription) => subscription.dispose());
 }

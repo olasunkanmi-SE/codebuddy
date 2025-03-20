@@ -1,0 +1,607 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--vscode-dropdown-background);
+}
+
+
+
+.container {
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin-top: 30px;
+  position: fixed;
+}
+
+
+.dropdown-container {
+  height: 650px;
+  overflow-y: scroll;
+  padding: 10px;
+  max-width: 100%;
+  font-size: 14px;
+}
+
+.currenFile{
+  margin: 5px;
+}
+
+vscode-dropdown {
+  width: 100%;
+}
+
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #535bf2;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+
+button:hover {
+  border-color: #646cff;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+
+  a:hover {
+    color: #747bff;
+  }
+
+  button {
+    background-color: #f9f9f9;
+  }
+}
+
+.dropdown-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 1rem 0;
+}
+
+/* label {
+  margin-bottom: 0.5rem;
+  color: var(--vscode-foreground);
+  font-size: 13px;
+  font-weight: 500;
+} */
+
+vscode-dropdown {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  margin: 10px;
+  border: 1px solid var(--vscode-editor-background);
+  ;
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border-radius: 4px;
+  transition: border-color 0.15s ease-in-out;
+}
+
+vscode-dropdown:hover {
+  border-color: var(--vscode-dropdown-border);
+  cursor: pointer;
+}
+
+vscode-dropdown:focus-within {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 2px var(--vscode-focusBorder);
+}
+
+/* Style for the options */
+vscode-option {
+  padding: 6px 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+vscode-option:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+/* When dropdown is open */
+vscode-dropdown[open] {
+  border-color: var(--vscode-focusBorder);
+}
+
+vscode-text-area {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  background-color: var(--vscode-input-background, #252526);
+  color: var(--vscode-input-foreground, #cccccc);
+  border: 2px solid var(--vscode-editor-background);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 36px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+vscode-text-area:hover {
+  border-color: var(--vscode-input-border-hover, #4d4d4d);
+}
+
+vscode-text-area:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder, #007fd4);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007fd4);
+}
+
+/* Placeholder styling */
+vscode-text-area::placeholder {
+  color: var(--vscode-input-placeholderForeground, #8c8c8c);
+  opacity: 1;
+}
+
+/* Disabled state */
+vscode-text-area[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+vscode-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  border-radius: 4px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+  min-width: 80px;
+  max-width: 100%;
+  width: 100%;
+  height: 28px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Primary button */
+vscode-button[appearance="primary"] {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: 1px solid var(--vscode-button-background);
+}
+
+vscode-button[appearance="primary"]:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+vscode-button[appearance="primary"]:active {
+  background-color: var(--vscode-button-background);
+  transform: translateY(1px);
+}
+
+/* Secondary button */
+vscode-button[appearance="secondary"] {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: 1px solid var(--vscode-button-secondaryBackground);
+}
+
+vscode-button[appearance="secondary"]:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+vscode-button[appearance="secondary"]:active {
+  background-color: var(--vscode-button-secondaryBackground);
+  transform: translateY(1px);
+}
+
+/* Focus states for both */
+vscode-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--vscode-focusBorder);
+}
+
+/* Disabled state */
+vscode-button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Icon support if needed */
+vscode-button>.codicon {
+  margin-right: 6px;
+}
+
+.message-container {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+
+  background-color: var(--vscode-editor-background);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.avatar-container {
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  background-color: #4a4a4a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+}
+
+.message-content {
+  text-align: left;
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.code-block {
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  font-family: var(--vscode-editor-font-family, 'Monaco', 'Menlo', 'Ubuntu Mono', monospace);
+  margin: 16px 0;
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.language-label {
+  color: var(--vscode-descriptionForeground);
+  font-size: 14px;
+}
+/* 
+.copy-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--vscode-button-secondaryBackground);
+  border: 1px solid var(--vscode-button-border, transparent);
+  color: var(--vscode-button-secondaryForeground);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.copy-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.copy-button:active {
+  background-color: var(--vscode-button-secondaryBackground);
+} */
+
+.copy-icon {
+  font-size: 16px;
+}
+
+.code-content {
+  margin: 0;
+  padding: 16px;
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-x: auto;
+  background-color: var(--vscode-editor-background);
+  text-align: left;
+}
+
+code {
+  font-family: inherit;
+  background-color: transparent;
+}
+
+.doc-content {
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-editor-foreground);
+  line-height: 1.6;
+  padding: 16px;
+  text-align: left;
+}
+
+/* Inline code styling (e.g., <code> within <p>) */
+.doc-content code {
+  background-color: var(--vscode-textCodeBlock-background, #2d2d2d);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+  color: var(--vscode-editor-foreground, #bb9af7);
+  /* Light gray for readability */
+}
+
+/* Code block styling (e.g., <pre><code>) */
+.doc-content pre {
+  background-color: #000;
+  /* Dark background like VS Code */
+  padding: 16px;
+  border-radius: 6px;
+  margin: 12px 0;
+  overflow-x: auto;
+  /* Handle long lines */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.doc-content pre code {
+  background-color: transparent;
+  /* Remove inline code background within pre */
+  padding: 0;
+  /* Reset padding */
+  border-radius: 0;
+  /* Reset border-radius */
+  font-size: 1em;
+  color: var(--vscode-editor-foreground, #bb9af7);
+  /* Default text color (light gray) */
+  display: block;
+  /* Ensure proper block behavior */
+  white-space: pre-wrap;
+  /* Preserve whitespace and wrap long lines if needed */
+}
+
+
+
+/* Strong text styling */
+.doc-content strong {
+  color: var(--vscode-foreground, #a77bf9);
+  font-weight: 600;
+}
+
+/* List styling */
+.doc-content ul,
+.doc-content ol {
+  padding-left: 24px;
+  margin: 12px 0;
+}
+
+.doc-content ul ul,
+.doc-content ol ol {
+  margin: 6px 0;
+}
+
+.doc-content li {
+  margin: 6px 0;
+}
+
+/* Paragraph styling */
+.doc-content p {
+  margin: 12px 0;
+}
+
+/* Ensure nested lists within paragraphs are styled correctly */
+.doc-content p ol,
+.doc-content p ul {
+  margin: 8px 0;
+}
+
+/* body {
+  background-color: #1a1b26;
+  color: #a9b1d6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  line-height: 1.6;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+} */
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: #7aa2f7;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+/* Paragraphs and text */
+p {
+  margin-bottom: 1.2rem;
+  color: #c0caf5;
+}
+
+/* Links */
+a {
+  color: #7dcfff;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: #bb9af7;
+  text-decoration: underline;
+}
+
+
+/* Important notes and warnings */
+blockquote {
+  border-left: 4px solid #f7768e;
+  margin: 1.5rem 0;
+  padding: 0.5rem 1rem;
+  background-color: #24283b;
+  color: #a9b1d6;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+th, td {
+  padding: 0.75rem;
+  border: 1px solid #414868;
+  text-align: left;
+}
+
+th {
+  background-color: #24283b;
+  color: #7aa2f7;
+}
+
+/* Section separators */
+hr {
+  border: none;
+  border-top: 1px solid #414868;
+  margin: 2rem 0;
+}
+
+/* File extensions and important terms */
+.file-ext {
+  color: #ff9e64;
+}
+
+/* Security notes */
+.security-note {
+  background-color: #24283b;
+  border-left: 4px solid #e0af68;
+  padding: 1rem;
+  margin: 1.5rem 0;
+  border-radius: 0 6px 6px 0;
+}
+
+vscode-dropdown {
+  max-width: 100px;
+}
+
+.horizontal-stack {
+  display: flex;
+  justify-content: left;
+  gap: 20px;
+}
+
+/* New Attachment Icon Styles */
+.attachment-icon {
+  padding: 10px; /* Matches button padding for size consistency */
+  cursor: pointer;
+  color: rgb(120, 124, 153); /* Matches button background as default color */
+  transition: color 0.3s ease;
+}
+
+.attachment-icon.active {
+  color: rgb(97, 101, 126) 
+}
+
+.attachment-icon:hover {
+  color:  rgb(97, 101, 126)
+}
+
+.textarea-container {
+  width: 90%;
+}
+
+.url-container {
+  background: linear-gradient(to bottom, #2d2d2d, #3a3a3a);
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 12px;
+  max-width: 600px;
+  width: 100%;
+}
+
+.url-link {
+  color: #007bff;
+  font-size: 16px;
+  font-family: 'Roboto', sans-serif;
+  line-height: 1.5;
+  text-decoration: none;
+  word-wrap: break-word;
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.url-link:hover {
+  color: #0056b3;
+  transform: scale(1.02);
+}
+
+.copy-button {
+  border: 1px solid #a738c0;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 12px;
+  transition: background 0.3s ease, border-color 0.3s ease;
+  display: flex
+}
+
+.copy-button:hover {
+  background: #494f69;
+  border-color: #494f69;
+  color: white;
+}
+
+.app-container {
+  padding: 20px;
+  background-color: #1a1a1a;
+  min-height: 100vh;
+}

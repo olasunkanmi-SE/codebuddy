@@ -1,14 +1,15 @@
 import * as vscode from "vscode";
-import { getConfigValue } from "../utils";
-import { ChatManager } from "./chat-manager";
+import { getConfigValue } from "../utils/utils";
+import { EventEmitter } from "../emitter/agent-emitter";
 
-export const setUpGenerativeAiModel = (
+export const initializeGenerativeAiEnvironment = async (
   context: vscode.ExtensionContext,
   model: string,
   key: string,
   webViewProviderClass: any,
   subscriptions: vscode.Disposable[],
   quickFixCodeAction: vscode.Disposable,
+  agentEventEmmitter: EventEmitter,
 ) => {
   try {
     const apiKey = getConfigValue(key);
@@ -26,14 +27,11 @@ export const setUpGenerativeAiModel = (
         webViewProvider,
       );
 
-    const chatManager = new ChatManager(context);
-    const chatWithCodeBuddy = chatManager.registerChatCommand();
-
     context.subscriptions.push(
       ...subscriptions,
       quickFixCodeAction,
       registerWebViewProvider,
-      chatWithCodeBuddy,
+      agentEventEmmitter,
     );
   } catch (error) {
     vscode.window.showErrorMessage(

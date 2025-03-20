@@ -1,4 +1,4 @@
-import { getConfigValue } from "../utils";
+import { getConfigValue } from "../utils/utils";
 import { oneDarkCss } from "./themes/atom-one-dark";
 import { oneDarkReasonableCss } from "./themes/code-highlight_atom-one-dark-reasonable";
 import { codePenCss } from "./themes/code-pen";
@@ -9,85 +9,86 @@ import { nightOwlCss } from "./themes/night-owl";
 import { stackOverFlowCss } from "./themes/stackoverflow";
 import { tokyoNightCss } from "./themes/tokyo-night";
 
-const fontFamily = getConfigValue("font.family");
-const theme = getConfigValue("chatview.theme");
-const fontSize = getConfigValue("chatview.font.size");
+export function getChatCss() {
+  let fontFamily = getConfigValue("font.family");
+  let theme = getConfigValue("chatview.theme");
+  let fontSize = getConfigValue("chatview.font.size");
 
-let selectedTheme = "";
+  let selectedTheme = "";
 
-switch (theme) {
-  case "Atom One Dark":
-    selectedTheme = oneDarkCss;
-    break;
-  case "Atom One Dark Reasonable":
-    selectedTheme = oneDarkReasonableCss;
-    break;
-  case "Code Pen":
-    selectedTheme = codePenCss;
-    break;
-  case "felipec":
-    selectedTheme = felipecCss;
-    break;
-  case "github dark":
-    selectedTheme = githubDarkDimmed;
-    break;
-  case "ir black":
-    selectedTheme = irBlack;
-    break;
-  case "night owl":
-    selectedTheme = nightOwlCss;
-    break;
-  case "stackoverflow":
-    selectedTheme = stackOverFlowCss;
-    break;
-  case "tokyo night":
-    selectedTheme = tokyoNightCss;
-    break;
-  default:
-    break;
-}
+  switch (theme) {
+    case "Atom One Dark":
+      selectedTheme = oneDarkCss;
+      break;
+    case "Atom One Dark Reasonable":
+      selectedTheme = oneDarkReasonableCss;
+      break;
+    case "Code Pen":
+      selectedTheme = codePenCss;
+      break;
+    case "felipec":
+      selectedTheme = felipecCss;
+      break;
+    case "github dark":
+      selectedTheme = githubDarkDimmed;
+      break;
+    case "ir black":
+      selectedTheme = irBlack;
+      break;
+    case "night owl":
+      selectedTheme = nightOwlCss;
+      break;
+    case "stackoverflow":
+      selectedTheme = stackOverFlowCss;
+      break;
+    case "tokyo night":
+      selectedTheme = tokyoNightCss;
+      break;
+    default:
+      break;
+  }
 
-let selectedFontFamily = "";
+  let selectedFontFamily = "";
 
-switch (fontFamily) {
-  case "SF Mono":
-    selectedFontFamily = '"SF Mono"';
-    break;
-  case "Montserrat":
-    selectedFontFamily = `'Montserrat', sans-serif`;
-    break;
-  case "Space Mono":
-    selectedFontFamily = "Space Mono";
-    break;
-  case "Fira Code":
-    selectedFontFamily = "Fira Code";
-    break;
-  case "Source Code Pro":
-    selectedFontFamily = "Source Code Pro";
-    break;
-  case "JetBrains Mono":
-    selectedFontFamily = "JetBrains Mono";
-    break;
-  case "Roboto Mono":
-    selectedFontFamily = "Roboto Mono";
-    break;
-  case "Ubuntu Mono":
-    selectedFontFamily = "Ubuntu Mono";
-    break;
-  case "IBM Plex Mono":
-    selectedFontFamily = "IBM Plex Mono";
-    break;
-  case "Inconsolata":
-    selectedFontFamily = "Inconsolata";
-    break;
-  case "JetBrains Mono":
-    selectedFontFamily = "JetBrains Mono";
-    break;
-  default:
-    break;
-}
+  switch (fontFamily) {
+    case "SF Mono":
+      selectedFontFamily = '"SF Mono"';
+      break;
+    case "Montserrat":
+      selectedFontFamily = `'Montserrat', sans-serif`;
+      break;
+    case "Space Mono":
+      selectedFontFamily = "Space Mono";
+      break;
+    case "Fira Code":
+      selectedFontFamily = "Fira Code";
+      break;
+    case "Source Code Pro":
+      selectedFontFamily = "Source Code Pro";
+      break;
+    case "JetBrains Mono":
+      selectedFontFamily = "JetBrains Mono";
+      break;
+    case "Roboto Mono":
+      selectedFontFamily = "Roboto Mono";
+      break;
+    case "Ubuntu Mono":
+      selectedFontFamily = "Ubuntu Mono";
+      break;
+    case "IBM Plex Mono":
+      selectedFontFamily = "IBM Plex Mono";
+      break;
+    case "Inconsolata":
+      selectedFontFamily = "Inconsolata";
+      break;
+    case "JetBrains Mono":
+      selectedFontFamily = "JetBrains Mono";
+      break;
+    default:
+      break;
+  }
 
-export const chatCss: string = `
+  return `
 #chat-container {
     width: 100%;
     max-width: 600px;
@@ -177,20 +178,6 @@ export const chatCss: string = `
     color: #666;
 }
 
-
-
-body {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-    padding: 0;
-    font-family: ${selectedFontFamily};
-    font-size: 17px;
-    font-weight: bold
-    font-ligatures: true
-}
 
 
 h1 {
@@ -283,7 +270,6 @@ div.code {
     align-items: center;
     margin-bottom: -15px;
     padding: 5px 10px;
-    background-color: #222;
     color: #fff;
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
@@ -309,3 +295,4 @@ div.code {
 
 ${selectedTheme}
 `;
+}
