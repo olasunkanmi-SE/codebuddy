@@ -32,7 +32,7 @@ const vsCode = (() => {
   if (typeof window !== "undefined" && "acquireVsCodeApi" in window) {
     return (window as any).acquireVsCodeApi();
   }
-  // Fallback for non-VSCode environments
+
   return {
     postMessage: (message: any) => {
       console.log("Message to VS Code:", message);
@@ -58,7 +58,7 @@ export const WebviewUI = () => {
       const message = event.data;
       switch (message.type) {
         case "bot-response":
-          setIsBotLoading(false); // Stop loading after receiving response
+          setIsBotLoading(false);
           setMessages((prevMessages) => [
             ...(prevMessages || []),
             {
@@ -132,7 +132,7 @@ export const WebviewUI = () => {
       },
     ]);
 
-    setIsBotLoading(true); // Start loading when sending message
+    setIsBotLoading(true);
 
     vsCode.postMessage({
       command: "user-input",
