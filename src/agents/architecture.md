@@ -1,4 +1,4 @@
-```mermaid
+```
 graph TD
     A[GeminiLLM] -->|Initializes| B[GoogleGenerativeAI]
     A -->|Creates| C[Orchestrator]
