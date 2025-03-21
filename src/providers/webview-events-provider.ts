@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { Logger } from "../infrastructure/logger/logger";
 
-type Ttopic = "updateStyles" | "modelUpdate" | "bot" | "user-input";
+type Ttopic = "bot" | "user-input";
 
 interface IPostMessage {
   // Note. Change to topic instead

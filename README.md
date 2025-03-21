@@ -23,24 +23,22 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 - [ ] Support for local LLMs such as Ollama
 - [ ] Support for Deepseek model
 
-## Repository Structure
 
+## Repository Structure
 ```
 .
-├── src/
-│   ├── events/
-│   ├── providers/
-│   ├── services/
-│   ├── test/
-│   ├── webview/
-│   ├── constant.ts
-│   ├── extension.ts
-│   └── utils.ts
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-├── package.json
-├── README.md
-└── tsconfig.json
+├── src/                         # Source code directory
+│   ├── agents/                  # AI agent implementations and orchestration
+│   ├── application/             # Core application constants and interfaces
+│   ├── commands/                # Command implementations for VS Code extension
+│   ├── infrastructure/          # Core infrastructure components (HTTP, logging, storage)
+│   ├── llms/                    # Language model integrations (Anthropic, Gemini, Groq)
+│   ├── memory/                  # Memory management for AI context
+│   ├── providers/               # Provider implementations for different services
+│   ├── services/                # Business logic and core services
+│   └── webview/                 # VS Code webview implementation
+├── webviewUi/                   # React-based UI for the extension
+└── package.json                 # Project configuration and dependencies
 ```
 
 Key Files:
@@ -73,17 +71,6 @@ Key Files:
 2. Right-click on the selected code to access CodeBuddy features in the context menu.
 3. Access the chat interface via the CodeBuddy panel in the Activity Bar.
 
-### Features
-
-- Code Comments: Generate meaningful comments for your code.
-- Code Review: Get AI-powered code reviews and suggestions.
-- Code Refactoring: Automatically refactor selected code.
-- Code Optimization: Optimize your code for better performance.
-- Code Explanation: Get detailed explanations of complex code snippets.
-- Commit Message Generation: Create meaningful commit messages based on your changes.
-- Inline chat for a quick conversation with the Codebuddy
-- Code Chart Generation: Create visual representations of your code structure.
-
 ### Troubleshooting
 
 1. API Key Issues:
@@ -100,31 +87,69 @@ Key Files:
    - Problem: Slow response times from CodeBuddy.
    - Solution: Check your internet connection and consider switching to a faster AI model.
 
-### Debugging
+## Architecture
 
-To enable debug mode:
+```mermaid
+graph TB
+    subgraph VSCode["VS Code Extension"]
+        Editor["Editor Interface"]
+        Commands["Commands Layer"]
+        Webview["Webview UI (React)"]
+    end
 
-1. Open the Output panel in VS Code (View > Output).
-2. Select "CodeBuddy" from the dropdown menu.
-3. Look for debug information and error messages in the output.
+    subgraph Core["Core Application"]
+        direction TB
+        Agents["AI Agents Layer"]
+        AppServices["Application Services"]
+        Infrastructure["Infrastructure Layer"]
+        Memory["Memory System"]
+    end
 
-## Data Flow
+    subgraph AIProviders["AI Providers"]
+        Gemini["Gemini API"]
+        Groq["Groq API"]
+        Anthropic["Anthropic API"]
+        XGrok["XGrok API"]
+    end
 
-When a user interacts with CodeBuddy, the following data flow occurs:
+    subgraph Storage["Storage Layer"]
+        SQLite["SQLite Database"]
+        VectorDB["Vector Embeddings"]
+        FileSystem["File System Service"]
+    end
 
-1. User Input: The user selects a code or enters a query in the CodeBuddy chat panel.
-2. Extension Processing: The `extension.ts` file manages the user's action and directs it to the appropriate event handler in the `events/` directory.
-3. AI Model Integration: The chosen AI model (Gemini, Groq, Anthropic, or XGrok) is activated through the respective provider in the `providers/` directory.
-4. API Request: The provider requests the AI service's API using the user's input and any necessary context.
-5. Response Processing: The provider receives and processes the AI service's response.
-6. User Interface Update: The processed response is relayed back to the user interface, updating either the code editor or the chat panel.
+    %% Main Flow Connections
+    Editor -->|"User Input"| Commands
+    Commands -->|"Process Request"| Agents
+    Agents -->|"Context Management"| Memory
+    Agents -->|"API Requests"| Infrastructure
+    Infrastructure -->|"Model Selection"| AIProviders
+    AppServices -->|"Data Access"| Storage
+    Memory -->|"Store Context"| Storage
+    Infrastructure -->|"Response"| Webview
 
-Note: The chat history and other session data are managed by the `ChatManager` service to maintain context across interactions.
+    %% Additional Connections
+    Agents -->|"Business Logic"| AppServices
+    Commands -->|"UI Updates"| Webview
+    FileSystem -->|"Code Analysis"| Agents
+    
 
-## Deployment
+    class VSCode vscode
+    class Core core
+    class AIProviders ai
+    class Storage storage
+```
+### Database
+- SQLite database for code pattern storage
+- Vector embeddings for semantic code search
 
-N/A - This is a Visual Studio Code extension and does not require separate deployment.
+### HTTP Services
+- Custom HTTP client for AI API communication
+- Support for multiple authentication methods
+- Configurable timeout and retry mechanisms
 
-## Infrastructure
+### File System
+- Workspace management for multi-root projects
+- TypeScript configuration detection
+- File watching and indexing services
 
-N/A - This project does not have a dedicated infrastructure stack.

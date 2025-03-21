@@ -49,10 +49,6 @@ export const WebviewUI = () => {
   const [isBotLoading, setIsBotLoading] = useState(false);
 
   useEffect(() => {
-    highlightCodeBlocks(hljsApi, messages);
-  }, [messages]);
-
-  useEffect(() => {
     const messageHandler = (event: any) => {
       setIsBotLoading(true);
       const message = event.data;
@@ -71,21 +67,16 @@ export const WebviewUI = () => {
         case "error":
           console.error("Extension error", message.payload);
           break;
-        case "modelUpdate":
-          setSelectedModel(message.payload.model);
-          break;
-        case "modeUpdate":
-          setSelectedCodeBuddyMode(message.payload.model);
-          break;
         default:
           console.warn("Unknown message type", message.type);
       }
     };
     window.addEventListener("message", messageHandler);
+    highlightCodeBlocks(hljsApi, messages);
     return () => {
       window.removeEventListener("message", messageHandler);
     };
-  });
+  }, [messages]);
 
   const handleModelChange = (e: any) => {
     const newValue = e.target.value;
