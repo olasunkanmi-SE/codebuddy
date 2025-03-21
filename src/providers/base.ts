@@ -3,15 +3,14 @@ import { Orchestrator } from "../agents/orchestrator";
 import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { FileUploader } from "../services/file-uploader";
-import { formatText, getConfigValue } from "../utils/utils";
+import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
-import { getChatCss } from "../webview/chat_css";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected readonly orchestrator: Orchestrator;
   public static readonly viewId = "chatView";
-  static webView: vscode.WebviewView | undefined;
+  public static webView: vscode.WebviewView | undefined;
   public currentWebView: vscode.WebviewView | undefined = _view;
   _context: vscode.ExtensionContext;
   protected readonly logger: Logger;
@@ -51,53 +50,25 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     webviewView.webview.options = webviewOptions;
 
     if (!this.apiKey) {
-      vscode.window.showErrorMessage(
-        "API key not configured. Check your settings."
-      );
+      vscode.window.showErrorMessage("API key not configured. Check your settings.");
       return;
     }
     this.setWebviewHtml(this.currentWebView);
-    this.setupMessageHandler(
-      this.apiKey,
-      this.generativeAiModel,
-      this.currentWebView
-    );
-
-    setTimeout(() => {
-      this.currentWebView?.webview.postMessage({
-        type: "updateStyles",
-        payload: getChatCss(),
-      });
-      // this.currentWebView?.webview.postMessage({
-      //   type: "modelUpdate",
-      //   payload: { model: getConfigValue("generativeAi.option") },
-      // });
-    }, 500);
+    this.setupMessageHandler(this.apiKey, this.generativeAiModel, this.currentWebView);
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
     const codepatterns: FileUploader = new FileUploader(this._context);
-    // const knowledgeBaseDocs: string[] = await codepatterns.getFiles();
-    view.webview.html = getWebviewContent(
-      this.currentWebView?.webview!,
-      this._extensionUri
-    );
+    view.webview.html = getWebviewContent(this.currentWebView?.webview!, this._extensionUri);
   }
 
-  private async setupMessageHandler(
-    apiKey: string,
-    modelName: string,
-    _view: vscode.WebviewView
-  ): Promise<void> {
+  private async setupMessageHandler(apiKey: string, modelName: string, _view: vscode.WebviewView): Promise<void> {
     try {
       _view.webview.onDidReceiveMessage(async (message) => {
         let response: any;
         if (message.command === "user-input") {
           if (message.tags?.length > 0) {
-            response = await this.generateResponse(
-              message.message,
-              message.tags
-            );
+            response = await this.generateResponse(message.message, message.tags);
           } else {
             response = await this.generateResponse(message.message);
           }
@@ -116,15 +87,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   public handleModelResponseEvent(event: IEventPayload) {
     this.sendResponse(formatText(event.message), "bot");
   }
-  abstract generateResponse(
-    message?: string,
-    metaData?: Record<string, any>
-  ): Promise<string | undefined>;
+  abstract generateResponse(message?: string, metaData?: Record<string, any>): Promise<string | undefined>;
 
-  abstract sendResponse(
-    response: string,
-    currentChat?: string
-  ): Promise<boolean | undefined>;
+  abstract sendResponse(response: string, currentChat?: string): Promise<boolean | undefined>;
 
   public dispose(): void {
     this.disposables.forEach((d) => d.dispose());
