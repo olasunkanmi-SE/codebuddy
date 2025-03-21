@@ -7,15 +7,21 @@ This extension provides a wide range of AI-powered features to assist developers
 ## Install in Vscode Market Place
 https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy
 
+## Highlevel Architecture
+![Screenshot 2025-01-28 at 4 00 10 PM](https://github.com/user-attachments/assets/99d610f9-3e88-4f43-9198-61629fed5eaf)
+
+
 ## Roadmap
-- [ ] Local codebase indexing. Perform retrieval-augmented generation (RAG) on the codebase.
-- [ ] Context Pinning. Pin directories, and files, (functions, classes, etc.) as persistent context. AI Models to reference these items for every suggestion, across Chat and Commands.
-- [ ] Persistent Context. AI model to use certain context throughout a conversation and across different conversations by configuring the Context.
-- [ ] Create Code base Documentation.
-- [ ] Orchestrator. Coordinate AI model activities with Agent capabilities, through tools and function calling.
+- [ ] Codebase Understanding: Comprehensive local codebase indexing with Retrieval-Augmented Generation (RAG) capabilities.
+- [ ] Code search: Search code across the entire codebase
+- [ ] Rewrite the Webview UI with React
+- [ ] Incorporate AI agents for seamless interaction with external resources and APIs.
+- [ ] Context Pinning: Allow users to pin specific directories, files, and code elements (functions, classes, etc.) as persistent context for AI models.
+- [ ] Automated Documentation Generation: Generate comprehensive and up-to-date codebase documentation.
+- [ ] Intelligent Orchestration: Orchestrate ReAct models activities through advanced tools and function calling.
 - [ ] Access to real-time data.
 - [ ] Support for local LLMs such as Ollama
-- [ ] Code search. Search code across the entire codebase
+- [ ] Support for Deepseek model
 
 
 ## Repository Structure
@@ -61,9 +67,9 @@ Key Files:
 
 ### Getting Started
 
-1. Open a JavaScript or TypeScript file in VS Code.
-2. Right-click on selected code to access CodeBuddy features in the context menu.
-3. Use the CodeBuddy panel in the Activity Bar to access the chat interface.
+1. Open a Vscode workspace/file containing some code
+2. Right-click on the selected code to access CodeBuddy features in the context menu.
+3. Access the chat interface via the CodeBuddy panel in the Activity Bar.
 
 ### Troubleshooting
 
@@ -80,9 +86,6 @@ Key Files:
 3. Performance Issues:
    - Problem: Slow response times from CodeBuddy.
    - Solution: Check your internet connection and consider switching to a faster AI model.
-
-
-
 
 ## Architecture
 
@@ -149,3 +152,4 @@ graph TB
 - Workspace management for multi-root projects
 - TypeScript configuration detection
 - File watching and indexing services
+

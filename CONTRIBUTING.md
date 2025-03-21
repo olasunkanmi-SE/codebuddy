@@ -1,6 +1,7 @@
 # Contributing to CodeBuddy
 
 Thank you for considering contributing to CodeBuddy! We appreciate your support.
+# Active development branch is the development branch
 
 ## How to Contribute
 
