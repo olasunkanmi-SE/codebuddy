@@ -7,8 +7,72 @@ This extension provides a wide range of AI-powered features to assist developers
 ## Install in Vscode Market Place
 https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy
 
-## Highlevel Architecture
-![Screenshot 2025-01-28 at 4 00 10 PM](https://github.com/user-attachments/assets/99d610f9-3e88-4f43-9198-61629fed5eaf)
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph VSCode["VS Code Extension"]
+        Editor["Editor Interface"]
+        Commands["Commands Layer"]
+        Webview["Webview UI (React)"]
+    end
+
+    subgraph Core["Core Application"]
+        direction TB
+        Agents["AI Agents Layer"]
+        AppServices["Application Services"]
+        Infrastructure["Infrastructure Layer"]
+        Memory["Memory System"]
+    end
+
+    subgraph AIProviders["AI Providers"]
+        Gemini["Gemini API"]
+        Groq["Groq API"]
+        Anthropic["Anthropic API"]
+        XGrok["XGrok API"]
+    end
+
+    subgraph Storage["Storage Layer"]
+        SQLite["SQLite Database"]
+        VectorDB["Vector Embeddings"]
+        FileSystem["File System Service"]
+    end
+
+    %% Main Flow Connections
+    Editor -->|"User Input"| Commands
+    Commands -->|"Process Request"| Agents
+    Agents -->|"Context Management"| Memory
+    Agents -->|"API Requests"| Infrastructure
+    Infrastructure -->|"Model Selection"| AIProviders
+    AppServices -->|"Data Access"| Storage
+    Memory -->|"Store Context"| Storage
+    Infrastructure -->|"Response"| Webview
+
+    %% Additional Connections
+    Agents -->|"Business Logic"| AppServices
+    Commands -->|"UI Updates"| Webview
+    FileSystem -->|"Code Analysis"| Agents
+    
+
+    class VSCode vscode
+    class Core core
+    class AIProviders ai
+    class Storage storage
+```
+### Database
+- SQLite database for code pattern storage
+- Vector embeddings for semantic code search
+
+### HTTP Services
+- Custom HTTP client for AI API communication
+- Support for multiple authentication methods
+- Configurable timeout and retry mechanisms
+
+### File System
+- Workspace management for multi-root projects
+- TypeScript configuration detection
+- File watching and indexing services
 
 
 ## Roadmap
@@ -86,70 +150,4 @@ Key Files:
 3. Performance Issues:
    - Problem: Slow response times from CodeBuddy.
    - Solution: Check your internet connection and consider switching to a faster AI model.
-
-## Architecture
-
-```mermaid
-graph TB
-    subgraph VSCode["VS Code Extension"]
-        Editor["Editor Interface"]
-        Commands["Commands Layer"]
-        Webview["Webview UI (React)"]
-    end
-
-    subgraph Core["Core Application"]
-        direction TB
-        Agents["AI Agents Layer"]
-        AppServices["Application Services"]
-        Infrastructure["Infrastructure Layer"]
-        Memory["Memory System"]
-    end
-
-    subgraph AIProviders["AI Providers"]
-        Gemini["Gemini API"]
-        Groq["Groq API"]
-        Anthropic["Anthropic API"]
-        XGrok["XGrok API"]
-    end
-
-    subgraph Storage["Storage Layer"]
-        SQLite["SQLite Database"]
-        VectorDB["Vector Embeddings"]
-        FileSystem["File System Service"]
-    end
-
-    %% Main Flow Connections
-    Editor -->|"User Input"| Commands
-    Commands -->|"Process Request"| Agents
-    Agents -->|"Context Management"| Memory
-    Agents -->|"API Requests"| Infrastructure
-    Infrastructure -->|"Model Selection"| AIProviders
-    AppServices -->|"Data Access"| Storage
-    Memory -->|"Store Context"| Storage
-    Infrastructure -->|"Response"| Webview
-
-    %% Additional Connections
-    Agents -->|"Business Logic"| AppServices
-    Commands -->|"UI Updates"| Webview
-    FileSystem -->|"Code Analysis"| Agents
-    
-
-    class VSCode vscode
-    class Core core
-    class AIProviders ai
-    class Storage storage
-```
-### Database
-- SQLite database for code pattern storage
-- Vector embeddings for semantic code search
-
-### HTTP Services
-- Custom HTTP client for AI API communication
-- Support for multiple authentication methods
-- Configurable timeout and retry mechanisms
-
-### File System
-- Workspace management for multi-root projects
-- TypeScript configuration detection
-- File watching and indexing services
 
