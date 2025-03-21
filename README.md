@@ -64,11 +64,6 @@ graph TB
 - SQLite database for code pattern storage
 - Vector embeddings for semantic code search
 
-### HTTP Services
-- Custom HTTP client for AI API communication
-- Support for multiple authentication methods
-- Configurable timeout and retry mechanisms
-
 ### File System
 - Workspace management for multi-root projects
 - TypeScript configuration detection
