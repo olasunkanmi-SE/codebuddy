@@ -100,13 +100,6 @@ graph TB
 └── package.json                 # Project configuration and dependencies
 ```
 
-Key Files:
-
-- `src/extension.ts`: Main entry point for the extension
-- `src/events/`: Contains event handlers for various CodeBuddy features
-- `src/providers/`: Implements providers for different AI models and webviews
-- `src/services/`: Contains service classes for chat management and AI model integration
-- `package.json`: Defines extension metadata, dependencies, and configuration
 
 ## Usage Instructions
 
