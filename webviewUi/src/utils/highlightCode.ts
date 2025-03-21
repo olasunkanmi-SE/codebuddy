@@ -10,21 +10,19 @@ export interface Message {
 }
 
 export const highlightCodeBlocks = (hljsApi: HLJSApi, messages: any) => {
-  if (!hljsApi || !(messages?.length > 0)) return;
+  if (!hljsApi || messages?.length <= 0) return;
 
   document.querySelectorAll("pre code").forEach((block) => {
-    const detected = hljsApi.highlightAuto(block.textContent || "").language;
+    const detected = hljsApi.highlightAuto(block.textContent ?? "").language;
     if (detected != undefined) {
-      block.setHTMLUnsafe(
-        hljsApi.highlight(block.getHTML(), { language: detected }).value
-      );
+      block.setHTMLUnsafe(hljsApi.highlight(block.getHTML(), { language: detected }).value);
 
       const copyButton = document.createElement("button");
       copyButton.innerHTML = "Copy";
       copyButton.classList.add("copy-button");
 
       copyButton.addEventListener("click", () => {
-        navigator.clipboard.writeText(block.textContent || "");
+        navigator.clipboard.writeText(block.textContent ?? "");
         copyButton.textContent = "Copied!";
         setTimeout(() => {
           copyButton.textContent = "Copy";

@@ -12,10 +12,7 @@ export interface ExtensionMessage {
   payload: any;
 }
 
-import {
-  VSCodeProgressRing,
-  VSCodeTextArea,
-} from "@vscode/webview-ui-toolkit/react";
+import { VSCodeProgressRing, VSCodeTextArea } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useEffect, useState } from "react";
 import { codeBuddyMode, modelOptions } from "../constants/constant";
@@ -25,6 +22,7 @@ import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
 import { updateStyles } from "../utils/dynamicCss";
+import { getChatCss } from "../themes/chat_css";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -32,7 +30,7 @@ const vsCode = (() => {
   if (typeof window !== "undefined" && "acquireVsCodeApi" in window) {
     return (window as any).acquireVsCodeApi();
   }
-  // Fallback for non-VSCode environments
+
   return {
     postMessage: (message: any) => {
       console.log("Message to VS Code:", message);
@@ -41,6 +39,8 @@ const vsCode = (() => {
 })();
 
 export const WebviewUI = () => {
+  const css = getChatCss("Atom One Dark");
+  updateStyles(css);
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("");
   const [userInput, setUserInput] = useState("");
@@ -58,7 +58,7 @@ export const WebviewUI = () => {
       const message = event.data;
       switch (message.type) {
         case "bot-response":
-          setIsBotLoading(false); // Stop loading after receiving response
+          setIsBotLoading(false);
           setMessages((prevMessages) => [
             ...(prevMessages || []),
             {
@@ -73,9 +73,6 @@ export const WebviewUI = () => {
           break;
         case "modelUpdate":
           setSelectedModel(message.payload.model);
-          break;
-        case "updateStyles":
-          updateStyles(message.payload);
           break;
         case "modeUpdate":
           setSelectedCodeBuddyMode(message.payload.model);
@@ -132,7 +129,7 @@ export const WebviewUI = () => {
       },
     ]);
 
-    setIsBotLoading(true); // Start loading when sending message
+    setIsBotLoading(true);
 
     vsCode.postMessage({
       command: "user-input",
@@ -147,19 +144,14 @@ export const WebviewUI = () => {
     <div className="container">
       <div className="dropdown-container">
         <div>
-          {messages?.map((msg, index) =>
+          {messages?.map((msg) =>
             msg.type === "bot" ? (
-              <BotMessage key={index} content={msg.content} />
+              <BotMessage key={msg.content} content={msg.content} />
             ) : (
-              <UserMessage
-                key={index}
-                message={msg.content}
-                alias={msg.alias}
-              />
+              <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
             )
           )}
-          {isBotLoading && <VSCodeProgressRing />}{" "}
-          {/* This doesnt work as expected */}
+          {isBotLoading && <VSCodeProgressRing />} {/* This doesnt work as expected */}
         </div>
       </div>
       <div className="business">
@@ -177,10 +169,7 @@ export const WebviewUI = () => {
           />
         </div>
         <div className="horizontal-stack">
-          <AttachmentIcon
-            onClick={() => setActiveItem("attach")}
-            isActive={activeItem === "attach"}
-          />
+          <AttachmentIcon onClick={() => setActiveItem("attach")} isActive={activeItem === "attach"} />
           <ModelDropdown
             value={selectedModel}
             onChange={handleModelChange}

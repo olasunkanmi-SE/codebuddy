@@ -1,7 +1,7 @@
 export const updateStyles = (data: string) => {
+  const styleId = "dynamic-chat-css";
   const styleElement = document.createElement("style");
-  styleElement.id = "dynamic-chat-css";
+  styleElement.id = styleId;
   styleElement.innerHTML = data;
   document.head.appendChild(styleElement);
-  console.log("Updating extension css style.");
 };
