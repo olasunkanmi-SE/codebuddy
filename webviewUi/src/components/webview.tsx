@@ -12,17 +12,18 @@ export interface ExtensionMessage {
   payload: any;
 }
 
-import { VSCodeProgressRing, VSCodeTextArea } from "@vscode/webview-ui-toolkit/react";
+import { VSCodeTextArea } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useEffect, useState } from "react";
 import { codeBuddyMode, modelOptions } from "../constants/constant";
+import { getChatCss } from "../themes/chat_css";
+import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
 import AttachmentIcon from "./attachmentIcon";
+import { BotIcon } from "./botIcon";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
-import { updateStyles } from "../utils/dynamicCss";
-import { getChatCss } from "../themes/chat_css";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -39,10 +40,10 @@ const vsCode = (() => {
 })();
 
 export const WebviewUI = () => {
-  const css = getChatCss("Atom One Dark");
+  const css = getChatCss("tokyo night");
   updateStyles(css);
-  const [selectedModel, setSelectedModel] = useState("");
-  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("");
+  const [selectedModel, setSelectedModel] = useState("Gemini");
+  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Edit");
   const [userInput, setUserInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeItem, setActiveItem] = useState<string | null>(null);
@@ -82,8 +83,8 @@ export const WebviewUI = () => {
     const newValue = e.target.value;
     setSelectedModel(newValue);
     vsCode.postMessage({
-      command: "user-input",
-      message: newValue,
+      topic: "update-model-event",
+      payload: newValue,
     });
   };
 
@@ -91,8 +92,8 @@ export const WebviewUI = () => {
     const newValue = e.target.value;
     setSelectedCodeBuddyMode(newValue);
     vsCode.postMessage({
-      command: "user-input",
-      message: newValue,
+      topic: "codebuddy-mode-change-event",
+      payload: newValue,
     });
   };
 
@@ -125,7 +126,7 @@ export const WebviewUI = () => {
     vsCode.postMessage({
       command: "user-input",
       message: userInput,
-      tags: ["file", "index", "search"],
+      metaData: { mode: selectedCodeBuddyMode },
     });
 
     setUserInput("");
@@ -142,7 +143,7 @@ export const WebviewUI = () => {
               <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
             )
           )}
-          {isBotLoading && <VSCodeProgressRing />} {/* This doesnt work as expected */}
+          {isBotLoading && <BotIcon isBlinking={true} />}
         </div>
       </div>
       <div className="business">
@@ -155,7 +156,7 @@ export const WebviewUI = () => {
           <VSCodeTextArea
             value={userInput}
             onInput={handleTextChange}
-            placeholder="Ask a question or enter '/' for quick actions"
+            placeholder="Ask Anything"
             onKeyDown={handleKeyDown}
           />
         </div>
