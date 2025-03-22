@@ -54,7 +54,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       return;
     }
     this.setWebviewHtml(this.currentWebView);
-    this.setupMessageHandler(this.apiKey, this.generativeAiModel, this.currentWebView);
+    this.setupMessageHandler(this.currentWebView);
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
@@ -62,13 +62,13 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     view.webview.html = getWebviewContent(this.currentWebView?.webview!, this._extensionUri);
   }
 
-  private async setupMessageHandler(apiKey: string, modelName: string, _view: vscode.WebviewView): Promise<void> {
+  private async setupMessageHandler(_view: vscode.WebviewView): Promise<void> {
     try {
       _view.webview.onDidReceiveMessage(async (message) => {
         let response: any;
         if (message.command === "user-input") {
-          if (message.tags?.length > 0) {
-            response = await this.generateResponse(message.message, message.tags);
+          if (message.metaData.mode === "Agent") {
+            response = await this.generateResponse(message.message, message.metaData);
           } else {
             response = await this.generateResponse(message.message);
           }

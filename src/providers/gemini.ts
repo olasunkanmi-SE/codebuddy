@@ -11,12 +11,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
   readonly model: GenerativeModel;
   readonly metaData?: Record<string, any>;
   private readonly gemini: GeminiLLM;
-  constructor(
-    extensionUri: vscode.Uri,
-    apiKey: string,
-    generativeAiModel: string,
-    context: vscode.ExtensionContext,
-  ) {
+  constructor(extensionUri: vscode.Uri, apiKey: string, generativeAiModel: string, context: vscode.ExtensionContext) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.gemini = GeminiLLM.getInstance({
       apiKey: this.apiKey,
@@ -25,10 +20,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     this.model = this.gemini.getModel();
   }
 
-  async sendResponse(
-    response: string,
-    currentChat: string,
-  ): Promise<boolean | undefined> {
+  async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -36,24 +28,19 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
           Message.of({
             role: "model",
             parts: [{ text: response }],
-          }),
+          })
         );
       } else {
         this.chatHistory.push(
           Message.of({
             role: "user",
             parts: [{ text: response }],
-          }),
+          })
         );
       }
       if (this.chatHistory.length === 2) {
-        const chatHistory = Memory.has(COMMON.GEMINI_CHAT_HISTORY)
-          ? Memory.get(COMMON.GEMINI_CHAT_HISTORY)
-          : [];
-        Memory.set(COMMON.GEMINI_CHAT_HISTORY, [
-          ...chatHistory,
-          ...this.chatHistory,
-        ]);
+        const chatHistory = Memory.has(COMMON.GEMINI_CHAT_HISTORY) ? Memory.get(COMMON.GEMINI_CHAT_HISTORY) : [];
+        Memory.set(COMMON.GEMINI_CHAT_HISTORY, [...chatHistory, ...this.chatHistory]);
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -65,10 +52,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(
-    message: string,
-    metaData?: any,
-  ): Promise<string | undefined> {
+  async generateResponse(message: string, metaData?: any): Promise<string | undefined> {
     try {
       if (metaData) {
         this.orchestrator.publish("onThinking", "...thinking");
@@ -83,9 +67,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
           },
         ],
       });
-      let chatHistory = Memory.has(COMMON.GEMINI_CHAT_HISTORY)
-        ? Memory.get(COMMON.GEMINI_CHAT_HISTORY)
-        : [userMessage];
+      let chatHistory = Memory.has(COMMON.GEMINI_CHAT_HISTORY) ? Memory.get(COMMON.GEMINI_CHAT_HISTORY) : [userMessage];
 
       chatHistory = [...chatHistory, userMessage];
 
@@ -99,9 +81,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       return response.text();
     } catch (error) {
       Memory.set(COMMON.GEMINI_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
-      );
+      vscode.window.showErrorMessage("Model not responding, please resend your question");
       console.error(error);
       return;
     }
