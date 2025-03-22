@@ -6,11 +6,7 @@ interface AttachmentIconProps {
   className?: string;
 }
 
-const AttachmentIcon: React.FC<AttachmentIconProps> = ({
-  onClick,
-  isActive = false,
-  className = "",
-}) => {
+const AttachmentIcon: React.FC<AttachmentIconProps> = ({ onClick, isActive = false, className = "" }) => {
   return (
     <svg
       className={`attachment-icon ${isActive ? "active" : ""} ${className}`}
