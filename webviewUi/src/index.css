@@ -555,3 +555,112 @@ hr {
   background-color: #1a1a1a;
   min-height: 100vh;
 }
+
+.url-grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* Exactly 3 cards per row */
+  gap: 20px;
+  padding: 16px;
+  width: 100%;
+}
+
+.url-card {
+  border-radius: 12px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  display: block;
+  height: 100%;
+}
+
+.url-card:hover {
+  border-color: #0070f3;
+}
+
+.url-card-content {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.url-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 98px;
+  background-color: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 14px;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.favicon {
+  width: 16px;
+  height: 16px;
+}
+
+.url-details {
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.url-details:hover {
+  text-decoration: none;
+}
+
+.domain-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+}
+
+.domain-name a {
+  text-decoration: none;
+}
+
+.domain-name:hover {
+  text-decoration: none;
+}
+
+.full-url {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #6e6e6e;
+  /* white-space: nowrap; */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.visit-icon {
+  color: #0070f3;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+
+.url-card:hover .visit-icon {
+  opacity: 1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .url-grid-container {
+    grid-template-columns: repeat(2, 1fr);
+    /* 2 cards per row on medium screens */
+  }
+}
+
+@media (max-width: 600px) {
+  .url-grid-container {
+    grid-template-columns: 1fr;
+    /* 1 card per row on small screens */
+  }
+}

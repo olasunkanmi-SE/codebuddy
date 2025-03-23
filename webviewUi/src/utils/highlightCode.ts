@@ -12,16 +12,21 @@ export const highlightCodeBlocks = (hljsApi: HLJSApi, messages: any) => {
   if (!hljsApi || messages?.length <= 0) return;
   document.querySelectorAll("pre code:not(.hljs-done)").forEach((block) => {
     let language = null;
-    const languageClass = Array.from(block.classList).find((className) => className.startsWith("language-"));
+    const languageClass = Array.from(block.classList).find((className) =>
+      className.startsWith("language-"),
+    );
     if (languageClass) {
       language = languageClass.substring("language-".length);
     }
 
     try {
       const decodedCode = decodeHtml(block.textContent ?? "");
-      const detectedLanguage = language ?? hljsApi.highlightAuto(decodedCode).language;
+      const detectedLanguage =
+        language ?? hljsApi.highlightAuto(decodedCode).language;
       if (detectedLanguage != undefined) {
-        const highlightedCode = hljsApi.highlight(decodedCode, { language: detectedLanguage }).value;
+        const highlightedCode = hljsApi.highlight(decodedCode, {
+          language: detectedLanguage,
+        }).value;
         block.setHTMLUnsafe(highlightedCode);
         block.classList.add("hljs-done");
 

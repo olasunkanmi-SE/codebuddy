@@ -96,6 +96,15 @@ export class GeminiLLM
           tools: modelParams?.tools ?? this.config.tools,
           systemInstruction:
             modelParams?.systemInstruction ?? this.config.systemInstruction,
+          generationConfig: {
+            stopSequences: [
+              "Thank you",
+              "Done",
+              "End",
+              "stuck in a loop",
+              "loop",
+            ],
+          },
         });
       if (!model) {
         throw new Error(`Error retrieving model ${this.config.model}`);
