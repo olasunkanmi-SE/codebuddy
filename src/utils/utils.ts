@@ -13,7 +13,8 @@ type GetConfigValueType<T> = (key: string) => T | undefined;
 export const formatText = (text?: string): string => {
   if (text) {
     const md = markdownit();
-    return md.render(text);
+    const renderedText = md.render(text);
+    return renderedText;
   }
   return "";
 };

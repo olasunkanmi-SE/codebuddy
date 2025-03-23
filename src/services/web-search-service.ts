@@ -10,6 +10,12 @@ interface ArticleContent {
   content: string;
 }
 
+interface IPageMetada {
+  url: string;
+  favicon: string;
+  title: string | undefined;
+}
+
 export class WebSearchService {
   protected readonly orchestrator: Orchestrator;
   private static instance: WebSearchService;
@@ -49,9 +55,9 @@ export class WebSearchService {
     }
   }
 
-  private async extractUrlsFromSearchPage(
+  private async fetchSearchResultMetadata(
     searchUrl: string,
-  ): Promise<string[]> {
+  ): Promise<IPageMetada[]> {
     try {
       const response = await axios.get(searchUrl, {
         timeout: 5000,
@@ -64,16 +70,28 @@ export class WebSearchService {
       const dom = new JSDOM(response.data);
       const urlElements =
         dom.window.document.querySelectorAll("a.wgl-display-url");
+
       const urls = Array.from(urlElements)
         .map((el) => el.getAttribute("href"))
         .filter((url): url is string => !!url && url.startsWith("http"))
-        .slice(0, 10);
+        .slice(0, 12);
+
+      const pagesMetaData: IPageMetada[] = await Promise.all(
+        urls.map(async (url) => {
+          const metadata = await this.extracturlMetaData(url);
+          return metadata;
+        }),
+      );
 
       this.logger.info(`Extracted URLs: ${urls.join(", ")}`);
-      if (urls?.length) {
-        this.orchestrator.publish("onUpdate", urls.join("\n\n"));
+      if (pagesMetaData?.length) {
+        this.orchestrator.publish(
+          "onUpdate",
+          pagesMetaData.map((item) => JSON.stringify(item)).join("\n\n"),
+        );
       }
-      return urls;
+      console.log(pagesMetaData);
+      return pagesMetaData;
     } catch (error: any) {
       this.logger.error(
         `Error fetching or parsing search results: ${error.message}`,
@@ -81,6 +99,106 @@ export class WebSearchService {
       );
       throw new Error(`Error fetching search results: ${error.message}`);
     }
+  }
+
+  private async extracturlMetaData(
+    url: string,
+  ): Promise<{ url: string; title: string | undefined; favicon: string }> {
+    try {
+      const parsedUrl = new URL(url);
+      const origin = parsedUrl.origin;
+      let favicon = "";
+      let title: string | undefined;
+
+      try {
+        const response = await axios.get(url, {
+          timeout: 3000,
+          headers: {
+            "User-Agent": this.userAgent,
+          },
+        });
+
+        const dom = new JSDOM(response.data);
+        const doc = dom.window.document;
+
+        title = this.extractTitle(doc);
+
+        const faviconElement = doc.querySelector(
+          'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]',
+        );
+
+        favicon = await this.extractFavicon(faviconElement, origin, parsedUrl);
+      } catch (error) {
+        favicon = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
+        title = parsedUrl.hostname;
+      }
+      return { url, favicon, title };
+    } catch (error: any) {
+      this.logger.warn(
+        `Error fetching favicon and title for ${url}: ${error.message}`,
+      );
+      throw new Error(`Error fetching Favicons and title: ${error.message}`);
+    }
+  }
+
+  private extractTitle(doc: Document): string | undefined {
+    let title: string | undefined;
+
+    let titleElement = doc.querySelector("title");
+    if (titleElement) {
+      title = titleElement.textContent?.trim();
+    }
+
+    if (!title) {
+      let ogTitle = doc.querySelector('meta[property="og:title"]');
+      if (ogTitle) {
+        title = ogTitle.getAttribute("content")?.trim();
+      }
+    }
+
+    if (!title) {
+      let twitterTitle = doc.querySelector('meta[name="twitter:title"]');
+      if (twitterTitle) {
+        title = twitterTitle.getAttribute("content")?.trim();
+      }
+    }
+
+    return title;
+  }
+
+  private async extractFavicon(
+    faviconElement: Element | null,
+    origin: string,
+    parsedUrl: URL,
+  ): Promise<string> {
+    let favicon = "";
+
+    if (faviconElement?.getAttribute("href")) {
+      const faviconHref = faviconElement.getAttribute("href")!;
+      favicon = faviconHref.startsWith("http")
+        ? faviconHref
+        : new URL(faviconHref, origin).href;
+    }
+    if (!favicon) {
+      const rootFaviconUrl = `${origin}/favicon.ico`;
+
+      try {
+        const faviconResponse = await axios.head(rootFaviconUrl, {
+          timeout: 2000,
+        });
+        if (faviconResponse.status === 200) {
+          favicon = rootFaviconUrl;
+        }
+      } catch (error: any) {
+        this.logger.error(`unable to fetch Favicons ${error.message}`, error);
+        throw new Error(`Error fetching Favicons: ${error.message}`);
+      }
+    }
+    if (!favicon) {
+      favicon = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
+    }
+
+    return favicon;
   }
 
   public async run(query: string): Promise<string> {
@@ -92,7 +210,7 @@ export class WebSearchService {
     const searchUrl = `${this.baseUrl}${queryString}`;
 
     try {
-      const urls = await this.extractUrlsFromSearchPage(searchUrl);
+      const urls = await this.fetchSearchResultMetadata(searchUrl);
 
       if (urls.length === 0) {
         return `No web results found for "${query}" on Startpage.`;
@@ -100,7 +218,7 @@ export class WebSearchService {
 
       const contextPromises = urls
         .slice(0, 5)
-        .map((url) => this.fetchArticleContent(url));
+        .map(({ url }) => this.fetchArticleContent(url));
       const contextResults = await Promise.all(contextPromises);
       const combinedContext = contextResults
         .map((result) => result.content)
