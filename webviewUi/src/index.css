@@ -130,7 +130,6 @@ vscode-dropdown[open] {
 
 vscode-text-area {
   display: block;
-  width: 100%;
   max-width: 100%;
   background-color: var(--vscode-input-background, #252526);
   color: var(--vscode-input-foreground, #cccccc);
@@ -142,6 +141,7 @@ vscode-text-area {
   line-height: 1.6;
   min-height: 36px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  width: -webkit-fill-available
 }
 
 vscode-text-area:hover {
@@ -663,4 +663,12 @@ hr {
     grid-template-columns: 1fr;
     /* 1 card per row on small screens */
   }
+}
+
+.chat-content {
+  height: "calc(100% - 120px)";
+  overflow-y: auto;
+  padding-bottom: 20px;
+  max-width: 100%;
+  width: "-webkit-fill-available";
 }

@@ -150,7 +150,7 @@ export const WebviewUI = () => {
         </VSCodePanelTab>
 
         <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
-          <div style={{ height: "calc(100% - 120px)", overflowY: "auto", paddingBottom: "20px" }}>
+          <div className="chat-content">
             <div className="dropdown-container">
               <div>
                 {messages?.map((msg) =>

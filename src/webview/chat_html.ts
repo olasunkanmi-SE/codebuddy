@@ -35,7 +35,7 @@ export const chartComponent = (webview: Webview, extensionUri: Uri) => {
     <link rel="stylesheet" type="text/css" href="${stylesUri}">
     </head>
 
-    <body>
+    <body style="background-color: rgb(22, 22, 30);">
     <div id="root"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js" integrity="sha512-EBLzUL8XLl+va/zAsmXwS7Z2B1F9HUHkZwyS/VKwh3S7T/U0nF4BaU29EP/ZSf6zgiIxYAnKLu6bJ8dqpmX5uw==" crossorigin="anonymous" referrerpolicy="no-referrer" charset="utf-8"></script>
     <script enable=true type="module" nonce="${nonce}" src="${scriptUri}">
