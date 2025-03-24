@@ -24,6 +24,7 @@ import { AnthropicWebViewProvider } from "./providers/anthropic";
 import { CodeActionsProvider } from "./providers/code-actions";
 import { GeminiWebViewProvider } from "./providers/gemini";
 import { GroqWebViewProvider } from "./providers/groq";
+import { DeepseekWebViewProvider } from "./providers/deepseek";
 import { FileUploader } from "./services/file-uploader";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { Credentials } from "./services/github-authentication";
@@ -38,6 +39,8 @@ const {
   anthropicModel,
   grokApiKey,
   grokModel,
+  deepseekApiKey,
+  deepseekModel,
 } = APP_CONFIG;
 
 const connectDB = async () => {
@@ -203,6 +206,11 @@ export async function activate(context: vscode.ExtensionContext) {
         key: grokApiKey,
         model: grokModel,
         webviewProviderClass: AnthropicWebViewProvider,
+      },
+      [generativeAiModels.DEEPSEEK]: {
+        key: deepseekApiKey,
+        model: deepseekModel,
+        webviewProviderClass: DeepseekWebViewProvider,
       },
     };
     if (selectedGenerativeAiModel in modelConfigurations) {

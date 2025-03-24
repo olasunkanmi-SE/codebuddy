@@ -31,6 +31,7 @@ graph TB
         Groq["Groq API"]
         Anthropic["Anthropic API"]
         XGrok["XGrok API"]
+        Deepseek["Deepseel API"]
     end
 
     subgraph Storage["Storage Layer"]
