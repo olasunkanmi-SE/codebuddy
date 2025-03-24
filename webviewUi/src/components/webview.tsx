@@ -12,7 +12,7 @@ export interface ExtensionMessage {
   payload: any;
 }
 
-import { VSCodeTextArea } from "@vscode/webview-ui-toolkit/react";
+import { VSCodeTextArea, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useEffect, useState } from "react";
 import { codeBuddyMode, modelOptions } from "../constants/constant";
@@ -48,6 +48,7 @@ export const WebviewUI = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [isBotLoading, setIsBotLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("tab-1");
 
   useEffect(() => {
     const messageHandler = (event: any) => {
@@ -133,51 +134,84 @@ export const WebviewUI = () => {
   };
 
   return (
-    <div className="container">
-      <div className="dropdown-container">
-        <div>
-          {messages?.map((msg) =>
-            msg.type === "bot" ? (
-              <BotMessage key={msg.content} content={msg.content} />
-            ) : (
-              <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
-            )
-          )}
-          {isBotLoading && <BotIcon isBlinking={true} />}
-        </div>
-      </div>
-      <div className="business">
-        <div className="horizontal-stack">
-          <span className="currenFile">
-            <small>create-singleClient.dto.ts</small>
-          </span>
-        </div>
-        <div className="textarea-container">
-          <VSCodeTextArea
-            value={userInput}
-            onInput={handleTextChange}
-            placeholder="Ask Anything"
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        <div className="horizontal-stack">
-          <AttachmentIcon onClick={() => setActiveItem("attach")} isActive={activeItem === "attach"} />
-          <ModelDropdown
-            value={selectedModel}
-            onChange={handleModelChange}
-            options={modelOptions}
-            id="model"
-            defaultValue="Gemini"
-          />
-          <ModelDropdown
-            value={selectedCodeBuddyMode}
-            onChange={handleCodeBuddyMode}
-            options={codeBuddyMode}
-            id="cBuddymode"
-            defaultValue="Agent"
-          />
-        </div>
-      </div>
+    <div style={{ height: "100vh", overflow: "hidden" }}>
+      <VSCodePanels activeid={activeTab}>
+        <VSCodePanelTab id="tab-1" onClick={() => setActiveTab("tab-1")}>
+          CHAT
+        </VSCodePanelTab>
+        <VSCodePanelTab id="tab-2" onClick={() => setActiveTab("tab-2")}>
+          HISTORY
+        </VSCodePanelTab>
+        <VSCodePanelTab id="tab-3" onClick={() => setActiveTab("tab-3")}>
+          SETTINGS
+        </VSCodePanelTab>
+        <VSCodePanelTab id="tab-4" onClick={() => setActiveTab("tab-4")}>
+          OTHERS
+        </VSCodePanelTab>
+
+        <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
+          <div style={{ height: "calc(100% - 120px)", overflowY: "auto", paddingBottom: "20px" }}>
+            <div className="dropdown-container">
+              <div>
+                {messages?.map((msg) =>
+                  msg.type === "bot" ? (
+                    <BotMessage key={msg.content} content={msg.content} />
+                  ) : (
+                    <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
+                  )
+                )}
+                {isBotLoading && <BotIcon isBlinking={true} />}
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="business"
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              padding: "10px",
+            }}
+          >
+            <div className="textarea-container">
+              <div className="horizontal-stack">
+                <span className="currenFile">
+                  <small>create-singleClient.dto.ts</small>
+                </span>
+              </div>
+              <VSCodeTextArea
+                value={userInput}
+                onInput={handleTextChange}
+                placeholder="Ask Anything"
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+            <div className="horizontal-stack">
+              <AttachmentIcon onClick={() => setActiveItem("attach")} isActive={activeItem === "attach"} />
+              <ModelDropdown
+                value={selectedModel}
+                onChange={handleModelChange}
+                options={modelOptions}
+                id="model"
+                defaultValue="Gemini"
+              />
+              <ModelDropdown
+                value={selectedCodeBuddyMode}
+                onChange={handleCodeBuddyMode}
+                options={codeBuddyMode}
+                id="cBuddymode"
+                defaultValue="Agent"
+              />
+            </div>
+          </div>
+        </VSCodePanelView>
+
+        <VSCodePanelView id="view-2">1 </VSCodePanelView>
+        <VSCodePanelView id="view-3">2 </VSCodePanelView>
+        <VSCodePanelView id="view-4">3 </VSCodePanelView>
+      </VSCodePanels>
     </div>
   );
 };

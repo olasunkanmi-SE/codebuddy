@@ -25,7 +25,6 @@
   left: 50%;
   transform: translate(-50%, -50%);
   margin-top: 0px;
-  position: fixed;
 }
 
 
@@ -35,10 +34,13 @@
   padding: 10px;
   max-width: 100%;
   font-size: 14px;
+  width: 734px;
+  margin-left: -6px;
 }
 
 .currenFile {
   margin: 5px;
+  /* background-color: #000000; */
 }
 
 
@@ -506,6 +508,7 @@ hr {
 
 .textarea-container {
   width: 90%;
+  background: var(--input-background);
 }
 
 .url-container {
@@ -633,7 +636,7 @@ hr {
   margin: 4px 0 0;
   font-size: 14px;
   color: #6e6e6e;
-  /* white-space: nowrap; */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
