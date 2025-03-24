@@ -34,13 +34,11 @@
   padding: 10px;
   max-width: 100%;
   font-size: 14px;
-  width: 734px;
   margin-left: -6px;
 }
 
 .currenFile {
   margin: 5px;
-  /* background-color: #000000; */
 }
 
 
@@ -507,7 +505,6 @@ hr {
 }
 
 .textarea-container {
-  width: 90%;
   background: var(--input-background);
 }
 
