@@ -1,14 +1,19 @@
 import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base";
-import { COMMON, GROQ_CONFIG } from "../application/constant";
+import { COMMON } from "../application/constant";
 import { Memory } from "../memory/base";
 import { IMessageInput, Message } from "../llms/message";
-import OpenAI from "openai";
+import { DeepseekLLM } from "../llms/deepseek/deepseek";
+import { Logger } from "../infrastructure/logger/logger";
 
 export class DeepseekWebViewProvider extends BaseWebViewProvider {
+  public static readonly viewId = "chatView";
   chatHistory: IMessageInput[] = [];
-  readonly model: OpenAI;
-  
+  readonly client: any;
+  readonly metaData?: Record<string, any>;
+  private readonly deepseekLLM: DeepseekLLM;
+  private readonly logger: Logger;
+
   constructor(
     extensionUri: vscode.Uri,
     apiKey: string,
@@ -17,10 +22,14 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     protected baseUrl?: string,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
-    this.model = new OpenAI({
+    this.logger = new Logger("DeepseekWebViewProvider");
+    this.deepseekLLM = DeepseekLLM.getInstance({
       apiKey: this.apiKey,
-      baseURL: this.baseUrl || "https://api.deepseek.com"
+      model: this.generativeAiModel,
+      baseUrl: this.baseUrl || "https://api.deepseek.com/v1"
     });
+    this.client = this.deepseekLLM.getModel();
+    this.logger.info(`Initialized Deepseek provider with model: ${generativeAiModel}`);
   }
 
   public async sendResponse(
@@ -28,6 +37,8 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     currentChat: string,
   ): Promise<boolean | undefined> {
     try {
+      this.logger.info(`Sending ${currentChat} response: ${response.substring(0, 50)}...`);
+      
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
         this.chatHistory.push(
@@ -59,14 +70,33 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
         message: response,
       });
     } catch (error) {
+      this.logger.error("Error sending response", error);
+      Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, []);
       console.error(error);
     }
   }
 
-  async generateResponse(message: string): Promise<string | undefined> {
+  async generateResponse(
+    message: string,
+    metaData?: any,
+  ): Promise<string | undefined> {
     try {
-      const { max_tokens } = GROQ_CONFIG;
-      const userMessage = Message.of({ role: "user", content: message });
+      this.logger.info(`Generating response for message: ${message.substring(0, 50)}...`);
+      
+      if (metaData) {
+        this.logger.info("Using agent mode with metadata");
+        this.orchestrator.publish("onThinking", "...thinking");
+        
+        await this.deepseekLLM.run(JSON.stringify(message));
+        // Agent mode is handled through event emitter in BaseWebViewProvider
+        return;
+      }
+      
+      const userMessage = Message.of({
+        role: "user",
+        content: message,
+      });
+      
       let chatHistory = Memory.has(COMMON.DEEPSEEK_CHAT_HISTORY)
         ? Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY)
         : [userMessage];
@@ -75,43 +105,23 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
 
       Memory.removeItems(COMMON.DEEPSEEK_CHAT_HISTORY);
 
-      // Call Deepseek API to get a response
-      const response = await this.callDeepseekAPI(chatHistory, max_tokens);
+      // Use DeepseekLLM to generate a response
+      this.logger.info("Calling generateText on DeepseekLLM");
+      const result = await this.deepseekLLM.generateText(message);
+      this.logger.info(`Received response: ${result.substring(0, 50)}...`);
       
-      return response;
+      return result;
     } catch (error) {
-      console.error(error);
+      this.logger.error("Error generating response", error);
       Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question"
       );
+      return;
     }
   }
 
-  private async callDeepseekAPI(chatHistory: IMessageInput[], maxTokens: number): Promise<string> {
-    try {
-      const messages = chatHistory.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-
-      // Using OpenAI SDK with Deepseek API endpoint as shown in their documentation
-      const chatCompletion = await this.model.chat.completions.create({
-        model: this.generativeAiModel,
-        messages: messages,
-        max_tokens: maxTokens,
-        stream: false
-      });
-      
-      // Extract the text from the response
-      const response = chatCompletion.choices[0].message.content;
-      return response;
-    } catch (error) {
-      console.error("Error calling Deepseek API:", error);
-      throw error;
-    }
-  }
-
+  // Used to format content for the webview
   generateContent(userInput: string) {
     return userInput;
   }
