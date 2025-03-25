@@ -90,4 +90,41 @@ export class WorkspaceService implements IWorkspaceService {
   public getOpenFiles(): { path: string; language: string }[] {
     return vscode.workspace.textDocuments.map((doc) => ({ path: doc.uri.fsPath, language: doc.languageId }));
   }
+
+  public async getFolderToFilesMap(rootPath: string): Promise<Map<string, string[]>> {
+    try {
+      const folderToFilesMap: Map<string, string[]> = new Map();
+      await this.traverseDirectoryForFolderMap(rootPath, folderToFilesMap);
+      return folderToFilesMap;
+    } catch (error: any) {
+      this.logger.error("Error getting the folder to files map", error);
+      throw new Error(`Error getting folder to files map: ${error.message}`);
+    }
+  }
+
+  private async traverseDirectoryForFolderMap(dir: string, folderToFilesMap: Map<string, string[]>): Promise<void> {
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory() && !entry.name.includes(".git")) {
+        await this.traverseDirectoryForFolderMap(fullPath, folderToFilesMap);
+      } else if (entry.isFile()) {
+        const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (rootPath) {
+          const relativePath = path.relative(rootPath, fullPath);
+          const folderPath = path.dirname(relativePath);
+
+          if (!folderToFilesMap.has(folderPath)) {
+            folderToFilesMap.set(folderPath, []);
+          }
+
+          folderToFilesMap.get(folderPath)?.push(path.basename(fullPath)); // Store only the file name
+        } else {
+          this.logger.warn(`Could not determine workspace root for file: ${fullPath}`);
+        }
+      }
+    }
+  }
 }
