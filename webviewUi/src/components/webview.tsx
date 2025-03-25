@@ -24,6 +24,7 @@ import { BotIcon } from "./botIcon";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
+import AttachmentSelector from "./context";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -49,6 +50,7 @@ export const WebviewUI = () => {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [isBotLoading, setIsBotLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("tab-1");
+  const [selectedValue, setSelectedValue] = useState("");
 
   useEffect(() => {
     const messageHandler = (event: any) => {
@@ -79,6 +81,10 @@ export const WebviewUI = () => {
       window.removeEventListener("message", messageHandler);
     };
   }, [messages]);
+
+  const handleAttachmentChange = (value: string) => {
+    setSelectedValue(value);
+  };
 
   const handleModelChange = (e: any) => {
     const newValue = e.target.value;
@@ -111,6 +117,8 @@ export const WebviewUI = () => {
   };
 
   const handleSend = () => {
+    // TODO Compare the data to be sent to the data recieved.
+    // TODO Since the folders will come through the parent, you can filter the values with the folders and files
     if (!userInput.trim()) return;
 
     setMessages((previousMessages) => [
@@ -176,9 +184,13 @@ export const WebviewUI = () => {
             }}
           >
             <div className="textarea-container">
+              <AttachmentSelector onInputChange={handleAttachmentChange} />
               <div className="horizontal-stack">
                 <span className="currenFile">
-                  <small>create-singleClient.dto.ts</small>
+                  <small>
+                    create-singleClient.dto.ts{" "}
+                    {Array.from(new Set(selectedValue.split("@").join(", ").split(", "))).join(", ")}
+                  </small>
                 </span>
               </div>
               <VSCodeTextArea

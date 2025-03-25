@@ -672,3 +672,84 @@ hr {
   max-width: 100%;
   width: "-webkit-fill-available";
 }
+
+
+.workspce-selector {
+  position: relative;
+  width: 100%;
+}
+
+.input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: "var(--vscode-input-background; #252526)";
+}
+
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: rgb(22, 22, 30);
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  margin-top: 4px;
+}
+
+.breadcrumb {
+  background-color: "#f0f0f0";
+  padding: "0.5rem";
+  display: "flex";
+  align-items: "center";
+  border-bottom: "1px solid #e0e0e0";
+}
+
+
+.breadcrumbBack {
+  margin-right: "10px";
+  color: "#007bff";
+  cursor: "pointer";
+}
+
+.bcrumbBack {
+  margin-right: "10px";
+  color: "#007bff";
+  cursor: "pointer";
+  background: "none";
+  border: "none";
+  padding: 0
+}
+
+
+.list {
+  list-style: "none";
+  padding: "0";
+  margin: "0";
+}
+
+
+
+.list-item {
+  padding: "0.5rem";
+  display: "flex";
+  justify-content: "space-between";
+  align-items: "center";
+  cursor: "pointer";
+  transition: "background-color 0.2s";
+}
+
+.list-item-hover {
+  background-color: "#f5f5f5";
+}
+
+
+.item-icon {
+  color: "#888";
+}
