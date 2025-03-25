@@ -84,10 +84,6 @@
           "group": "CodeBuddy"
         },
         {
-          "command": "CodeBuddy.savePattern",
-          "group": "CodeBuddy"
-        },
-        {
           "when": "editorHasSelection",
           "command": "CodeBuddy.readFromKnowledgeBase",
           "group": "CodeBuddy"
@@ -135,16 +131,8 @@
         "title": "CodeBuddy. Optimize these selected code."
       },
       {
-        "command": "CodeBuddy.sendChatMessage",
-        "title": "Send to CodeBuddy"
-      },
-      {
         "command": "CodeBuddy.explain",
         "title": "CodeBuddy. Explain this code"
-      },
-      {
-        "command": "CodeBuddy.savePattern",
-        "title": "CodeBuddy. Save this code pattern"
       },
       {
         "command": "CodeBuddy.readFromKnowledgeBase",
