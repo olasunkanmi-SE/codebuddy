@@ -80,11 +80,6 @@
         },
         {
           "when": "editorHasSelection",
-          "command": "CodeBuddy.sendChatMessage",
-          "group": "CodeBuddy"
-        },
-        {
-          "when": "editorHasSelection",
           "command": "CodeBuddy.readFromKnowledgeBase",
           "group": "CodeBuddy"
         },
