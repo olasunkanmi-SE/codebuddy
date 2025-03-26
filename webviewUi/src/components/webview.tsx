@@ -188,7 +188,6 @@ export const WebviewUI = () => {
             }}
           >
             <div className="textarea-container">
-              <WorkspceSelector onInputChange={handleAttachmentChange} folders={folders} />
               <div className="horizontal-stack">
                 <span className="currenFile">
                   <small>
@@ -197,6 +196,8 @@ export const WebviewUI = () => {
                   </small>
                 </span>
               </div>
+              <WorkspceSelector onInputChange={handleAttachmentChange} folders={folders} />
+
               <VSCodeTextArea
                 value={userInput}
                 onInput={handleTextChange}

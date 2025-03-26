@@ -8,6 +8,8 @@ import { randomUUID } from "crypto";
 export class WorkspaceService implements IWorkspaceService {
   private static instance: WorkspaceService;
   private readonly logger: Logger;
+  private readonly excludedDirectories = ["node_modules", "build", ".git", "dist"];
+  private readonly excludedFiles = ["package-lock.json", ".vscode", ".env"];
 
   private constructor() {
     this.logger = new Logger(WorkspaceService.name);
@@ -40,9 +42,9 @@ export class WorkspaceService implements IWorkspaceService {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory() && !entry.name.includes(".git")) {
+      if (entry.isDirectory() && !this.excludedDirectories.some((dir) => entry.name.includes(dir))) {
         await this.traverseDirectory(fullPath, workspaceFiles);
-      } else if (entry.isFile()) {
+      } else if (entry.isFile() && !this.excludedFiles.some((file) => entry.name.includes(file))) {
         await this.readFileAndStore(fullPath, workspaceFiles);
       }
     }
@@ -116,10 +118,10 @@ export class WorkspaceService implements IWorkspaceService {
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-
-      if (entry.isDirectory() && !entry.name.includes(".git")) {
+      console.log("Entry Name:", entry.name);
+      if (entry.isDirectory() && this.excludedDirectories.some((dir) => entry.name.includes(dir))) {
         await this.traverseDirectoryForFolderMap(fullPath, folderToFilesMap);
-      } else if (entry.isFile()) {
+      } else if (entry.isFile() && !this.excludedFiles.some((file) => entry.name.includes(file))) {
         const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (rootPath) {
           const relativePath = path.relative(rootPath, fullPath);
@@ -150,10 +152,10 @@ export class WorkspaceService implements IWorkspaceService {
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
 
-      if (entry.isDirectory() && !entry.name.includes(".git")) {
+      if (entry.isDirectory() && !this.excludedDirectories.some((dir) => entry.name.includes(dir))) {
         const childFolder = await this.traverseDirectoryForStructure(fullPath, rootPath);
         folderEntry.children.push(childFolder);
-      } else if (entry.isFile()) {
+      } else if (entry.isFile() && !this.excludedFiles.some((file) => entry.name.includes(file))) {
         const fileEntry: FileEntry = {
           id: randomUUID(),
           type: "file",
