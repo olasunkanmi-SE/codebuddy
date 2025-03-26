@@ -1,4 +1,9 @@
-import { FileEntry, FolderEntry, IContextInfo, IWorkspaceService } from "../application/interfaces/workspace.interface";
+import {
+  FileEntry,
+  FolderEntry,
+  IContextInfo,
+  IWorkspaceService,
+} from "../application/interfaces/workspace.interface";
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
@@ -8,7 +13,12 @@ import { randomUUID } from "crypto";
 export class WorkspaceService implements IWorkspaceService {
   private static instance: WorkspaceService;
   private readonly logger: Logger;
-  private readonly excludedDirectories = ["node_modules", "build", ".git", "dist"];
+  private readonly excludedDirectories = [
+    "node_modules",
+    "build",
+    ".git",
+    "dist",
+  ];
   private readonly excludedFiles = ["package-lock.json", ".vscode", ".env"];
 
   private constructor() {
@@ -27,7 +37,9 @@ export class WorkspaceService implements IWorkspaceService {
     return activeEditor?.document.getText();
   }
 
-  public async getWorkspaceFiles(rootPath: string): Promise<Record<string, string>> {
+  public async getWorkspaceFiles(
+    rootPath: string,
+  ): Promise<Record<string, string>> {
     try {
       const workspaceFiles: Record<string, string> = {};
       await this.traverseDirectory(rootPath, workspaceFiles);
@@ -38,26 +50,40 @@ export class WorkspaceService implements IWorkspaceService {
     }
   }
 
-  private async traverseDirectory(dir: string, workspaceFiles: Record<string, string>): Promise<void> {
+  private async traverseDirectory(
+    dir: string,
+    workspaceFiles: Record<string, string>,
+  ): Promise<void> {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory() && !this.excludedDirectories.some((dir) => entry.name.includes(dir))) {
+      if (
+        entry.isDirectory() &&
+        !this.excludedDirectories.some((dir) => entry.name.includes(dir))
+      ) {
         await this.traverseDirectory(fullPath, workspaceFiles);
-      } else if (entry.isFile() && !this.excludedFiles.some((file) => entry.name.includes(file))) {
+      } else if (
+        entry.isFile() &&
+        !this.excludedFiles.some((file) => entry.name.includes(file))
+      ) {
         await this.readFileAndStore(fullPath, workspaceFiles);
       }
     }
   }
 
-  private async readFileAndStore(fullPath: string, workspaceFiles: Record<string, string>): Promise<void> {
+  private async readFileAndStore(
+    fullPath: string,
+    workspaceFiles: Record<string, string>,
+  ): Promise<void> {
     try {
       const fileContent = await fs.promises.readFile(fullPath, "utf8");
       const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (rootPath) {
         workspaceFiles[path.relative(rootPath, fullPath)] = fileContent;
       } else {
-        this.logger.warn(`Could not determine workspace root for file: ${fullPath}`);
+        this.logger.warn(
+          `Could not determine workspace root for file: ${fullPath}`,
+        );
       }
     } catch (error: any) {
       this.logger.error(`Error reading file ${fullPath}:`, error);
@@ -65,14 +91,18 @@ export class WorkspaceService implements IWorkspaceService {
     }
   }
 
-  public async getContextInfo(useWorkspaceContext: boolean): Promise<IContextInfo> {
+  public async getContextInfo(
+    useWorkspaceContext: boolean,
+  ): Promise<IContextInfo> {
     const activeFileContent = this.getActiveFileContent();
     const openFiles = this.getOpenFiles();
     let workspaceFiles: FolderEntry | undefined;
 
     if (useWorkspaceContext) {
       const workspaceFolders = vscode.workspace.workspaceFolders;
-      const rootPath = workspaceFolders ? workspaceFolders[0].uri.fsPath : undefined;
+      const rootPath = workspaceFolders
+        ? workspaceFolders[0].uri.fsPath
+        : undefined;
 
       if (rootPath) {
         workspaceFiles = await this.getFolderStructure(rootPath);
@@ -81,7 +111,9 @@ export class WorkspaceService implements IWorkspaceService {
 
     return {
       activeFileContent,
-      workspaceFiles: workspaceFiles ? new Map([["root", [workspaceFiles]]]) : undefined,
+      workspaceFiles: workspaceFiles
+        ? new Map([["root", [workspaceFiles]]])
+        : undefined,
       openFiles,
     };
   }
@@ -102,7 +134,9 @@ export class WorkspaceService implements IWorkspaceService {
     }));
   }
 
-  public async getFolderToFilesMap(rootPath: string): Promise<Map<string, string[]>> {
+  public async getFolderToFilesMap(
+    rootPath: string,
+  ): Promise<Map<string, string[]>> {
     try {
       const folderToFilesMap: Map<string, string[]> = new Map();
       await this.traverseDirectoryForFolderMap(rootPath, folderToFilesMap);
@@ -113,15 +147,24 @@ export class WorkspaceService implements IWorkspaceService {
     }
   }
 
-  private async traverseDirectoryForFolderMap(dir: string, folderToFilesMap: Map<string, string[]>): Promise<void> {
+  private async traverseDirectoryForFolderMap(
+    dir: string,
+    folderToFilesMap: Map<string, string[]>,
+  ): Promise<void> {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       console.log("Entry Name:", entry.name);
-      if (entry.isDirectory() && this.excludedDirectories.some((dir) => entry.name.includes(dir))) {
+      if (
+        entry.isDirectory() &&
+        this.excludedDirectories.some((dir) => entry.name.includes(dir))
+      ) {
         await this.traverseDirectoryForFolderMap(fullPath, folderToFilesMap);
-      } else if (entry.isFile() && !this.excludedFiles.some((file) => entry.name.includes(file))) {
+      } else if (
+        entry.isFile() &&
+        !this.excludedFiles.some((file) => entry.name.includes(file))
+      ) {
         const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (rootPath) {
           const relativePath = path.relative(rootPath, fullPath);
@@ -133,13 +176,18 @@ export class WorkspaceService implements IWorkspaceService {
 
           folderToFilesMap.get(folderPath)?.push(path.basename(fullPath)); // Store only the file name
         } else {
-          this.logger.warn(`Could not determine workspace root for file: ${fullPath}`);
+          this.logger.warn(
+            `Could not determine workspace root for file: ${fullPath}`,
+          );
         }
       }
     }
   }
 
-  private async traverseDirectoryForStructure(dir: string, rootPath: string): Promise<FolderEntry> {
+  private async traverseDirectoryForStructure(
+    dir: string,
+    rootPath: string,
+  ): Promise<FolderEntry> {
     const folderName = path.basename(dir);
     const folderEntry: FolderEntry = {
       id: randomUUID(),
@@ -152,10 +200,19 @@ export class WorkspaceService implements IWorkspaceService {
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
 
-      if (entry.isDirectory() && !this.excludedDirectories.some((dir) => entry.name.includes(dir))) {
-        const childFolder = await this.traverseDirectoryForStructure(fullPath, rootPath);
+      if (
+        entry.isDirectory() &&
+        !this.excludedDirectories.some((dir) => entry.name.includes(dir))
+      ) {
+        const childFolder = await this.traverseDirectoryForStructure(
+          fullPath,
+          rootPath,
+        );
         folderEntry.children.push(childFolder);
-      } else if (entry.isFile() && !this.excludedFiles.some((file) => entry.name.includes(file))) {
+      } else if (
+        entry.isFile() &&
+        !this.excludedFiles.some((file) => entry.name.includes(file))
+      ) {
         const fileEntry: FileEntry = {
           id: randomUUID(),
           type: "file",

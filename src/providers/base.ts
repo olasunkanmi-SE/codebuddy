@@ -6,7 +6,10 @@ import { Logger } from "../infrastructure/logger/logger";
 import { FileUploader } from "../services/file-uploader";
 import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
-import { FolderEntry, IContextInfo } from "../application/interfaces/workspace.interface";
+import {
+  FolderEntry,
+  IContextInfo,
+} from "../application/interfaces/workspace.interface";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -23,7 +26,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     private readonly _extensionUri: vscode.Uri,
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     this._context = context;
     this.orchestrator = Orchestrator.getInstance();
@@ -34,7 +37,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onThinking(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onUpdate(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onError(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onSecretChange(this.handleModelResponseEvent.bind(this))
+      this.orchestrator.onSecretChange(
+        this.handleModelResponseEvent.bind(this),
+      ),
     );
   }
 
@@ -54,12 +59,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     webviewView.webview.options = webviewOptions;
 
     if (!this.apiKey) {
-      vscode.window.showErrorMessage("API key not configured. Check your settings.");
+      vscode.window.showErrorMessage(
+        "API key not configured. Check your settings.",
+      );
       return;
     }
 
-    await this.setWebviewHtml(this.currentWebView);
-    await this.setupMessageHandler(this.currentWebView);
+    this.setWebviewHtml(this.currentWebView);
+    this.setupMessageHandler(this.currentWebView);
     setTimeout(async () => {
       await this.publishWorkSpace();
     }, 6000);
@@ -67,13 +74,18 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
     const codepatterns: FileUploader = new FileUploader(this._context);
-    view.webview.html = getWebviewContent(this.currentWebView?.webview!, this._extensionUri);
+    view.webview.html = getWebviewContent(
+      this.currentWebView?.webview!,
+      this._extensionUri,
+    );
   }
 
   private async publishWorkSpace(): Promise<void> {
     try {
-      const filesAndDirs: IContextInfo = await this.workspaceService.getContextInfo(true);
-      const workspaceFiles: Map<string, FolderEntry[]> | undefined = filesAndDirs.workspaceFiles;
+      const filesAndDirs: IContextInfo =
+        await this.workspaceService.getContextInfo(true);
+      const workspaceFiles: Map<string, FolderEntry[]> | undefined =
+        filesAndDirs.workspaceFiles;
       if (!workspaceFiles) {
         this.logger.warn("There no files within the workspace");
         return;
@@ -95,7 +107,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         switch (message.command) {
           case "user-input":
             if (message.metaData.mode === "Agent") {
-              response = await this.generateResponse(message.message, message.metaData);
+              response = await this.generateResponse(
+                message.message,
+                message.metaData,
+              );
             } else {
               response = await this.generateResponse(message.message);
             }
@@ -117,11 +132,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   public handleModelResponseEvent(event: IEventPayload) {
-    this.sendResponse(formatText(event.message), event.message === "folders" ? "bootstrap" : "bot");
+    this.sendResponse(
+      formatText(event.message),
+      event.message === "folders" ? "bootstrap" : "bot",
+    );
   }
-  abstract generateResponse(message?: string, metaData?: Record<string, any>): Promise<string | undefined>;
+  abstract generateResponse(
+    message?: string,
+    metaData?: Record<string, any>,
+  ): Promise<string | undefined>;
 
-  abstract sendResponse(response: string, currentChat?: string): Promise<boolean | undefined>;
+  abstract sendResponse(
+    response: string,
+    currentChat?: string,
+  ): Promise<boolean | undefined>;
 
   public dispose(): void {
     this.disposables.forEach((d) => d.dispose());
