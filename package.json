@@ -173,7 +173,8 @@
               "Gemini",
               "Groq",
               "Anthropic",
-              "XGrok"
+              "XGrok",
+              "Deepseek"
             ],
             "default": "Groq",
             "description": "Select the Generative AI to use with code buddy"
@@ -241,6 +242,22 @@
             ],
             "default": null,
             "markdownDescription": "Enter your [Grok API Key](https://console.x.ai/)"
+          },
+          "deepseek.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "deepseek-chat",
+            "markdownDescription": "Provide the name of the Deepseek model you want to use."
+          },
+          "deepseek.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "markdownDescription": "Enter your Deepseek API Key"
           },
           "font.family": {
             "type": "string",
@@ -329,6 +346,7 @@
     "jsdom": "^26.0.0",
     "markdown-it": "^14.1.0",
     "node-fetch": "^3.3.2",
+    "openai": "^4.28.0",
     "prettier": "^3.2.5",
     "readable-stream": "^4.5.2",
     "simple-git": "^3.25.0",
