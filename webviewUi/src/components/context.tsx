@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useEffect, useRef, useState } from "react";
 
 interface WorkspceCategory {
   id: string;
@@ -64,38 +65,24 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: "#888",
   },
 };
-
-const WORKSPACE_CONTEXT: WorkspceCategory[] = [
-  { id: "code-context", name: "Code Context Items" },
-  { id: "diff", name: "Diff (Beta)" },
-  {
-    id: "directories",
-    name: "Directories",
-    children: [
-      { id: "project-root", name: "Project Root" },
-      { id: "src", name: "src" },
-      { id: "tests", name: "tests" },
-    ],
-  },
-  {
-    id: "files",
-    name: "Files",
-    children: [
-      { id: "recent", name: "Recent Files" },
-      { id: "open", name: "Open Files" },
-      { id: "workspace", name: "Workspace Files" },
-    ],
-  },
-  { id: "repositories", name: "Repositories" },
-  { id: "terminal", name: "Terminal" },
-];
+// Default value for the folders to help solve issues with race conditions
+const WORKSPACE_CONTEXT: WorkspceCategory[] = [{ id: "code-context", name: "Code Context Items" }];
 
 interface WorkspceSelectorProps {
   onInputChange: (value: string) => void;
   initialValue?: string;
+  folders: any;
 }
 
-const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, initialValue = "" }) => {
+const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, initialValue = "", folders }) => {
+  let x: any;
+  if (folders) {
+    try {
+      x = JSON.parse(folders.message);
+    } catch (error: any) {
+      console.log("folders prop is empty or not a valid string", error.message);
+    }
+  }
   const [isOpen, setIsOpen] = useState(false);
   const [currentCategories, setCurrentCategories] = useState<WorkspceCategory[]>(WORKSPACE_CONTEXT);
   const [breadcrumbs, setBreadcrumbs] = useState<WorkspceCategory[]>([]);
@@ -118,12 +105,12 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
       setIsOpen(lastAtIsValidStart);
       if (!lastAtIsValidStart) {
         setIsOpen(false);
-        setCurrentCategories(WORKSPACE_CONTEXT);
+        setCurrentCategories(x);
         setBreadcrumbs([]);
       }
     } else {
       setIsOpen(false);
-      setCurrentCategories(WORKSPACE_CONTEXT);
+      setCurrentCategories(x);
       setBreadcrumbs([]);
     }
   };
@@ -143,9 +130,7 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
       newBreadcrumbs.pop();
 
       const parentCategories =
-        newBreadcrumbs.length === 0
-          ? WORKSPACE_CONTEXT
-          : newBreadcrumbs[newBreadcrumbs.length - 1].children || WORKSPACE_CONTEXT;
+        newBreadcrumbs.length === 0 ? x : newBreadcrumbs[newBreadcrumbs.length - 1].children || x;
 
       setCurrentCategories(parentCategories);
       setBreadcrumbs(newBreadcrumbs);
@@ -183,7 +168,7 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
       const target = event.target as HTMLElement;
       if (isOpen && !target.closest("[data-Workspce-selector]")) {
         setIsOpen(false);
-        setCurrentCategories(WORKSPACE_CONTEXT);
+        setCurrentCategories(x);
         setBreadcrumbs([]);
       }
     };
@@ -192,7 +177,7 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, x]);
 
   return (
     <div style={styles.WorkspceSelector} data-Workspce-selector="true">
