@@ -15,9 +15,10 @@ const styles: { [key: string]: React.CSSProperties } = {
   input: {
     width: "100%",
     padding: "0.5rem",
-    border: "1px solid #ccc",
+    border: "2px solid var(--vscode-editor-background)",
     borderRadius: "4px",
     backgroundColor: "var(--vscode-input-background, #252526)",
+    color: "inherit",
   },
   dropdown: {
     position: "absolute",
@@ -66,7 +67,9 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 // Default value for the folders to help solve issues with race conditions
-const WORKSPACE_CONTEXT: WorkspceCategory[] = [{ id: "code-context", name: "Code Context Items" }];
+const WORKSPACE_CONTEXT: WorkspceCategory[] = [
+  { id: "code-context", name: "Code Context Items" },
+];
 
 interface WorkspceSelectorProps {
   onInputChange: (value: string) => void;
@@ -74,17 +77,22 @@ interface WorkspceSelectorProps {
   folders: any;
 }
 
-const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, initialValue = "", folders }) => {
-  let x: any;
+const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({
+  onInputChange,
+  initialValue = "",
+  folders,
+}) => {
+  let workspaceFolders: any;
   if (folders) {
     try {
-      x = JSON.parse(folders.message);
+      workspaceFolders = JSON.parse(folders.message);
     } catch (error: any) {
       console.log("folders prop is empty or not a valid string", error.message);
     }
   }
   const [isOpen, setIsOpen] = useState(false);
-  const [currentCategories, setCurrentCategories] = useState<WorkspceCategory[]>(WORKSPACE_CONTEXT);
+  const [currentCategories, setCurrentCategories] =
+    useState<WorkspceCategory[]>(WORKSPACE_CONTEXT);
   const [breadcrumbs, setBreadcrumbs] = useState<WorkspceCategory[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState(initialValue);
@@ -101,16 +109,17 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
 
     if (newValue.length > 0 && newValue.startsWith("@")) {
       const lastAtIndex = newValue.lastIndexOf("@");
-      const lastAtIsValidStart = lastAtIndex === 0 || newValue[lastAtIndex - 1] === " ";
+      const lastAtIsValidStart =
+        lastAtIndex === 0 || newValue[lastAtIndex - 1] === " ";
       setIsOpen(lastAtIsValidStart);
       if (!lastAtIsValidStart) {
         setIsOpen(false);
-        setCurrentCategories(x);
+        setCurrentCategories(workspaceFolders);
         setBreadcrumbs([]);
       }
     } else {
       setIsOpen(false);
-      setCurrentCategories(x);
+      setCurrentCategories(workspaceFolders);
       setBreadcrumbs([]);
     }
   };
@@ -130,7 +139,10 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
       newBreadcrumbs.pop();
 
       const parentCategories =
-        newBreadcrumbs.length === 0 ? x : newBreadcrumbs[newBreadcrumbs.length - 1].children || x;
+        newBreadcrumbs.length === 0
+          ? workspaceFolders
+          : newBreadcrumbs[newBreadcrumbs.length - 1].children ||
+            workspaceFolders;
 
       setCurrentCategories(parentCategories);
       setBreadcrumbs(newBreadcrumbs);
@@ -145,16 +157,24 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
       const textBeforeCursor = inputValue.substring(0, cursorPosition);
       const lastAtIndex = textBeforeCursor.lastIndexOf("@");
 
-      if (lastAtIndex !== -1 && (lastAtIndex === 0 || textBeforeCursor[lastAtIndex - 1] === " ")) {
+      if (
+        lastAtIndex !== -1 &&
+        (lastAtIndex === 0 || textBeforeCursor[lastAtIndex - 1] === " ")
+      ) {
         const newInputValue =
-          textBeforeCursor.substring(0, lastAtIndex) + `@${item.name} ` + inputValue.substring(cursorPosition);
+          textBeforeCursor.substring(0, lastAtIndex) +
+          `@${item.name} ` +
+          inputValue.substring(cursorPosition);
         inputRef.current.value = newInputValue;
         setInputValue(newInputValue);
         onInputChange(newInputValue);
         inputRef.current.focus();
 
         const newCursorPosition = lastAtIndex + item.name.length + 2;
-        inputRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
+        inputRef.current.setSelectionRange(
+          newCursorPosition,
+          newCursorPosition
+        );
       } else {
         inputRef.current.value = `@${item.name}`;
         setInputValue(`@${item.name}`);
@@ -168,7 +188,7 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
       const target = event.target as HTMLElement;
       if (isOpen && !target.closest("[data-Workspce-selector]")) {
         setIsOpen(false);
-        setCurrentCategories(x);
+        setCurrentCategories(workspaceFolders);
         setBreadcrumbs([]);
       }
     };
@@ -177,14 +197,14 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isOpen, x]);
+  }, [isOpen, workspaceFolders]);
 
   return (
     <div style={styles.WorkspceSelector} data-Workspce-selector="true">
       <input
         ref={inputRef}
         type="text"
-        placeholder="Type @ to attach"
+        placeholder="Type @ to reveal files"
         style={styles.input}
         onChange={handleInputChange}
         value={inputValue}
@@ -196,7 +216,12 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
             <div style={styles.breadcrumb}>
               <button
                 onClick={goBack}
-                style={{ ...styles.breadcrumbBack, background: "none", border: "none", padding: 0 }}
+                style={{
+                  ...styles.breadcrumbBack,
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                }}
                 aria-label="Go back"
               >
                 ← Back
@@ -212,7 +237,11 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({ onInputChange, init
 
           <ul style={styles.list}>
             {currentCategories.map((category) => (
-              <li key={category.id} className="list-item" style={styles.listItem}>
+              <li
+                key={category.id}
+                className="list-item"
+                style={styles.listItem}
+              >
                 <button
                   onClick={() => navigateToCategory(category)}
                   style={{
