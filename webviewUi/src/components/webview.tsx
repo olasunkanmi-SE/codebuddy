@@ -24,7 +24,7 @@ import { BotIcon } from "./botIcon";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
-import AttachmentSelector from "./context";
+import WorkspceSelector from "./context";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -51,6 +51,7 @@ export const WebviewUI = () => {
   const [isBotLoading, setIsBotLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("tab-1");
   const [selectedValue, setSelectedValue] = useState("");
+  const [folders, setFolders] = useState<any>("");
 
   useEffect(() => {
     const messageHandler = (event: any) => {
@@ -67,6 +68,9 @@ export const WebviewUI = () => {
               language: "Typescript",
             },
           ]);
+          break;
+        case "bootstrap":
+          setFolders(message);
           break;
         case "error":
           console.error("Extension error", message.payload);
@@ -184,7 +188,7 @@ export const WebviewUI = () => {
             }}
           >
             <div className="textarea-container">
-              <AttachmentSelector onInputChange={handleAttachmentChange} />
+              <WorkspceSelector onInputChange={handleAttachmentChange} folders={folders} />
               <div className="horizontal-stack">
                 <span className="currenFile">
                   <small>

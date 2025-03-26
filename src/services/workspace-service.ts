@@ -1,8 +1,9 @@
-import { IContextInfo, IWorkspaceService } from "../application/interfaces/workspace.interface";
+import { FileEntry, FolderEntry, IContextInfo, IWorkspaceService } from "../application/interfaces/workspace.interface";
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { Logger } from "../infrastructure/logger/logger";
+import { randomUUID } from "crypto";
 
 export class WorkspaceService implements IWorkspaceService {
   private static instance: WorkspaceService;
@@ -65,30 +66,38 @@ export class WorkspaceService implements IWorkspaceService {
   public async getContextInfo(useWorkspaceContext: boolean): Promise<IContextInfo> {
     const activeFileContent = this.getActiveFileContent();
     const openFiles = this.getOpenFiles();
-    let workspaceFiles: Record<string, string> | undefined;
+    let workspaceFiles: FolderEntry | undefined;
 
     if (useWorkspaceContext) {
-      workspaceFiles = await this.getWorkspaceFilesFromWorkspaceFolders();
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      const rootPath = workspaceFolders ? workspaceFolders[0].uri.fsPath : undefined;
+
+      if (rootPath) {
+        workspaceFiles = await this.getFolderStructure(rootPath);
+      }
     }
 
     return {
       activeFileContent,
-      workspaceFiles,
+      workspaceFiles: workspaceFiles ? new Map([["root", [workspaceFiles]]]) : undefined,
       openFiles,
     };
   }
 
-  private async getWorkspaceFilesFromWorkspaceFolders(): Promise<Record<string, string> | undefined> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    const rootPath = workspaceFolders ? workspaceFolders[0].uri.fsPath : undefined;
-    if (rootPath) {
-      return await this.getWorkspaceFiles(rootPath);
+  private async getFolderStructure(rootPath: string): Promise<FolderEntry> {
+    try {
+      return await this.traverseDirectoryForStructure(rootPath, rootPath);
+    } catch (error: any) {
+      this.logger.error("Error getting the folder structure", error);
+      throw new Error(`Error getting folder structure: ${error.message}`);
     }
-    return undefined;
   }
 
   public getOpenFiles(): { path: string; language: string }[] {
-    return vscode.workspace.textDocuments.map((doc) => ({ path: doc.uri.fsPath, language: doc.languageId }));
+    return vscode.workspace.textDocuments.map((doc) => ({
+      path: doc.uri.fsPath,
+      language: String(doc.languageId),
+    }));
   }
 
   public async getFolderToFilesMap(rootPath: string): Promise<Map<string, string[]>> {
@@ -126,5 +135,34 @@ export class WorkspaceService implements IWorkspaceService {
         }
       }
     }
+  }
+
+  private async traverseDirectoryForStructure(dir: string, rootPath: string): Promise<FolderEntry> {
+    const folderName = path.basename(dir);
+    const folderEntry: FolderEntry = {
+      id: randomUUID(),
+      type: "folder",
+      name: folderName,
+      children: [],
+    };
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory() && !entry.name.includes(".git")) {
+        const childFolder = await this.traverseDirectoryForStructure(fullPath, rootPath);
+        folderEntry.children.push(childFolder);
+      } else if (entry.isFile()) {
+        const fileEntry: FileEntry = {
+          id: randomUUID(),
+          type: "file",
+          name: entry.name,
+        };
+        folderEntry.children.push(fileEntry);
+      }
+    }
+
+    return folderEntry;
   }
 }
