@@ -670,7 +670,7 @@ hr {
   overflow-y: auto;
   padding-bottom: 20px;
   max-width: 100%;
-  width: "-webkit-fill-available";
+  width: 100%;
 }
 
 
@@ -682,7 +682,7 @@ hr {
 .input {
   width: 100%;
   padding: 0.5rem;
-  border: 1px solid #ccc;
+  border: 2px solid var(--vscode-editor-background);
   border-radius: 4px;
   background-color: "var(--vscode-input-background; #252526)";
 }

@@ -12,7 +12,12 @@ export interface ExtensionMessage {
   payload: any;
 }
 
-import { VSCodeTextArea, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
+import {
+  VSCodeTextArea,
+  VSCodePanels,
+  VSCodePanelTab,
+  VSCodePanelView,
+} from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useEffect, useState } from "react";
 import { codeBuddyMode, modelOptions } from "../constants/constant";
@@ -161,7 +166,10 @@ export const WebviewUI = () => {
           OTHERS
         </VSCodePanelTab>
 
-        <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
+        <VSCodePanelView
+          id="view-1"
+          style={{ height: "calc(100vh - 55px)", position: "relative" }}
+        >
           <div className="chat-content">
             <div className="dropdown-container">
               <div>
@@ -169,7 +177,11 @@ export const WebviewUI = () => {
                   msg.type === "bot" ? (
                     <BotMessage key={msg.content} content={msg.content} />
                   ) : (
-                    <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
+                    <UserMessage
+                      key={msg.content}
+                      message={msg.content}
+                      alias={msg.alias}
+                    />
                   )
                 )}
                 {isBotLoading && <BotIcon isBlinking={true} />}
@@ -180,8 +192,8 @@ export const WebviewUI = () => {
           <div
             className="business"
             style={{
-              position: "absolute",
-              bottom: 0,
+              position: "fixed",
+              bottom: -10,
               left: 0,
               right: 0,
               padding: "10px",
@@ -192,11 +204,16 @@ export const WebviewUI = () => {
                 <span className="currenFile">
                   <small>
                     create-singleClient.dto.ts{" "}
-                    {Array.from(new Set(selectedValue.split("@").join(", ").split(", "))).join(", ")}
+                    {Array.from(
+                      new Set(selectedValue.split("@").join(", ").split(", "))
+                    ).join(", ")}
                   </small>
                 </span>
               </div>
-              <WorkspceSelector onInputChange={handleAttachmentChange} folders={folders} />
+              <WorkspceSelector
+                onInputChange={handleAttachmentChange}
+                folders={folders}
+              />
 
               <VSCodeTextArea
                 value={userInput}
@@ -206,7 +223,10 @@ export const WebviewUI = () => {
               />
             </div>
             <div className="horizontal-stack">
-              <AttachmentIcon onClick={() => setActiveItem("attach")} isActive={activeItem === "attach"} />
+              <AttachmentIcon
+                onClick={() => setActiveItem("attach")}
+                isActive={activeItem === "attach"}
+              />
               <ModelDropdown
                 value={selectedModel}
                 onChange={handleModelChange}
