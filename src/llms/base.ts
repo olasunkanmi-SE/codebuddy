@@ -6,7 +6,7 @@ import { IBaseLLM, ILlmConfig } from "./interface";
 export abstract class BaseLLM<T extends Record<string, any>>
   implements IBaseLLM
 {
-  protected readonly logger: Logger;
+  protected logger: Logger;
   constructor(protected config: ILlmConfig) {
     this.logger = new Logger("BaseLLM");
     this.validateConfig();

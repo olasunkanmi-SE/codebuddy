@@ -17,6 +17,7 @@ import { createPrompt } from "../../utils/prompt";
 import { BaseLLM } from "../base";
 import { GeminiModelResponseType, ILlmConfig } from "../interface";
 import { Message } from "../message";
+import { Logger } from "../../infrastructure/logger/logger";
 
 export class GeminiLLM
   extends BaseLLM<GeminiModelResponseType>
@@ -39,6 +40,7 @@ export class GeminiLLM
     this.orchestrator = Orchestrator.getInstance();
     CodeBuddyToolProvider.initialize();
     this.intializeDisposable();
+    this.logger = new Logger("GeminiLLM");
   }
 
   private intializeDisposable(): void {

@@ -12,7 +12,6 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
   readonly client: any;
   readonly metaData?: Record<string, any>;
   private readonly deepseekLLM: DeepseekLLM;
-  private readonly logger: Logger;
 
   constructor(
     extensionUri: vscode.Uri,
@@ -26,10 +25,12 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     this.deepseekLLM = DeepseekLLM.getInstance({
       apiKey: this.apiKey,
       model: this.generativeAiModel,
-      baseUrl: this.baseUrl || "https://api.deepseek.com/v1"
+      baseUrl: this.baseUrl || "https://api.deepseek.com/v1",
     });
     this.client = this.deepseekLLM.getModel();
-    this.logger.info(`Initialized Deepseek provider with model: ${generativeAiModel}`);
+    this.logger.info(
+      `Initialized Deepseek provider with model: ${generativeAiModel}`,
+    );
   }
 
   public async sendResponse(
@@ -37,8 +38,10 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     currentChat: string,
   ): Promise<boolean | undefined> {
     try {
-      this.logger.info(`Sending ${currentChat} response: ${response.substring(0, 50)}...`);
-      
+      this.logger.info(
+        `Sending ${currentChat} response: ${response.substring(0, 50)}...`,
+      );
+
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
         this.chatHistory.push(
@@ -81,22 +84,24 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     metaData?: any,
   ): Promise<string | undefined> {
     try {
-      this.logger.info(`Generating response for message: ${message.substring(0, 50)}...`);
-      
+      this.logger.info(
+        `Generating response for message: ${message.substring(0, 50)}...`,
+      );
+
       if (metaData) {
         this.logger.info("Using agent mode with metadata");
         this.orchestrator.publish("onThinking", "...thinking");
-        
+
         await this.deepseekLLM.run(JSON.stringify(message));
         // Agent mode is handled through event emitter in BaseWebViewProvider
         return;
       }
-      
+
       const userMessage = Message.of({
         role: "user",
         content: message,
       });
-      
+
       let chatHistory = Memory.has(COMMON.DEEPSEEK_CHAT_HISTORY)
         ? Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY)
         : [userMessage];
@@ -109,13 +114,13 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
       this.logger.info("Calling generateText on DeepseekLLM");
       const result = await this.deepseekLLM.generateText(message);
       this.logger.info(`Received response: ${result.substring(0, 50)}...`);
-      
+
       return result;
     } catch (error) {
       this.logger.error("Error generating response", error);
       Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
-        "Model not responding, please resend your question"
+        "Model not responding, please resend your question",
       );
       return;
     }
