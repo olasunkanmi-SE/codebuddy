@@ -18,7 +18,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   public static webView: vscode.WebviewView | undefined;
   public currentWebView: vscode.WebviewView | undefined = _view;
   _context: vscode.ExtensionContext;
-  protected readonly logger: Logger;
+  protected logger: Logger;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly workspaceService: WorkspaceService;
 
