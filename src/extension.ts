@@ -52,7 +52,7 @@ let agentEventEmmitter: EventEmitter;
 
 async function connectToDatabase() {
   try {
-    const dbPath = path.join(__dirname, "..", "patterns", "dev.db");
+    const dbPath = path.join(__dirname, "..", "patterns", "aii.db");
     const urlPath = dbPath.replace(/\\/g, "/");
     const isWindows = dbPath.includes("\\");
     const filePath = isWindows ? `file:/${urlPath}` : `file:${urlPath}`;

@@ -113,22 +113,6 @@ export class UrlReranker {
   }
 
   /**
-   * Calculates how well the title matches the query context
-   * @param metadata Page metadata containing the title
-   * @returns Match score between 0 and 1
-   */
-  async calculateQueryTitleMatchScore(
-    metadata: IPageMetada,
-  ): Promise<string | undefined> {
-    if (!metadata.title) return;
-    return await this.groqLLM.generateText(
-      metadata.title,
-      undefined,
-      this.query,
-    );
-  }
-
-  /**
    * Calculates diversity score based on URL category
    * @param metadata Page metadata containing the URL
    * @returns Diversity score
@@ -150,7 +134,6 @@ export class UrlReranker {
     );
     const reputationScore = this.calculateSourceReputationScore(metadata);
     const contentQualityScore = this.calculateContentQualityScore(metadata);
-    const queryTitleMatchScore = this.calculateQueryTitleMatchScore(metadata);
     const diversityScore = this.calculateDiversityScore(metadata);
 
     return (

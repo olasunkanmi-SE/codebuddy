@@ -344,4 +344,8 @@ export const PRIORITY_URLS = [
   "interviewkickstart.com",
   "dev.to",
   "devdocs.io",
+  "docs.aws.amazon.com",
+  "cloud.google.com",
+  "docs.oracle.com",
+  "git-scm.com",
 ];
