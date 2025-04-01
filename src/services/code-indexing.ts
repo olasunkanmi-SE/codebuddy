@@ -1,11 +1,11 @@
 import { ResultSet } from "@libsql/client/.";
 import { IFunctionData } from "../application/interfaces";
-import { getGeminiAPIKey } from "../utils/utils";
 import { Logger } from "../infrastructure/logger/logger";
 import { CodeRepository } from "../infrastructure/repository/code";
 import { CodeStructureMapper } from "./code-structure.mapper";
 import { EmbeddingService } from "./embedding";
 import { TypeScriptAtsMapper } from "./typescript-ats.service";
+import { getAPIKey } from "../utils/utils";
 
 /**
  * Provides a centralized service for managing code indexing, including building function structure maps,
@@ -18,7 +18,7 @@ export class CodeIndexingService {
   private static instance: CodeIndexingService;
   constructor() {
     this.logger = new Logger("CodeIndexingService");
-    const apiKey = getGeminiAPIKey();
+    const apiKey = getAPIKey("gemini");
     this.embeddingService = new EmbeddingService(apiKey);
   }
 

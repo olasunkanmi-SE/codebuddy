@@ -28,9 +28,6 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
       baseUrl: this.baseUrl || "https://api.deepseek.com/v1",
     });
     this.client = this.deepseekLLM.getModel();
-    this.logger.info(
-      `Initialized Deepseek provider with model: ${generativeAiModel}`,
-    );
   }
 
   public async sendResponse(
@@ -38,10 +35,6 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     currentChat: string,
   ): Promise<boolean | undefined> {
     try {
-      this.logger.info(
-        `Sending ${currentChat} response: ${response.substring(0, 50)}...`,
-      );
-
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
         this.chatHistory.push(
@@ -84,16 +77,9 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     metaData?: any,
   ): Promise<string | undefined> {
     try {
-      this.logger.info(
-        `Generating response for message: ${message.substring(0, 50)}...`,
-      );
-
       if (metaData) {
-        this.logger.info("Using agent mode with metadata");
         this.orchestrator.publish("onThinking", "...thinking");
-
         await this.deepseekLLM.run(JSON.stringify(message));
-        // Agent mode is handled through event emitter in BaseWebViewProvider
         return;
       }
 
@@ -109,12 +95,7 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
       chatHistory = [...chatHistory, userMessage];
 
       Memory.removeItems(COMMON.DEEPSEEK_CHAT_HISTORY);
-
-      // Use DeepseekLLM to generate a response
-      this.logger.info("Calling generateText on DeepseekLLM");
       const result = await this.deepseekLLM.generateText(message);
-      this.logger.info(`Received response: ${result.substring(0, 50)}...`);
-
       return result;
     } catch (error) {
       this.logger.error("Error generating response", error);
@@ -126,7 +107,6 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  // Used to format content for the webview
   generateContent(userInput: string) {
     return userInput;
   }
