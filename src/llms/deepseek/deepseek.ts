@@ -49,8 +49,8 @@ export class DeepseekLLM
   private initializeDisposable(): void {
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration(() =>
-        this.handleConfigurationChange()
-      )
+        this.handleConfigurationChange(),
+      ),
     );
   }
 
@@ -87,7 +87,7 @@ export class DeepseekLLM
 
   public async generateText(
     prompt: string,
-    instruction?: string
+    instruction?: string,
   ): Promise<string> {
     try {
       const messages = [
@@ -145,7 +145,7 @@ export class DeepseekLLM
         undefined,
         undefined,
         undefined,
-        true
+        true,
       );
       // Note this prompt should be for system instruction only.
       const prompt = createPrompt(userInput);
@@ -203,7 +203,7 @@ export class DeepseekLLM
                 {
                   name: response.choices[0].message.function_call.name,
                   args: JSON.parse(
-                    response.choices[0].message.function_call.arguments
+                    response.choices[0].message.function_call.arguments,
                   ),
                 },
               ];
@@ -246,8 +246,8 @@ export class DeepseekLLM
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error("Timeout Exceeded")),
-            this.timeOutMs
-          )
+            this.timeOutMs,
+          ),
         );
 
         const responsePromise = this.generateContentWithTools(userQuery);
@@ -276,17 +276,17 @@ export class DeepseekLLM
           ) {
             this.logger.warn(
               "Detecting no progress: same function calls repeated",
-              ""
+              "",
             );
 
             const regeneratedQuery = await this.generateText(
               userQuery,
-              "Rewrite the user query to more clearly and effectively express the user's underlying intent. The goal is to enable the system to retrieve and utilize the available tools more accurately. Identify the core information need and rephrase the query to highlight it. Consider what information the tools need to function optimally and ensure the query provides it."
+              "Rewrite the user query to more clearly and effectively express the user's underlying intent. The goal is to enable the system to retrieve and utilize the available tools more accurately. Identify the core information need and rephrase the query to highlight it. Consider what information the tools need to function optimally and ensure the query provides it.",
             );
 
             this.orchestrator.publish(
               "onQuery",
-              JSON.stringify(regeneratedQuery)
+              JSON.stringify(regeneratedQuery),
             );
 
             let answer = await this.processUserQuery(regeneratedQuery);
@@ -300,13 +300,13 @@ export class DeepseekLLM
           this.lastFunctionCalls.add(currentCallSignatures);
           if (this.lastFunctionCalls.size > 10) {
             this.lastFunctionCalls = new Set(
-              [...this.lastFunctionCalls].slice(-10)
+              [...this.lastFunctionCalls].slice(-10),
             );
           }
 
           if (toolCalls && toolCalls.length > 0) {
             this.logger.info(
-              `Function calls detected: ${JSON.stringify(toolCalls)}`
+              `Function calls detected: ${JSON.stringify(toolCalls)}`,
             );
 
             for (const functionCall of toolCalls) {
@@ -320,7 +320,7 @@ export class DeepseekLLM
                   functionCall,
                   functionResult,
                   undefined,
-                  false
+                  false,
                 );
 
                 const snapShot = this.createSnapShot({
@@ -336,7 +336,7 @@ export class DeepseekLLM
                 const retry = await vscode.window.showErrorMessage(
                   `Function call failed: ${error.message}. Retry or abort?`,
                   "Retry",
-                  "Abort"
+                  "Abort",
                 );
 
                 if (retry === "Retry") {
@@ -369,7 +369,7 @@ export class DeepseekLLM
       if (snapshot?.length > 0) {
         Memory.removeItems(
           "DEEPSEEK_SNAPSHOT",
-          Memory.get("DEEPSEEK_SNAPSHOT").length
+          Memory.get("DEEPSEEK_SNAPSHOT").length,
         );
       }
 
@@ -377,12 +377,12 @@ export class DeepseekLLM
     } catch (error: any) {
       this.orchestrator.publish(
         "onError",
-        "Model not responding at this time, please try again"
+        "Model not responding at this time, please try again",
       );
       vscode.window.showErrorMessage("Error processing user query");
       this.logger.error(
         "Error generating queries, thoughts from user query",
-        error
+        error,
       );
       throw error;
     }
@@ -390,7 +390,7 @@ export class DeepseekLLM
 
   private async handleSingleFunctionCall(
     functionCall: any,
-    attempt: number = 0
+    attempt: number = 0,
   ): Promise<any> {
     const MAX_RETRIES = 3;
     const args = functionCall.args as Record<string, any>;
@@ -418,7 +418,7 @@ export class DeepseekLLM
       if (attempt < MAX_RETRIES) {
         this.logger.warn(
           `Retry attempt ${attempt + 1} for function ${name}`,
-          JSON.stringify({ error: error.message, args })
+          JSON.stringify({ error: error.message, args }),
         );
         return this.handleSingleFunctionCall(functionCall, attempt + 1);
       }
@@ -441,7 +441,7 @@ export class DeepseekLLM
     functionCall?: any,
     functionResponse?: any,
     chat?: any,
-    isInitialQuery: boolean = false
+    isInitialQuery: boolean = false,
   ): Promise<any[]> {
     let chatHistory: any = Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY) || [];
     Memory.removeItems(COMMON.DEEPSEEK_CHAT_HISTORY);
@@ -471,7 +471,7 @@ export class DeepseekLLM
               },
             },
           ],
-        })
+        }),
       );
 
       // Add function result as user message
@@ -479,7 +479,7 @@ export class DeepseekLLM
         Message.of({
           role: "user",
           content: `Tool result: ${JSON.stringify(functionResponse)}`,
-        })
+        }),
       );
     }
 
