@@ -21,6 +21,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     this.gemini = GeminiLLM.getInstance({
       apiKey: this.apiKey,
       model: this.generativeAiModel,
+      tools: [{ googleSearch: {} }],
     });
     this.model = this.gemini.getModel();
   }

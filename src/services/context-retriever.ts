@@ -6,7 +6,7 @@ import {
 } from "../application/interfaces/agent.interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { CodeRepository } from "../infrastructure/repository/code";
-import { getGeminiAPIKey } from "../utils/utils";
+import { getAPIKey } from "../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { WebSearchService } from "./web-search-service";
 import { Orchestrator } from "../agents/orchestrator";
@@ -21,7 +21,7 @@ export class ContextRetriever {
   protected readonly orchestrator: Orchestrator;
   constructor() {
     this.codeRepository = CodeRepository.getInstance();
-    const geminiApiKey = getGeminiAPIKey();
+    const geminiApiKey = getAPIKey("gemini");
     this.embeddingService = new EmbeddingService(geminiApiKey);
     this.logger = new Logger("ContextRetriever");
     this.webSearchService = WebSearchService.getInstance();

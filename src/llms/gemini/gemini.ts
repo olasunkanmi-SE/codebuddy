@@ -30,7 +30,7 @@ export class GeminiLLM
   private static instance: GeminiLLM | undefined;
   private model: GenerativeModel | undefined;
   private lastFunctionCalls: Set<string> = new Set();
-  private readonly timeOutMs: number = 30000;
+  private readonly timeOutMs: number = 300000; // For testing purposes only change back to 30000
 
   constructor(config: ILlmConfig) {
     super(config);
@@ -204,7 +204,11 @@ export class GeminiLLM
                 .map((call) => `${call.name}:${JSON.stringify(call.args)}`)
                 .join(";")
             : "";
+          // TODO Checking for repeated calls, I think this is a good candidate to check if any data was saved to memory during the last function call
           if (this.lastFunctionCalls.has(currentCallSignatures)) {
+            // TODO if it is a repeated function call check the memory to see if any data was saved, use the data instead of making repeated calls
+            // For example there could be a websearch, some data was returned but because it wasnt able to crawl certain websites it makes the call again.
+            // This is a common pattern I have seen over time.
             this.logger.warn(
               "Detecting no progress: same function calls repeated",
               "",
@@ -233,8 +237,11 @@ export class GeminiLLM
           if (toolCalls && toolCalls.length > 0) {
             for (const functionCall of toolCalls) {
               try {
+                // TODO Save the function result in memory and use again in case of repeated function calls.
+                // If the function result is empty based on errors while crawling the webpage, use GroQ to deliver the final answer.
                 const functionResult =
                   await this.handleSingleFunctionCall(functionCall);
+                //TODO If function result combined text = '' , then use Gemini search
                 userQuery = `Tool result: ${JSON.stringify(functionResult)}. What is your next step?`;
                 //TODO need to update the properties later
                 await this.buildChatHistory(
@@ -356,10 +363,12 @@ export class GeminiLLM
     chat?: ChatSession,
     isInitialQuery: boolean = false,
   ): Promise<Content[]> {
+    // Check if it makes sense to kind of seperate agent and Edit Mode memory, when switching.
     let chatHistory: any = Memory.get(COMMON.GEMINI_CHAT_HISTORY) || [];
     Memory.removeItems(COMMON.GEMINI_CHAT_HISTORY);
     if (!isInitialQuery && chatHistory.length === 0) {
-      throw new Error("No chat history available for non-initial query");
+      this.logger.warn("No chat history available for non-initial query");
+      // throw new Error("No chat history available for non-initial query");
     }
 
     const userMessage = Message.of({
