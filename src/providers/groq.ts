@@ -8,6 +8,7 @@ import { IMessageInput, Message } from "../llms/message";
 export class GroqWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
   readonly model: Groq;
+  private static instance: GroqWebViewProvider;
   constructor(
     extensionUri: vscode.Uri,
     apiKey: string,
@@ -19,6 +20,22 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       apiKey: this.apiKey,
       maxRetries: 3,
     });
+  }
+
+  static initialize(
+    extensionUri: vscode.Uri,
+    apiKey: string,
+    generativeAiModel: string,
+    context: vscode.ExtensionContext,
+  ) {
+    if (!GroqWebViewProvider.instance) {
+      GroqWebViewProvider.instance = new GroqWebViewProvider(
+        extensionUri,
+        apiKey,
+        generativeAiModel,
+        context,
+      );
+    }
   }
 
   public async sendResponse(
