@@ -33,4 +33,21 @@ export abstract class BaseLLM<T extends Record<string, any>>
       throw error;
     }
   }
+
+  prompts(props: { title: string; query: string }): {
+    urlRelevanceScore: string;
+  } {
+    return {
+      urlRelevanceScore: `
+      You are an expert in natural language processing. Your task is to first generate a list of 10 keywords or phrases that are synonyms or semantically related to a given user query. Then, evaluate how relevant a webpage title is to these generated keywords based on semantic similarity, synonyms, and overall meaning—not just exact matches. Consider the following:
+
+      - Query: "${props.query}"
+      - Title: "${props.title}"
+
+      Return your response in this format:
+
+      - Score: [number]
+    `,
+    };
+  }
 }
