@@ -343,5 +343,5 @@ export const PRIORITY_URLS = [
   "refactoring.guru",
   "interviewkickstart.com",
   "dev.to",
-  "devdocs.io"
+  "devdocs.io",
 ];
