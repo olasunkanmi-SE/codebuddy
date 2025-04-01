@@ -9,58 +9,97 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 
 
 ## Architecture
-
 ```mermaid
-graph TB
-    subgraph VSCode["VS Code Extension"]
-        Editor["Editor Interface"]
-        Commands["Commands Layer"]
-        Webview["Webview UI (React)"]
+flowchart TD
+
+    %% VS Code Extension Frontend
+    subgraph "VS Code Extension Frontend"
+        CE["Editor Interface"]:::frontend
+        CL["Commands Layer"]:::frontend
+        WV1["Webview (VS Code)"]:::frontend
+        WV2["Webview (React UI)"]:::frontend
     end
 
-    subgraph Core["Core Application"]
-        direction TB
-        Agents["AI Agents Layer"]
-        AppServices["Application Services"]
-        Infrastructure["Infrastructure Layer"]
-        Memory["Memory System"]
+    %% Core Application Layer
+    subgraph "Core Application"
+        AA["AI Agents"]:::core
+        MS["Memory System"]:::core
+        subgraph "Application Services"
+            BL["Business Logic"]:::core
+            AI["Application Interfaces"]:::core
+        end
+        subgraph "Infrastructure Layer"
+            HTTP["HTTP Services"]:::infra
+            LOG["Logging"]:::infra
+            REP["Repository"]:::infra
+            LS["Local Storage"]:::infra
+        end
     end
 
-    subgraph AIProviders["AI Providers"]
-        Gemini["Gemini API"]
-        Groq["Groq API"]
-        Anthropic["Anthropic API"]
-        XGrok["XGrok API"]
-        Deepseek["Deepseel API"]
+    %% AI Providers
+    subgraph "AI Providers"
+        LLM["Language Model Integrations"]:::provider
+        ESP["External Service Providers"]:::provider
     end
 
-    subgraph Storage["Storage Layer"]
-        SQLite["SQLite Database"]
-        VectorDB["Vector Embeddings"]
-        FileSystem["File System Service"]
+    %% Storage Layer
+    subgraph "Storage Layer"
+        DB["Database (SQLite)"]:::storage
+        FS["File System"]:::storage
+        VD["Vector Database"]:::storage
     end
 
-    %% Main Flow Connections
-    Editor -->|"User Input"| Commands
-    Commands -->|"Process Request"| Agents
-    Agents -->|"Context Management"| Memory
-    Agents -->|"API Requests"| Infrastructure
-    Infrastructure -->|"Model Selection"| AIProviders
-    AppServices -->|"Data Access"| Storage
-    Memory -->|"Store Context"| Storage
-    Infrastructure -->|"Response"| Webview
+    %% Connections between VS Code Extension Frontend
+    CE -->|"UserInput"| CL
+    CL -->|"ProcessRequest"| AA
+    CL -->|"UIUpdate"| WV1
 
-    %% Additional Connections
-    Agents -->|"Business Logic"| AppServices
-    Commands -->|"UI Updates"| Webview
-    FileSystem -->|"Code Analysis"| Agents
-    
+    %% Connections within Core Application
+    AA -->|"ContextManagement"| MS
+    AA -->|"Orchestration"| BL
+    AA -->|"ContractCall"| AI
 
-    class VSCode vscode
-    class Core core
-    class AIProviders ai
-    class Storage storage
+    %% Connections to Infrastructure
+    AA -->|"APIRequest"| HTTP
+    HTTP -->|"APICall"| LLM
+    HTTP -->|"APICall"| ESP
+    HTTP -->|"Feedback"| WV1
+
+    %% Connections from Application Services to Storage
+    BL -->|"DataAccess"| DB
+    BL -->|"FileAccess"| FS
+    BL -->|"EmbedData"| VD
+    AI -->|"RepositoryAccess"| REP
+
+    %% Memory System stores context to Storage
+    MS -->|"StoreContext"| DB
+
+    %% Styling Classes
+    classDef frontend fill:#cce5ff,stroke:#2a6592,stroke-width:2px;
+    classDef core fill:#d4edda,stroke:#155724,stroke-width:2px;
+    classDef infra fill:#f8d7da,stroke:#a71d2a,stroke-width:2px;
+    classDef provider fill:#fff3cd,stroke:#856404,stroke-width:2px;
+    classDef storage fill:#d1ecf1,stroke:#0c5460,stroke-width:2px;
+
+    %% Click Events
+    click CE "https://github.com/olasunkanmi-se/codebuddy/blob/main/src/extension.ts"
+    click CL "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/commands"
+    click WV1 "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/webview"
+    click WV2 "https://github.com/olasunkanmi-se/codebuddy/tree/main/webviewUi"
+    click AA "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/agents"
+    click MS "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/memory"
+    click BL "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/services"
+    click AI "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/application"
+    click HTTP "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/infrastructure/http"
+    click LOG "https://github.com/olasunkanmi-se/codebuddy/blob/main/src/infrastructure/logger/logger.ts"
+    click REP "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/infrastructure/repository"
+    click LS "https://github.com/olasunkanmi-se/codebuddy/blob/main/src/infrastructure/storage/local-storage.ts"
+    click LLM "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/llms"
+    click ESP "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/providers"
+    click DB "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/infrastructure/repository"
+    click FS "https://github.com/olasunkanmi-se/codebuddy/blob/main/src/services/file-system.ts"
 ```
+
 ### Database
 - SQLite database for code pattern storage
 - Vector embeddings for semantic code search

@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import {
   APP_CONFIG,
@@ -18,6 +19,7 @@ import { OptimizeCode } from "./commands/optimize";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
 import { EventEmitter } from "./emitter/agent-emitter";
+import { Logger } from "./infrastructure/logger/logger";
 import { dbManager } from "./infrastructure/repository/data-base-manager";
 import { Memory } from "./memory/base";
 import { AnthropicWebViewProvider } from "./providers/anthropic";
@@ -43,40 +45,48 @@ const {
   deepseekModel,
 } = APP_CONFIG;
 
-const connectDB = async () => {
-  await dbManager.connect(
-    "file:/Users/olasunkanmi/Documents/Github/codebuddy/patterns/dev.db",
-  );
-};
+const logger = new Logger("extension");
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
 
+async function connectToDatabase() {
+  try {
+    const dbPath = path.join(__dirname, "..", "patterns", "dev.db");
+    const urlPath = dbPath.replace(/\\/g, "/");
+    const isWindows = dbPath.includes("\\");
+    const filePath = isWindows ? `file:/${urlPath}` : `file:${urlPath}`;
+    await dbManager.connect(filePath);
+  } catch (error: any) {
+    logger.error("Unable to connect to DB", error);
+    throw new Error(error);
+  }
+}
+
+async function createFileDB(context: vscode.ExtensionContext) {
+  try {
+    const fileUploader = new FileUploader(context);
+    const files = await fileUploader.getFiles();
+    if (!files?.find((file) => file.includes("dev.db"))) {
+      await fileUploader.createFile("dev.db");
+    }
+  } catch (error: any) {
+    logger.error("Unable to ", error);
+    throw new Error(error);
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    await createFileDB(context);
+    await connectToDatabase();
     const credentials = new Credentials();
     await credentials.initialize(context);
     const session: vscode.AuthenticationSession | undefined =
       await credentials.getSession();
-    vscode.window.showInformationMessage(
-      `Logged into GitHub as ${session?.account.label}`,
-    );
+    logger.info(`Logged into GitHub as ${session?.account.label}`);
     Memory.getInstance();
-    await connectDB();
-    // const web = WebSearchService.getInstance();
-    // const x = CodeRepository.getInstance();
-    // const apiKey = getGeminiAPIKey();
-    // const embeddingService = new EmbeddingService(apiKey);
-    // const embedding = await embeddingService.generateEmbedding("is jwt web token used withnin this app ?");
-    // const y = await x.searchSimilarFunctions(embedding, 2);
-    // console.log(y);
     const fileUpload = new FileUploader(context);
-    // await fileUpload.createFile("aiix.db");
-
-    // const files = await fileUpload.getFiles();
-    // const names = await fileUpload.getFileNames();
-    // console.log(files, names);
-
     // const index = CodeIndexingService.createInstance();
     // Get each of the folders and call the next line for each
     // const result = await index.buildFunctionStructureMap();

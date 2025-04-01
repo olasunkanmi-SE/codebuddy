@@ -12,7 +12,12 @@ export interface ExtensionMessage {
   payload: any;
 }
 
-import { VSCodeTextArea, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
+import {
+  VSCodeTextArea,
+  VSCodePanels,
+  VSCodePanelTab,
+  VSCodePanelView,
+} from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useEffect, useState } from "react";
 import { codeBuddyMode, modelOptions } from "../constants/constant";
@@ -24,6 +29,7 @@ import { BotIcon } from "./botIcon";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
+import WorkspceSelector from "./context";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -49,6 +55,8 @@ export const WebviewUI = () => {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [isBotLoading, setIsBotLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("tab-1");
+  const [selectedValue, setSelectedValue] = useState("");
+  const [folders, setFolders] = useState<any>("");
 
   useEffect(() => {
     const messageHandler = (event: any) => {
@@ -66,6 +74,9 @@ export const WebviewUI = () => {
             },
           ]);
           break;
+        case "bootstrap":
+          setFolders(message);
+          break;
         case "error":
           console.error("Extension error", message.payload);
           break;
@@ -79,6 +90,10 @@ export const WebviewUI = () => {
       window.removeEventListener("message", messageHandler);
     };
   }, [messages]);
+
+  const handleAttachmentChange = (value: string) => {
+    setSelectedValue(value);
+  };
 
   const handleModelChange = (e: any) => {
     const newValue = e.target.value;
@@ -111,6 +126,8 @@ export const WebviewUI = () => {
   };
 
   const handleSend = () => {
+    // TODO Compare the data to be sent to the data recieved.
+    // TODO Since the folders will come through the parent, you can filter the values with the folders and files
     if (!userInput.trim()) return;
 
     setMessages((previousMessages) => [
@@ -149,15 +166,22 @@ export const WebviewUI = () => {
           OTHERS
         </VSCodePanelTab>
 
-        <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
-          <div style={{ height: "calc(100% - 120px)", overflowY: "auto", paddingBottom: "20px" }}>
+        <VSCodePanelView
+          id="view-1"
+          style={{ height: "calc(100vh - 55px)", position: "relative" }}
+        >
+          <div className="chat-content">
             <div className="dropdown-container">
               <div>
                 {messages?.map((msg) =>
                   msg.type === "bot" ? (
                     <BotMessage key={msg.content} content={msg.content} />
                   ) : (
-                    <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
+                    <UserMessage
+                      key={msg.content}
+                      message={msg.content}
+                      alias={msg.alias}
+                    />
                   )
                 )}
                 {isBotLoading && <BotIcon isBlinking={true} />}
@@ -168,8 +192,8 @@ export const WebviewUI = () => {
           <div
             className="business"
             style={{
-              position: "absolute",
-              bottom: 0,
+              position: "fixed",
+              bottom: -10,
               left: 0,
               right: 0,
               padding: "10px",
@@ -178,9 +202,19 @@ export const WebviewUI = () => {
             <div className="textarea-container">
               <div className="horizontal-stack">
                 <span className="currenFile">
-                  <small>create-singleClient.dto.ts</small>
+                  <small>
+                    create-singleClient.dto.ts{" "}
+                    {Array.from(
+                      new Set(selectedValue.split("@").join(", ").split(", "))
+                    ).join(", ")}
+                  </small>
                 </span>
               </div>
+              <WorkspceSelector
+                onInputChange={handleAttachmentChange}
+                folders={folders}
+              />
+
               <VSCodeTextArea
                 value={userInput}
                 onInput={handleTextChange}
@@ -189,7 +223,10 @@ export const WebviewUI = () => {
               />
             </div>
             <div className="horizontal-stack">
-              <AttachmentIcon onClick={() => setActiveItem("attach")} isActive={activeItem === "attach"} />
+              <AttachmentIcon
+                onClick={() => setActiveItem("attach")}
+                isActive={activeItem === "attach"}
+              />
               <ModelDropdown
                 value={selectedModel}
                 onChange={handleModelChange}

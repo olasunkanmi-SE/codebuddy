@@ -1,3 +1,4 @@
+import { WorkspaceService } from "./../services/workspace-service";
 import * as vscode from "vscode";
 import { Orchestrator } from "../agents/orchestrator";
 import { IEventPayload } from "../emitter/interface";
@@ -5,6 +6,10 @@ import { Logger } from "../infrastructure/logger/logger";
 import { FileUploader } from "../services/file-uploader";
 import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
+import {
+  FolderEntry,
+  IContextInfo,
+} from "../application/interfaces/workspace.interface";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -15,6 +20,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   _context: vscode.ExtensionContext;
   protected readonly logger: Logger;
   private readonly disposables: vscode.Disposable[] = [];
+  private readonly workspaceService: WorkspaceService;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -25,6 +31,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this._context = context;
     this.orchestrator = Orchestrator.getInstance();
     this.logger = new Logger("BaseWebViewProvider");
+    this.workspaceService = WorkspaceService.getInstance();
     this.disposables.push(
       this.orchestrator.onResponse(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onThinking(this.handleModelResponseEvent.bind(this)),
@@ -36,7 +43,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     );
   }
 
-  resolveWebviewView(webviewView: vscode.WebviewView): void {
+  async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
     _view = webviewView;
     BaseWebViewProvider.webView = webviewView;
     this.currentWebView = webviewView;
@@ -57,8 +64,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       );
       return;
     }
+
     this.setWebviewHtml(this.currentWebView);
     this.setupMessageHandler(this.currentWebView);
+    setTimeout(async () => {
+      await this.publishWorkSpace();
+    }, 6000);
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
@@ -69,23 +80,49 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     );
   }
 
+  private async publishWorkSpace(): Promise<void> {
+    try {
+      const filesAndDirs: IContextInfo =
+        await this.workspaceService.getContextInfo(true);
+      const workspaceFiles: Map<string, FolderEntry[]> | undefined =
+        filesAndDirs.workspaceFiles;
+      if (!workspaceFiles) {
+        this.logger.warn("There no files within the workspace");
+        return;
+      }
+      const files: FolderEntry[] = Array.from(workspaceFiles.values()).flat();
+      await this.currentWebView?.webview.postMessage({
+        type: "bootstrap",
+        message: JSON.stringify(files[0].children),
+      });
+    } catch (error: any) {
+      this.logger.error("Error while getting workspace", error.message);
+    }
+  }
+
   private async setupMessageHandler(_view: vscode.WebviewView): Promise<void> {
     try {
       _view.webview.onDidReceiveMessage(async (message) => {
         let response: any;
-        if (message.command === "user-input") {
-          if (message.metaData.mode === "Agent") {
-            response = await this.generateResponse(
-              message.message,
-              message.metaData,
-            );
-          } else {
-            response = await this.generateResponse(message.message);
-          }
-
-          if (response) {
-            this.sendResponse(formatText(response), "bot");
-          }
+        switch (message.command) {
+          case "user-input":
+            if (message.metaData.mode === "Agent") {
+              response = await this.generateResponse(
+                message.message,
+                message.metaData,
+              );
+            } else {
+              response = await this.generateResponse(message.message);
+            }
+            if (response) {
+              await this.sendResponse(formatText(response), "bot");
+            }
+            break;
+          case "webview-ready":
+            await this.publishWorkSpace();
+            break;
+          default:
+            throw new Error("Unknown command");
         }
       });
     } catch (error) {
@@ -95,7 +132,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   public handleModelResponseEvent(event: IEventPayload) {
-    this.sendResponse(formatText(event.message), "bot");
+    this.sendResponse(
+      formatText(event.message),
+      event.message === "folders" ? "bootstrap" : "bot",
+    );
   }
   abstract generateResponse(
     message?: string,
