@@ -7,8 +7,107 @@ This extension provides a wide range of AI-powered features to assist developers
 ## Install in Vscode Market Place
 https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy
 
-## Highlevel Architecture
-![Screenshot 2025-01-28 at 4 00 10 PM](https://github.com/user-attachments/assets/99d610f9-3e88-4f43-9198-61629fed5eaf)
+
+## Architecture
+```mermaid
+flowchart TD
+
+    %% VS Code Extension Frontend
+    subgraph "VS Code Extension Frontend"
+        CE["Editor Interface"]:::frontend
+        CL["Commands Layer"]:::frontend
+        WV1["Webview (VS Code)"]:::frontend
+        WV2["Webview (React UI)"]:::frontend
+    end
+
+    %% Core Application Layer
+    subgraph "Core Application"
+        AA["AI Agents"]:::core
+        MS["Memory System"]:::core
+        subgraph "Application Services"
+            BL["Business Logic"]:::core
+            AI["Application Interfaces"]:::core
+        end
+        subgraph "Infrastructure Layer"
+            HTTP["HTTP Services"]:::infra
+            LOG["Logging"]:::infra
+            REP["Repository"]:::infra
+            LS["Local Storage"]:::infra
+        end
+    end
+
+    %% AI Providers
+    subgraph "AI Providers"
+        LLM["Language Model Integrations"]:::provider
+        ESP["External Service Providers"]:::provider
+    end
+
+    %% Storage Layer
+    subgraph "Storage Layer"
+        DB["Database (SQLite)"]:::storage
+        FS["File System"]:::storage
+        VD["Vector Database"]:::storage
+    end
+
+    %% Connections between VS Code Extension Frontend
+    CE -->|"UserInput"| CL
+    CL -->|"ProcessRequest"| AA
+    CL -->|"UIUpdate"| WV1
+
+    %% Connections within Core Application
+    AA -->|"ContextManagement"| MS
+    AA -->|"Orchestration"| BL
+    AA -->|"ContractCall"| AI
+
+    %% Connections to Infrastructure
+    AA -->|"APIRequest"| HTTP
+    HTTP -->|"APICall"| LLM
+    HTTP -->|"APICall"| ESP
+    HTTP -->|"Feedback"| WV1
+
+    %% Connections from Application Services to Storage
+    BL -->|"DataAccess"| DB
+    BL -->|"FileAccess"| FS
+    BL -->|"EmbedData"| VD
+    AI -->|"RepositoryAccess"| REP
+
+    %% Memory System stores context to Storage
+    MS -->|"StoreContext"| DB
+
+    %% Styling Classes
+    classDef frontend fill:#cce5ff,stroke:#2a6592,stroke-width:2px;
+    classDef core fill:#d4edda,stroke:#155724,stroke-width:2px;
+    classDef infra fill:#f8d7da,stroke:#a71d2a,stroke-width:2px;
+    classDef provider fill:#fff3cd,stroke:#856404,stroke-width:2px;
+    classDef storage fill:#d1ecf1,stroke:#0c5460,stroke-width:2px;
+
+    %% Click Events
+    click CE "https://github.com/olasunkanmi-se/codebuddy/blob/main/src/extension.ts"
+    click CL "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/commands"
+    click WV1 "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/webview"
+    click WV2 "https://github.com/olasunkanmi-se/codebuddy/tree/main/webviewUi"
+    click AA "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/agents"
+    click MS "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/memory"
+    click BL "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/services"
+    click AI "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/application"
+    click HTTP "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/infrastructure/http"
+    click LOG "https://github.com/olasunkanmi-se/codebuddy/blob/main/src/infrastructure/logger/logger.ts"
+    click REP "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/infrastructure/repository"
+    click LS "https://github.com/olasunkanmi-se/codebuddy/blob/main/src/infrastructure/storage/local-storage.ts"
+    click LLM "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/llms"
+    click ESP "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/providers"
+    click DB "https://github.com/olasunkanmi-se/codebuddy/tree/main/src/infrastructure/repository"
+    click FS "https://github.com/olasunkanmi-se/codebuddy/blob/main/src/services/file-system.ts"
+```
+
+### Database
+- SQLite database for code pattern storage
+- Vector embeddings for semantic code search
+
+### File System
+- Workspace management for multi-root projects
+- TypeScript configuration detection
+- File watching and indexing services
 
 
 ## Roadmap
@@ -41,13 +140,6 @@ https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-bud
 └── package.json                 # Project configuration and dependencies
 ```
 
-Key Files:
-
-- `src/extension.ts`: Main entry point for the extension
-- `src/events/`: Contains event handlers for various CodeBuddy features
-- `src/providers/`: Implements providers for different AI models and webviews
-- `src/services/`: Contains service classes for chat management and AI model integration
-- `package.json`: Defines extension metadata, dependencies, and configuration
 
 ## Usage Instructions
 
@@ -86,70 +178,4 @@ Key Files:
 3. Performance Issues:
    - Problem: Slow response times from CodeBuddy.
    - Solution: Check your internet connection and consider switching to a faster AI model.
-
-## Architecture
-
-```mermaid
-graph TB
-    subgraph VSCode["VS Code Extension"]
-        Editor["Editor Interface"]
-        Commands["Commands Layer"]
-        Webview["Webview UI (React)"]
-    end
-
-    subgraph Core["Core Application"]
-        direction TB
-        Agents["AI Agents Layer"]
-        AppServices["Application Services"]
-        Infrastructure["Infrastructure Layer"]
-        Memory["Memory System"]
-    end
-
-    subgraph AIProviders["AI Providers"]
-        Gemini["Gemini API"]
-        Groq["Groq API"]
-        Anthropic["Anthropic API"]
-        XGrok["XGrok API"]
-    end
-
-    subgraph Storage["Storage Layer"]
-        SQLite["SQLite Database"]
-        VectorDB["Vector Embeddings"]
-        FileSystem["File System Service"]
-    end
-
-    %% Main Flow Connections
-    Editor -->|"User Input"| Commands
-    Commands -->|"Process Request"| Agents
-    Agents -->|"Context Management"| Memory
-    Agents -->|"API Requests"| Infrastructure
-    Infrastructure -->|"Model Selection"| AIProviders
-    AppServices -->|"Data Access"| Storage
-    Memory -->|"Store Context"| Storage
-    Infrastructure -->|"Response"| Webview
-
-    %% Additional Connections
-    Agents -->|"Business Logic"| AppServices
-    Commands -->|"UI Updates"| Webview
-    FileSystem -->|"Code Analysis"| Agents
-    
-
-    class VSCode vscode
-    class Core core
-    class AIProviders ai
-    class Storage storage
-```
-### Database
-- SQLite database for code pattern storage
-- Vector embeddings for semantic code search
-
-### HTTP Services
-- Custom HTTP client for AI API communication
-- Support for multiple authentication methods
-- Configurable timeout and retry mechanisms
-
-### File System
-- Workspace management for multi-root projects
-- TypeScript configuration detection
-- File watching and indexing services
 

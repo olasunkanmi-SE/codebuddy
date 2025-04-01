@@ -14,16 +14,15 @@ export enum OLA_ACTIONS {
   generateCodeChart = "CodeBuddy.generateCodeChart",
   inlineChat = "CodeBuddy.inLineChat",
 }
-
 export enum COMMON {
   GROQ_CHAT_HISTORY = "groqChatHistory",
   GEMINI_CHAT_HISTORY = "geminiChatHistory",
   ANTHROPIC_CHAT_HISTORY = "anthropicChatHistory",
+  DEEPSEEK_CHAT_HISTORY = "deepseekChatHistory",
   USER_INPUT = "user-input",
   BOT = "bot",
   GEMINI_SNAPSHOT = "GeminiSnapshot",
 }
-
 export const GROQ_CONFIG = {
   temperature: 0.1,
   max_tokens: 5024,
@@ -31,7 +30,6 @@ export const GROQ_CONFIG = {
   stream: false,
   stop: null,
 };
-
 export const APP_CONFIG = {
   geminiKey: "google.gemini.apiKeys",
   geminiModel: "google.gemini.model",
@@ -42,32 +40,30 @@ export const APP_CONFIG = {
   anthropicApiKey: "anthropic.apiKey",
   grokApiKey: "grok.apiKey",
   grokModel: "grok.model",
+  deepseekApiKey: "deepseek.apiKey",
+  deepseekModel: "deepseek.model",
 };
-
 export enum generativeAiModels {
   GEMINI = "Gemini",
   GROQ = "Groq",
   ANTHROPIC = "Anthropic",
   GROK = "XGrok",
+  DEEPSEEK = "Deepseek",
 }
-
 export const MEMORY_CACHE_OPTIONS = {
   sessionTTL: 24 * 60 * 60 * 1000,
 };
-
 export type aIProviderConfig = {
   apiKey: string;
   model: string;
   providerName: string;
 };
-
 export enum FSPROPS {
   SRC_DIRECTORY = "src",
   TS_FILE_PATTERN = "**/*.ts",
   TSCONFIG_FILE = "tsconfig.json",
   NODE_MODULES_PATTERN = "**/node_modules/**",
 }
-
 export const EmbeddingsConfig = {
   batchSize: 5,
   maxRetries: 3,
@@ -126,20 +122,17 @@ export enum HTTP_STATUS_CODE {
   GATEWAY_TIMEOUT = 504,
   HTTP_VERSION_NOT_SUPPORTED = 505,
 }
-
 export enum RequestHeader {
   AUTHORIZATION = "authorization",
   CONTENT_TYPE = "Content-Type",
   ACCEPT = "accept",
   CONNECTION = "connection",
 }
-
 export enum HTTP_VERBS {
   GET = "GET",
   POST = "POST",
   PUT = "PUT",
 }
-
 export const HTTPS_DEFAULT_TIMEOUT = 10000;
 export const generateQuerySting = (query: string) =>
   `q=${encodeURIComponent(query)}`;
