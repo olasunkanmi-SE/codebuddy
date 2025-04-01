@@ -232,7 +232,13 @@ export class WebSearchService {
       if (pageMetadata.length === 0) {
         return `No web results found for "${query}" on Startpage.`;
       }
-      const excludedURLs = ["medium.com", "linkedin.com", "naukri.com"];
+      const excludedURLs = [
+        "medium.com",
+        "linkedin.com",
+        "naukri.com",
+        "akamai.com",
+        "x.com",
+      ];
 
       const crawleableMetadata: IPageMetada[] = [];
 
