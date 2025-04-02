@@ -111,12 +111,20 @@ export const showInfoMessage = (message?: string): void => {
  * Retrieves the Gemini API key from the application configuration, which is required for code indexing.
  * @returns {string} The API key.
  */
-export const getGeminiAPIKey = (): string => {
-  const { geminiKey } = APP_CONFIG;
-  const apiKey = getConfigValue(geminiKey);
+export const getAPIKey = (model: string): string => {
+  const { geminiKey, groqApiKey } = APP_CONFIG;
+  let apiKey = getConfigValue(geminiKey);
+  if (model.toLowerCase() === "gemini") {
+    apiKey = getConfigValue(geminiKey);
+  }
+  if (model.toLowerCase() === "groq") {
+    apiKey = getConfigValue(groqApiKey);
+  }
   if (!apiKey) {
-    console.error("Gemini API Key is required for code indexing");
-    throw new Error("Gemini API Key is required for code indexing");
+    throw new Error("Add API key in extension configuration");
   }
   return apiKey;
 };
+
+export const generateQueryString = (query: string) =>
+  `q=${encodeURIComponent(query)}`;

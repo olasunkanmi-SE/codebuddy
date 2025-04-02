@@ -95,7 +95,7 @@ export class CodeRepository implements ICodeRepository {
       );
       return result ? result.rows : undefined;
     } catch (error) {
-      this.logger.error("Failed to search similar code functions", error);
+      console.error("Failed to search similar code functions", error);
       throw error;
     }
   }

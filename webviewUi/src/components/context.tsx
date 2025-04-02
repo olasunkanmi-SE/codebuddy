@@ -66,21 +66,18 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: "#888",
   },
 };
-// Default value for the folders to help solve issues with race conditions
-const WORKSPACE_CONTEXT: WorkspceCategory[] = [
-  { id: "code-context", name: "Code Context Items" },
-];
-
 interface WorkspceSelectorProps {
   onInputChange: (value: string) => void;
   initialValue?: string;
   folders: any;
+  activeEditor: string;
 }
 
-const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({
+const WorkspaceSelector: React.FC<WorkspceSelectorProps> = ({
   onInputChange,
   initialValue = "",
   folders,
+  activeEditor,
 }) => {
   let workspaceFolders: any;
   if (folders) {
@@ -91,8 +88,9 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({
     }
   }
   const [isOpen, setIsOpen] = useState(false);
-  const [currentCategories, setCurrentCategories] =
-    useState<WorkspceCategory[]>(WORKSPACE_CONTEXT);
+  const [currentCategories, setCurrentCategories] = useState<
+    WorkspceCategory[]
+  >([{ id: "activeEditor", name: activeEditor }]);
   const [breadcrumbs, setBreadcrumbs] = useState<WorkspceCategory[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState(initialValue);
@@ -114,12 +112,18 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({
       setIsOpen(lastAtIsValidStart);
       if (!lastAtIsValidStart) {
         setIsOpen(false);
-        setCurrentCategories(workspaceFolders);
+        setCurrentCategories([
+          { id: "activeEditor", name: activeEditor },
+          ...workspaceFolders,
+        ]);
         setBreadcrumbs([]);
       }
     } else {
       setIsOpen(false);
-      setCurrentCategories(workspaceFolders);
+      setCurrentCategories([
+        { id: "activeEditor", name: activeEditor },
+        ...workspaceFolders,
+      ]);
       setBreadcrumbs([]);
     }
   };
@@ -268,4 +272,4 @@ const WorkspceSelector: React.FC<WorkspceSelectorProps> = ({
   );
 };
 
-export default WorkspceSelector;
+export default WorkspaceSelector;

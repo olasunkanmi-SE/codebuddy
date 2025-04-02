@@ -18,6 +18,8 @@ import { BaseLLM } from "../base";
 import { GeminiModelResponseType, ILlmConfig } from "../interface";
 import { Message } from "../message";
 import { Logger } from "../../infrastructure/logger/logger";
+import { GroqLLM } from "../groq/groq";
+import { getAPIKey } from "../../utils/utils";
 
 export class GeminiLLM
   extends BaseLLM<GeminiModelResponseType>
@@ -31,6 +33,7 @@ export class GeminiLLM
   private model: GenerativeModel | undefined;
   private lastFunctionCalls: Set<string> = new Set();
   private readonly timeOutMs: number = 30000;
+  private readonly groqLLM: GroqLLM;
 
   constructor(config: ILlmConfig) {
     super(config);
@@ -41,6 +44,10 @@ export class GeminiLLM
     CodeBuddyToolProvider.initialize();
     this.intializeDisposable();
     this.logger = new Logger("GeminiLLM");
+    this.groqLLM = GroqLLM.getInstance({
+      apiKey: getAPIKey("groq"),
+      model: "deepseek-r1-distill-qwen-32b",
+    });
   }
 
   private intializeDisposable(): void {
@@ -162,6 +169,72 @@ export class GeminiLLM
     return baseLimit * complexityFactor;
   }
 
+  /**
+   * Processes tool calls from the language model.
+   * @param toolCalls An array of function calls to process.
+   * @param userInput The original user input.
+   * @returns A promise that resolves to the final result string or undefined if an error occurs.
+   */
+  private async processToolCalls(
+    toolCalls: FunctionCall[],
+    userInput: string,
+  ): Promise<string | undefined> {
+    let finalResult: string | undefined = undefined;
+    let userQuery = userInput;
+    let callCount = 0;
+
+    for (const functionCall of toolCalls) {
+      try {
+        const functionResult =
+          await this.handleSingleFunctionCall(functionCall);
+
+        if (functionResult === undefined) {
+          finalResult = await this.groqLLM.generateText(userInput);
+          if (finalResult) {
+            finalResult = await this.fallBackToGroq(userInput);
+            return finalResult;
+          }
+        }
+
+        userQuery = `Tool result: ${JSON.stringify(
+          functionResult,
+        )}. What is your next step?`;
+
+        await this.buildChatHistory(
+          userQuery,
+          functionCall,
+          functionResult,
+          undefined,
+          false,
+        );
+
+        const snapShot = this.createSnapShot({
+          lastQuery: userQuery,
+          lastCall: functionCall,
+          lastResult: functionResult,
+        });
+        Memory.set(COMMON.GEMINI_SNAPSHOT, snapShot);
+        callCount++;
+      } catch (error: any) {
+        console.error("Error processing function call", error);
+
+        const retry = await vscode.window.showErrorMessage(
+          `Function call failed: ${error.message}. Retry or abort?`,
+          "Retry",
+          "Abort",
+        );
+
+        if (retry === "Retry") {
+          continue; // Retry the current function call
+        } else {
+          finalResult = `Function call error: ${error.message}. Falling back to last response.`;
+          break; // Exit the loop and return the error result
+        }
+      }
+    }
+    return finalResult;
+  }
+
   async processUserQuery(
     userInput: string,
   ): Promise<string | GenerateContentResult | undefined> {
@@ -197,6 +270,7 @@ export class GeminiLLM
             candidates,
             promptFeedback,
           } = result.response;
+          // Note consider tokencount
           const tokenCount = usageMetadata?.totalTokenCount ?? 0;
           const toolCalls = functionCalls ? functionCalls() : [];
           const currentCallSignatures = toolCalls
@@ -205,24 +279,11 @@ export class GeminiLLM
                 .join(";")
             : "";
           if (this.lastFunctionCalls.has(currentCallSignatures)) {
-            this.logger.warn(
-              "Detecting no progress: same function calls repeated",
-              "",
-            );
-            const regeneratedQuery = await this.generateText(
-              userQuery,
-              "Rewrite the user query to more clearly and effectively express the user's underlying intent. The goal is to enable the system to retrieve and utilize the available tools more accurately. Identify the core information need and rephrase the query to highlight it. Consider what information the tools need to function optimally and ensure the query provides it.",
-            );
-            this.orchestrator.publish(
-              "onQuery",
-              JSON.stringify(regeneratedQuery),
-            );
-            let answer = await this.processUserQuery(regeneratedQuery);
-            if (typeof answer === "string") {
-              finalResult = answer;
-              this.orchestrator.publish("onQuery", JSON.stringify(answer));
+            finalResult = await this.groqLLM.generateText(userInput);
+            if (finalResult) {
+              finalResult = await this.fallBackToGroq(userInput);
+              return finalResult;
             }
-            break;
           }
           this.lastFunctionCalls.add(currentCallSignatures);
           if (this.lastFunctionCalls.size > 10) {
@@ -231,40 +292,9 @@ export class GeminiLLM
             );
           }
           if (toolCalls && toolCalls.length > 0) {
-            for (const functionCall of toolCalls) {
-              try {
-                const functionResult =
-                  await this.handleSingleFunctionCall(functionCall);
-                userQuery = `Tool result: ${JSON.stringify(functionResult)}. What is your next step?`;
-                //TODO need to update the properties later
-                await this.buildChatHistory(
-                  userQuery,
-                  functionCall,
-                  functionResult,
-                  undefined,
-                  false,
-                );
-                const snapShot = this.createSnapShot({
-                  lastQuery: userQuery,
-                  lastCall: functionCall,
-                  lastResult: functionResult,
-                });
-                Memory.set(COMMON.GEMINI_SNAPSHOT, snapShot);
-                callCount++;
-              } catch (error: any) {
-                this.logger.error("Error processing function call", error);
-                const retry = await vscode.window.showErrorMessage(
-                  `Function call failed: ${error.message}. Retry or abort?`,
-                  "Retry",
-                  "Abort",
-                );
-                if (retry === "Retry") {
-                  continue;
-                } else {
-                  finalResult = `Function call error: ${error.message}. Falling back to last response.`;
-                  break;
-                }
-              }
+            finalResult = await this.processToolCalls(toolCalls, userQuery);
+            if (finalResult) {
+              return finalResult;
             }
           } else {
             finalResult = text();
@@ -280,7 +310,6 @@ export class GeminiLLM
       if (!finalResult) {
         throw new Error("No final result generated after function calls");
       }
-      // Should I clear the memory at this point or retry.
       const snapshot = Memory.get(COMMON.GEMINI_SNAPSHOT);
       if (snapshot?.length > 0) {
         Memory.removeItems(
@@ -291,13 +320,12 @@ export class GeminiLLM
 
       return finalResult;
     } catch (error: any) {
-      // Note. Use this approach to return error messages back to the FE
       this.orchestrator.publish(
         "onError",
         "Model not responding at this time, please try again",
       );
       vscode.window.showErrorMessage("Error processing user query");
-      this.logger.error(
+      console.error(
         "Error generating, queries, thoughts from user query",
         error,
       );
@@ -330,7 +358,7 @@ export class GeminiLLM
       };
     } catch (error: any) {
       if (attempt < MAX_RETRIES) {
-        this.logger.warn(
+        console.warn(
           `Retry attempt ${attempt + 1} for function ${name}`,
           JSON.stringify({ error, args }),
         );
@@ -344,7 +372,7 @@ export class GeminiLLM
       const result = await this.processUserQuery(userQuery);
       return result;
     } catch (error) {
-      this.logger.error("Error occured will running the agent", error);
+      console.error("Error occured will running the agent", error);
       throw error;
     }
   }
@@ -356,10 +384,12 @@ export class GeminiLLM
     chat?: ChatSession,
     isInitialQuery: boolean = false,
   ): Promise<Content[]> {
+    // Check if it makes sense to kind of seperate agent and Edit Mode memory, when switching.
     let chatHistory: any = Memory.get(COMMON.GEMINI_CHAT_HISTORY) || [];
     Memory.removeItems(COMMON.GEMINI_CHAT_HISTORY);
     if (!isInitialQuery && chatHistory.length === 0) {
-      throw new Error("No chat history available for non-initial query");
+      console.warn("No chat history available for non-initial query");
+      // throw new Error("No chat history available for non-initial query");
     }
 
     const userMessage = Message.of({
@@ -422,5 +452,23 @@ export class GeminiLLM
     this.disposables.forEach((d) => d.dispose());
     Memory.delete(COMMON.GEMINI_CHAT_HISTORY);
     Memory.delete(COMMON.GEMINI_SNAPSHOT);
+  }
+
+  private async fallBackToGroq(userInput: string): Promise<string | undefined> {
+    let finalResult = await this.groqLLM.generateText(userInput);
+    if (finalResult) {
+      const systemMessage = Message.of({
+        role: "system",
+        content: finalResult,
+      });
+
+      let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
+        ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
+        : [systemMessage];
+
+      chatHistory = [...chatHistory, systemMessage];
+      this.orchestrator.publish("onQuery", String(finalResult));
+    }
+    return finalResult;
   }
 }

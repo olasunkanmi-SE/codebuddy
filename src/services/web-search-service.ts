@@ -1,19 +1,24 @@
 import { Readability } from "@mozilla/readability";
 import axios from "axios";
 import { JSDOM } from "jsdom";
-import { generateQuerySting, WEB_SEARCH_CONFIG } from "../application/constant";
-import { Logger } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../agents/orchestrator";
+import { PRIORITY_URLS, WEB_SEARCH_CONFIG } from "../application/constant";
+import { Logger } from "../infrastructure/logger/logger";
+import { generateQueryString } from "../utils/utils";
+import { UrlReranker } from "./url-reranker";
 
 interface ArticleContent {
   url: string;
   content: string;
 }
 
-interface IPageMetada {
+export interface IPageMetada {
   url: string;
   favicon: string;
   title: string | undefined;
+  content?: string;
+  publishedDate?: Date;
+  sourceReputation?: number;
 }
 
 export class WebSearchService {
@@ -22,10 +27,13 @@ export class WebSearchService {
   private readonly baseUrl = WEB_SEARCH_CONFIG.baseUrl;
   private readonly logger: Logger;
   private readonly userAgent = WEB_SEARCH_CONFIG.userAgent;
+  private readonly urlRanker: UrlReranker;
+  private static URL_PRIORITY_LIST = PRIORITY_URLS;
 
   private constructor(logger: Logger) {
     this.logger = logger;
     this.orchestrator = Orchestrator.getInstance();
+    this.urlRanker = new UrlReranker("");
   }
 
   public static getInstance(): WebSearchService {
@@ -37,7 +45,9 @@ export class WebSearchService {
     return WebSearchService.instance;
   }
 
-  private async fetchArticleContent(url: string): Promise<ArticleContent> {
+  private async fetchArticleContent(
+    url: string,
+  ): Promise<ArticleContent | undefined> {
     try {
       const response = await axios.get(url, { timeout: 5000 });
       const html = response.data;
@@ -50,8 +60,8 @@ export class WebSearchService {
         : "No readable content found";
       return { url, content: content.trim() };
     } catch (error: any) {
-      this.logger.error(`Failed to fetch ${url}: ${error.message}`, error);
-      return { url, content: `Error fetching content from ${url}` };
+      this.logger.warn(`Failed to fetch ${url}: ${error.message}`, error);
+      return undefined;
     }
   }
 
@@ -90,14 +100,17 @@ export class WebSearchService {
           pagesMetaData.map((item) => JSON.stringify(item)).join("\n\n"),
         );
       }
+
       console.log(pagesMetaData);
-      return pagesMetaData;
+      return pagesMetaData.filter(
+        ({ url, favicon }) => url.length > 1 && favicon.length > 1,
+      );
     } catch (error: any) {
       this.logger.error(
         `Error fetching or parsing search results: ${error.message}`,
         error,
       );
-      throw new Error(`Error fetching search results: ${error.message}`);
+      return [];
     }
   }
 
@@ -137,7 +150,7 @@ export class WebSearchService {
       this.logger.warn(
         `Error fetching favicon and title for ${url}: ${error.message}`,
       );
-      throw new Error(`Error fetching Favicons and title: ${error.message}`);
+      return { url: "", title: "", favicon: "" };
     }
   }
 
@@ -201,37 +214,89 @@ export class WebSearchService {
     return favicon;
   }
 
-  public async run(query: string): Promise<string> {
+  public async run(
+    query: string,
+  ): Promise<
+    { pagesPublished: boolean; combinedContext: string | undefined } | string
+  > {
+    this.urlRanker.query = query;
     if (!query || query.trim().length < 2) {
       return "Query too short or invalid.";
     }
 
-    const queryString = generateQuerySting(query);
+    const queryString = generateQueryString(query);
     const searchUrl = `${this.baseUrl}${queryString}`;
 
     try {
-      const urls = await this.fetchSearchResultMetadata(searchUrl);
-
-      if (urls.length === 0) {
+      const pageMetadata = await this.fetchSearchResultMetadata(searchUrl);
+      if (pageMetadata.length === 0) {
         return `No web results found for "${query}" on Startpage.`;
       }
+      const excludedURLs = [
+        "medium.com",
+        "linkedin.com",
+        "naukri.com",
+        "akamai.com",
+        "x.com",
+      ];
+
+      const crawleableMetadata: IPageMetada[] = [];
+
+      pageMetadata.forEach((meta) => {
+        const urlObj = new URL(meta.url);
+        const domain = urlObj.hostname.toLowerCase();
+        if (!excludedURLs.some((ex) => domain.includes(ex))) {
+          crawleableMetadata.push(meta);
+        }
+      });
+
+      const urls = this.sortUrlsByPriority(
+        crawleableMetadata,
+        WebSearchService.URL_PRIORITY_LIST,
+      ).filter((url) => !url.includes("youtube.com"));
 
       const contextPromises = urls
-        .slice(0, 5)
-        .map(({ url }) => this.fetchArticleContent(url));
+        .slice(0, 6)
+        .map((url) => this.fetchArticleContent(url));
+      if (contextPromises?.length) {
+      }
       const contextResults = await Promise.all(contextPromises);
-      const combinedContext = contextResults
-        .map((result) => result.content)
+      const filteredContext = contextResults.filter((c) => c !== undefined);
+      const combinedContext = filteredContext
+        .map((result) => result?.content)
         .join("\n\n");
 
-      if (!combinedContext) {
-        return `No content retrieved for "${query}".`;
-      }
-
-      return combinedContext;
+      return {
+        pagesPublished: crawleableMetadata?.length > 0 ? true : false,
+        combinedContext,
+      };
     } catch (error: any) {
       this.logger.error(`search error: ${error.message}`, error);
       return `Error searching the web: ${error.message}`;
     }
   }
+
+  private sortUrlsByPriority = (
+    metadata: IPageMetada[],
+    priorityDomains: string[],
+  ): string[] => {
+    const priorityUrls: string[] = [];
+    const otherUrls: string[] = [];
+
+    metadata.forEach((m) => {
+      try {
+        const urlObj = new URL(m.url);
+        const domain = urlObj.hostname.toLowerCase();
+
+        if (priorityDomains.some((priority) => domain.includes(priority))) {
+          priorityUrls.push(m.url);
+        } else {
+          otherUrls.push(m.url);
+        }
+      } catch (error) {
+        otherUrls.push(m.url);
+      }
+    });
+    return [...priorityUrls, ...otherUrls];
+  };
 }
