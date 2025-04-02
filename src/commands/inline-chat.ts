@@ -18,9 +18,9 @@ export class InLineChat extends EventGenerator {
   }
 
   async createPrompt(selectedCode: string): Promise<string> {
-    const x = await this.getUserInLineChat();
+    const inlineChat = await this.getUserInLineChat();
     let context = this.getCurrentActiveEditorCode() ?? "";
-    const fullPrompt = `${x} ${selectedCode} \n Here is the code context ${context}`;
+    const fullPrompt = `${inlineChat} ${selectedCode} \n Here is the code context ${context}`;
     return fullPrompt;
   }
 }

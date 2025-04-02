@@ -10,6 +10,7 @@ import {
   FolderEntry,
   IContextInfo,
 } from "../application/interfaces/workspace.interface";
+import { FileService } from "../services/file-system";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -21,13 +22,15 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected logger: Logger;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly workspaceService: WorkspaceService;
+  private readonly fileService: FileService;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: vscode.ExtensionContext
   ) {
+    this.fileService = FileService.getInstance();
     this._context = context;
     this.orchestrator = Orchestrator.getInstance();
     this.logger = new Logger("BaseWebViewProvider");
@@ -38,8 +41,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onUpdate(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onError(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onSecretChange(
-        this.handleModelResponseEvent.bind(this),
+        this.handleModelResponseEvent.bind(this)
       ),
+      this.orchestrator.onActiveworkspaceUpdate(
+        this.handleGenericEvents.bind(this)
+      )
     );
   }
 
@@ -60,7 +66,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     if (!this.apiKey) {
       vscode.window.showErrorMessage(
-        "API key not configured. Check your settings.",
+        "API key not configured. Check your settings."
       );
       return;
     }
@@ -69,14 +75,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.setupMessageHandler(this.currentWebView);
     setTimeout(async () => {
       await this.publishWorkSpace();
-    }, 6000);
+    }, 2000);
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
     const codepatterns: FileUploader = new FileUploader(this._context);
     view.webview.html = getWebviewContent(
       this.currentWebView?.webview!,
-      this._extensionUri,
+      this._extensionUri
     );
   }
 
@@ -109,7 +115,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             if (message.metaData.mode === "Agent") {
               response = await this.generateResponse(
                 message.message,
-                message.metaData,
+                message.metaData
               );
             } else {
               response = await this.generateResponse(message.message);
@@ -131,23 +137,43 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
   }
 
+  public async handleGenericEvents({ type, message }: IEventPayload) {
+    return await this.currentWebView?.webview.postMessage({
+      type,
+      message,
+    });
+  }
+
   public handleModelResponseEvent(event: IEventPayload) {
     this.sendResponse(
       formatText(event.message),
-      event.message === "folders" ? "bootstrap" : "bot",
+      event.message === "folders" ? "bootstrap" : "bot"
     );
   }
   abstract generateResponse(
     message?: string,
-    metaData?: Record<string, any>,
+    metaData?: Record<string, any>
   ): Promise<string | undefined>;
 
   abstract sendResponse(
     response: string,
-    currentChat?: string,
+    currentChat?: string
   ): Promise<boolean | undefined>;
 
   public dispose(): void {
     this.disposables.forEach((d) => d.dispose());
+  }
+
+  async getContext(files: string[]) {
+    try {
+      const filesContent: Map<string, string> | undefined =
+        await this.fileService.getFilesContent(files);
+      if (filesContent && filesContent.size > 0) {
+        return Array.from(filesContent.values()).join("\n");
+      }
+    } catch (error: any) {
+      console.log(error);
+      throw new Error(error.message);
+    }
   }
 }

@@ -20,6 +20,7 @@ export interface IAgentEventMap {
   onThinking: IEventPayload;
   onSecretChange: IEventPayload;
   onBootstrap: IEventPayload;
+  onActiveworkspaceUpdate: IEventPayload;
 }
 
 export interface IEventPayload {
