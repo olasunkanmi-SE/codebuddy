@@ -29,7 +29,7 @@ import { BotIcon } from "./botIcon";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
-import WorkspceSelector from "./context";
+import WorkspaceSelector from "./context";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -55,8 +55,9 @@ export const WebviewUI = () => {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [isBotLoading, setIsBotLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("tab-1");
-  const [selectedValue, setSelectedValue] = useState("");
+  const [selectedContext, setSelectedContext] = useState("");
   const [folders, setFolders] = useState<any>("");
+  const [activeEditor, setActiveEditor] = useState("");
 
   useEffect(() => {
     const messageHandler = (event: any) => {
@@ -80,6 +81,9 @@ export const WebviewUI = () => {
         case "error":
           console.error("Extension error", message.payload);
           break;
+        case "onActiveworkspaceUpdate":
+          setActiveEditor(message.message);
+          break;
         default:
           console.warn("Unknown message type", message.type);
       }
@@ -91,8 +95,8 @@ export const WebviewUI = () => {
     };
   }, [messages]);
 
-  const handleAttachmentChange = (value: string) => {
-    setSelectedValue(value);
+  const handleContextChange = (value: string) => {
+    setSelectedContext(value);
   };
 
   const handleModelChange = (e: any) => {
@@ -144,10 +148,20 @@ export const WebviewUI = () => {
     vsCode.postMessage({
       command: "user-input",
       message: userInput,
-      metaData: { mode: selectedCodeBuddyMode },
+      metaData: {
+        mode: selectedCodeBuddyMode,
+        context: selectedContext.split("@"),
+      },
     });
 
     setUserInput("");
+  };
+
+  const handleGetContext = () => {
+    vsCode.postMessage({
+      command: "get-context",
+      message: userInput,
+    });
   };
 
   return (
@@ -192,7 +206,7 @@ export const WebviewUI = () => {
           <div
             className="business"
             style={{
-              position: "fixed",
+              position: "absolute",
               bottom: -10,
               left: 0,
               right: 0,
@@ -203,15 +217,20 @@ export const WebviewUI = () => {
               <div className="horizontal-stack">
                 <span className="currenFile">
                   <small>
-                    create-singleClient.dto.ts{" "}
+                    {selectedContext.includes(activeEditor)
+                      ? ""
+                      : `Active Editor: ${activeEditor}`}
+                  </small>
+                  <small>
                     {Array.from(
-                      new Set(selectedValue.split("@").join(", ").split(", "))
-                    ).join(", ")}
+                      new Set(selectedContext.split("@").join(", ").split(", "))
+                    ).join(" ")}
                   </small>
                 </span>
               </div>
-              <WorkspceSelector
-                onInputChange={handleAttachmentChange}
+              <WorkspaceSelector
+                activeEditor={activeEditor}
+                onInputChange={handleContextChange}
                 folders={folders}
               />
 
@@ -241,6 +260,7 @@ export const WebviewUI = () => {
                 id="cBuddymode"
                 defaultValue="Agent"
               />
+              <button onClick={handleGetContext}>context</button>
             </div>
           </div>
         </VSCodePanelView>
