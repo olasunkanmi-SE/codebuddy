@@ -47,12 +47,15 @@ export class WorkspaceService implements IWorkspaceService {
 
   private setUpWorkspaceListeners() {
     vscode.window.onDidChangeActiveTextEditor((editor) =>
-      this.orchestrator.publish("onActiveworkspaceUpdate", this.getActiveFile())
+      this.orchestrator.publish(
+        "onActiveworkspaceUpdate",
+        this.getActiveFile(),
+      ),
     );
   }
 
   public async getWorkspaceFiles(
-    rootPath: string
+    rootPath: string,
   ): Promise<Record<string, string>> {
     try {
       const workspaceFiles: Record<string, string> = {};
@@ -66,7 +69,7 @@ export class WorkspaceService implements IWorkspaceService {
 
   private async traverseDirectory(
     dir: string,
-    workspaceFiles: Record<string, string>
+    workspaceFiles: Record<string, string>,
   ): Promise<void> {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -87,7 +90,7 @@ export class WorkspaceService implements IWorkspaceService {
 
   private async readFileAndStore(
     fullPath: string,
-    workspaceFiles: Record<string, string>
+    workspaceFiles: Record<string, string>,
   ): Promise<void> {
     try {
       const fileContent = await fs.promises.readFile(fullPath, "utf8");
@@ -96,7 +99,7 @@ export class WorkspaceService implements IWorkspaceService {
         workspaceFiles[path.relative(rootPath, fullPath)] = fileContent;
       } else {
         this.logger.warn(
-          `Could not determine workspace root for file: ${fullPath}`
+          `Could not determine workspace root for file: ${fullPath}`,
         );
       }
     } catch (error: any) {
@@ -106,7 +109,7 @@ export class WorkspaceService implements IWorkspaceService {
   }
 
   public async getContextInfo(
-    useWorkspaceContext: boolean
+    useWorkspaceContext: boolean,
   ): Promise<IContextInfo> {
     const activeFileContent = this.getActiveFile();
     const openFiles = this.getOpenFiles();
@@ -149,7 +152,7 @@ export class WorkspaceService implements IWorkspaceService {
   }
 
   public async getFolderToFilesMap(
-    rootPath: string
+    rootPath: string,
   ): Promise<Map<string, string[]>> {
     try {
       const folderToFilesMap: Map<string, string[]> = new Map();
@@ -163,7 +166,7 @@ export class WorkspaceService implements IWorkspaceService {
 
   private async traverseDirectoryForFolderMap(
     dir: string,
-    folderToFilesMap: Map<string, string[]>
+    folderToFilesMap: Map<string, string[]>,
   ): Promise<void> {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
 
@@ -191,7 +194,7 @@ export class WorkspaceService implements IWorkspaceService {
           folderToFilesMap.get(folderPath)?.push(path.basename(fullPath)); // Store only the file name
         } else {
           this.logger.warn(
-            `Could not determine workspace root for file: ${fullPath}`
+            `Could not determine workspace root for file: ${fullPath}`,
           );
         }
       }
@@ -200,7 +203,7 @@ export class WorkspaceService implements IWorkspaceService {
 
   private async traverseDirectoryForStructure(
     dir: string,
-    rootPath: string
+    rootPath: string,
   ): Promise<FolderEntry> {
     const folderName = path.basename(dir);
     const folderEntry: FolderEntry = {
@@ -220,7 +223,7 @@ export class WorkspaceService implements IWorkspaceService {
       ) {
         const childFolder = await this.traverseDirectoryForStructure(
           fullPath,
-          rootPath
+          rootPath,
         );
         folderEntry.children.push(childFolder);
       } else if (

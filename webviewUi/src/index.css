@@ -276,7 +276,7 @@ vscode-button>.codicon {
   border: 1px solid var(--vscode-panel-border);
   border-radius: 6px;
   font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
-  margin: 16px 0;
+  margin: 46px 0;
 }
 
 .code-header {

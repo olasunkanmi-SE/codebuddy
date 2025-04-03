@@ -3,13 +3,21 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { IFileUploader } from "../application/interfaces";
 
-export class FileUploader implements IFileUploader {
+export class FileManager implements IFileUploader {
   fileDir: string;
+  private static instance: FileManager;
   constructor(private readonly context: vscode.ExtensionContext) {
     this.fileDir = path.join(this.context.extensionPath, "patterns");
     if (!fs.existsSync(this.fileDir)) {
       fs.mkdirSync(this.fileDir);
     }
+  }
+
+  static initialize(context: vscode.ExtensionContext) {
+    if (!FileManager.instance) {
+      FileManager.instance = new FileManager(context);
+    }
+    return FileManager.instance;
   }
 
   /**

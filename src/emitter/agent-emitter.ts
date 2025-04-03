@@ -13,7 +13,7 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
     this.createEvent("onSecretChange");
   onBootstrap: vscode.Event<IEventPayload> = this.createEvent("onBootstrap");
   onActiveworkspaceUpdate: vscode.Event<IEventPayload> = this.createEvent(
-    "onActiveworkspaceUpdate"
+    "onActiveworkspaceUpdate",
   );
 
   /**

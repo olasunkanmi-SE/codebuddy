@@ -13,7 +13,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     width: "100%",
   },
   input: {
-    width: "100%",
+    width: "96%",
     padding: "0.5rem",
     border: "2px solid var(--vscode-editor-background)",
     borderRadius: "4px",

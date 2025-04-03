@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { getWebviewContent } from "../webview/chat";
-import { FileUploader } from "../services/file-uploader";
 import { formatText } from "../utils/utils";
 
 let _view: vscode.WebviewView | undefined;
@@ -49,8 +48,6 @@ export abstract class BaseWebViewProvider {
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
-    const codepatterns: FileUploader = new FileUploader(this._context);
-    // const knowledgeBaseDocs: string[] = await codepatterns.getFiles();
     view.webview.html = getWebviewContent(
       this.currentWebView?.webview!,
       this._extensionUri,
