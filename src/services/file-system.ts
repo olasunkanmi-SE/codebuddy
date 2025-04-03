@@ -42,7 +42,7 @@ export class FileService {
       }
 
       const directories = await vscode.workspace.fs.readDirectory(
-        workSpaceInfo.root
+        workSpaceInfo.root,
       );
       const tsFilePaths: string[] = [];
       for (const [name, type] of directories) {
@@ -50,17 +50,17 @@ export class FileService {
           const dirUri = vscode.Uri.joinPath(workSpaceInfo.root, name);
           const tsConfigUrl = vscode.Uri.joinPath(
             dirUri,
-            FSPROPS.TSCONFIG_FILE
+            FSPROPS.TSCONFIG_FILE,
           );
 
           const tsConfigExists =
             (await Promise.resolve(vscode.workspace.fs.stat(tsConfigUrl)).catch(
-              () => null
+              () => null,
             )) !== null;
           if (tsConfigExists) {
             const tsFiles = await vscode.workspace.findFiles(
               new vscode.RelativePattern(dirUri, pattern),
-              FSPROPS.NODE_MODULES_PATTERN
+              FSPROPS.NODE_MODULES_PATTERN,
             );
             tsFilePaths.push(...tsFiles.map((file) => file.fsPath));
           }
@@ -70,7 +70,7 @@ export class FileService {
     } catch (error) {
       handleError(
         error,
-        `Error fetching the files from ${dir} with pattern ${pattern}`
+        `Error fetching the files from ${dir} with pattern ${pattern}`,
       );
       throw error;
     }
@@ -83,7 +83,7 @@ export class FileService {
 
       if (fileName === FSPROPS.TSCONFIG_FILE) {
         const tsconfigFiles = await vscode.workspace.findFiles(
-          new vscode.RelativePattern(rootUri, "**tsconfig.json")
+          new vscode.RelativePattern(rootUri, "**tsconfig.json"),
         );
         if (tsconfigFiles?.length > 0) {
           fileUri = tsconfigFiles[0];
@@ -121,7 +121,7 @@ export class FileService {
   }
 
   async getFilesContent(
-    fileNames: string[]
+    fileNames: string[],
   ): Promise<Map<string, string> | undefined> {
     const filesContent = new Map<string, string>();
     try {
@@ -134,7 +134,7 @@ export class FileService {
           continue;
         }
         const files: vscode.Uri[] = await vscode.workspace.findFiles(
-          `**/${fileName.trim()}`
+          `**/${fileName.trim()}`,
         );
         if (files.length > 0) {
           const fileUri = files[0];
@@ -142,7 +142,7 @@ export class FileService {
             const fileContent = await vscode.workspace.fs.readFile(fileUri);
             filesContent.set(
               fileName,
-              Buffer.from(fileContent).toString("utf8")
+              Buffer.from(fileContent).toString("utf8"),
             );
           } catch (error: any) {
             console.log(`Error reading file ${fileName}: ${error}`);

@@ -52,7 +52,6 @@ export const WebviewUI = () => {
   const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Edit");
   const [userInput, setUserInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [activeItem, setActiveItem] = useState<string | null>(null);
   const [isBotLoading, setIsBotLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("tab-1");
   const [selectedContext, setSelectedContext] = useState("");
@@ -159,7 +158,7 @@ export const WebviewUI = () => {
 
   const handleGetContext = () => {
     vsCode.postMessage({
-      command: "get-context",
+      command: "upload-file",
       message: userInput,
     });
   };
@@ -207,7 +206,7 @@ export const WebviewUI = () => {
             className="business"
             style={{
               position: "absolute",
-              bottom: -10,
+              bottom: -5,
               left: 0,
               right: 0,
               padding: "10px",
@@ -242,10 +241,7 @@ export const WebviewUI = () => {
               />
             </div>
             <div className="horizontal-stack">
-              <AttachmentIcon
-                onClick={() => setActiveItem("attach")}
-                isActive={activeItem === "attach"}
-              />
+              <AttachmentIcon onClick={handleGetContext} />
               <ModelDropdown
                 value={selectedModel}
                 onChange={handleModelChange}
@@ -260,7 +256,6 @@ export const WebviewUI = () => {
                 id="cBuddymode"
                 defaultValue="Agent"
               />
-              <button onClick={handleGetContext}>context</button>
             </div>
           </div>
         </VSCodePanelView>

@@ -1,22 +1,23 @@
 import { EventGenerator } from "./event-generator";
 import * as vscode from "vscode";
-import { FileUploader } from "../services/file-uploader";
+import { FileManager } from "../services/file-manager";
 import * as path from "path";
 import { formatText } from "../utils/utils";
 
 export class ReadFromKnowledgeBase extends EventGenerator {
+  private readonly fileManager: FileManager;
   constructor(action: string, context: vscode.ExtensionContext) {
     super(action, context);
+    this.fileManager = FileManager.initialize(context);
   }
 
   private async getKnowledgeBase(): Promise<string> {
-    const patternUploader = new FileUploader(this.context);
-    const knowledgeBases = await patternUploader.getFileNames();
+    const knowledgeBases = await this.fileManager.getFileNames();
     // TODO Because of the limitation of state change detection of knowlege bases we will only allow uploading and reading from one knowlwdebase for now
     const knowledgeBasesName: string = knowledgeBases[0];
-    const baseDirectory = patternUploader.fileDir;
+    const baseDirectory = this.fileManager.fileDir;
     const knowledgeBasePath = path.join(baseDirectory, knowledgeBasesName);
-    const content = patternUploader.readFileAsync(knowledgeBasePath);
+    const content = await this.fileManager.readFileAsync(knowledgeBasePath);
     return content;
   }
 

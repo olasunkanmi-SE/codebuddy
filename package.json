@@ -45,6 +45,7 @@
     "views": {
       "codeBuddy-view-container": [
         {
+          "icon": "images/codebuddylogo.png",
           "type": "webview",
           "id": "chatView",
           "name": "Chat"

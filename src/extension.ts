@@ -24,10 +24,10 @@ import { dbManager } from "./infrastructure/repository/data-base-manager";
 import { Memory } from "./memory/base";
 import { AnthropicWebViewProvider } from "./providers/anthropic";
 import { CodeActionsProvider } from "./providers/code-actions";
+import { DeepseekWebViewProvider } from "./providers/deepseek";
 import { GeminiWebViewProvider } from "./providers/gemini";
 import { GroqWebViewProvider } from "./providers/groq";
-import { DeepseekWebViewProvider } from "./providers/deepseek";
-import { FileUploader } from "./services/file-uploader";
+import { FileManager } from "./services/file-manager";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { Credentials } from "./services/github-authentication";
 import { getConfigValue } from "./utils/utils";
@@ -65,7 +65,7 @@ async function connectToDatabase() {
 
 async function createFileDB(context: vscode.ExtensionContext) {
   try {
-    const fileUploader = new FileUploader(context);
+    const fileUploader = new FileManager(context);
     const files = await fileUploader.getFiles();
     if (!files?.find((file) => file.includes("dev.db"))) {
       await fileUploader.createFile("dev.db");
@@ -86,7 +86,7 @@ export async function activate(context: vscode.ExtensionContext) {
       await credentials.getSession();
     logger.info(`Logged into GitHub as ${session?.account.label}`);
     Memory.getInstance();
-    const fileUpload = new FileUploader(context);
+    const fileUpload = new FileManager(context);
     // const index = CodeIndexingService.createInstance();
     // Get each of the folders and call the next line for each
     // const result = await index.buildFunctionStructureMap();
