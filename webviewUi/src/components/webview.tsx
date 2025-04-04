@@ -81,7 +81,7 @@ export const WebviewUI = () => {
           console.error("Extension error", message.payload);
           break;
         case "onActiveworkspaceUpdate":
-          setActiveEditor(message.message);
+          setActiveEditor(message.message ?? "");
           break;
         default:
           console.warn("Unknown message type", message.type);
@@ -164,8 +164,8 @@ export const WebviewUI = () => {
   };
 
   return (
-    <div style={{ height: "100vh", overflow: "hidden" }}>
-      <VSCodePanels activeid={activeTab}>
+    <div style={{ overflow: "hidden" }}>
+      <VSCodePanels className="vscodePanels" activeid={activeTab}>
         <VSCodePanelTab id="tab-1" onClick={() => setActiveTab("tab-1")}>
           CHAT
         </VSCodePanelTab>
@@ -201,69 +201,69 @@ export const WebviewUI = () => {
               </div>
             </div>
           </div>
-
-          <div
-            className="business"
-            style={{
-              position: "absolute",
-              bottom: -5,
-              left: 0,
-              right: 0,
-              padding: "10px",
-            }}
-          >
-            <div className="textarea-container">
-              <div className="horizontal-stack">
-                <span className="currenFile">
-                  <small>
-                    {selectedContext.includes(activeEditor)
-                      ? ""
-                      : `Active Editor: ${activeEditor}`}
-                  </small>
-                  <small>
-                    {Array.from(
-                      new Set(selectedContext.split("@").join(", ").split(", "))
-                    ).join(" ")}
-                  </small>
-                </span>
-              </div>
-              <WorkspaceSelector
-                activeEditor={activeEditor}
-                onInputChange={handleContextChange}
-                folders={folders}
-              />
-
-              <VSCodeTextArea
-                value={userInput}
-                onInput={handleTextChange}
-                placeholder="Ask Anything"
-                onKeyDown={handleKeyDown}
-              />
-            </div>
-            <div className="horizontal-stack">
-              <AttachmentIcon onClick={handleGetContext} />
-              <ModelDropdown
-                value={selectedModel}
-                onChange={handleModelChange}
-                options={modelOptions}
-                id="model"
-                defaultValue="Gemini"
-              />
-              <ModelDropdown
-                value={selectedCodeBuddyMode}
-                onChange={handleCodeBuddyMode}
-                options={codeBuddyMode}
-                id="cBuddymode"
-                defaultValue="Agent"
-              />
-            </div>
-          </div>
         </VSCodePanelView>
 
         <VSCodePanelView id="view-2">1 </VSCodePanelView>
         <VSCodePanelView id="view-3">2 </VSCodePanelView>
         <VSCodePanelView id="view-4">3 </VSCodePanelView>
       </VSCodePanels>
+      <div
+        className="business"
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          padding: "10px",
+          backgroundColor: "#16161e",
+        }}
+      >
+        <div className="textarea-container">
+          <div className="horizontal-stack">
+            <span className="currenFile">
+              <small>
+                Active workspace:
+                {selectedContext.includes(activeEditor)
+                  ? ""
+                  : `${activeEditor}`}
+              </small>
+              <small>
+                {Array.from(
+                  new Set(selectedContext.split("@").join(", ").split(", "))
+                ).join(" ")}
+              </small>
+            </span>
+          </div>
+          <WorkspaceSelector
+            activeEditor={activeEditor}
+            onInputChange={handleContextChange}
+            folders={folders}
+          />
+
+          <VSCodeTextArea
+            value={userInput}
+            onInput={handleTextChange}
+            placeholder="Ask Anything"
+            onKeyDown={handleKeyDown}
+          />
+        </div>
+        <div className="horizontal-stack">
+          <AttachmentIcon onClick={handleGetContext} />
+          <ModelDropdown
+            value={selectedModel}
+            onChange={handleModelChange}
+            options={modelOptions}
+            id="model"
+            defaultValue="Gemini"
+          />
+          <ModelDropdown
+            value={selectedCodeBuddyMode}
+            onChange={handleCodeBuddyMode}
+            options={codeBuddyMode}
+            id="cBuddymode"
+            defaultValue="Agent"
+          />
+        </div>
+      </div>
     </div>
   );
 };

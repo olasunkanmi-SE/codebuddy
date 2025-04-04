@@ -10,6 +10,7 @@ import { FileService } from "../services/file-system";
 import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
 import { WorkspaceService } from "./../services/workspace-service";
+import { FileManager } from "../services/file-manager";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -22,6 +23,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   private readonly workspaceService: WorkspaceService;
   private readonly fileService: FileService;
+  private readonly fileManager: FileManager;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -29,6 +31,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     protected readonly generativeAiModel: string,
     context: vscode.ExtensionContext,
   ) {
+    this.fileManager = FileManager.initialize(context);
     this.fileService = FileService.getInstance();
     this._context = context;
     this.orchestrator = Orchestrator.getInstance();
@@ -125,6 +128,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           case "webview-ready":
             await this.publishWorkSpace();
             break;
+          case "upload-file":
+            await this.fileManager.uploadFileHandler();
           default:
             throw new Error("Unknown command");
         }

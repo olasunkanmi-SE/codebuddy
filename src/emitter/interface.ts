@@ -1,27 +1,16 @@
-interface IBaseEmitter {
-  timestamp: string;
-}
+type AgentEventKeys =
+  | "onStatus"
+  | "onError"
+  | "onUpdate"
+  | "onQuery"
+  | "onResponse"
+  | "onThinking"
+  | "onSecretChange"
+  | "onBootstrap"
+  | "onActiveworkspaceUpdate"
+  | "onFileUpload";
 
-export type Action = "query" | "update" | "status" | "error";
-export type EventState =
-  | "idle"
-  | "processing"
-  | "completed"
-  | "ui-update"
-  | "error"
-  | "query";
-
-export interface IAgentEventMap {
-  onStatus: IEventPayload;
-  onError: IEventPayload;
-  onUpdate: IEventPayload;
-  onQuery: IEventPayload;
-  onResponse: IEventPayload;
-  onThinking: IEventPayload;
-  onSecretChange: IEventPayload;
-  onBootstrap: IEventPayload;
-  onActiveworkspaceUpdate: IEventPayload;
-}
+export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {
   type: string;
