@@ -46,7 +46,7 @@ export class GeminiLLM
     this.logger = new Logger("GeminiLLM");
     this.groqLLM = GroqLLM.getInstance({
       apiKey: getAPIKey("groq"),
-      model: "deepseek-r1-distill-qwen-32b",
+      model: "deepseek-r1-distill-llama-70b",
     });
   }
 

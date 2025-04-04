@@ -334,6 +334,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.9",
+    "@google/genai": "^0.7.0",
     "@google/generative-ai": "^0.21.0",
     "@googleapis/customsearch": "^3.2.0",
     "@libsql/client": "^0.14.0",

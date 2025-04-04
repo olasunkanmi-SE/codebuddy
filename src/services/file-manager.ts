@@ -3,12 +3,15 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { IFileUploader } from "../application/interfaces";
 import { Logger } from "../infrastructure/logger/logger";
+import { Orchestrator } from "../agents/orchestrator";
 
 export class FileManager implements IFileUploader {
   fileDir: string;
   private static instance: FileManager;
   private readonly logger: Logger;
+  protected readonly orchestrator: Orchestrator;
   constructor(private readonly context: vscode.ExtensionContext) {
+    this.orchestrator = Orchestrator.getInstance();
     this.logger = new Logger(FileManager.name);
     this.fileDir = path.join(this.context.extensionPath, "patterns");
     if (!fs.existsSync(this.fileDir)) {
@@ -40,14 +43,19 @@ export class FileManager implements IFileUploader {
       // }
       // Create a global state this.context.globalState
       const filePath = path.join(this.fileDir, fileName);
+      if (fs.existsSync(filePath)) {
+        this.logger.info(`A file with the name ${fileName} already exists.`);
+        return;
+      }
+
       await fs.promises.writeFile(filePath, content);
-      vscode.window.showInformationMessage(
-        `KnowledgeBase uploaded successfully`,
+      vscode.window.showInformationMessage(`File uploaded successfully`);
+      this.orchestrator.publish(
+        "onFileUpload",
+        JSON.stringify({ fileName, filePath }),
       );
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Failed to upload pattern: ${error.message}`,
-      );
+      this.logger.info(`Failed to upload file, please try again`);
       throw error;
     }
   }
@@ -66,9 +74,7 @@ export class FileManager implements IFileUploader {
       const content = await fs.promises.readFile(fullPath, "utf8");
       return content;
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Error reading from knowledgeBase: ${error.message}`,
-      );
+      this.logger.info(`Error reading while file`);
       throw error;
     }
   }
@@ -88,9 +94,7 @@ export class FileManager implements IFileUploader {
       });
       await Promise.all(deletePromises);
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Unable to delete files: ${error.message}`,
-      );
+      this.logger.info(`Unable to delete files`);
       throw error;
     }
   }
@@ -105,9 +109,7 @@ export class FileManager implements IFileUploader {
       const files = await fs.promises.readdir(this.fileDir);
       return files.map((file) => path.join(this.fileDir, file));
     } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Error fetching the files ${error.message}`,
-      );
+      this.logger.info(`Error fetching the files`);
       throw error;
     }
   }
@@ -125,7 +127,7 @@ export class FileManager implements IFileUploader {
       canSelectFolders: false,
       canSelectMany: false,
       filters: {
-        files: ["pdf", "txt"],
+        files: ["pdf", "txt", "csv"],
       },
     });
 
@@ -161,17 +163,15 @@ export class FileManager implements IFileUploader {
       //TODO After upload sace the file url in a long term memory config DB. This application should have a long term memory.
       if (!fs.existsSync(filePath)) {
         await fs.promises.writeFile(filePath, "");
-        vscode.window.showInformationMessage(
-          `File ${filename} created successfully`,
-        );
+        this.logger.info(`File ${filename} created successfully`);
         created = true;
       } else {
         created = false;
-        vscode.window.showInformationMessage(`File ${filename} already exists`);
+        this.logger.info(`File ${filename} already exists`);
       }
       return created;
     } catch (error: any) {
-      vscode.window.showErrorMessage(`Failed to create file: ${error.message}`);
+      this.logger.info(`Failed to create file: ${error.message}`);
       throw error;
     }
   }
