@@ -87,6 +87,7 @@ export async function activate(context: vscode.ExtensionContext) {
     logger.info(`Logged into GitHub as ${session?.account.label}`);
     Memory.getInstance();
     const fileUpload = new FileManager(context);
+    // TODO This is broken. Need to Fix
     // const index = CodeIndexingService.createInstance();
     // Get each of the folders and call the next line for each
     // const result = await index.buildFunctionStructureMap();

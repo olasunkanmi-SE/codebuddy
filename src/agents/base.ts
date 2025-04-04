@@ -23,7 +23,7 @@ export abstract class BaseAiAgent
     };
   }
 
-  extractQueries(input: string): string[] | undefined {
+  protected extractQueries(input: string): string[] | undefined {
     const startIndex = input.indexOf("Queries: [");
     if (startIndex === -1) {
       return;
@@ -41,7 +41,7 @@ export abstract class BaseAiAgent
     return queriesArray;
   }
 
-  extractThought(input: string): string | undefined {
+  protected extractThought(input: string): string | undefined {
     const match = RegExp(/Thought:\s*(.*?)\n/).exec(input);
     if (match) {
       return match[1].trim();

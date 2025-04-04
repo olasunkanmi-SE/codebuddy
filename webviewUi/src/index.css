@@ -29,7 +29,6 @@
 
 
 .dropdown-container {
-  height: 790px;
   overflow-y: scroll;
   padding: 10px;
   max-width: 100%;
@@ -276,7 +275,7 @@ vscode-button>.codicon {
   border: 1px solid var(--vscode-panel-border);
   border-radius: 6px;
   font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
-  margin: 46px 0;
+  margin: 16px 0;
 }
 
 .code-header {
@@ -753,3 +752,9 @@ hr {
 .item-icon {
   color: "#888";
 }
+
+
+.vscodePanels {
+  height: 700px;
+}
+

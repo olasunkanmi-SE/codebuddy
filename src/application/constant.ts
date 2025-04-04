@@ -349,3 +349,12 @@ export const PRIORITY_URLS = [
   "docs.oracle.com",
   "git-scm.com",
 ];
+
+const FILE_TYPE_PROMPTS: Record<string, string> = {
+  pdf: "Extract the main information and key points from this PDF document:",
+  docx: "Summarize the content of this Word document:",
+  csv: "Analyze this CSV data and provide key insights:",
+  txt: "Process this text file and extract the relevant information:",
+  json: "Parse this JSON file and provide a structured analysis:",
+  default: "Extract all relevant information from this file:",
+};

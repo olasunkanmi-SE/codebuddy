@@ -238,6 +238,8 @@ export class WebSearchService {
         "naukri.com",
         "akamai.com",
         "x.com",
+        "reuters.com",
+        "cbinsights.com",
       ];
 
       const crawleableMetadata: IPageMetada[] = [];

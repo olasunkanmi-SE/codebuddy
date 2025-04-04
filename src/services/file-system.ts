@@ -34,6 +34,9 @@ export class FileService {
     }
   }
 
+  // This is broken. Fix this such that it returns all files regardless if it is .ts files or not
+  // Similar implementation has been applied in workspace space service
+  // This is needed for code indexing feature for Typescript and general documentation architecture of any programming language https://github.com/olasunkanmi-SE/codebuddy/issues/130
   async getFilesFromDirectory(dir: string, pattern: string) {
     try {
       const workSpaceInfo = this.getWorkspaceInfo(dir);
