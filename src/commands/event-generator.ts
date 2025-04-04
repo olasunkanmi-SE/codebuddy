@@ -419,7 +419,7 @@ export abstract class EventGenerator implements IEventGenerator {
       }
     } catch (error) {
       this.logger.error(
-        "Error while passing bit response to the webview",
+        "Error while passing model response to the webview",
         error,
       );
     }

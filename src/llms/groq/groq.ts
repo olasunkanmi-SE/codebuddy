@@ -28,7 +28,7 @@ export class GroqLLM extends BaseLLM<any> implements vscode.Disposable {
 
   async generateText(message: string): Promise<string> {
     try {
-      const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
+      const { temperature, top_p, stop } = GROQ_CONFIG;
       const userMessage = Message.of({ role: "user", content: message });
       let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
         ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
@@ -42,7 +42,6 @@ export class GroqLLM extends BaseLLM<any> implements vscode.Disposable {
         messages: [...chatHistory],
         model: this.config.model,
         temperature,
-        max_tokens,
         top_p,
         stream: false,
         stop,

@@ -2,11 +2,14 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { IFileUploader } from "../application/interfaces";
+import { Logger } from "../infrastructure/logger/logger";
 
 export class FileManager implements IFileUploader {
   fileDir: string;
   private static instance: FileManager;
+  private readonly logger: Logger;
   constructor(private readonly context: vscode.ExtensionContext) {
+    this.logger = new Logger(FileManager.name);
     this.fileDir = path.join(this.context.extensionPath, "patterns");
     if (!fs.existsSync(this.fileDir)) {
       fs.mkdirSync(this.fileDir);
@@ -114,23 +117,31 @@ export class FileManager implements IFileUploader {
    * Prompts the user to select a text file, uploads it, and handles any errors that occur.
    * @returns A Promise that resolves when the upload is complete or rejected with an error
    * */
+
   async uploadFileHandler(): Promise<void> {
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB, adjust as needed
     const file: vscode.Uri[] | undefined = await vscode.window.showOpenDialog({
       canSelectFiles: true,
       canSelectFolders: false,
       canSelectMany: false,
       filters: {
-        "Text files": ["txt"],
+        files: ["pdf", "txt"],
       },
     });
 
     if (file?.[0]) {
       try {
+        const fileSize = fs.statSync(file[0].fsPath).size;
+
+        if (fileSize > MAX_FILE_SIZE) {
+          this.logger.info(
+            `File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)} MB.`,
+          );
+          return;
+        }
+
         await this.uploadFile(file[0]);
       } catch (error: any) {
-        vscode.window.showErrorMessage(
-          `Failed to upload file: ${error.message}`,
-        );
         throw error;
       }
     }
