@@ -31,7 +31,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     protected readonly generativeAiModel: string,
     context: vscode.ExtensionContext,
   ) {
-    this.fileManager = FileManager.initialize(context);
+    this.fileManager = FileManager.initialize(context, "files");
     this.fileService = FileService.getInstance();
     this._context = context;
     this.orchestrator = Orchestrator.getInstance();
@@ -48,6 +48,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onActiveworkspaceUpdate(
         this.handleGenericEvents.bind(this),
       ),
+      this.orchestrator.onFileUpload(this.handleModelResponseEvent.bind(this)),
     );
   }
 
@@ -78,6 +79,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     setTimeout(async () => {
       await this.publishWorkSpace();
     }, 2000);
+    await this.getFiles();
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
@@ -85,6 +87,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.currentWebView?.webview!,
       this._extensionUri,
     );
+  }
+
+  private async getFiles() {
+    const files: string[] = await this.fileManager.getFileNames();
+    if (files?.length) {
+      await this.currentWebView?.webview.postMessage({
+        type: "onFilesRetrieved",
+        message: JSON.stringify(files),
+      });
+    }
   }
 
   private async publishWorkSpace(): Promise<void> {

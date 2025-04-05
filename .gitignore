@@ -6,6 +6,7 @@ node_modules
 # Sentry Config File
 .sentryclirc
 config.ts
-patterns
+database
+files
 webviewUi/dist
 samples

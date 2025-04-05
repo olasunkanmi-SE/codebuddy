@@ -8,7 +8,9 @@ type AgentEventKeys =
   | "onSecretChange"
   | "onBootstrap"
   | "onActiveworkspaceUpdate"
-  | "onFileUpload";
+  | "onFileUpload"
+  | "onFileProcessSuccess"
+  | "onFilesRetrieved";
 
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
