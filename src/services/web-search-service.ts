@@ -28,7 +28,7 @@ export class WebSearchService {
   private readonly logger: Logger;
   private readonly userAgent = WEB_SEARCH_CONFIG.userAgent;
   private readonly urlRanker: UrlReranker;
-  private static URL_PRIORITY_LIST = PRIORITY_URLS;
+  static readonly URL_PRIORITY_LIST = PRIORITY_URLS;
 
   private constructor(logger: Logger) {
     this.logger = logger;
@@ -264,8 +264,6 @@ export class WebSearchService {
       const contextPromises = urls
         .slice(0, 6)
         .map((url) => this.fetchArticleContent(url));
-      if (contextPromises?.length) {
-      }
       const contextResults = await Promise.all(contextPromises);
       const filteredContext = contextResults.filter((c) => c !== undefined);
       const combinedContext = filteredContext
@@ -273,7 +271,7 @@ export class WebSearchService {
         .join("\n\n");
 
       return {
-        pagesPublished: crawleableMetadata?.length > 0 ? true : false,
+        pagesPublished: Boolean(crawleableMetadata?.length),
         combinedContext,
       };
     } catch (error: any) {
@@ -282,7 +280,7 @@ export class WebSearchService {
     }
   }
 
-  private sortUrlsByPriority = (
+  readonly sortUrlsByPriority = (
     metadata: IPageMetada[],
     priorityDomains: string[],
   ): string[] => {

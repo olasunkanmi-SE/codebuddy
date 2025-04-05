@@ -142,6 +142,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             break;
           case "upload-file":
             await this.fileManager.uploadFileHandler();
+            break;
           default:
             throw new Error("Unknown command");
         }
