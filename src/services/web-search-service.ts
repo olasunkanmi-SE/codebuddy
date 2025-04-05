@@ -70,7 +70,7 @@ export class WebSearchService {
   ): Promise<IPageMetada[]> {
     try {
       const response = await axios.get(searchUrl, {
-        timeout: 5000,
+        timeout: 10000,
         headers: {
           Accept: "text/html",
           "User-Agent": this.userAgent,
@@ -197,7 +197,7 @@ export class WebSearchService {
 
       try {
         const faviconResponse = await axios.head(rootFaviconUrl, {
-          timeout: 2000,
+          timeout: 5000,
         });
         if (faviconResponse.status === 200) {
           favicon = rootFaviconUrl;
@@ -240,6 +240,10 @@ export class WebSearchService {
         "x.com",
         "reuters.com",
         "cbinsights.com",
+        "openai.com",
+        "sp-edge.com",
+        "accuweather.com",
+        "www.blockchain-council.org",
       ];
 
       const crawleableMetadata: IPageMetada[] = [];

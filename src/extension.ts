@@ -14,7 +14,6 @@ import { GenerateCommitMessage } from "./commands/generate-commit-message";
 import { GenerateUnitTest } from "./commands/generate-unit-test";
 import { InLineChat } from "./commands/inline-chat";
 import { InterviewMe } from "./commands/interview-me";
-import { ReadFromKnowledgeBase } from "./commands/knowledge-base";
 import { OptimizeCode } from "./commands/optimize";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
@@ -30,7 +29,9 @@ import { GroqWebViewProvider } from "./providers/groq";
 import { FileManager } from "./services/file-manager";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { Credentials } from "./services/github-authentication";
-import { getConfigValue } from "./utils/utils";
+import { getAPIKey, getConfigValue } from "./utils/utils";
+import { FileUploadAgent } from "./agents/file-upload";
+import * as fs from "fs";
 
 const {
   geminiKey,
@@ -50,9 +51,13 @@ const logger = new Logger("extension");
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
 
-async function connectToDatabase() {
+async function connectToDatabase(context: vscode.ExtensionContext) {
   try {
-    const dbPath = path.join(__dirname, "..", "patterns", "aii.db");
+    const dbDir = path.join(context.extensionPath, "database");
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir);
+    }
+    const dbPath = path.join(__dirname, "..", "database", "aii.db");
     const urlPath = dbPath.replace(/\\/g, "/");
     const isWindows = dbPath.includes("\\");
     const filePath = isWindows ? `file:/${urlPath}` : `file:${urlPath}`;
@@ -65,7 +70,7 @@ async function connectToDatabase() {
 
 async function createFileDB(context: vscode.ExtensionContext) {
   try {
-    const fileUploader = new FileManager(context);
+    const fileUploader = new FileManager(context, "database");
     const files = await fileUploader.getFiles();
     if (!files?.find((file) => file.includes("dev.db"))) {
       await fileUploader.createFile("dev.db");
@@ -79,14 +84,16 @@ async function createFileDB(context: vscode.ExtensionContext) {
 export async function activate(context: vscode.ExtensionContext) {
   try {
     await createFileDB(context);
-    await connectToDatabase();
+    await connectToDatabase(context);
     const credentials = new Credentials();
+    const geminiApiKey = getAPIKey("gemini");
+    FileUploadAgent.initialize(geminiApiKey);
     await credentials.initialize(context);
     const session: vscode.AuthenticationSession | undefined =
       await credentials.getSession();
     logger.info(`Logged into GitHub as ${session?.account.label}`);
     Memory.getInstance();
-    const fileUpload = new FileManager(context);
+
     // TODO This is broken. Need to Fix
     // const index = CodeIndexingService.createInstance();
     // Get each of the folders and call the next line for each
@@ -136,11 +143,6 @@ export async function activate(context: vscode.ExtensionContext) {
       `${USER_MESSAGE} creates the code chart...`,
       context,
     );
-    const codePattern = fileUpload;
-    const knowledgeBase = new ReadFromKnowledgeBase(
-      `${USER_MESSAGE} generate your code pattern...`,
-      context,
-    );
     const generateCommitMessage = new GenerateCommitMessage(
       `${USER_MESSAGE} generates a commit message...`,
       context,
@@ -169,8 +171,6 @@ export async function activate(context: vscode.ExtensionContext) {
           errorMessage,
         ).execute(errorMessage),
       [explain]: async () => await explainCode.execute(),
-      [pattern]: async () => await codePattern.uploadFileHandler(),
-      [knowledge]: async () => await knowledgeBase.execute(),
       [commitMessage]: async () =>
         await generateCommitMessage.execute("commitMessage"),
       [generateCodeChart]: async () => await codeChartGenerator.execute(),

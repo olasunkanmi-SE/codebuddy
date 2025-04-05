@@ -6,22 +6,24 @@ import { Logger } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../agents/orchestrator";
 
 export class FileManager implements IFileUploader {
-  fileDir: string;
   private static instance: FileManager;
   private readonly logger: Logger;
   protected readonly orchestrator: Orchestrator;
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly fileDir: string,
+  ) {
     this.orchestrator = Orchestrator.getInstance();
     this.logger = new Logger(FileManager.name);
-    this.fileDir = path.join(this.context.extensionPath, "patterns");
+    this.fileDir = path.join(this.context.extensionPath, this.fileDir);
     if (!fs.existsSync(this.fileDir)) {
       fs.mkdirSync(this.fileDir);
     }
   }
 
-  static initialize(context: vscode.ExtensionContext) {
+  static initialize(context: vscode.ExtensionContext, fileDir: string) {
     if (!FileManager.instance) {
-      FileManager.instance = new FileManager(context);
+      FileManager.instance = new FileManager(context, fileDir);
     }
     return FileManager.instance;
   }
@@ -121,7 +123,7 @@ export class FileManager implements IFileUploader {
    * */
 
   async uploadFileHandler(): Promise<void> {
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB, adjust as needed
+    const MAX_FILE_SIZE = 40 * 1024 * 1024; // 5MB, adjust as needed
     const file: vscode.Uri[] | undefined = await vscode.window.showOpenDialog({
       canSelectFiles: true,
       canSelectFolders: false,
