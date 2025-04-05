@@ -1,4 +1,4 @@
-import * as markdownit from "markdown-it";
+import markdownit from "markdown-it";
 import * as vscode from "vscode";
 import {
   APP_CONFIG,

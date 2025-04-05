@@ -6,19 +6,50 @@ import {
   GoogleGenAI,
 } from "@google/genai";
 import * as path from "path";
+import * as vscode from "vscode";
 import { BaseAiAgent } from "./base";
 import { Orchestrator } from "./orchestrator";
+import { IEventPayload } from "../emitter/interface";
 
-export class FileUploadAgent extends BaseAiAgent {
+export class FileUploadAgent extends BaseAiAgent implements vscode.Disposable {
   private readonly ai: GoogleGenAI;
   protected readonly orchestrator: Orchestrator;
   private static readonly PROCESSING_WAIT_TIME_MS = 6000;
   private static readonly MAX_CACHE_PAGE_SIZE = 10;
   private static readonly CACHE_MODEL = "gemini-1.5-flash-002";
+  private readonly disposables: vscode.Disposable[] = [];
+  private static instance: FileUploadAgent;
   constructor(private readonly apiKey: string) {
     super();
     this.ai = new GoogleGenAI({ apiKey: this.apiKey });
     this.orchestrator = Orchestrator.getInstance();
+    this.disposables.push(
+      this.orchestrator.onFileUpload(this.handleLocalFileUpload.bind(this)),
+    );
+  }
+
+  static initialize(apiKey: string) {
+    if (!FileUploadAgent.instance) {
+      FileUploadAgent.instance = new FileUploadAgent(apiKey);
+    }
+    return FileUploadAgent.instance;
+  }
+
+  private async handleLocalFileUpload(event: IEventPayload) {
+    try {
+      if (!event.message?.length) {
+        this.logger.info("Error while uploading file, try again");
+        return;
+      }
+      const data = JSON.parse(event.message);
+      const { fileName, filePath } = data;
+      if (fileName && filePath) {
+        await this.uploadAndProcessFile(filePath, fileName);
+      }
+    } catch (error: any) {
+      console.log(error);
+      throw new Error(error);
+    }
   }
 
   private async uploadFile(filePath: string, displayName: string) {
@@ -105,7 +136,7 @@ export class FileUploadAgent extends BaseAiAgent {
 
       return {
         response: response.text,
-        fileName,
+        fileName: fileName ?? file.displayName,
         cache: cached.name,
       };
     } catch (error) {
@@ -134,7 +165,8 @@ export class FileUploadAgent extends BaseAiAgent {
       model: FileUploadAgent.CACHE_MODEL,
       config: {
         contents: createUserContent(fileContent),
-        systemInstruction: "You are an expert analyzing documents",
+        systemInstruction:
+          "You are an expert analyzing documents. Give a detail analysis of this doc in markdown",
       },
     });
     this.logger.info("Cache created:", cached);
@@ -162,29 +194,7 @@ export class FileUploadAgent extends BaseAiAgent {
     }
   }
 
-  async getCaches(): Promise<CachedContent[]> {
-    this.logger.info("Retrieving caches");
-    const caches: CachedContent[] = [];
-
-    try {
-      const pager = await this.ai.caches.list({
-        config: { pageSize: FileUploadAgent.MAX_CACHE_PAGE_SIZE },
-      });
-
-      let page = pager.page;
-
-      do {
-        caches.push(...page);
-        if (!pager.hasNextPage()) break;
-        page = await pager.nextPage();
-      } while (true);
-
-      return caches;
-    } catch (error) {
-      console.log("Failed to retrieve caches", error);
-      throw new Error(
-        `Failed to retrieve caches: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+  public dispose(): void {
+    this.disposables.forEach((d) => d.dispose());
   }
 }
