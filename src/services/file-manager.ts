@@ -168,7 +168,6 @@ export class FileManager implements IFileUploader {
         this.logger.info(`File ${filename} created successfully`);
         created = true;
       } else {
-        created = false;
         this.logger.info(`File ${filename} already exists`);
       }
       return created;

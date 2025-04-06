@@ -7,15 +7,9 @@ interface ModelDropdownProps {
   onChange: (e: any) => void;
   id?: string;
   options: any[];
-  defaultValue?: string;
 }
 
-export const ModelDropdown: React.FC<ModelDropdownProps> = ({
-  value,
-  onChange,
-  id,
-  options,
-}) => {
+export const ModelDropdown: React.FC<ModelDropdownProps> = ({ value, onChange, id, options }) => {
   console.log({ value, onChange, id, options });
   return (
     <VSCodeDropdown value={value} id={id} onChange={onChange}>

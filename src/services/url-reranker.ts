@@ -130,7 +130,7 @@ export class UrlReranker {
    */
   calculateFinalScore(metadata: IPageMetada): number {
     const titleRelevanceScore = this.calculateTitleRelevanceScore(
-      metadata.title || "",
+      metadata.title ?? "",
     );
     const reputationScore = this.calculateSourceReputationScore(metadata);
     const contentQualityScore = this.calculateContentQualityScore(metadata);
