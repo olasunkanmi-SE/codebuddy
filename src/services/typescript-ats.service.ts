@@ -490,7 +490,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
    * Builds a hierarchical map of the codebase by traversing TypeScript files
    * and extracting module and class information.
    */
-  async buildCodebaseMap(): Promise<Map<string, string>> {
+  async buildCodebaseMap(): Promise<ICodebaseMap> {
     try {
       const filesMap = new Map<string, string>();
       const rootDir: string = this.fsService.getRootFilePath();
@@ -576,7 +576,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
         });
       });
       Memory.set("codeIndex", filesMap);
-      return filesMap;
+      return codebaseMap;
     } catch (error) {
       handleError(error, "Error fetching the files");
       throw Error;

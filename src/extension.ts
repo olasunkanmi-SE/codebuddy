@@ -32,6 +32,7 @@ import { Credentials } from "./services/github-authentication";
 import { getAPIKey, getConfigValue } from "./utils/utils";
 import { FileUploadAgent } from "./agents/file-upload";
 import * as fs from "fs";
+import { CodeIndexingService } from "./services/code-indexing";
 
 const {
   geminiKey,
@@ -70,7 +71,7 @@ async function connectToDatabase(context: vscode.ExtensionContext) {
 
 async function createFileDB(context: vscode.ExtensionContext) {
   try {
-    const fileUploader = new FileManager(context, "database");
+    const fileUploader = new FileManager(context, "patterns");
     const files = await fileUploader.getFiles();
     if (!files?.find((file) => file.includes("dev.db"))) {
       await fileUploader.createFile("dev.db");
@@ -95,11 +96,11 @@ export async function activate(context: vscode.ExtensionContext) {
     Memory.getInstance();
 
     // TODO This is broken. Need to Fix
-    // const index = CodeIndexingService.createInstance();
+    const index = CodeIndexingService.createInstance();
     // Get each of the folders and call the next line for each
-    // const result = await index.buildFunctionStructureMap();
-    // await index.insertFunctionsinDB();
-    // console.log(result);
+    const result = await index.buildFunctionStructureMap();
+    await index.insertFunctionsinDB();
+    console.log(result);
     const {
       comment,
       review,
@@ -107,8 +108,6 @@ export async function activate(context: vscode.ExtensionContext) {
       optimize,
       fix,
       explain,
-      pattern,
-      knowledge,
       commitMessage,
       interviewMe,
       generateUnitTest,

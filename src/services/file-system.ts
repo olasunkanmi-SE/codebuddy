@@ -48,6 +48,26 @@ export class FileService {
         workSpaceInfo.root,
       );
       const tsFilePaths: string[] = [];
+
+      // Check for tsconfig.json at the root
+      const tsConfigUrl = vscode.Uri.joinPath(
+        workSpaceInfo.root,
+        FSPROPS.TSCONFIG_FILE,
+      );
+
+      const tsConfigExists =
+        (await Promise.resolve(vscode.workspace.fs.stat(tsConfigUrl)).catch(
+          () => null,
+        )) !== null;
+
+      if (tsConfigExists) {
+        const tsFiles = await vscode.workspace.findFiles(
+          new vscode.RelativePattern(workSpaceInfo.root, pattern),
+          FSPROPS.NODE_MODULES_PATTERN,
+        );
+        tsFilePaths.push(...tsFiles.map((file) => file.fsPath));
+      }
+
       for (const [name, type] of directories) {
         if (type === vscode.FileType.Directory) {
           const dirUri = vscode.Uri.joinPath(workSpaceInfo.root, name);
