@@ -1,6 +1,7 @@
 import { SchemaType } from "@google/generative-ai";
 import { ContextRetriever } from "../services/context-retriever";
 import { IFileToolConfig } from "../application/interfaces/agent.interface";
+import { Orchestrator } from "../agents/orchestrator";
 
 class SearchTool {
   constructor(private readonly contextRetriever?: ContextRetriever) {}
@@ -13,17 +14,17 @@ class SearchTool {
     return {
       name: "search_vector_db",
       description:
-        "Perform a similarity search in the vector database based on user input",
+        "Search the codebase knowledge base for information related to the user's query. Use this to find code snippets, architectural decisions, or existing solutions within the project.",
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
           query: {
             type: SchemaType.STRING,
             description:
-              "The user input to search for similar items in the vector database",
+              "The user's question or topic to search for in the codebase knowledge base.",
           },
         },
-        example: ["How was authentication implemented within this codebase"],
+        example: ["How is user authentication handled in this project?"],
         required: ["query"],
       },
     };
@@ -41,18 +42,18 @@ export class WebTool {
     return {
       name: "web_search",
       description:
-        "Search the web for additional information and extract relevant content",
+        "Search the internet for general programming knowledge, best practices, or solutions to common coding problems. Useful for understanding concepts, exploring different approaches, or finding external libraries.",
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
           query: {
             type: SchemaType.STRING,
             description:
-              "The search query to find relevant information on the web",
+              "The search query to use when searching the web for relevant information.",
           },
         },
         example: [
-          "What is the general guideline on handling user session in software development",
+          "Best practices for handling user sessions in web applications",
         ],
         required: ["query"],
       },
@@ -70,30 +71,29 @@ export class FileTool {
     return {
       name: "analyze_files_for_question",
       description:
-        "Analyze the contents of specified files to determine which best answers a given question",
+        "Analyze specific code files to understand their functionality and answer user questions related to the code. Use this tool when the user is asking about specific parts of the codebase or how certain features are implemented.",
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
           files: {
             type: SchemaType.ARRAY,
-            description: SchemaType.STRING,
+            description: "An array of file configurations to analyze.",
             items: {
               type: SchemaType.OBJECT,
               properties: {
                 class_name: {
                   type: SchemaType.STRING,
                   description:
-                    "The class containing the function that may be responsible for the user query.",
+                    "The class name within the file that is relevant to the user's query.",
                 },
                 function_name: {
                   type: SchemaType.STRING,
                   description:
-                    "The function that may be responsible for the user query",
+                    "The function name within the file that is relevant to the user's query.",
                 },
                 file_path: {
                   type: SchemaType.STRING,
-                  description:
-                    "The file path to the class that contains the function,",
+                  description: "The path to the code file to be analyzed.",
                 },
               },
               required: ["class_name", "function_name", "file_path"],
@@ -106,8 +106,41 @@ export class FileTool {
   }
 }
 
+export class ThinkTool {
+  private readonly orchestrator: Orchestrator;
+  constructor() {
+    this.orchestrator = Orchestrator.getInstance();
+  }
+  public async execute(thought: { thought: string }) {
+    this.orchestrator.publish("onStrategizing", thought.thought);
+  }
+
+  config() {
+    return {
+      name: "think",
+      description:
+        "Use this tool to think through complex problems, analyze information, or plan multi-step solutions before taking action" +
+        "This creates space for structured reasoning about code architecture, debugging approaches, " +
+        "or implementation strategies. Use when analyzing tool outputs, making sequential decisions, " +
+        "or following complex guidelines. This tool does not execute code or retrieve new information.",
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          thought: {
+            type: SchemaType.STRING,
+            description:
+              "Describe your detailed analysis, thought process, reasoning steps, or plan of action.",
+          },
+        },
+        required: ["thought"],
+      },
+    };
+  }
+}
+
 export const TOOL_CONFIGS = {
   SearchTool: { tool: SearchTool, useContextRetriever: true },
   FileTool: { tool: FileTool, useContextRetriever: true },
   WebTool: { tool: WebTool, useContextRetriever: true },
+  ThinkTool: { tool: ThinkTool, useContextRetriever: false },
 };

@@ -49,6 +49,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         this.handleGenericEvents.bind(this),
       ),
       this.orchestrator.onFileUpload(this.handleModelResponseEvent.bind(this)),
+      this.orchestrator.onStrategizing(
+        this.handleModelResponseEvent.bind(this),
+      ),
     );
   }
 
