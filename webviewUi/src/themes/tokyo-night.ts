@@ -106,6 +106,9 @@ export const tokyoNightCss = `/*!
 .hljs {
   background: transparent;
   color: #9aa5ce;
+    font-family: "Fira Sans", sans-serif;
+  font-weight: 300;
+  font-style: normal;
 }
 
 .hljs-emphasis {
