@@ -203,15 +203,14 @@ export class WebSearchService {
           favicon = rootFaviconUrl;
         }
       } catch (error: any) {
-        this.logger.error(`unable to fetch Favicons ${error.message}`, error);
-        throw new Error(`Error fetching Favicons: ${error.message}`);
+        this.logger.info(`unable to fetch Favicons ${error.message}`, error);
       }
     }
     if (!favicon) {
       favicon = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
     }
 
-    return favicon;
+    return favicon ?? "";
   }
 
   public async run(
@@ -266,17 +265,13 @@ export class WebSearchService {
         .map((url) => this.fetchArticleContent(url));
       const contextResults = await Promise.all(contextPromises);
       const filteredContext = contextResults.filter((c) => c !== undefined);
-      const combinedContext = filteredContext
-        .map((result) => result?.content)
-        .join("\n\n");
-
-      return {
-        pagesPublished: Boolean(crawleableMetadata?.length),
-        combinedContext,
-      };
+      return filteredContext.map((result) => result?.content).join("\n\n");
     } catch (error: any) {
       this.logger.error(`search error: ${error.message}`, error);
-      return `Error searching the web: ${error.message}`;
+      return {
+        pagesPublished: false,
+        combinedContext: "",
+      };
     }
   }
 
