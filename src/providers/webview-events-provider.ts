@@ -16,10 +16,10 @@ export class WebViewEventsProvider {
     this.logger = new Logger("WebViewEventsProvider");
   }
 
-  public postMessage(message: IPostMessage) {
+  public async postMessage(message: IPostMessage) {
     const { type, payload } = message;
     try {
-      this.webView.webview.postMessage({ type, payload });
+      await this.webView.webview.postMessage({ type, payload });
     } catch (error: any) {
       this.logger.error(`Unable to emit ${type}`, error);
       throw new Error(error);

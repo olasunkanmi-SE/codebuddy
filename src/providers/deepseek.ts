@@ -25,7 +25,7 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     this.deepseekLLM = DeepseekLLM.getInstance({
       apiKey: this.apiKey,
       model: this.generativeAiModel,
-      baseUrl: this.baseUrl || "https://api.deepseek.com/v1",
+      baseUrl: this.baseUrl ?? "https://api.deepseek.com/v1",
     });
     this.client = this.deepseekLLM.getModel();
   }

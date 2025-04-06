@@ -5,7 +5,6 @@ import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
 import { GeminiLLM } from "./../llms/gemini/gemini";
 import { BaseWebViewProvider } from "./base";
-import { FileService } from "../services/file-system";
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
