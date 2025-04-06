@@ -112,7 +112,6 @@ export class ThinkTool {
     this.orchestrator = Orchestrator.getInstance();
   }
   public async execute(thought: string) {
-    this.orchestrator.publish("onStrategizing", thought);
     return thought[0];
   }
 

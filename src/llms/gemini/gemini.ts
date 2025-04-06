@@ -184,7 +184,7 @@ export class GeminiLLM
   private async processToolCalls(
     toolCalls: FunctionCall[],
     userInput: string,
-  ): Promise<string | undefined> {
+  ): Promise<any> {
     let finalResult: string | undefined = undefined;
     let userQuery = userInput;
     let callCount = 0;
@@ -205,17 +205,23 @@ export class GeminiLLM
         if (functionCall.name === "think") {
           const thought = functionResult?.response.content;
           if (thought) {
-            console.log("Thought Process:", thought);
+            this.orchestrator.publish("onStrategizing", thought);
+            this.planSteps = this.parseThought(thought);
+            if (this.planSteps?.length > 0) {
+              const firstStep = this.planSteps[0];
+              userQuery = `Based on the plan, the first step is: "${firstStep}". Please execute this step.`;
+            } else {
+              userQuery = userInput;
+              this.planSteps = [];
+            }
+          } else {
+            userQuery = `Tool result: ${JSON.stringify(functionResult)}. What is your next step?`;
           }
         }
 
-        userQuery = `Tool result: ${JSON.stringify(
-          functionResult,
-        )}. What is your next step?`;
-
         await this.buildChatHistory(
           userQuery,
-          functionCall,
+          functionCall.name,
           functionResult,
           undefined,
           false,
@@ -223,11 +229,14 @@ export class GeminiLLM
 
         const snapShot = this.createSnapShot({
           lastQuery: userQuery,
-          lastCall: functionCall,
+          lastCall: functionCall.name,
           lastResult: functionResult,
+          currentStepIndex: this.currentStepIndex,
+          planSteps: this.planSteps,
         });
         Memory.set(COMMON.GEMINI_SNAPSHOT, snapShot);
         callCount++;
+        return functionResult;
       } catch (error: any) {
         console.error("Error processing function call", error);
 
@@ -256,7 +265,7 @@ export class GeminiLLM
     const MAX_BASE_CALLS = 5;
     let callCount = 0;
     try {
-      const snapShot = Memory.get(COMMON.GEMINI_SNAPSHOT) as GeminiLLMSnapShot;
+      let snapShot = Memory.get(COMMON.GEMINI_SNAPSHOT) as GeminiLLMSnapShot;
       if (snapShot) {
         this.loadSnapShot(snapShot);
         this.planSteps = snapShot.planSteps;
@@ -313,10 +322,7 @@ export class GeminiLLM
             );
           }
           if (toolCalls && toolCalls.length > 0) {
-            finalResult = await this.processToolCalls(toolCalls, userQuery);
-            if (finalResult) {
-              return finalResult;
-            }
+            await this.processToolCalls(toolCalls, userQuery);
           } else {
             finalResult = text();
             this.orchestrator.publish("onQuery", String(finalResult));
@@ -331,6 +337,7 @@ export class GeminiLLM
             if (this.currentStepIndex < this.planSteps.length) {
               userQuery = `Continuing with the plan. Step ${this.currentStepIndex + 1} of ${this.planSteps.length}: "${this.planSteps[this.currentStepIndex]}". Please execute this step`;
             } else {
+              this.currentStepIndex = 0;
               this.planSteps = [];
               userQuery =
                 "Plan execution completed. What is the final answer or next steps based on the completed plan?";

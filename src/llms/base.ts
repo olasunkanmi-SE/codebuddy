@@ -1,4 +1,3 @@
-import { error } from "console";
 import { Logger } from "../infrastructure/logger/logger";
 import { validateLlmConfig } from "../utils/llm-config-validator";
 import { IBaseLLM, ILlmConfig } from "./interface";
@@ -49,5 +48,116 @@ export abstract class BaseLLM<T extends Record<string, any>>
       - Score: [number]
     `,
     };
+  }
+
+  /**
+   * Parses a thought string into a series of steps, extracting titles and bullet points.
+   *
+   * @param {string} thought The input thought string, expected to be in a numbered step format.
+   *                         Example: "1. **Step Title**: Step content.\n   * Bullet point 1\n   * Bullet point 2"
+   * @returns {string[]} An array of parsed steps. Each step is a string. Returns a single-element array
+   *                      containing the trimmed input if the input doesn't follow the expected format.
+   */
+  protected parseThought(thought: string): string[] {
+    const sections = this.splitThoughtIntoSections(thought);
+
+    if (sections.length <= 1) {
+      return [thought.trim()];
+    }
+
+    return this.processSections(sections);
+  }
+
+  /**
+   * Splits the thought string into sections based on numbered steps.
+   *
+   * @param {string} thought The input thought string.
+   * @returns {string[]} An array of strings, where even indices are step numbers (e.g., "1. ") and odd indices are step contents.
+   */
+  private splitThoughtIntoSections(thought: string): string[] {
+    return thought.split(/(\d+\.\s+)/);
+  }
+
+  /**
+   * Processes the sections array to extract step titles, content, and bullet points.
+   *
+   * @param {string[]} sections An array of strings representing the split thought.
+   * @returns {string[]} An array of parsed steps.
+   */
+  private processSections(sections: string[]): string[] {
+    const steps: string[] = [];
+
+    for (let i = 1; i < sections.length; i += 2) {
+      if (i + 1 >= sections.length) break;
+
+      const stepNumber = sections[i].trim();
+      const stepContent = sections[i + 1];
+
+      const parsedStep = this.parseStepContent(stepNumber, stepContent);
+      steps.push(parsedStep);
+    }
+
+    return steps;
+  }
+
+  /**
+   * Parses the content of a single step to extract the title and any associated bullet points.
+   *
+   * @param {string} stepNumber The step number (e.g., "1.").
+   * @param {string} stepContent The content of the step.
+   * @returns {string} The formatted step string.
+   */
+  private parseStepContent(stepNumber: string, stepContent: string): string {
+    const titleRegex = /^\s*\*\*([^:\n*]+)\*\*:?\s*/;
+    const titleMatch = titleRegex.exec(stepContent);
+
+    if (titleMatch) {
+      return this.formatStepWithTitle(titleMatch, stepContent);
+    } else {
+      return stepNumber + " " + stepContent.trim();
+    }
+  }
+
+  /**
+   * Formats a step that includes a title.  Handles cases with and without bullet points.
+   *
+   * @param {RegExpMatchArray} titleMatch The result of the regex match for the title.
+   * @param {string} stepContent The content of the step.
+   * @returns {string} The formatted step string including the title and bullet points (if any).
+   */
+  private formatStepWithTitle(
+    titleMatch: RegExpMatchArray,
+    stepContent: string,
+  ): string {
+    const title = titleMatch[1].trim();
+    const remainingContent = stepContent.substring(titleMatch[0].length).trim();
+
+    if (remainingContent.includes("*")) {
+      const bulletPoints = this.extractBulletPoints(remainingContent);
+
+      if (bulletPoints.length > 0) {
+        const formattedBulletPoints = bulletPoints
+          .map((bp) => "- " + bp)
+          .join(" ");
+        return title + ": " + formattedBulletPoints;
+      } else {
+        return `${title}: ${remainingContent}`;
+      }
+    } else {
+      return `${title}: ${remainingContent}`;
+    }
+  }
+
+  /**
+   * Extracts bullet points from the step content.
+   *
+   * @param {string} content The remaining content of the step (after the title).
+   * @returns {string[]} An array of bullet points.
+   */
+  private extractBulletPoints(content: string): string[] {
+    return content
+      .split(/\n\s*\*\s+/)
+      .filter(Boolean)
+      .map((point) => point.trim());
   }
 }
