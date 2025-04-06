@@ -15,14 +15,18 @@ import { Memory } from "../../memory/base";
 import { CodeBuddyToolProvider } from "../../providers/tool";
 import { createPrompt } from "../../utils/prompt";
 import { BaseLLM } from "../base";
-import { GeminiModelResponseType, ILlmConfig } from "../interface";
+import {
+  GeminiModelResponseType,
+  ILlmConfig,
+  GeminiLLMSnapShot,
+} from "../interface";
 import { Message } from "../message";
 import { Logger } from "../../infrastructure/logger/logger";
 import { GroqLLM } from "../groq/groq";
 import { getAPIKey } from "../../utils/utils";
 
 export class GeminiLLM
-  extends BaseLLM<GeminiModelResponseType>
+  extends BaseLLM<GeminiLLMSnapShot>
   implements vscode.Disposable
 {
   private readonly generativeAi: GoogleGenerativeAI;
@@ -34,6 +38,8 @@ export class GeminiLLM
   private lastFunctionCalls: Set<string> = new Set();
   private readonly timeOutMs: number = 30000;
   private readonly groqLLM: GroqLLM;
+  private planSteps: string[] = [];
+  private currentStepIndex = 0;
 
   constructor(config: ILlmConfig) {
     super(config);
@@ -196,6 +202,13 @@ export class GeminiLLM
           }
         }
 
+        if (functionCall.name === "think") {
+          const thought = functionResult?.response.content;
+          if (thought) {
+            console.log("Thought Process:", thought);
+          }
+        }
+
         userQuery = `Tool result: ${JSON.stringify(
           functionResult,
         )}. What is your next step?`;
@@ -243,12 +256,20 @@ export class GeminiLLM
     const MAX_BASE_CALLS = 5;
     let callCount = 0;
     try {
-      const snapShot = Memory.get(
-        COMMON.GEMINI_SNAPSHOT,
-      ) as GeminiModelResponseType;
+      const snapShot = Memory.get(COMMON.GEMINI_SNAPSHOT) as GeminiLLMSnapShot;
       if (snapShot) {
         this.loadSnapShot(snapShot);
+        this.planSteps = snapShot.planSteps;
+        this.currentStepIndex = snapShot.currentStepIndex;
       }
+
+      if (this.currentStepIndex < this.planSteps?.length) {
+        userQuery = `Continuing with the plan. Step ${this.currentStepIndex + 1} of ${this.planSteps.length}: "${this.planSteps[this.currentStepIndex]}". Please execute this step.`;
+      } else {
+        this.currentStepIndex = 0;
+        this.planSteps = [];
+      }
+
       while (callCount < this.calculateDynamicCallLimit(userQuery)) {
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
@@ -301,6 +322,19 @@ export class GeminiLLM
             this.orchestrator.publish("onQuery", String(finalResult));
             console.log();
             break;
+          }
+          if (
+            this.planSteps?.length > 0 &&
+            toolCalls.every((call) => call.name !== "think")
+          ) {
+            this.currentStepIndex++;
+            if (this.currentStepIndex < this.planSteps.length) {
+              userQuery = `Continuing with the plan. Step ${this.currentStepIndex + 1} of ${this.planSteps.length}: "${this.planSteps[this.currentStepIndex]}". Please execute this step`;
+            } else {
+              this.planSteps = [];
+              userQuery =
+                "Plan execution completed. What is the final answer or next steps based on the completed plan?";
+            }
           }
           if (callCount >= this.calculateDynamicCallLimit(userQuery)) {
             throw new Error("Dynamic call limit reached");
@@ -426,21 +460,32 @@ export class GeminiLLM
     return chatHistory;
   }
 
-  public createSnapShot(data?: any): any {
-    return {
-      ...this.response,
+  public createSnapShot(data?: any): GeminiLLMSnapShot {
+    const snapshot: GeminiLLMSnapShot = {
       lastQuery: data?.lastQuery,
       lastCall: data?.lastCall,
       lastResult: data?.lastResult,
       chatHistory: Memory.get(COMMON.GEMINI_CHAT_HISTORY),
+      planSteps: data?.planSteps,
+      currentStepIndex: data?.currentStepIndex,
+      response: (this.response as GenerateContentResult)?.response, //Conditionally assign the response and assert its type
+      embedding: (this.response as EmbedContentResponse)?.embedding, //Conditionally assign the embedding and assert its type
     };
+
+    return snapshot;
   }
 
   public loadSnapShot(snapshot: ReturnType<typeof this.createSnapShot>): void {
     if (snapshot) {
       this.response = snapshot;
     }
-    if (snapshot.history) {
+    if (snapshot.planSteps) {
+      this.planSteps = snapshot.planSteps;
+    }
+    if (snapshot.currentStepIndex !== 0) {
+      this.currentStepIndex = snapshot.currentStepIndex;
+    }
+    if (snapshot.chatHistory) {
       Memory.set(COMMON.GEMINI_CHAT_HISTORY, snapshot.chatHistory);
     }
     if (snapshot.lastQuery) {

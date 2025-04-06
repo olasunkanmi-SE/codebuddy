@@ -111,8 +111,9 @@ export class ThinkTool {
   constructor() {
     this.orchestrator = Orchestrator.getInstance();
   }
-  public async execute(thought: { thought: string }) {
-    this.orchestrator.publish("onStrategizing", thought.thought);
+  public async execute(thought: string) {
+    this.orchestrator.publish("onStrategizing", thought);
+    return thought[0];
   }
 
   config() {
@@ -142,5 +143,5 @@ export const TOOL_CONFIGS = {
   SearchTool: { tool: SearchTool, useContextRetriever: true },
   FileTool: { tool: FileTool, useContextRetriever: true },
   WebTool: { tool: WebTool, useContextRetriever: true },
-  ThinkTool: { tool: ThinkTool, useContextRetriever: false },
+  ThinkTool: { tool: ThinkTool, useContextRetriever: true },
 };

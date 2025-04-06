@@ -34,11 +34,11 @@ export const createPrompt = (query: string) => {
 
    Example of using 'think' tool (Internal thought process - not to be shown to user):
 
-   User Query: "How can I implement real-time collaboration in our application?"
+   User Query: "how do i add authorization to the existing codebase without breaking it. Also you need to generate unit tests"
 
    AI Thought Process:
 
-   1. Initial analysis: User is asking about implementing real-time collaboration. This is a complex feature requiring multiple steps and potentially different approaches.
+   1. Initial analysis: User is asking about how to add authorization to the existing codebase without breaking it. This is a complex feature requiring multiple steps and potentially different approaches.
    2. Need to consider:  Existing codebase (search_vector_db), general best practices (web_search), and potentially specific file analysis (analyze_files_for_question) if the user points to existing collaboration features.
    3. Plan of action:
       a. Use 'think' tool to outline the approach.
@@ -49,17 +49,16 @@ export const createPrompt = (query: string) => {
    Example 'think' tool call (Internal):
    \`\`\`json
    {
-      "tool_calls": [
-        {
-          "id": "think-tool-call-id",
-          "type": "function",
-          "function": {
-            "name": "think",
-            "arguments": \`{"thought": "User wants to implement real-time collaboration. I should first check the codebase for any existing collaboration features or relevant architectural patterns using 'search_vector_db'. Then, I'll use 'web_search' to find general best practices for real-time collaboration implementation. Finally, I'll synthesize the information and provide a detailed plan to the user."}\`
-          }
-        }
-      ]
-    }
+    thought: "The user wants to add authorization to the codebase without breaking it, 
+    and they need unit tests. This is a complex task that requires careful planning and execution. 
+    Here's the plan:\n\n1.  **Understand the existing codebase:** Use search_vector_db to find information about the existing authentication and authorization mechanisms (if any) in the codebase. This will help avoid conflicts and ensure a smooth integration.
+    \n2.  **Choose an authorization approach:** Based on the codebase analysis and general best practices, select an appropriate authorization method (e.g., RBAC, ABAC, OAuth 2.0). Consider the complexity of the application and the required granularity of access control.
+    \n3.  **Implement the authorization logic:** Implement the chosen authorization method in a modular and extensible way. Use established design patterns (e.g., decorator, middleware) to avoid code duplication and maintainability issues.
+    \n4.  **Write unit tests:** Write comprehensive unit tests to ensure that the authorization logic works as expected and doesn't introduce any regressions. Focus on testing different scenarios, including both positive and negative cases.
+    \n5.  **Integration testing:** Perform integration tests to verify that the authorization mechanism interacts correctly with other parts of the application. This will help identify any potential compatibility issues.
+    \n6.  **Documentation:** Document the authorization implementation, including the chosen method, the code structure, and the unit tests. This will make it easier for other developers to understand and maintain the code.
+    \n\nFirst, I'll use 'search_vector_db' to check for existing authorization mechanisms in the codebase.",
+  }
    \`\`\`
    MORE THINK TOOL USAGE SCENARIOS:
     - When analyzing tool outputs to determine the best approach
