@@ -142,5 +142,5 @@ export const TOOL_CONFIGS = {
   SearchTool: { tool: SearchTool, useContextRetriever: true },
   FileTool: { tool: FileTool, useContextRetriever: true },
   WebTool: { tool: WebTool, useContextRetriever: true },
-  ThinkTool: { tool: WebTool, useContextRetriever: false },
+  ThinkTool: { tool: ThinkTool, useContextRetriever: false },
 };
