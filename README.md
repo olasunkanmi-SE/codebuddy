@@ -145,9 +145,9 @@ flowchart TD
 2. npm install the packages
 3. Click Run, an option on your screen's top bar, then click Start Debugging. Run -> Start Debugging
 4. A new instance of VS Code will be opened up. This is like your test instance; all changes made on the Codebuddy repo can be seen on this instance.
-5. The main entry into the application is the extension. For the Webview, the main entry is the webview.tsx
+5. The main entry into the application is the extension.ts. For the Webview, the main entry is the webview.tsx
 6. Raise a PR
-7. For more info, check the contribution.md page
+7. For more info, check the contributing.md page
 
 ## Usage Instructions
 
