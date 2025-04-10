@@ -111,16 +111,16 @@ flowchart TD
 
 
 ## Roadmap
-- [ ] Codebase Understanding: Comprehensive local codebase indexing with Retrieval-Augmented Generation (RAG) capabilities.
-- [ ] Code search: Search code across the entire codebase
-- [ ] Rewrite the Webview UI with React
-- [ ] Incorporate AI agents for seamless interaction with external resources and APIs.
-- [ ] Context Pinning: Allow users to pin specific directories, files, and code elements (functions, classes, etc.) as persistent context for AI models.
+- [x] Codebase Understanding: Comprehensive local codebase indexing with Retrieval-Augmented Generation (RAG) capabilities.
+- [x] Code search: Search code across the entire codebase
+- [x] Rewrite the Webview UI with React
+- [x] Incorporate AI agents for seamless interaction with external resources and APIs.
+- [x] Context Pinning: Allow users to pin specific directories, files, and code elements (functions, classes, etc.) as persistent context for AI models.
 - [ ] Automated Documentation Generation: Generate comprehensive and up-to-date codebase documentation.
-- [ ] Intelligent Orchestration: Coordinate AI agents' activities with proper workflow.
-- [ ] Access to real-time data.
+- [x] Intelligent Orchestration: Coordinate AI agents' activities with proper workflow.
+- [x] Access to real-time data.
 - [ ] Support for local LLMs such as Ollama
-- [ ] Support for Deepseek model
+- [x] Support for Deepseek model
 
 
 ## Repository Structure
