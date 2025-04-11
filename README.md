@@ -1,14 +1,15 @@
 # CodeBuddy: Your AI Coding Assistant
 
-CodeBuddy is a powerful Visual Studio Code extension that integrates various generative AI models to enhance your coding workflow and productivity.
+CodeBuddy is a Visual Studio Code extension that enhances developer productivity through AI-powered code assistance. It provides intelligent code review, refactoring suggestions, optimization tips, and interactive chat capabilities powered by multiple AI models including Gemini, Groq, Anthropic, and Deepseek.
 
-This extension provides a wide range of AI-powered features to assist developers in their daily coding tasks, from code generation and refactoring and to unit test creation.
+The extension leverages advanced language models to help developers write better code, understand complex codebases, and automate routine tasks. Key features include code commenting, refactoring suggestions, performance optimization, error fixing, code explanation, commit message generation, and interactive code chat. CodeBuddy integrates seamlessly with VS Code's interface and supports TypeScript/JavaScript development workflows with extensibility for other languages.
 
 ## Install in Vscode Market Place
+
 https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy
 
-
 ## Architecture
+
 ```mermaid
 flowchart TD
 
@@ -101,16 +102,18 @@ flowchart TD
 ```
 
 ### Database
+
 - SQLite database for code pattern storage
 - Vector embeddings for semantic code search
 
 ### File System
+
 - Workspace management for multi-root projects
 - TypeScript configuration detection
 - File watching and indexing services
 
-
 ## Roadmap
+
 - [ ] Codebase Understanding: Comprehensive local codebase indexing with Retrieval-Augmented Generation (RAG) capabilities.
 - [ ] Code search: Search code across the entire codebase
 - [ ] Rewrite the Webview UI with React
@@ -122,8 +125,8 @@ flowchart TD
 - [ ] Support for local LLMs such as Ollama
 - [ ] Support for Deepseek model
 
-
 ## Repository Structure
+
 ```
 .
 ├── src/                         # Source code directory
@@ -139,7 +142,6 @@ flowchart TD
 ├── webviewUi/                   # React-based UI for the extension
 └── package.json                 # Project configuration and dependencies
 ```
-
 
 ## Usage Instructions
 
@@ -178,4 +180,3 @@ flowchart TD
 3. Performance Issues:
    - Problem: Slow response times from CodeBuddy.
    - Solution: Check your internet connection and consider switching to a faster AI model.
-

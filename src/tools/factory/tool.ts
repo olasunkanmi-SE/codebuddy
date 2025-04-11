@@ -1,7 +1,7 @@
-import { IToolConfig } from "../application/interfaces/agent.interface";
-import { ContextRetriever } from "../services/context-retriever";
-import { CodeBuddyTool } from "../tools/base";
-import { TOOL_CONFIGS } from "../tools/tools";
+import { IToolConfig } from "../../application/interfaces/agent.interface";
+import { ContextRetriever } from "../../services/context-retriever";
+import { CodeBuddyTool } from "../base";
+import { TOOL_CONFIGS } from "../tools";
 
 export class ToolFactory {
   private readonly tools: Map<string, IToolConfig> = new Map();
@@ -9,7 +9,7 @@ export class ToolFactory {
   constructor() {
     this.contextRetriever = ContextRetriever.initialize();
     for (const [name, { tool, useContextRetriever }] of Object.entries(
-      TOOL_CONFIGS,
+      TOOL_CONFIGS
     )) {
       const toolConfig = tool.prototype.config();
       this.register({
@@ -33,7 +33,7 @@ export class ToolFactory {
 
   getInstances(): CodeBuddyTool[] {
     return Array.from(this.tools.values()).map((tool) =>
-      tool.createInstance(tool, this.contextRetriever),
+      tool.createInstance(tool, this.contextRetriever)
     );
   }
 }

@@ -73,10 +73,10 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
   ): Promise<string | undefined> {
     try {
       let context: string | undefined;
-      if (metaData) {
-        if (metaData.context as string[]) {
-          context = await this.getContext(metaData.context);
-        }
+      if (metaData.context as string[]) {
+        context = await this.getContext(metaData.context);
+      }
+      if (metaData?.mode === "Agent") {
         this.orchestrator.publish("onThinking", "...thinking");
         await this.gemini.run(
           context
@@ -89,7 +89,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         role: "user",
         parts: [
           {
-            text: message,
+            text: `${message} \n context: ${context}`,
           },
         ],
       });

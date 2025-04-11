@@ -1,0 +1,13 @@
+digraph INFRA {
+  node [ color = "black", fillcolor = "#E6E6E6", height =1, style = "filled,bold,rounded", fontname = "Arial" ];
+  "DatabaseManager" [ label = "DatabaseManager
+(Custom::DatabaseManager)", shape =cylinder, fillcolor = "#FFCFB3" ];
+  "FileService" [ label = "FileService
+(Custom::FileService)", shape =rectangle ];
+  "CIPipeline" [ label = "CIPipeline
+(GitHub::Actions::Workflow)", shape =rectangle ];
+  "VSCodeExtension" [ label = "VSCodeExtension
+(VSCode::Extension)", shape =rectangle ];
+  "VSCodeExtension" -> "DatabaseManager";
+  "VSCodeExtension" -> "FileService";
+}

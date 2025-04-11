@@ -134,7 +134,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 message.metaData,
               );
             } else {
-              response = await this.generateResponse(message.message);
+              response = await this.generateResponse(
+                message.message,
+                message.metaData,
+              );
             }
             if (response) {
               await this.sendResponse(formatText(response), "bot");

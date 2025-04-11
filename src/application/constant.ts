@@ -28,7 +28,7 @@ export const GROQ_CONFIG = {
   max_tokens: 500024,
   top_p: 1,
   stream: false,
-  stop: null,
+  stop: ["thanks"],
 };
 export const APP_CONFIG = {
   geminiKey: "google.gemini.apiKeys",

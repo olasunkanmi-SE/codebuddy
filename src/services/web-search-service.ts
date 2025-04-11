@@ -61,7 +61,7 @@ export class WebSearchService {
       return { url, content: content.trim() };
     } catch (error: any) {
       this.logger.warn(`Failed to fetch ${url}: ${error.message}`, error);
-      return undefined;
+      return { url: "", content: "" };
     }
   }
 
@@ -144,6 +144,7 @@ export class WebSearchService {
       } catch (error) {
         favicon = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
         title = parsedUrl.hostname;
+        return { url: url ?? "", favicon: favicon ?? "", title: title ?? "" };
       }
       return { url, favicon, title };
     } catch (error: any) {
@@ -204,6 +205,7 @@ export class WebSearchService {
         }
       } catch (error: any) {
         this.logger.info(`unable to fetch Favicons ${error.message}`, error);
+        return "";
       }
     }
     if (!favicon) {
@@ -213,11 +215,7 @@ export class WebSearchService {
     return favicon ?? "";
   }
 
-  public async run(
-    query: string,
-  ): Promise<
-    { pagesPublished: boolean; combinedContext: string | undefined } | string
-  > {
+  public async run(query: string): Promise<string[] | string> {
     this.urlRanker.query = query;
     if (!query || query.trim().length < 2) {
       return "Query too short or invalid.";
@@ -261,17 +259,14 @@ export class WebSearchService {
       ).filter((url) => !url.includes("youtube.com"));
 
       const contextPromises = urls
-        .slice(0, 6)
+        .slice(0, 3)
         .map((url) => this.fetchArticleContent(url));
       const contextResults = await Promise.all(contextPromises);
       const filteredContext = contextResults.filter((c) => c !== undefined);
       return filteredContext.map((result) => result?.content).join("\n\n");
     } catch (error: any) {
-      this.logger.error(`search error: ${error.message}`, error);
-      return {
-        pagesPublished: false,
-        combinedContext: "",
-      };
+      this.logger.info(`search error: ${error.message}`, error);
+      return "";
     }
   }
 

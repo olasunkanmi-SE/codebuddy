@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { BaseEmitter } from "./emitter";
+import { BaseEmitter } from "./base";
 import { IAgentEventMap, IEventPayload } from "./interface";
 
 export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
@@ -14,10 +14,10 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onBootstrap: vscode.Event<IEventPayload> = this.createEvent("onBootstrap");
   onFileUpload: vscode.Event<IEventPayload> = this.createEvent("onFileUpload");
   onFileProcessSuccess: vscode.Event<IEventPayload> = this.createEvent(
-    "onFileProcessSuccess",
+    "onFileProcessSuccess"
   );
   onActiveworkspaceUpdate: vscode.Event<IEventPayload> = this.createEvent(
-    "onActiveworkspaceUpdate",
+    "onActiveworkspaceUpdate"
   );
   onFilesRetrieved: vscode.Event<IEventPayload> =
     this.createEvent("onFilesRetrieved");

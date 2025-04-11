@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { getConfigValue } from "../utils/utils";
-import { EventEmitter } from "../emitter/agent-emitter";
+import { EventEmitter } from "../emitter/publisher";
 
 export const initializeGenerativeAiEnvironment = async (
   context: vscode.ExtensionContext,
@@ -9,7 +9,7 @@ export const initializeGenerativeAiEnvironment = async (
   webViewProviderClass: any,
   subscriptions: vscode.Disposable[],
   quickFixCodeAction: vscode.Disposable,
-  agentEventEmmitter: EventEmitter,
+  agentEventEmmitter: EventEmitter
 ) => {
   try {
     const apiKey = getConfigValue(key);
@@ -18,24 +18,24 @@ export const initializeGenerativeAiEnvironment = async (
       context.extensionUri,
       apiKey,
       apiModel,
-      context,
+      context
     );
 
     const registerWebViewProvider: vscode.Disposable =
       vscode.window.registerWebviewViewProvider(
         webViewProviderClass.viewId,
-        webViewProvider,
+        webViewProvider
       );
 
     context.subscriptions.push(
       ...subscriptions,
       quickFixCodeAction,
       registerWebViewProvider,
-      agentEventEmmitter,
+      agentEventEmmitter
     );
   } catch (error) {
     vscode.window.showErrorMessage(
-      "An Error occured while registering event subscriptions",
+      "An Error occured while registering event subscriptions"
     );
     console.log(error);
   }
