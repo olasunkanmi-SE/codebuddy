@@ -26,6 +26,7 @@ export class GroqLLM extends BaseLLM<any> implements vscode.Disposable {
     return [1, 2];
   }
 
+  // TODO Implement function call, especially think for this model.
   async generateText(message: string): Promise<string> {
     try {
       const { temperature, top_p, stop } = GROQ_CONFIG;
