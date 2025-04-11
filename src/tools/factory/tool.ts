@@ -9,7 +9,7 @@ export class ToolFactory {
   constructor() {
     this.contextRetriever = ContextRetriever.initialize();
     for (const [name, { tool, useContextRetriever }] of Object.entries(
-      TOOL_CONFIGS
+      TOOL_CONFIGS,
     )) {
       const toolConfig = tool.prototype.config();
       this.register({
@@ -33,7 +33,7 @@ export class ToolFactory {
 
   getInstances(): CodeBuddyTool[] {
     return Array.from(this.tools.values()).map((tool) =>
-      tool.createInstance(tool, this.contextRetriever)
+      tool.createInstance(tool, this.contextRetriever),
     );
   }
 }

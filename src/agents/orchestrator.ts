@@ -10,7 +10,7 @@ export class Orchestrator extends EventEmitter implements vscode.Disposable {
     super();
     this.disposables.push(
       this.onStatusChange(this.handleStatus.bind(this)),
-      this.onPromptGenerated(this.handlePromptGeneratedEvent.bind(this))
+      this.onPromptGenerated(this.handlePromptGeneratedEvent.bind(this)),
       // this.onError(this.handleError.bind(this)),
     );
   }

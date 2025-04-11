@@ -24,7 +24,7 @@ export class FileUploadService implements vscode.Disposable {
     this.ai = new GoogleGenAI({ apiKey: this.apiKey });
     this.orchestrator = Orchestrator.getInstance();
     this.disposables.push(
-      this.orchestrator.onFileUpload(this.handleLocalFileUpload.bind(this))
+      this.orchestrator.onFileUpload(this.handleLocalFileUpload.bind(this)),
     );
   }
 
@@ -61,7 +61,7 @@ export class FileUploadService implements vscode.Disposable {
     } catch (error) {
       console.error(`Failed to upload file: ${filePath}`, error);
       throw new Error(
-        `File upload failed: ${error instanceof Error ? error.message : String(error)}`
+        `File upload failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -69,7 +69,7 @@ export class FileUploadService implements vscode.Disposable {
   async uploadAndProcessFile(
     filePath: string,
     displayName: string,
-    prompt: string = "Summarize this document"
+    prompt: string = "Summarize this document",
   ): Promise<string | undefined> {
     let file;
     try {
@@ -84,7 +84,7 @@ export class FileUploadService implements vscode.Disposable {
     } catch (error) {
       this.logger.info(`Failed to process file: ${file.name}`);
       throw new Error(
-        `File processing pipeline failed: ${error instanceof Error ? error.message : String(error)}`
+        `File processing pipeline failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -116,7 +116,7 @@ export class FileUploadService implements vscode.Disposable {
   private async generateContentWithFile(
     file: any,
     prompt: string,
-    cacheName?: string
+    cacheName?: string,
   ): Promise<{
     response: string | undefined;
     fileName: string;
@@ -130,7 +130,7 @@ export class FileUploadService implements vscode.Disposable {
 
       const response = await this.generateContentWithCache(
         prompt,
-        cached.name ?? ""
+        cached.name ?? "",
       );
       const fileName = file.fsPath ? path.basename(file.fsPath) : "";
 
@@ -151,7 +151,7 @@ export class FileUploadService implements vscode.Disposable {
 
   private async findOrCreateCache(
     cacheName: string,
-    fileContent: any
+    fileContent: any,
   ): Promise<CachedContent> {
     try {
       return await this.getDocCache(cacheName);
@@ -175,7 +175,7 @@ export class FileUploadService implements vscode.Disposable {
 
   private async generateContentWithCache(
     prompt: string,
-    cacheName: string
+    cacheName: string,
   ): Promise<GenerateContentResponse> {
     return await this.ai.models.generateContent({
       model: FileUploadService.CACHE_MODEL,

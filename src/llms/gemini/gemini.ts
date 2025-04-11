@@ -60,8 +60,8 @@ export class GeminiLLM
   private intializeDisposable(): void {
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration(() =>
-        this.handleConfigurationChange()
-      )
+        this.handleConfigurationChange(),
+      ),
     );
   }
 
@@ -91,7 +91,7 @@ export class GeminiLLM
 
   public async generateText(
     prompt: string,
-    instruction?: string
+    instruction?: string,
   ): Promise<string> {
     try {
       const model = this.getModel();
@@ -141,7 +141,7 @@ export class GeminiLLM
   }
 
   async generateContentWithTools(
-    userInput: string
+    userInput: string,
   ): Promise<GenerateContentResult> {
     try {
       await this.buildChatHistory(
@@ -149,7 +149,7 @@ export class GeminiLLM
         undefined,
         undefined,
         undefined,
-        true
+        true,
       );
       const prompt = createPrompt(userInput);
       const contents = Memory.get(COMMON.GEMINI_CHAT_HISTORY) as Content[];
@@ -184,7 +184,7 @@ export class GeminiLLM
    */
   private async processToolCalls(
     toolCalls: FunctionCall[],
-    userInput: string
+    userInput: string,
   ): Promise<any> {
     let finalResult: string | undefined = undefined;
     let userQuery = userInput;
@@ -227,7 +227,7 @@ export class GeminiLLM
           functionCall.name,
           functionResult,
           undefined,
-          false
+          false,
         );
 
         const snapShot = this.createSnapShot({
@@ -245,7 +245,7 @@ export class GeminiLLM
         const retry = await vscode.window.showErrorMessage(
           `Function call failed: ${error.message}. Retry or abort?`,
           "Retry",
-          "Abort"
+          "Abort",
         );
 
         if (retry === "Retry") {
@@ -260,7 +260,7 @@ export class GeminiLLM
   }
 
   async processUserQuery(
-    userInput: string
+    userInput: string,
   ): Promise<string | GenerateContentResult | undefined> {
     let finalResult: string | GenerateContentResult | undefined;
     let userQuery = userInput;
@@ -285,8 +285,8 @@ export class GeminiLLM
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error("TImeout Exceeded")),
-            this.timeOutMs
-          )
+            this.timeOutMs,
+          ),
         );
         const responsePromise = await this.generateContentWithTools(userQuery);
         const result = (await Promise.race([
@@ -320,7 +320,7 @@ export class GeminiLLM
           this.lastFunctionCalls.add(currentCallSignatures);
           if (this.lastFunctionCalls.size > 10) {
             this.lastFunctionCalls = new Set(
-              [...this.lastFunctionCalls].slice(-10)
+              [...this.lastFunctionCalls].slice(-10),
             );
           }
           if (toolCalls && toolCalls.length > 0) {
@@ -357,7 +357,7 @@ export class GeminiLLM
       if (snapshot?.length > 0) {
         Memory.removeItems(
           COMMON.GEMINI_SNAPSHOT,
-          Memory.get(COMMON.GEMINI_SNAPSHOT).length
+          Memory.get(COMMON.GEMINI_SNAPSHOT).length,
         );
       }
 
@@ -369,7 +369,7 @@ export class GeminiLLM
       // );
       console.log("Error processing user query", error);
       finalResult = await this.fallBackToGroq(
-        `${userInput} \n ${this.initialThought ?? "Write production ready code to demonstrate your solution"}`
+        `${userInput} \n ${this.initialThought ?? "Write production ready code to demonstrate your solution"}`,
       );
       console.log("Model not responding at this time, please try again", error);
     }
@@ -377,7 +377,7 @@ export class GeminiLLM
 
   private async handleSingleFunctionCall(
     functionCall: FunctionCall,
-    attempt: number = 0
+    attempt: number = 0,
   ): Promise<any> {
     const MAX_RETRIES = 3;
     const args = functionCall.args as Record<string, any>;
@@ -402,7 +402,7 @@ export class GeminiLLM
       if (attempt < MAX_RETRIES) {
         console.warn(
           `Retry attempt ${attempt + 1} for function ${name}`,
-          JSON.stringify({ error, args })
+          JSON.stringify({ error, args }),
         );
         return this.handleSingleFunctionCall(functionCall, attempt + 1);
       }
@@ -424,7 +424,7 @@ export class GeminiLLM
     functionCall?: any,
     functionResponse?: any,
     chat?: ChatSession,
-    isInitialQuery: boolean = false
+    isInitialQuery: boolean = false,
   ): Promise<Content[]> {
     // Check if it makes sense to kind of seperate agent and Edit Mode memory, when switching.
     let chatHistory: any = Memory.get(COMMON.GEMINI_CHAT_HISTORY) || [];
@@ -450,17 +450,17 @@ export class GeminiLLM
         Message.of({
           role: "model",
           parts: [{ functionCall }],
-        })
+        }),
       );
 
       const observationResult = await chat.sendMessage(
-        `Tool result: ${JSON.stringify(functionResponse)}`
+        `Tool result: ${JSON.stringify(functionResponse)}`,
       );
       chatHistory.push(
         Message.of({
           role: "user",
           parts: [{ text: observationResult.response.text() }],
-        })
+        }),
       );
     }
     if (chatHistory.length > 50) chatHistory = chatHistory.slice(-50);

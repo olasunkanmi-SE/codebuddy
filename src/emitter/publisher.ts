@@ -14,10 +14,10 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onBootstrap: vscode.Event<IEventPayload> = this.createEvent("onBootstrap");
   onFileUpload: vscode.Event<IEventPayload> = this.createEvent("onFileUpload");
   onFileProcessSuccess: vscode.Event<IEventPayload> = this.createEvent(
-    "onFileProcessSuccess"
+    "onFileProcessSuccess",
   );
   onActiveworkspaceUpdate: vscode.Event<IEventPayload> = this.createEvent(
-    "onActiveworkspaceUpdate"
+    "onActiveworkspaceUpdate",
   );
   onFilesRetrieved: vscode.Event<IEventPayload> =
     this.createEvent("onFilesRetrieved");
