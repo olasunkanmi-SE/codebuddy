@@ -7,5 +7,5 @@ export const modelOptions = [
 
 export const codeBuddyMode = [
   { value: "Agent", label: "Agent" },
-  { value: "Edit", label: "Edit" },
+  { value: "Ask", label: "Ask" },
 ];

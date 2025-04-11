@@ -49,7 +49,7 @@ export const WebviewUI = () => {
   const css = getChatCss("tokyo night");
   updateStyles(css);
   const [selectedModel, setSelectedModel] = useState("Gemini");
-  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Edit");
+  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Ask");
   const [userInput, setUserInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isBotLoading, setIsBotLoading] = useState(false);
