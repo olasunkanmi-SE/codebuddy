@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { getConfigValue } from "../utils/utils";
-import { EventEmitter } from "../emitter/agent-emitter";
+import { EventEmitter } from "../emitter/publisher";
 
 export const initializeGenerativeAiEnvironment = async (
   context: vscode.ExtensionContext,

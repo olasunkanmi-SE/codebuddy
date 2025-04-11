@@ -1,5 +1,6 @@
 import { Row } from "@libsql/client/.";
 import * as vscode from "vscode";
+import { Orchestrator } from "../agents/orchestrator";
 import {
   IFileToolConfig,
   IFileToolResponse,
@@ -9,7 +10,6 @@ import { CodeRepository } from "../infrastructure/repository/code";
 import { getAPIKey } from "../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { WebSearchService } from "./web-search-service";
-import { Orchestrator } from "../agents/orchestrator";
 
 export class ContextRetriever {
   private readonly codeRepository: CodeRepository;
@@ -40,7 +40,7 @@ export class ContextRetriever {
       const embedding = await this.embeddingService.generateEmbedding(input);
       this.logger.info("Retrieving context from DB");
       // this.orchestrator.publish("onUpdate", "Retrieving context from DB");
-      return this.codeRepository.searchSimilarFunctions(
+      return await this.codeRepository.searchSimilarFunctions(
         embedding,
         ContextRetriever.SEARCH_RESULT_COUNT,
       );

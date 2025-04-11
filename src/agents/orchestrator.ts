@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
-import { BaseAiAgent } from "./base";
 import { IEventPayload } from "../emitter/interface";
+import { EventEmitter } from "../emitter/publisher";
 
-export class Orchestrator extends BaseAiAgent implements vscode.Disposable {
+export class Orchestrator extends EventEmitter implements vscode.Disposable {
   private static instance: Orchestrator;
   private readonly disposables: vscode.Disposable[] = [];
 

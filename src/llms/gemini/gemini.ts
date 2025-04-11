@@ -12,17 +12,21 @@ import * as vscode from "vscode";
 import { Orchestrator } from "../../agents/orchestrator";
 import { COMMON } from "../../application/constant";
 import { Memory } from "../../memory/base";
-import { CodeBuddyToolProvider } from "../../providers/tool";
+import { CodeBuddyToolProvider } from "../../tools/factory/tool";
 import { createPrompt } from "../../utils/prompt";
 import { BaseLLM } from "../base";
-import { GeminiModelResponseType, ILlmConfig } from "../interface";
+import {
+  GeminiModelResponseType,
+  ILlmConfig,
+  GeminiLLMSnapShot,
+} from "../interface";
 import { Message } from "../message";
 import { Logger } from "../../infrastructure/logger/logger";
 import { GroqLLM } from "../groq/groq";
 import { getAPIKey } from "../../utils/utils";
 
 export class GeminiLLM
-  extends BaseLLM<GeminiModelResponseType>
+  extends BaseLLM<GeminiLLMSnapShot>
   implements vscode.Disposable
 {
   private readonly generativeAi: GoogleGenerativeAI;
@@ -34,6 +38,9 @@ export class GeminiLLM
   private lastFunctionCalls: Set<string> = new Set();
   private readonly timeOutMs: number = 30000;
   private readonly groqLLM: GroqLLM;
+  private planSteps: string[] = [];
+  private currentStepIndex = 0;
+  private initialThought = "";
 
   constructor(config: ILlmConfig) {
     super(config);
@@ -46,7 +53,7 @@ export class GeminiLLM
     this.logger = new Logger("GeminiLLM");
     this.groqLLM = GroqLLM.getInstance({
       apiKey: getAPIKey("groq"),
-      model: "deepseek-r1-distill-qwen-32b",
+      model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",
     });
   }
 
@@ -178,7 +185,7 @@ export class GeminiLLM
   private async processToolCalls(
     toolCalls: FunctionCall[],
     userInput: string,
-  ): Promise<string | undefined> {
+  ): Promise<any> {
     let finalResult: string | undefined = undefined;
     let userQuery = userInput;
     let callCount = 0;
@@ -196,13 +203,28 @@ export class GeminiLLM
           }
         }
 
-        userQuery = `Tool result: ${JSON.stringify(
-          functionResult,
-        )}. What is your next step?`;
+        userQuery = `Tool result: ${JSON.stringify(functionResult)}. What is your next step?`;
+
+        if (functionCall.name === "think") {
+          const thought = functionResult?.response.content;
+          this.initialThought = thought;
+          if (thought) {
+            this.orchestrator.publish("onStrategizing", thought);
+            this.planSteps = this.parseThought(thought);
+            if (this.planSteps?.length > 0) {
+              userQuery = `Based on the plan, please provide an answer`;
+            } else {
+              userQuery = userInput;
+              this.planSteps = [];
+            }
+          } else {
+            userQuery = `Tool result: ${JSON.stringify(functionResult)}. What is your next step?`;
+          }
+        }
 
         await this.buildChatHistory(
           userQuery,
-          functionCall,
+          functionCall.name,
           functionResult,
           undefined,
           false,
@@ -210,8 +232,10 @@ export class GeminiLLM
 
         const snapShot = this.createSnapShot({
           lastQuery: userQuery,
-          lastCall: functionCall,
+          lastCall: functionCall.name,
           lastResult: functionResult,
+          currentStepIndex: this.currentStepIndex,
+          planSteps: this.planSteps,
         });
         Memory.set(COMMON.GEMINI_SNAPSHOT, snapShot);
         callCount++;
@@ -243,12 +267,20 @@ export class GeminiLLM
     const MAX_BASE_CALLS = 5;
     let callCount = 0;
     try {
-      const snapShot = Memory.get(
-        COMMON.GEMINI_SNAPSHOT,
-      ) as GeminiModelResponseType;
+      let snapShot = Memory.get(COMMON.GEMINI_SNAPSHOT) as GeminiLLMSnapShot;
       if (snapShot) {
         this.loadSnapShot(snapShot);
+        this.planSteps = snapShot.planSteps;
+        this.currentStepIndex = snapShot.currentStepIndex;
       }
+
+      // if (this.currentStepIndex < this.planSteps?.length) {
+      //   userQuery = `Continuing with the plan. Step ${this.currentStepIndex + 1} of ${this.planSteps.length}: "${this.planSteps[this.currentStepIndex]}". Please execute this step.`;
+      // } else {
+      //   this.currentStepIndex = 0;
+      //   this.planSteps = [];
+      // }
+
       while (callCount < this.calculateDynamicCallLimit(userQuery)) {
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
@@ -256,7 +288,7 @@ export class GeminiLLM
             this.timeOutMs,
           ),
         );
-        const responsePromise = this.generateContentWithTools(userQuery);
+        const responsePromise = await this.generateContentWithTools(userQuery);
         const result = (await Promise.race([
           responsePromise,
           timeoutPromise,
@@ -293,15 +325,26 @@ export class GeminiLLM
           }
           if (toolCalls && toolCalls.length > 0) {
             finalResult = await this.processToolCalls(toolCalls, userQuery);
-            if (finalResult) {
-              return finalResult;
-            }
           } else {
             finalResult = text();
             this.orchestrator.publish("onQuery", String(finalResult));
             console.log();
             break;
           }
+          // if (
+          //   this.planSteps?.length > 0 &&
+          //   toolCalls.every((call) => call.name !== "think")
+          // ) {
+          //   this.currentStepIndex++;
+          //   if (this.currentStepIndex < this.planSteps.length) {
+          //     userQuery = `Continuing with the plan. Step ${this.currentStepIndex + 1} of ${this.planSteps.length}: "${this.planSteps[this.currentStepIndex]}". Please execute this step`;
+          //   } else {
+          //     this.currentStepIndex = 0;
+          //     this.planSteps = [];
+          //     userQuery =
+          //       "Plan execution completed. What is the final answer or next steps based on the completed plan?";
+          //   }
+          // }
           if (callCount >= this.calculateDynamicCallLimit(userQuery)) {
             throw new Error("Dynamic call limit reached");
           }
@@ -320,16 +363,15 @@ export class GeminiLLM
 
       return finalResult;
     } catch (error: any) {
-      this.orchestrator.publish(
-        "onError",
-        "Model not responding at this time, please try again",
+      // this.orchestrator.publish(
+      //   "onError",
+      //   "Model not responding at this time, please try again"
+      // );
+      console.log("Error processing user query", error);
+      finalResult = await this.fallBackToGroq(
+        `${userInput} \n ${this.initialThought ?? "Write production ready code to demonstrate your solution"}`,
       );
-      vscode.window.showErrorMessage("Error processing user query");
-      console.error(
-        "Error generating, queries, thoughts from user query",
-        error,
-      );
-      throw error;
+      console.log("Model not responding at this time, please try again", error);
     }
   }
 
@@ -426,21 +468,32 @@ export class GeminiLLM
     return chatHistory;
   }
 
-  public createSnapShot(data?: any): any {
-    return {
-      ...this.response,
+  public createSnapShot(data?: any): GeminiLLMSnapShot {
+    const snapshot: GeminiLLMSnapShot = {
       lastQuery: data?.lastQuery,
       lastCall: data?.lastCall,
       lastResult: data?.lastResult,
       chatHistory: Memory.get(COMMON.GEMINI_CHAT_HISTORY),
+      planSteps: data?.planSteps,
+      currentStepIndex: data?.currentStepIndex,
+      response: (this.response as GenerateContentResult)?.response, //Conditionally assign the response and assert its type
+      embedding: (this.response as EmbedContentResponse)?.embedding, //Conditionally assign the embedding and assert its type
     };
+
+    return snapshot;
   }
 
   public loadSnapShot(snapshot: ReturnType<typeof this.createSnapShot>): void {
     if (snapshot) {
       this.response = snapshot;
     }
-    if (snapshot.history) {
+    if (snapshot.planSteps) {
+      this.planSteps = snapshot.planSteps;
+    }
+    if (snapshot.currentStepIndex !== 0) {
+      this.currentStepIndex = snapshot.currentStepIndex;
+    }
+    if (snapshot.chatHistory) {
       Memory.set(COMMON.GEMINI_CHAT_HISTORY, snapshot.chatHistory);
     }
     if (snapshot.lastQuery) {
@@ -472,3 +525,6 @@ export class GeminiLLM
     return finalResult;
   }
 }
+
+// On each step publish to frontend, somwtimes the
+//response take a while, use the states to keep the user engaged.
