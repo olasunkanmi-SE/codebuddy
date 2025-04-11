@@ -7,20 +7,20 @@ import {
 } from "@google/genai";
 import * as path from "path";
 import * as vscode from "vscode";
-import { BaseAiAgent } from "./base";
-import { Orchestrator } from "./orchestrator";
 import { IEventPayload } from "../emitter/interface";
+import { Logger } from "../infrastructure/logger/logger";
+import { Orchestrator } from "../agents/orchestrator";
 
-export class FileUploadAgent extends BaseAiAgent implements vscode.Disposable {
+export class FileUploadService implements vscode.Disposable {
   private readonly ai: GoogleGenAI;
   protected readonly orchestrator: Orchestrator;
   private static readonly PROCESSING_WAIT_TIME_MS = 6000;
   private static readonly MAX_CACHE_PAGE_SIZE = 10;
   private static readonly CACHE_MODEL = "gemini-1.5-flash-002";
   private readonly disposables: vscode.Disposable[] = [];
-  private static instance: FileUploadAgent;
+  private static instance: FileUploadService;
+  private readonly logger = new Logger("FileUploadService");
   constructor(private readonly apiKey: string) {
-    super();
     this.ai = new GoogleGenAI({ apiKey: this.apiKey });
     this.orchestrator = Orchestrator.getInstance();
     this.disposables.push(
@@ -29,10 +29,10 @@ export class FileUploadAgent extends BaseAiAgent implements vscode.Disposable {
   }
 
   static initialize(apiKey: string) {
-    if (!FileUploadAgent.instance) {
-      FileUploadAgent.instance = new FileUploadAgent(apiKey);
+    if (!FileUploadService.instance) {
+      FileUploadService.instance = new FileUploadService(apiKey);
     }
-    return FileUploadAgent.instance;
+    return FileUploadService.instance;
   }
 
   private async handleLocalFileUpload(event: IEventPayload) {
@@ -99,7 +99,7 @@ export class FileUploadAgent extends BaseAiAgent implements vscode.Disposable {
       let retries = 0;
       while (getFile.state === "PROCESSING" && retries < maxRetries) {
         this.logger.info("☕ File upload in progress, grab a cup of coffee");
-        await this.delay(FileUploadAgent.PROCESSING_WAIT_TIME_MS);
+        await this.delay(FileUploadService.PROCESSING_WAIT_TIME_MS);
         getFile = await this.ai.files.get({ name: fileName });
         retries++;
       }
@@ -162,7 +162,7 @@ export class FileUploadAgent extends BaseAiAgent implements vscode.Disposable {
 
   private async createNewCache(fileContent: any): Promise<CachedContent> {
     const cached = await this.ai.caches.create({
-      model: FileUploadAgent.CACHE_MODEL,
+      model: FileUploadService.CACHE_MODEL,
       config: {
         contents: createUserContent(fileContent),
         systemInstruction:
@@ -178,7 +178,7 @@ export class FileUploadAgent extends BaseAiAgent implements vscode.Disposable {
     cacheName: string,
   ): Promise<GenerateContentResponse> {
     return await this.ai.models.generateContent({
-      model: FileUploadAgent.CACHE_MODEL,
+      model: FileUploadService.CACHE_MODEL,
       contents: prompt,
       config: { cachedContent: cacheName },
     });

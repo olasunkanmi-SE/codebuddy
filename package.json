@@ -80,11 +80,6 @@
           "group": "CodeBuddy"
         },
         {
-          "when": "editorHasSelection",
-          "command": "CodeBuddy.readFromKnowledgeBase",
-          "group": "CodeBuddy"
-        },
-        {
           "command": "CodeBuddy.generateCommitMessage",
           "group": "CodeBuddy"
         },
@@ -129,10 +124,6 @@
       {
         "command": "CodeBuddy.explain",
         "title": "CodeBuddy. Explain this code"
-      },
-      {
-        "command": "CodeBuddy.readFromKnowledgeBase",
-        "title": "CodeBuddy. Generate based on knowledgeBase"
       },
       {
         "command": "CodeBuddy.generateCommitMessage",

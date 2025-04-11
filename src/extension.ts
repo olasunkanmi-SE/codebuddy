@@ -17,7 +17,7 @@ import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
-import { EventEmitter } from "./emitter/agent-emitter";
+import { EventEmitter } from "./emitter/publisher";
 import { Logger } from "./infrastructure/logger/logger";
 import { dbManager } from "./infrastructure/repository/data-base-manager";
 import { Memory } from "./memory/base";
@@ -30,8 +30,9 @@ import { FileManager } from "./services/file-manager";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { Credentials } from "./services/github-authentication";
 import { getAPIKey, getConfigValue } from "./utils/utils";
-import { FileUploadAgent } from "./agents/file-upload";
+import { FileUploadService } from "./services/file-upload";
 import * as fs from "fs";
+import { CodeIndexingService } from "./services/code-indexing";
 
 const {
   geminiKey,
@@ -70,7 +71,7 @@ async function connectToDatabase(context: vscode.ExtensionContext) {
 
 async function createFileDB(context: vscode.ExtensionContext) {
   try {
-    const fileUploader = new FileManager(context, "database");
+    const fileUploader = new FileManager(context, "patterns");
     const files = await fileUploader.getFiles();
     if (!files?.find((file) => file.includes("dev.db"))) {
       await fileUploader.createFile("dev.db");
@@ -87,7 +88,7 @@ export async function activate(context: vscode.ExtensionContext) {
     await connectToDatabase(context);
     const credentials = new Credentials();
     const geminiApiKey = getAPIKey("gemini");
-    FileUploadAgent.initialize(geminiApiKey);
+    FileUploadService.initialize(geminiApiKey);
     await credentials.initialize(context);
     const session: vscode.AuthenticationSession | undefined =
       await credentials.getSession();
@@ -107,8 +108,6 @@ export async function activate(context: vscode.ExtensionContext) {
       optimize,
       fix,
       explain,
-      pattern,
-      knowledge,
       commitMessage,
       interviewMe,
       generateUnitTest,

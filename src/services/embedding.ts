@@ -1,5 +1,6 @@
 import {
   EmbedContentResponse,
+  GenerativeModel,
   GoogleGenerativeAI,
 } from "@google/generative-ai";
 import { EmbeddingsConfig } from "../application/constant";
@@ -34,6 +35,7 @@ export class EmbeddingService {
   private readonly requestInterval: number;
   private readonly genAI: GoogleGenerativeAI;
   private readonly logger: Logger;
+  readonly model: GenerativeModel;
 
   constructor(private readonly apiKey: string) {
     if (!this.apiKey) {
@@ -45,6 +47,7 @@ export class EmbeddingService {
     this.requestInterval = (60 * 1000) / this.options.rateLimit;
     this.genAI = new GoogleGenerativeAI(this.apiKey);
     this.logger = new Logger("EmbeddingService");
+    this.model = this.getModel("gemini-2.0-flash");
   }
 
   /**
@@ -73,6 +76,12 @@ export class EmbeddingService {
     return Math.max(0, this.requestInterval - elapsed);
   }
 
+  getModel(aiModel?: string): GenerativeModel {
+    return this.genAI.getGenerativeModel({
+      model: aiModel ?? this.options.embeddingModel,
+    });
+  }
+
   /**
    * Generates an embedding for the given text using the configured AI model.
    * The embedding is a numerical representation of the text that can be used for various tasks, such as clustering and classification.
@@ -81,9 +90,9 @@ export class EmbeddingService {
    * @returns {Promise<number[]>} The generated embedding.
    * @memberof EmbeddingService
    */
-  async generateEmbedding(text: string) {
+  async generateEmbedding(text: string, aiModel?: string) {
     const model = this.genAI.getGenerativeModel({
-      model: this.options.embeddingModel,
+      model: aiModel ?? this.options.embeddingModel,
     });
     const result: EmbedContentResponse = await model.embedContent(text);
     const embedding = result.embedding.values;

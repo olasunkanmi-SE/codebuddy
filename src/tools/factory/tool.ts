@@ -1,7 +1,7 @@
-import { IToolConfig } from "../application/interfaces/agent.interface";
-import { ContextRetriever } from "../services/context-retriever";
-import { CodeBuddyTool } from "../tools/base";
-import { TOOL_CONFIGS } from "../tools/tools";
+import { IToolConfig } from "../../application/interfaces/agent.interface";
+import { ContextRetriever } from "../../services/context-retriever";
+import { CodeBuddyTool } from "../base";
+import { TOOL_CONFIGS } from "../tools";
 
 export class ToolFactory {
   private readonly tools: Map<string, IToolConfig> = new Map();

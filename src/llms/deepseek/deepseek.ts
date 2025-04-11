@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { Orchestrator } from "../../agents/orchestrator";
 import { COMMON } from "../../application/constant";
 import { Memory } from "../../memory/base";
-import { CodeBuddyToolProvider } from "../../providers/tool";
+import { CodeBuddyToolProvider } from "../../tools/factory/tool";
 import { createPrompt } from "../../utils/prompt";
 import { BaseLLM } from "../base";
 import { ILlmConfig } from "../interface";

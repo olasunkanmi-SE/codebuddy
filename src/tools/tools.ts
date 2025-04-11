@@ -106,13 +106,32 @@ export class FileTool {
   }
 }
 
+// export class SynthesisTool {
+//   public async execute(content: string) {
+//     return content;
+//   }
+//   config() {
+//     return {
+//       name: "synthesize_web_data",
+//       description:
+//         "Use this tool for combining information from web searches into a concise answer.",
+//       parameters: {
+//         type: SchemaType.OBJECT,
+//         properties: {
+//           content: {
+//             type: SchemaType.STRING,
+//             description: "constains information from different web results",
+//           },
+//         },
+//         required: ["content"],
+//       },
+//     };
+//   }
+// }
+
 export class ThinkTool {
-  private readonly orchestrator: Orchestrator;
-  constructor() {
-    this.orchestrator = Orchestrator.getInstance();
-  }
-  public async execute(thought: { thought: string }) {
-    this.orchestrator.publish("onStrategizing", thought.thought);
+  public async execute(thought: string) {
+    return thought[0];
   }
 
   config() {
@@ -142,5 +161,5 @@ export const TOOL_CONFIGS = {
   SearchTool: { tool: SearchTool, useContextRetriever: true },
   FileTool: { tool: FileTool, useContextRetriever: true },
   WebTool: { tool: WebTool, useContextRetriever: true },
-  ThinkTool: { tool: ThinkTool, useContextRetriever: false },
+  ThinkTool: { tool: ThinkTool, useContextRetriever: true },
 };

@@ -12,7 +12,12 @@ export interface ExtensionMessage {
   payload: any;
 }
 
-import { VSCodeTextArea, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
+import {
+  VSCodeTextArea,
+  VSCodePanels,
+  VSCodePanelTab,
+  VSCodePanelView,
+} from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useEffect, useState } from "react";
 import { codeBuddyMode, modelOptions } from "../constants/constant";
@@ -174,7 +179,10 @@ export const WebviewUI = () => {
           OTHERS
         </VSCodePanelTab>
 
-        <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
+        <VSCodePanelView
+          id="view-1"
+          style={{ height: "calc(100vh - 55px)", position: "relative" }}
+        >
           <div className="chat-content">
             <div className="dropdown-container">
               <div>
@@ -182,7 +190,11 @@ export const WebviewUI = () => {
                   msg.type === "bot" ? (
                     <BotMessage key={msg.content} content={msg.content} />
                   ) : (
-                    <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
+                    <UserMessage
+                      key={msg.content}
+                      message={msg.content}
+                      alias={msg.alias}
+                    />
                   )
                 )}
                 {isBotLoading && <BotIcon isBlinking={true} />}
@@ -210,12 +222,22 @@ export const WebviewUI = () => {
             <span className="currenFile">
               <small>
                 Active workspace:
-                {selectedContext.includes(activeEditor) ? "" : `${activeEditor}`}
+                {selectedContext.includes(activeEditor)
+                  ? ""
+                  : `${activeEditor}`}
               </small>
-              <small>{Array.from(new Set(selectedContext.split("@").join(", ").split(", "))).join(" ")}</small>
+              <small>
+                {Array.from(
+                  new Set(selectedContext.split("@").join(", ").split(", "))
+                ).join(" ")}
+              </small>
             </span>
           </div>
-          <WorkspaceSelector activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
+          <WorkspaceSelector
+            activeEditor={activeEditor}
+            onInputChange={handleContextChange}
+            folders={folders}
+          />
 
           <VSCodeTextArea
             value={userInput}
@@ -226,7 +248,12 @@ export const WebviewUI = () => {
         </div>
         <div className="horizontal-stack">
           <AttachmentIcon onClick={handleGetContext} />
-          <ModelDropdown value={selectedModel} onChange={handleModelChange} options={modelOptions} id="model" />
+          <ModelDropdown
+            value={selectedModel}
+            onChange={handleModelChange}
+            options={modelOptions}
+            id="model"
+          />
           <ModelDropdown
             value={selectedCodeBuddyMode}
             onChange={handleCodeBuddyMode}
