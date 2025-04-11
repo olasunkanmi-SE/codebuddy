@@ -114,16 +114,16 @@ flowchart TD
 
 ## Roadmap
 
-- [ ] Codebase Understanding: Comprehensive local codebase indexing with Retrieval-Augmented Generation (RAG) capabilities.
-- [ ] Code search: Search code across the entire codebase
-- [ ] Rewrite the Webview UI with React
-- [ ] Incorporate AI agents for seamless interaction with external resources and APIs.
-- [ ] Context Pinning: Allow users to pin specific directories, files, and code elements (functions, classes, etc.) as persistent context for AI models.
+- [x] Codebase Understanding: Comprehensive local codebase indexing with Retrieval-Augmented Generation (RAG) capabilities.
+- [x] Code search: Search code across the entire codebase
+- [x] Rewrite the Webview UI with React
+- [x] Incorporate AI agents for seamless interaction with external resources and APIs.
+- [x] Context Pinning: Allow users to pin specific directories, files, and code elements (functions, classes, etc.) as persistent context for AI models.
 - [ ] Automated Documentation Generation: Generate comprehensive and up-to-date codebase documentation.
-- [ ] Intelligent Orchestration: Orchestrate ReAct models activities through advanced tools and function calling.
-- [ ] Access to real-time data.
+- [x] Intelligent Orchestration: Coordinate AI agents' activities with proper workflow.
+- [x] Access to real-time data.
 - [ ] Support for local LLMs such as Ollama
-- [ ] Support for Deepseek model
+- [x] Support for Deepseek model
 
 ## Repository Structure
 
@@ -143,6 +143,15 @@ flowchart TD
 └── package.json                 # Project configuration and dependencies
 ```
 
+### Contribution
+1. Fork the repository. Make a branch from Development.
+2. npm install the packages
+3. Click Run, an option on your screen's top bar, then click Start Debugging. Run -> Start Debugging
+4. A new instance of VS Code will be opened up. This is like your test instance; all changes made on the Codebuddy repo can be seen on this instance.
+5. The main entry into the application is the extension.ts. For the Webview, the main entry is the webview.tsx
+6. Raise a PR
+7. For more info, check the contributing.md page
+
 ## Usage Instructions
 
 ### Installation
@@ -159,11 +168,6 @@ flowchart TD
    - Enter the API key for your chosen model
    - Choose your preferred font family and chat view theme
 
-### Getting Started
-
-1. Open a Vscode workspace/file containing some code
-2. Right-click on the selected code to access CodeBuddy features in the context menu.
-3. Access the chat interface via the CodeBuddy panel in the Activity Bar.
 
 ### Troubleshooting
 
