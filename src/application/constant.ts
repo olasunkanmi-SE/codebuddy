@@ -22,6 +22,9 @@ export enum COMMON {
   USER_INPUT = "user-input",
   BOT = "bot",
   GEMINI_SNAPSHOT = "GeminiSnapshot",
+  AGENT_STATE_PREFIX = "agent_state",
+  CHAT_HISTORY_PREFIX = "chat_history",
+  SNAPSHOT_PREFIX = "snapshot",
 }
 export const GROQ_CONFIG = {
   temperature: 0.1,

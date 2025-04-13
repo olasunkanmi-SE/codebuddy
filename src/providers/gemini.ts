@@ -73,7 +73,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
   ): Promise<string | undefined> {
     try {
       let context: string | undefined;
-      if (metaData.context as string[]) {
+      if (metaData?.context.length > 0) {
         context = await this.getContext(metaData.context);
       }
       if (metaData?.mode === "Agent") {

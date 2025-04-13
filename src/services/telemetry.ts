@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 
-// TODO Log data in MongoDB Atlas, take advantage of telemetery
+// TODO Log data in MongoDB Atlas
 
 export enum LogLevel {
   DEBUG = "DEBUG",
@@ -60,14 +60,12 @@ export class Logger {
   private static telemetry: ITelemetry | undefined;
   private static sessionId: string;
   private static traceId: string;
-  static instance: Logger;
   constructor(private readonly module: string) {}
 
-  public static initialize(
-    module: string,
+  public initialize(
     config: Partial<ILoggerConfig>,
     telemetry?: ITelemetry,
-  ): Logger {
+  ): void {
     Logger.config = { ...Logger.config, ...config };
     if (Logger.config.enableFile && !Logger.config.filePath) {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -90,10 +88,6 @@ export class Logger {
     Logger.telemetry = telemetry;
     Logger.sessionId = Logger.generateId();
     Logger.setTraceId(Logger.generateId());
-    if (!Logger.instance) {
-      Logger.instance = new Logger(module);
-    }
-    return Logger.instance;
   }
 
   public static setTraceId(traceId: string): void {
