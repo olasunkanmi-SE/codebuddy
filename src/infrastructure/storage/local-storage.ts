@@ -24,6 +24,6 @@ export class LocalStorageManager {
 
   async handleOnChange(event: vscode.SecretStorageChangeEvent) {
     const value = await this.localStorage.get(event.key);
-    this.logger.info(`Key: ${event.key}, Value: ${value}`);
+    this.logger.info(`${event.key}'s value has been changed`);
   }
 }

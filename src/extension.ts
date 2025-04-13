@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
@@ -18,7 +19,7 @@ import { OptimizeCode } from "./commands/optimize";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
 import { EventEmitter } from "./emitter/publisher";
-import { Logger } from "./infrastructure/logger/logger";
+import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { dbManager } from "./infrastructure/repository/data-base-manager";
 import { Memory } from "./memory/base";
 import { AnthropicWebViewProvider } from "./providers/anthropic";
@@ -27,12 +28,10 @@ import { DeepseekWebViewProvider } from "./providers/deepseek";
 import { GeminiWebViewProvider } from "./providers/gemini";
 import { GroqWebViewProvider } from "./providers/groq";
 import { FileManager } from "./services/file-manager";
+import { FileUploadService } from "./services/file-upload";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { Credentials } from "./services/github-authentication";
 import { getAPIKey, getConfigValue } from "./utils/utils";
-import { FileUploadService } from "./services/file-upload";
-import * as fs from "fs";
-import { CodeIndexingService } from "./services/code-indexing";
 
 const {
   geminiKey,
@@ -47,7 +46,7 @@ const {
   deepseekModel,
 } = APP_CONFIG;
 
-const logger = new Logger("extension");
+const logger = Logger.initialize("extension", { minLevel: LogLevel.DEBUG });
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
