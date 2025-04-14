@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { COMMON } from "../application/constant";
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
-import { GeminiLLM } from "./../llms/gemini/gemini";
+import { GeminiLLM } from "../llms/gemini/gemini";
 import { BaseWebViewProvider } from "./base";
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
@@ -16,7 +16,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     extensionUri: vscode.Uri,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: vscode.ExtensionContext
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.gemini = GeminiLLM.getInstance({
@@ -29,7 +29,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
 
   async sendResponse(
     response: string,
-    currentChat: string,
+    currentChat: string
   ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
@@ -38,14 +38,14 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
           Message.of({
             role: "model",
             parts: [{ text: response }],
-          }),
+          })
         );
       } else {
         this.chatHistory.push(
           Message.of({
             role: "user",
             parts: [{ text: response }],
-          }),
+          })
         );
       }
       if (this.chatHistory.length === 2) {
@@ -69,7 +69,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
 
   async generateResponse(
     message: string,
-    metaData?: any,
+    metaData?: any
   ): Promise<string | undefined> {
     try {
       let context: string | undefined;
@@ -81,7 +81,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         await this.gemini.run(
           context
             ? JSON.stringify(`${message} \n context: ${context}`)
-            : JSON.stringify(message),
+            : JSON.stringify(message)
         );
         return;
       }
@@ -110,7 +110,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     } catch (error) {
       Memory.set(COMMON.GEMINI_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
+        "Model not responding, please resend your question"
       );
       console.error(error);
       return;

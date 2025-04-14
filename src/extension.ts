@@ -22,11 +22,11 @@ import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { dbManager } from "./infrastructure/repository/database-manager";
 import { Memory } from "./memory/base";
-import { AnthropicWebViewProvider } from "./providers/anthropic";
-import { CodeActionsProvider } from "./providers/code-actions";
-import { DeepseekWebViewProvider } from "./providers/deepseek";
-import { GeminiWebViewProvider } from "./providers/gemini";
-import { GroqWebViewProvider } from "./providers/groq";
+import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
+import { CodeActionsProvider } from "./webview-providers/code-actions";
+import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
+import { GeminiWebViewProvider } from "./webview-providers/gemini";
+import { GroqWebViewProvider } from "./webview-providers/groq";
 import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
@@ -115,44 +115,44 @@ export async function activate(context: vscode.ExtensionContext) {
     } = OLA_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
-      context,
+      context
     );
     const getInLineChat = new InLineChat(
       `${USER_MESSAGE} generates a response...`,
-      context,
+      context
     );
     const generateOptimizeCode = new OptimizeCode(
       `${USER_MESSAGE} optimizes the code...`,
-      context,
+      context
     );
     const generateRefactoredCode = new RefactorCode(
       `${USER_MESSAGE} refactors the code...`,
-      context,
+      context
     );
     const explainCode = new ExplainCode(
       `${USER_MESSAGE} explains the code...`,
-      context,
+      context
     );
     const generateReview = new ReviewCode(
       `${USER_MESSAGE} reviews the code...`,
-      context,
+      context
     );
     const codeChartGenerator = new CodeChartGenerator(
       `${USER_MESSAGE} creates the code chart...`,
-      context,
+      context
     );
     const generateCommitMessage = new GenerateCommitMessage(
       `${USER_MESSAGE} generates a commit message...`,
-      context,
+      context
     );
     const generateInterviewQuestions = new InterviewMe(
       `${USER_MESSAGE} generates interview questions...`,
-      context,
+      context
     );
 
     const generateUnitTests = new GenerateUnitTest(
       `${USER_MESSAGE} generates unit tests...`,
-      context,
+      context
     );
 
     const actionMap = {
@@ -166,7 +166,7 @@ export async function activate(context: vscode.ExtensionContext) {
         new FixError(
           `${USER_MESSAGE} finds a solution to the error...`,
           context,
-          errorMessage,
+          errorMessage
         ).execute(errorMessage),
       [explain]: async () => await explainCode.execute(),
       [commitMessage]: async () =>
@@ -176,7 +176,7 @@ export async function activate(context: vscode.ExtensionContext) {
     };
 
     const subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
-      ([action, handler]) => vscode.commands.registerCommand(action, handler),
+      ([action, handler]) => vscode.commands.registerCommand(action, handler)
     );
 
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
@@ -184,7 +184,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const quickFix = new CodeActionsProvider();
     quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
       { scheme: "file", language: "*" },
-      quickFix,
+      quickFix
     );
 
     agentEventEmmitter = new EventEmitter();
@@ -232,13 +232,13 @@ export async function activate(context: vscode.ExtensionContext) {
         webviewProviderClass,
         subscriptions,
         quickFixCodeAction,
-        agentEventEmmitter,
+        agentEventEmmitter
       );
     }
   } catch (error) {
     Memory.clear();
     vscode.window.showErrorMessage(
-      "An Error occured while setting up generative AI model",
+      "An Error occured while setting up generative AI model"
     );
     console.log(error);
   }

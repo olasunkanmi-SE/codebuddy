@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { Logger } from "../infrastructure/logger/logger";
-import { Orchestrator } from "./../agents/orchestrator";
+import { Orchestrator } from "../agents/orchestrator";
 
 export class VSCodeSecretStorage {
   private readonly context: vscode.ExtensionContext;
