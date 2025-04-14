@@ -29,7 +29,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     private readonly _extensionUri: vscode.Uri,
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     this.fileManager = FileManager.initialize(context, "files");
     this.fileService = FileService.getInstance();
@@ -43,13 +43,15 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onUpdate(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onError(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onSecretChange(
-        this.handleModelResponseEvent.bind(this)
+        this.handleModelResponseEvent.bind(this),
       ),
       this.orchestrator.onActiveworkspaceUpdate(
-        this.handleGenericEvents.bind(this)
+        this.handleGenericEvents.bind(this),
       ),
       this.orchestrator.onFileUpload(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onStrategizing(this.handleModelResponseEvent.bind(this))
+      this.orchestrator.onStrategizing(
+        this.handleModelResponseEvent.bind(this),
+      ),
     );
   }
 
@@ -70,7 +72,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     if (!this.apiKey) {
       vscode.window.showErrorMessage(
-        "API key not configured. Check your settings."
+        "API key not configured. Check your settings.",
       );
       return;
     }
@@ -86,7 +88,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
     view.webview.html = getWebviewContent(
       this.currentWebView?.webview!,
-      this._extensionUri
+      this._extensionUri,
     );
   }
 
@@ -129,12 +131,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             if (message.metaData.mode === "Agent") {
               response = await this.generateResponse(
                 message.message,
-                message.metaData
+                message.metaData,
               );
             } else {
               response = await this.generateResponse(
                 message.message,
-                message.metaData
+                message.metaData,
               );
             }
             if (response) {
@@ -167,17 +169,17 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   public handleModelResponseEvent(event: IEventPayload) {
     this.sendResponse(
       formatText(event.message),
-      event.message === "folders" ? "bootstrap" : "bot"
+      event.message === "folders" ? "bootstrap" : "bot",
     );
   }
   abstract generateResponse(
     message?: string,
-    metaData?: Record<string, any>
+    metaData?: Record<string, any>,
   ): Promise<string | undefined>;
 
   abstract sendResponse(
     response: string,
-    currentChat?: string
+    currentChat?: string,
   ): Promise<boolean | undefined>;
 
   public dispose(): void {
