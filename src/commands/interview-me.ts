@@ -1,8 +1,8 @@
 import { formatText } from "../utils/utils";
-import { EventGenerator } from "./event-generator";
+import { CodeCommandHandler } from "./handler";
 import * as vscode from "vscode";
 
-export class InterviewMe extends EventGenerator {
+export class InterviewMe extends CodeCommandHandler {
   constructor(action: string, context: vscode.ExtensionContext) {
     super(action, context);
   }

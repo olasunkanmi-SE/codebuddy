@@ -8,9 +8,9 @@ import {
   COMMON,
   generativeAiModels,
 } from "../application/constant";
-import { AnthropicWebViewProvider } from "../providers/anthropic";
-import { GeminiWebViewProvider } from "../providers/gemini";
-import { GroqWebViewProvider } from "../providers/groq";
+import { AnthropicWebViewProvider } from "../webview-providers/anthropic";
+import { GeminiWebViewProvider } from "../webview-providers/gemini";
+import { GroqWebViewProvider } from "../webview-providers/groq";
 import {
   createAnthropicClient,
   getConfigValue,
@@ -21,12 +21,12 @@ import {
 import { Memory } from "../memory/base";
 import { Logger } from "../infrastructure/logger/logger";
 
-interface IEventGenerator {
+interface ICodeCommandHandler {
   getApplicationConfig(configKey: string): string | undefined;
   getSelectedWindowArea(): string | undefined;
 }
 
-export abstract class EventGenerator implements IEventGenerator {
+export abstract class CodeCommandHandler implements ICodeCommandHandler {
   context: vscode.ExtensionContext;
   protected error?: string;
   private readonly generativeAi: string;
@@ -67,7 +67,7 @@ export abstract class EventGenerator implements IEventGenerator {
     this.anthropicApiKey = getConfigValue(anthropicApiKey);
     this.xGrokApiKey = getConfigValue(grokApiKey);
     this.xGrokModel = getConfigValue(grokModel);
-    this.logger = new Logger("EventGenerator");
+    this.logger = new Logger("CodeCommandHandler");
   }
 
   getApplicationConfig(configKey: string): string | undefined {

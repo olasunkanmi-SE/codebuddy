@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { COMMON } from "../application/constant";
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
-import { GeminiLLM } from "./../llms/gemini/gemini";
+import { GeminiLLM } from "../llms/gemini/gemini";
 import { BaseWebViewProvider } from "./base";
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
