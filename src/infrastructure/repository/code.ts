@@ -1,7 +1,7 @@
 import { Client, ResultSet, Row } from "@libsql/client";
 import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
 import { Logger } from "../logger/logger";
-import { dbManager } from "./data-base-manager";
+import { dbManager } from "./database-manager";
 import {
   createIndex,
   createTableQuery,
@@ -74,7 +74,7 @@ export class CodeRepository implements ICodeRepository {
         } else {
           this.logger.error("Failed to initialize database", error);
           throw new Error(
-            `Failed to insert into table after ${maxRetries} retries`,
+            `Failed to insert into table after ${maxRetries} retries`
           );
         }
       }
@@ -83,7 +83,7 @@ export class CodeRepository implements ICodeRepository {
 
   async searchSimilarFunctions(
     queryEmbeddings: number[],
-    limit: number,
+    limit: number
   ): Promise<Row[] | undefined> {
     try {
       const query = selectFunctionProps();
@@ -91,7 +91,7 @@ export class CodeRepository implements ICodeRepository {
         `SELECT class_name,
           function_name,
           file_path,
-          created_at FROM vector_top_k('code_functions_idx', '${JSON.stringify(queryEmbeddings)}', ${limit}) JOIN code_functions ON code_functions.rowid = id`,
+          created_at FROM vector_top_k('code_functions_idx', '${JSON.stringify(queryEmbeddings)}', ${limit}) JOIN code_functions ON code_functions.rowid = id`
       );
       return result ? result.rows : undefined;
     } catch (error) {

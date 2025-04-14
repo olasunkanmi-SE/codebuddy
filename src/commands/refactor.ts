@@ -1,8 +1,8 @@
 import { formatText } from "../utils/utils";
-import { EventGenerator } from "./event-generator";
 import * as vscode from "vscode";
+import { CodeCommandHandler } from "./hander";
 
-export class RefactorCode extends EventGenerator {
+export class RefactorCode extends CodeCommandHandler {
   constructor(action: string, context: vscode.ExtensionContext) {
     super(action, context);
   }

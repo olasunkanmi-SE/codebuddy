@@ -1,9 +1,9 @@
 import simpleGit, { GitError, SimpleGit, SimpleGitOptions } from "simple-git";
-import { EventGenerator } from "./event-generator";
+import { CodeCommandHandler } from "./hander";
 import * as vscode from "vscode";
 import { formatText } from "../utils/utils";
 
-export class GenerateCommitMessage extends EventGenerator {
+export class GenerateCommitMessage extends CodeCommandHandler {
   constructor(action: string, context: vscode.ExtensionContext) {
     super(action, context);
   }
@@ -41,7 +41,7 @@ export class GenerateCommitMessage extends EventGenerator {
             if (
               error instanceof GitError &&
               error.message.includes(
-                "unknown revision or path not in the working tree",
+                "unknown revision or path not in the working tree"
               )
             ) {
               try {
@@ -65,7 +65,7 @@ export class GenerateCommitMessage extends EventGenerator {
               return { file: file.file, diff: null, error: error.message };
             }
           }
-        },
+        }
       );
 
       const fileDiffs = await Promise.all(fileDifferencePromises);

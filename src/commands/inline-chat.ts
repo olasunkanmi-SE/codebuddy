@@ -1,8 +1,8 @@
 import { formatText } from "../utils/utils";
-import { EventGenerator } from "./event-generator";
+import { CodeCommandHandler } from "./hander";
 import * as vscode from "vscode";
 
-export class InLineChat extends EventGenerator {
+export class InLineChat extends CodeCommandHandler {
   selectedCode: string | undefined;
   constructor(action: string, context: vscode.ExtensionContext) {
     super(action, context);

@@ -21,12 +21,12 @@ import {
 import { Memory } from "../memory/base";
 import { Logger } from "../infrastructure/logger/logger";
 
-interface IEventGenerator {
+interface ICodeCommandHandler {
   getApplicationConfig(configKey: string): string | undefined;
   getSelectedWindowArea(): string | undefined;
 }
 
-export abstract class EventGenerator implements IEventGenerator {
+export abstract class CodeCommandHandler implements ICodeCommandHandler {
   context: vscode.ExtensionContext;
   protected error?: string;
   private readonly generativeAi: string;
@@ -43,7 +43,7 @@ export abstract class EventGenerator implements IEventGenerator {
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,
-    errorMessage?: string,
+    errorMessage?: string
   ) {
     this.context = _context;
     this.error = errorMessage;
@@ -67,7 +67,7 @@ export abstract class EventGenerator implements IEventGenerator {
     this.anthropicApiKey = getConfigValue(anthropicApiKey);
     this.xGrokApiKey = getConfigValue(grokApiKey);
     this.xGrokModel = getConfigValue(grokModel);
-    this.logger = new Logger("EventGenerator");
+    this.logger = new Logger("CodeCommandHandler");
   }
 
   getApplicationConfig(configKey: string): string | undefined {
@@ -82,7 +82,7 @@ export abstract class EventGenerator implements IEventGenerator {
       let modelName = "";
       if (!this.generativeAi) {
         vscodeErrorMessage(
-          "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
+          "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
         );
       }
       if (this.generativeAi === generativeAiModels.GROQ) {
@@ -90,7 +90,7 @@ export abstract class EventGenerator implements IEventGenerator {
         modelName = this.groqModel;
         if (!apiKey || !modelName) {
           vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
+            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
           );
         }
         model = this.createGroqModel(apiKey);
@@ -117,7 +117,7 @@ export abstract class EventGenerator implements IEventGenerator {
     } catch (error) {
       console.error("Error creating model:", error);
       vscode.window.showErrorMessage(
-        "An error occurred while creating the model. Please try again.",
+        "An error occurred while creating the model. Please try again."
       );
     }
   }
@@ -152,7 +152,7 @@ export abstract class EventGenerator implements IEventGenerator {
   }
 
   protected async generateModelResponse(
-    text: string,
+    text: string
   ): Promise<string | Anthropic.Messages.Message | undefined> {
     try {
       const activeModel = this.createModel();
@@ -190,7 +190,7 @@ export abstract class EventGenerator implements IEventGenerator {
 
       if (!response) {
         throw new Error(
-          "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly.",
+          "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly."
         );
       }
       if (this.action.includes("chart")) {
@@ -200,7 +200,7 @@ export abstract class EventGenerator implements IEventGenerator {
     } catch (error) {
       this.logger.error("Error generating response:", error);
       vscode.window.showErrorMessage(
-        "An error occurred while generating the response. Please try again.",
+        "An error occurred while generating the response. Please try again."
       );
     }
   }
@@ -214,7 +214,7 @@ export abstract class EventGenerator implements IEventGenerator {
 
   async generateGeminiResponse(
     model: any,
-    text: string,
+    text: string
   ): Promise<string | undefined> {
     const result = await model.generateContent(text);
     return result ? await result.response.text() : undefined;
@@ -223,7 +223,7 @@ export abstract class EventGenerator implements IEventGenerator {
   private async anthropicResponse(
     model: Anthropic,
     generativeAiModel: string,
-    userPrompt: string,
+    userPrompt: string
   ) {
     try {
       const response = await model.messages.create({
@@ -241,7 +241,7 @@ export abstract class EventGenerator implements IEventGenerator {
   private async groqResponse(
     model: Groq,
     prompt: string,
-    generativeAiModel: string,
+    generativeAiModel: string
   ): Promise<string | undefined> {
     try {
       const chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY)
@@ -271,7 +271,7 @@ export abstract class EventGenerator implements IEventGenerator {
   abstract createPrompt(text?: string): any;
 
   async generateResponse(
-    message?: string,
+    message?: string
   ): Promise<string | Anthropic.Messages.Message | undefined> {
     this.logger.info(this.action);
     let prompt;
@@ -384,7 +384,7 @@ export abstract class EventGenerator implements IEventGenerator {
     try {
       let prompt: string | undefined;
       const response = (await this.generateResponse(
-        prompt ? prompt : message,
+        prompt ? prompt : message
       )) as string;
       if (!response) {
         vscode.window.showErrorMessage("model not reponding, try again later");
@@ -420,7 +420,7 @@ export abstract class EventGenerator implements IEventGenerator {
     } catch (error) {
       this.logger.error(
         "Error while passing model response to the webview",
-        error,
+        error
       );
     }
   }
