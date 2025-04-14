@@ -1,5 +1,5 @@
 import { formatText } from "../utils/utils";
-import { CodeCommandHandler } from "./hander";
+import { CodeCommandHandler } from "./handler";
 import * as vscode from "vscode";
 
 export class InterviewMe extends CodeCommandHandler {

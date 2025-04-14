@@ -1,6 +1,6 @@
 import { formatText } from "../utils/utils";
 import * as vscode from "vscode";
-import { CodeCommandHandler } from "./hander";
+import { CodeCommandHandler } from "./handler";
 
 export class RefactorCode extends CodeCommandHandler {
   constructor(action: string, context: vscode.ExtensionContext) {

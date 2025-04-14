@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { CodeCommandHandler } from "./hander";
+import { CodeCommandHandler } from "./handler";
 import { formatText } from "../utils/utils";
 
 export class ExplainCode extends CodeCommandHandler {

@@ -1,5 +1,5 @@
 import simpleGit, { GitError, SimpleGit, SimpleGitOptions } from "simple-git";
-import { CodeCommandHandler } from "./hander";
+import { CodeCommandHandler } from "./handler";
 import * as vscode from "vscode";
 import { formatText } from "../utils/utils";
 
