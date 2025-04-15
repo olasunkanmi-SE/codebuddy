@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
+import { handleWarning, showInfoMessage } from "../utils/utils";
 
 // TODO Log data in MongoDB Atlas
 
@@ -173,10 +174,12 @@ export class Logger {
   }
 
   public info(message: string, data?: any): void {
+    showInfoMessage(message);
     this.log(LogLevel.INFO, message, data);
   }
 
   public warn(message: string, data?: any): void {
+    handleWarning(message);
     this.log(LogLevel.WARN, message, data);
   }
 
