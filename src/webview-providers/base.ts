@@ -6,11 +6,12 @@ import {
 } from "../application/interfaces/workspace.interface";
 import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
+import { AgentService } from "../services/agent-state";
+import { FileManager } from "../services/file-manager";
 import { FileService } from "../services/file-system";
+import { WorkspaceService } from "../services/workspace-service";
 import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
-import { WorkspaceService } from "../services/workspace-service";
-import { FileManager } from "../services/file-manager";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -24,6 +25,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly workspaceService: WorkspaceService;
   private readonly fileService: FileService;
   private readonly fileManager: FileManager;
+  private readonly agentService: AgentService;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -37,6 +39,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.orchestrator = Orchestrator.getInstance();
     this.logger = new Logger("BaseWebViewProvider");
     this.workspaceService = WorkspaceService.getInstance();
+    this.agentService = AgentService.getInstance();
+    this.registerDisposables();
+  }
+
+  registerDisposables() {
     this.disposables.push(
       this.orchestrator.onResponse(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onThinking(this.handleModelResponseEvent.bind(this)),
@@ -149,6 +156,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           case "upload-file":
             await this.fileManager.uploadFileHandler();
             break;
+          case "model-change":
+            await this.orchestrator.publish("onModelChange", message);
+            break;
+          //Publish an event instead to prevent cyclic dependendency
+          // case "chat-history-import":
+          //   await this.agentService.saveChatHistory(
+          //     WebViewProviderManager.AgentId,
+          //     JSON.parse(message.message),
+          //   );
+          //   break;
           default:
             throw new Error("Unknown command");
         }

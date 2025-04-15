@@ -32,6 +32,7 @@ import { FileUploadService } from "./services/file-upload";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { Credentials } from "./services/github-authentication";
 import { getAPIKey, getConfigValue } from "./utils/utils";
+import { WebViewProviderManager } from "./webview-providers/manager";
 
 const {
   geminiKey,
@@ -45,6 +46,7 @@ const {
   deepseekApiKey,
   deepseekModel,
 } = APP_CONFIG;
+console.log(APP_CONFIG);
 
 const logger = Logger.initialize("extension", { minLevel: LogLevel.DEBUG });
 
@@ -175,7 +177,7 @@ export async function activate(context: vscode.ExtensionContext) {
       [inlineChat]: async () => await getInLineChat.execute(),
     };
 
-    const subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
+    let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
       ([action, handler]) => vscode.commands.registerCommand(action, handler),
     );
 
@@ -222,19 +224,26 @@ export async function activate(context: vscode.ExtensionContext) {
         webviewProviderClass: DeepseekWebViewProvider,
       },
     };
+
+    const providerManager = WebViewProviderManager.getInstance(context);
+    const webviewProviderDisposable = providerManager.registerWebViewProvider();
+
     if (selectedGenerativeAiModel in modelConfigurations) {
       const modelConfig = modelConfigurations[selectedGenerativeAiModel];
-      const { key, model, webviewProviderClass } = modelConfig;
-      initializeGenerativeAiEnvironment(
-        context,
-        model,
-        key,
-        webviewProviderClass,
-        subscriptions,
-        quickFixCodeAction,
-        agentEventEmmitter,
+      const apiKey = getConfigValue(modelConfig.key);
+      const apiModel = getConfigValue(modelConfig.model);
+      providerManager.initializeProvider(
+        selectedGenerativeAiModel,
+        apiKey,
+        apiModel,
       );
     }
+    context.subscriptions.push(
+      ...subscriptions,
+      webviewProviderDisposable,
+      quickFixCodeAction,
+      agentEventEmmitter,
+    );
   } catch (error) {
     Memory.clear();
     vscode.window.showErrorMessage(

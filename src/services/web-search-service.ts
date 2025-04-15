@@ -143,7 +143,7 @@ export class WebSearchService {
         favicon = await this.extractFavicon(faviconElement, origin, parsedUrl);
       } catch (error) {
         favicon = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
-        title = parsedUrl.hostname;
+        title = parsedUrl.hostname.slice(0, 20);
         return { url: url ?? "", favicon: favicon ?? "", title: title ?? "" };
       }
       return { url, favicon, title };
