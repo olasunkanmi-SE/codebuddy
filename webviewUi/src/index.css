@@ -314,6 +314,7 @@ code {
 .doc-content {
   font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
   color: var(--vscode-editor-foreground);
+  padding: 16px;
   text-align: left;
   overflow-x: auto;
 }

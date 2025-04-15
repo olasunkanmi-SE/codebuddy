@@ -1,7 +1,7 @@
 import { Client, ResultSet, Row } from "@libsql/client";
 import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
 import { Logger } from "../logger/logger";
-import { dbManager } from "./data-base-manager";
+import { dbManager } from "./database-manager";
 import {
   createIndex,
   createTableQuery,

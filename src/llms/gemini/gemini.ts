@@ -234,7 +234,7 @@ export class GeminiLLM
           callCount++;
         } catch (error: any) {
           console.error("Error processing function call", error);
-          // Send this to the webview instead and let the user decide
+          // Send this to the webview instead
           const retry = await vscode.window.showErrorMessage(
             `Function call failed: ${error.message}. Retry or abort?`,
             "Retry",
@@ -273,12 +273,12 @@ export class GeminiLLM
         this.currentStepIndex = snapShot.currentStepIndex;
       }
 
-      if (this.currentStepIndex < this.planSteps?.length) {
-        userQuery = `Continuing with the plan. Step ${this.currentStepIndex + 1} of ${this.planSteps.length}: "${this.planSteps[this.currentStepIndex]}". Please execute this step.`;
-      } else {
-        this.currentStepIndex = 0;
-        this.planSteps = [];
-      }
+      // if (this.currentStepIndex < this.planSteps?.length) {
+      //   userQuery = `Continuing with the plan. Step ${this.currentStepIndex + 1} of ${this.planSteps.length}: "${this.planSteps[this.currentStepIndex]}". Please execute this step.`;
+      // } else {
+      //   this.currentStepIndex = 0;
+      //   this.planSteps = [];
+      // }
 
       while (callCount < this.calculateDynamicCallLimit(userQuery)) {
         const timeoutPromise = new Promise((_, reject) =>
@@ -335,20 +335,20 @@ export class GeminiLLM
             break;
           }
 
-          if (
-            this.planSteps?.length > 0 &&
-            toolCalls.every((call) => call.name !== "think")
-          ) {
-            this.currentStepIndex++;
-            if (this.currentStepIndex < this.planSteps.length) {
-              userQuery = `Continuing with the plan. Step ${this.currentStepIndex + 1} of ${this.planSteps.length}: "${this.planSteps[this.currentStepIndex]}". Please execute this step`;
-            } else {
-              this.currentStepIndex = 0;
-              this.planSteps = [];
-              userQuery =
-                "Plan execution completed. What is the final answer or next steps based on the completed plan?";
-            }
-          }
+          // if (
+          //   this.planSteps?.length > 0 &&
+          //   toolCalls.every((call) => call.name !== "think")
+          // ) {
+          //   this.currentStepIndex++;
+          //   if (this.currentStepIndex < this.planSteps.length) {
+          //     userQuery = `Continuing with the plan. Step ${this.currentStepIndex + 1} of ${this.planSteps.length}: "${this.planSteps[this.currentStepIndex]}". Please execute this step`;
+          //   } else {
+          //     this.currentStepIndex = 0;
+          //     this.planSteps = [];
+          //     userQuery =
+          //       "Plan execution completed. What is the final answer or next steps based on the completed plan?";
+          //   }
+          // }
           if (callCount >= this.calculateDynamicCallLimit(userQuery)) {
             throw new Error("Dynamic call limit reached");
           }

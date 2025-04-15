@@ -1,8 +1,8 @@
 import { formatText } from "../utils/utils";
-import { EventGenerator } from "./event-generator";
 import * as vscode from "vscode";
+import { CodeCommandHandler } from "./handler";
 
-export class FixError extends EventGenerator {
+export class FixError extends CodeCommandHandler {
   constructor(action: string, context: vscode.ExtensionContext, error: string) {
     super(action, context, error);
   }

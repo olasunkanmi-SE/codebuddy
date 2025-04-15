@@ -9,7 +9,7 @@ import { Logger } from "../infrastructure/logger/logger";
 import { FileService } from "../services/file-system";
 import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
-import { WorkspaceService } from "./../services/workspace-service";
+import { WorkspaceService } from "../services/workspace-service";
 import { FileManager } from "../services/file-manager";
 
 let _view: vscode.WebviewView | undefined;

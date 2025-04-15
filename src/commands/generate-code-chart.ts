@@ -1,8 +1,8 @@
 import { formatText } from "../utils/utils";
 import * as vscode from "vscode";
-import { EventGenerator } from "./event-generator";
+import { CodeCommandHandler } from "./handler";
 
-export class CodeChartGenerator extends EventGenerator {
+export class CodeChartGenerator extends CodeCommandHandler {
   constructor(action: string, context: vscode.ExtensionContext) {
     super(action, context);
   }
