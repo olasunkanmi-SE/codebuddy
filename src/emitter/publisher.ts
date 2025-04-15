@@ -23,6 +23,11 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
     this.createEvent("onFilesRetrieved");
   onStrategizing: vscode.Event<IEventPayload> =
     this.createEvent("onStrategizing");
+  onModelChange: vscode.Event<IEventPayload> =
+    this.createEvent("onModelChange");
+  onModelChangeSuccess: vscode.Event<IEventPayload> = this.createEvent(
+    "onModelChangeSuccess",
+  );
 
   /**
    * Emits a generic event with specified status, message, and optional data.
