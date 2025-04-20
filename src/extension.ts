@@ -31,7 +31,7 @@ import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
 import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
 import { Credentials } from "./services/github-authentication";
-import { getAPIKey, getConfigValue } from "./utils/utils";
+import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { WebViewProviderManager } from "./webview-providers/manager";
 
 const {
@@ -88,8 +88,8 @@ export async function activate(context: vscode.ExtensionContext) {
     await createFileDB(context);
     await connectToDatabase(context);
     const credentials = new Credentials();
-    const geminiApiKey = getAPIKey("gemini");
-    FileUploadService.initialize(geminiApiKey);
+    const { apiKey, model } = getAPIKeyAndModel("gemini");
+    FileUploadService.initialize(apiKey);
     await credentials.initialize(context);
     const session: vscode.AuthenticationSession | undefined =
       await credentials.getSession();
@@ -226,7 +226,6 @@ export async function activate(context: vscode.ExtensionContext) {
     };
 
     const providerManager = WebViewProviderManager.getInstance(context);
-    const webviewProviderDisposable = providerManager.registerWebViewProvider();
 
     if (selectedGenerativeAiModel in modelConfigurations) {
       const modelConfig = modelConfigurations[selectedGenerativeAiModel];
@@ -240,7 +239,6 @@ export async function activate(context: vscode.ExtensionContext) {
     }
     context.subscriptions.push(
       ...subscriptions,
-      webviewProviderDisposable,
       quickFixCodeAction,
       agentEventEmmitter,
     );

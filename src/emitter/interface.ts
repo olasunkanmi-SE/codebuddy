@@ -19,7 +19,7 @@ export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {
   type: string;
-  message?: string;
+  message?: any;
   timestamp: string;
   data?: any;
 }

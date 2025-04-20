@@ -111,19 +111,52 @@ export const showInfoMessage = (message?: string): void => {
  * Retrieves the Gemini API key from the application configuration, which is required for code indexing.
  * @returns {string} The API key.
  */
-export const getAPIKey = (model: string): string => {
-  const { geminiKey, groqApiKey } = APP_CONFIG;
-  let apiKey = getConfigValue(geminiKey);
-  if (model.toLowerCase() === "gemini") {
-    apiKey = getConfigValue(geminiKey);
+/**
+ * Retrieves the API key and model name based on the provided model identifier.
+ * @param {string} model - The identifier of the model (e.g., "gemini", "groq", "anthropic").
+ * @returns {APIKeyConfig} An object containing the API key and the model name.
+ * @throws {Error} If the API key is not found in the configuration.
+ */
+export const getAPIKeyAndModel = (
+  model: string,
+): { apiKey: string; model?: string } => {
+  const {
+    geminiKey,
+    groqApiKey,
+    groqModel,
+    anthropicApiKey,
+    geminiModel,
+    anthropicModel,
+  } = APP_CONFIG;
+  let apiKey: string | undefined;
+  let modelName: string | undefined;
+
+  const lowerCaseModel = model.toLowerCase();
+
+  switch (lowerCaseModel) {
+    case "gemini":
+      apiKey = getConfigValue(geminiKey);
+      modelName = getConfigValue(geminiModel);
+      break;
+    case "groq":
+      apiKey = getConfigValue(groqApiKey);
+      modelName = getConfigValue(groqModel);
+      break;
+    case "anthropic":
+      apiKey = getConfigValue(anthropicApiKey);
+      modelName = getConfigValue(anthropicModel);
+      break;
+    default:
+      throw new Error(`Unsupported model: ${model}`);
   }
-  if (model.toLowerCase() === "groq") {
-    apiKey = getConfigValue(groqApiKey);
-  }
+
   if (!apiKey) {
-    throw new Error("Add API key in extension configuration");
+    throw new Error(
+      `API key not found for model: ${model}. Please add the API key in the extension configuration.`,
+    );
   }
-  return apiKey;
+
+  return { apiKey, model: modelName };
 };
 
 export const generateQueryString = (query: string) =>

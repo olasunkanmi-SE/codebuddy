@@ -4,7 +4,7 @@ import { generativeAiModels } from "../application/constant";
 import { IEventPayload } from "../emitter/interface";
 import { AgentService } from "../services/agent-state";
 import { Logger } from "../services/telemetry";
-import { getAPIKey } from "../utils/utils";
+import { getAPIKeyAndModel, getConfigValue } from "../utils/utils";
 import { AnthropicWebViewProvider } from "./anthropic";
 import { BaseWebViewProvider } from "./base";
 import { DeepseekWebViewProvider } from "./deepseek";
@@ -69,23 +69,25 @@ export class WebViewProviderManager implements vscode.Disposable {
     );
   }
 
-  registerWebViewProvider(): vscode.Disposable {
-    this.webviewViewProvider = {
-      resolveWebviewView: async (webviewView: vscode.WebviewView) => {
-        this.webviewView = webviewView;
-        if (this.currentProvider) {
-          await this.currentProvider.resolveWebviewView(webviewView);
-        }
-      },
-    };
+  registerWebViewProvider(): vscode.Disposable | undefined {
+    if (!this.webviewViewProvider) {
+      this.webviewViewProvider = {
+        resolveWebviewView: async (webviewView: vscode.WebviewView) => {
+          this.webviewView = webviewView;
+          if (this.currentProvider) {
+            await this.currentProvider.resolveWebviewView(webviewView);
+          }
+        },
+      };
 
-    const disposable = vscode.window.registerWebviewViewProvider(
-      BaseWebViewProvider.viewId,
-      this.webviewViewProvider,
-      { webviewOptions: { retainContextWhenHidden: true } },
-    );
-    this.disposables.push(disposable);
-    return disposable;
+      const disposable = vscode.window.registerWebviewViewProvider(
+        BaseWebViewProvider.viewId,
+        this.webviewViewProvider,
+        { webviewOptions: { retainContextWhenHidden: true } },
+      );
+      this.disposables.push(disposable);
+      return disposable;
+    }
   }
 
   // NOTE. This could be better off as modelName instead of modelType, once we are focusing on specific Models
@@ -128,6 +130,11 @@ export class WebViewProviderManager implements vscode.Disposable {
       if (chatHistory?.length > 0) {
         await this.restoreChatHistory();
       }
+      const webviewProviderDisposable = this.registerWebViewProvider();
+      if (webviewProviderDisposable) {
+        this.extensionContext.subscriptions.push(webviewProviderDisposable);
+      }
+
       this.orchestrator.publish(
         "onModelChangeSuccess",
         JSON.stringify({
@@ -157,15 +164,26 @@ export class WebViewProviderManager implements vscode.Disposable {
   }
 
   private async handleModelChange(event: IEventPayload): Promise<void> {
-    if (!event.message) {
-      return;
+    try {
+      if (!event.message) {
+        return;
+      }
+      const modelName = event.message.message as string;
+      if (!modelName) {
+        throw new Error("Unknown model");
+      }
+      const { apiKey, model } = getAPIKeyAndModel(modelName.toLowerCase());
+      if (!model) {
+        throw new Error("Model not found");
+      }
+      if (!apiKey) {
+        this.logger.warn(`${modelName} APIkey is required`);
+      }
+      await this.switchProvider(modelName, apiKey, model);
+    } catch (error: any) {
+      this.logger.error("Error handling model change", error);
+      throw new Error(error.message);
     }
-    const { model, modelType } = JSON.parse(event.message);
-    const apiKey = getAPIKey(modelType);
-    if (!apiKey) {
-      this.logger.warn(`${modelType} APIkey is required`);
-    }
-    await this.switchProvider(modelType, apiKey, model);
   }
 
   private async getCurrentHistory(): Promise<any[]> {
@@ -199,6 +217,9 @@ export class WebViewProviderManager implements vscode.Disposable {
       this.currentProvider.dispose();
     }
     this.disposables.forEach((d) => d.dispose());
+    this.extensionContext.subscriptions.forEach((subscription) =>
+      subscription.dispose(),
+    );
     this.disposables = [];
   }
 }
