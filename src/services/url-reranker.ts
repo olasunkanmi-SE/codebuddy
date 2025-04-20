@@ -5,7 +5,7 @@ import {
   URL_RERANKING_CONFIG,
 } from "../application/constant";
 import { GroqLLM } from "../llms/groq/groq";
-import { getAPIKey } from "../utils/utils";
+import { getAPIKeyAndModel } from "../utils/utils";
 import { IPageMetada } from "./web-search-service";
 
 /**
@@ -36,7 +36,7 @@ export class UrlReranker {
   constructor(_query: string) {
     this.query = _query;
     this.groqLLM = GroqLLM.getInstance({
-      apiKey: getAPIKey("groq"),
+      apiKey: getAPIKeyAndModel("groq").apiKey,
       model: "llama-3.2-1b-preview",
     });
   }

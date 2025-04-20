@@ -23,7 +23,7 @@ import {
 import { Message } from "../message";
 import { Logger } from "../../infrastructure/logger/logger";
 import { GroqLLM } from "../groq/groq";
-import { getAPIKey } from "../../utils/utils";
+import { getAPIKeyAndModel } from "../../utils/utils";
 
 export class GeminiLLM
   extends BaseLLM<GeminiLLMSnapShot>
@@ -52,7 +52,7 @@ export class GeminiLLM
     this.intializeDisposable();
     this.logger = new Logger("GeminiLLM");
     this.groqLLM = GroqLLM.getInstance({
-      apiKey: getAPIKey("groq"),
+      apiKey: getAPIKeyAndModel("groq").apiKey,
       model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",
     });
   }
