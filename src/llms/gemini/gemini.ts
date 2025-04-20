@@ -41,6 +41,7 @@ export class GeminiLLM
   private planSteps: string[] = [];
   private currentStepIndex = 0;
   private initialThought = "";
+  private userQuery = "";
 
   constructor(config: ILlmConfig) {
     super(config);
@@ -60,8 +61,8 @@ export class GeminiLLM
   private intializeDisposable(): void {
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration(() =>
-        this.handleConfigurationChange(),
-      ),
+        this.handleConfigurationChange()
+      )
     );
   }
 
@@ -91,7 +92,7 @@ export class GeminiLLM
 
   public async generateText(
     prompt: string,
-    instruction?: string,
+    instruction?: string
   ): Promise<string> {
     try {
       const model = this.getModel();
@@ -141,7 +142,7 @@ export class GeminiLLM
   }
 
   async generateContentWithTools(
-    userInput: string,
+    userInput: string
   ): Promise<GenerateContentResult> {
     try {
       await this.buildChatHistory(
@@ -149,7 +150,7 @@ export class GeminiLLM
         undefined,
         undefined,
         undefined,
-        true,
+        true
       );
       const prompt = createPrompt(userInput);
       const contents = Memory.get(COMMON.GEMINI_CHAT_HISTORY) as Content[];
@@ -184,7 +185,7 @@ export class GeminiLLM
    */
   private async processToolCalls(
     toolCalls: FunctionCall[],
-    userInput: string,
+    userInput: string
   ): Promise<any> {
     let finalResult: string | undefined = undefined;
     try {
@@ -220,7 +221,7 @@ export class GeminiLLM
             functionCall.name,
             functionResult,
             undefined,
-            false,
+            false
           );
 
           const snapShot = this.createSnapShot({
@@ -238,11 +239,13 @@ export class GeminiLLM
           const retry = await vscode.window.showErrorMessage(
             `Function call failed: ${error.message}. Retry or abort?`,
             "Retry",
-            "Abort",
+            "Abort"
           );
 
           if (retry === "Retry") {
-            continue; // Retry the current function call
+            finalResult = await this.fallBackToGroq(
+              `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`
+            );
           } else {
             finalResult = `Function call error: ${error.message}. Falling back to last response.`;
             break; // Exit the loop and return the error result
@@ -253,13 +256,13 @@ export class GeminiLLM
     } catch (error) {
       console.error("Error processing tool calls", error);
       finalResult = await this.fallBackToGroq(
-        `User Input: ${userInput} \n Plans: ${this.initialThought ?? "Write production ready code to demonstrate your solution"}`,
+        `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`
       );
     }
   }
 
   async processUserQuery(
-    userInput: string,
+    userInput: string
   ): Promise<string | GenerateContentResult | undefined> {
     let finalResult: string | GenerateContentResult | undefined;
     let userQuery = userInput;
@@ -284,8 +287,8 @@ export class GeminiLLM
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error("TImeout Exceeded")),
-            this.timeOutMs,
-          ),
+            this.timeOutMs
+          )
         );
         const responsePromise = await this.generateContentWithTools(userQuery);
         const result = (await Promise.race([
@@ -317,14 +320,16 @@ export class GeminiLLM
           if (this.lastFunctionCalls.has(currentCallSignatures)) {
             finalResult = await this.groqLLM.generateText(userInput);
             if (finalResult) {
-              finalResult = await this.fallBackToGroq(userInput);
+              finalResult = await this.fallBackToGroq(
+                `User Input: ${this.userQuery} \n Plans: ${userInput} Write production ready code to demonstrate your solution`
+              );
               return finalResult;
             }
           }
           this.lastFunctionCalls.add(currentCallSignatures);
           if (this.lastFunctionCalls.size > 10) {
             this.lastFunctionCalls = new Set(
-              [...this.lastFunctionCalls].slice(-10),
+              [...this.lastFunctionCalls].slice(-10)
             );
           }
           if (toolCalls && toolCalls.length > 0) {
@@ -361,7 +366,7 @@ export class GeminiLLM
       if (snapshot?.length > 0) {
         Memory.removeItems(
           COMMON.GEMINI_SNAPSHOT,
-          Memory.get(COMMON.GEMINI_SNAPSHOT).length,
+          Memory.get(COMMON.GEMINI_SNAPSHOT).length
         );
       }
       this.orchestrator.publish("onQuery", String(finalResult));
@@ -373,7 +378,7 @@ export class GeminiLLM
       // );
       console.log("Error processing user query", error);
       finalResult = await this.fallBackToGroq(
-        `${userInput} \n ${this.initialThought ?? "Write production ready code to demonstrate your solution"}`,
+        `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`
       );
       console.log("Model not responding at this time, please try again", error);
     }
@@ -381,7 +386,7 @@ export class GeminiLLM
 
   private async handleSingleFunctionCall(
     functionCall: FunctionCall,
-    attempt: number = 0,
+    attempt: number = 0
   ): Promise<any> {
     const MAX_RETRIES = 3;
     const args = functionCall.args as Record<string, any>;
@@ -403,7 +408,7 @@ export class GeminiLLM
       if (attempt < MAX_RETRIES) {
         console.warn(
           `Retry attempt ${attempt + 1} for function ${name}`,
-          JSON.stringify({ error, args }),
+          JSON.stringify({ error, args })
         );
         return this.handleSingleFunctionCall(functionCall, attempt + 1);
       }
@@ -412,6 +417,7 @@ export class GeminiLLM
 
   async run(userQuery: string) {
     try {
+      this.userQuery = userQuery;
       const result = await this.processUserQuery(userQuery);
       return result;
     } catch (error) {
@@ -425,7 +431,7 @@ export class GeminiLLM
     functionCall?: any,
     functionResponse?: any,
     chat?: ChatSession,
-    isInitialQuery: boolean = false,
+    isInitialQuery: boolean = false
   ): Promise<Content[]> {
     // Check if it makes sense to kind of seperate agent and Edit Mode memory, when switching.
     let chatHistory: any = Memory.get(COMMON.GEMINI_CHAT_HISTORY) || [];
@@ -451,17 +457,17 @@ export class GeminiLLM
         Message.of({
           role: "model",
           parts: [{ functionCall }],
-        }),
+        })
       );
 
       const observationResult = await chat.sendMessage(
-        `Tool result: ${JSON.stringify(functionResponse)}`,
+        `Tool result: ${JSON.stringify(functionResponse)}`
       );
       chatHistory.push(
         Message.of({
           role: "user",
           parts: [{ text: observationResult.response.text() }],
-        }),
+        })
       );
     }
     if (chatHistory.length > 50) chatHistory = chatHistory.slice(-50);
@@ -508,22 +514,28 @@ export class GeminiLLM
     Memory.delete(COMMON.GEMINI_SNAPSHOT);
   }
 
+  // Note: Call Groq provider directly. Remove from Gemini
   private async fallBackToGroq(userInput: string): Promise<string | undefined> {
-    let finalResult = await this.groqLLM.generateText(userInput);
-    if (finalResult) {
-      const systemMessage = Message.of({
-        role: "system",
-        content: finalResult,
-      });
+    try {
+      let finalResult = await this.groqLLM.generateText(userInput);
+      if (finalResult) {
+        const systemMessage = Message.of({
+          role: "system",
+          content: finalResult,
+        });
 
-      let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
-        ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
-        : [systemMessage];
+        let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
+          ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
+          : [systemMessage];
 
-      chatHistory = [...chatHistory, systemMessage];
-      this.orchestrator.publish("onQuery", String(finalResult));
+        chatHistory = [...chatHistory, systemMessage];
+        this.orchestrator.publish("onQuery", String(finalResult));
+      }
+      return finalResult;
+    } catch (error: any) {
+      this.logger.info(error.message);
+      throw new Error(error);
     }
-    return finalResult;
   }
 }
 
