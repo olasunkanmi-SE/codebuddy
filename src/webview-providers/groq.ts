@@ -95,7 +95,6 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         messages: [...chatHistory],
         model: this.generativeAiModel,
         temperature,
-        max_tokens,
         top_p,
         stream: false,
         stop,

@@ -131,45 +131,47 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   private async setupMessageHandler(_view: vscode.WebviewView): Promise<void> {
     try {
-      _view.webview.onDidReceiveMessage(async (message) => {
-        let response: any;
-        switch (message.command) {
-          case "user-input":
-            if (message.metaData.mode === "Agent") {
-              response = await this.generateResponse(
-                message.message,
-                message.metaData,
-              );
-            } else {
-              response = await this.generateResponse(
-                message.message,
-                message.metaData,
-              );
-            }
-            if (response) {
-              await this.sendResponse(formatText(response), "bot");
-            }
-            break;
-          case "webview-ready":
-            await this.publishWorkSpace();
-            break;
-          case "upload-file":
-            await this.fileManager.uploadFileHandler();
-            break;
-          case "model-change":
-            await this.orchestrator.publish("onModelChange", message);
-            break;
-          //Publish an event instead to prevent cyclic dependendency
-          // case "chat-history-import":
-          //   await this.agentService.saveChatHistory(
-          //     WebViewProviderManager.AgentId,
-          //     JSON.parse(message.message),
-          //   );
-          //   break;
-          default:
-            throw new Error("Unknown command");
-        }
-      });
+      this.disposables.push(
+        _view.webview.onDidReceiveMessage(async (message) => {
+          let response: any;
+          switch (message.command) {
+            case "user-input":
+              if (message.metaData.mode === "Agent") {
+                response = await this.generateResponse(
+                  message.message,
+                  message.metaData,
+                );
+              } else {
+                response = await this.generateResponse(
+                  message.message,
+                  message.metaData,
+                );
+              }
+              if (response) {
+                await this.sendResponse(formatText(response), "bot");
+              }
+              break;
+            case "webview-ready":
+              await this.publishWorkSpace();
+              break;
+            case "upload-file":
+              await this.fileManager.uploadFileHandler();
+              break;
+            case "update-model-event":
+              await this.orchestrator.publish("onModelChange", message);
+              break;
+            //Publish an event instead to prevent cyclic dependendency
+            // case "chat-history-import":
+            //   await this.agentService.saveChatHistory(
+            //     WebViewProviderManager.AgentId,
+            //     JSON.parse(message.message),
+            //   );
+            //   break;
+            default:
+              throw new Error("Unknown command");
+          }
+        }),
+      );
     } catch (error) {
       this.logger.error("Message handler failed", error);
       console.error(error);

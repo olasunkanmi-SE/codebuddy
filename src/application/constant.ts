@@ -28,7 +28,7 @@ export enum COMMON {
 }
 export const GROQ_CONFIG = {
   temperature: 0.1,
-  max_tokens: 500024,
+  max_tokens: 60000,
   top_p: 1,
   stream: false,
   stop: ["thanks"],

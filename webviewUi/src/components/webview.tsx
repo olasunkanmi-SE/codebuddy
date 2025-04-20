@@ -102,8 +102,8 @@ export const WebviewUI = () => {
     const newValue = e.target.value;
     setSelectedModel(newValue);
     vsCode.postMessage({
-      topic: "update-model-event",
-      payload: newValue,
+      command: "update-model-event",
+      message: newValue,
     });
   };
 
@@ -111,8 +111,8 @@ export const WebviewUI = () => {
     const newValue = e.target.value;
     setSelectedCodeBuddyMode(newValue);
     vsCode.postMessage({
-      topic: "codebuddy-mode-change-event",
-      payload: newValue,
+      command: "codebuddy-mode-change-event",
+      message: newValue,
     });
   };
 

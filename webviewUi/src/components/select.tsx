@@ -9,8 +9,12 @@ interface ModelDropdownProps {
   options: any[];
 }
 
-export const ModelDropdown: React.FC<ModelDropdownProps> = ({ value, onChange, id, options }) => {
-  console.log({ value, onChange, id, options });
+export const ModelDropdown: React.FC<ModelDropdownProps> = ({
+  value,
+  onChange,
+  id,
+  options,
+}) => {
   return (
     <VSCodeDropdown value={value} id={id} onChange={onChange}>
       {options.map((option) => (
