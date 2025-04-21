@@ -19,7 +19,9 @@ export class AgentService {
   }
 
   async getState(agentId: string): Promise<AgentState | undefined> {
-    return this.storage.get<AgentState>(`${COMMON.AGENT_STATE_PREFIX}_${agentId}`);
+    return this.storage.get<AgentState>(
+      `${COMMON.AGENT_STATE_PREFIX}_${agentId}`,
+    );
   }
 
   async saveState(agentId: string, state: AgentState): Promise<void> {
@@ -27,18 +29,30 @@ export class AgentService {
   }
 
   async getChatHistory(agentId: string): Promise<any[]> {
-    return (await this.storage.get<any[]>(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`)) || [];
+    return (
+      (await this.storage.get<any[]>(
+        `${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`,
+      )) || []
+    );
   }
 
   async saveChatHistory(agentId: string, history: any[]): Promise<void> {
-    return this.storage.set(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`, history);
+    return this.storage.set(
+      `${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`,
+      history,
+    );
   }
 
   async getSnapshot(agentId: string): Promise<GeminiLLMSnapShot | undefined> {
-    return this.storage.get<GeminiLLMSnapShot>(`${COMMON.SNAPSHOT_PREFIX}_${agentId}`);
+    return this.storage.get<GeminiLLMSnapShot>(
+      `${COMMON.SNAPSHOT_PREFIX}_${agentId}`,
+    );
   }
 
-  async saveSnapshot(agentId: string, snapshot: GeminiLLMSnapShot): Promise<void> {
+  async saveSnapshot(
+    agentId: string,
+    snapshot: GeminiLLMSnapShot,
+  ): Promise<void> {
     return this.storage.set(`${COMMON.SNAPSHOT_PREFIX}_${agentId}`, snapshot);
   }
 

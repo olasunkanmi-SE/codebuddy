@@ -15,13 +15,20 @@ import { Memory } from "../../memory/base";
 import { CodeBuddyToolProvider } from "../../tools/factory/tool";
 import { createPrompt } from "../../utils/prompt";
 import { BaseLLM } from "../base";
-import { GeminiModelResponseType, ILlmConfig, GeminiLLMSnapShot } from "../interface";
+import {
+  GeminiModelResponseType,
+  ILlmConfig,
+  GeminiLLMSnapShot,
+} from "../interface";
 import { Message } from "../message";
 import { Logger } from "../../infrastructure/logger/logger";
 import { GroqLLM } from "../groq/groq";
 import { getAPIKeyAndModel } from "../../utils/utils";
 
-export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disposable {
+export class GeminiLLM
+  extends BaseLLM<GeminiLLMSnapShot>
+  implements vscode.Disposable
+{
   private readonly generativeAi: GoogleGenerativeAI;
   private response: EmbedContentResponse | GenerateContentResult | undefined;
   protected readonly orchestrator: Orchestrator;
@@ -52,7 +59,11 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
   }
 
   private intializeDisposable(): void {
-    this.disposables.push(vscode.workspace.onDidChangeConfiguration(() => this.handleConfigurationChange()));
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration(() =>
+        this.handleConfigurationChange(),
+      ),
+    );
   }
 
   // TODO handle configuration, when you introduce multiple LLM Agents
@@ -77,7 +88,10 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
     }
   }
 
-  public async generateText(prompt: string, instruction?: string): Promise<string> {
+  public async generateText(
+    prompt: string,
+    instruction?: string,
+  ): Promise<string> {
     try {
       const model = this.getModel();
       const result: GenerateContentResult = await model.generateContent(prompt);
@@ -91,14 +105,22 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
 
   getModel(modelParams?: Partial<ILlmConfig>): GenerativeModel {
     try {
-      const model: GenerativeModel | undefined = this.generativeAi.getGenerativeModel({
-        model: this.config.model,
-        tools: modelParams?.tools ?? this.config.tools,
-        systemInstruction: modelParams?.systemInstruction ?? this.config.systemInstruction,
-        generationConfig: {
-          stopSequences: ["Thank you", "Done", "End", "stuck in a loop", "loop"],
-        },
-      });
+      const model: GenerativeModel | undefined =
+        this.generativeAi.getGenerativeModel({
+          model: this.config.model,
+          tools: modelParams?.tools ?? this.config.tools,
+          systemInstruction:
+            modelParams?.systemInstruction ?? this.config.systemInstruction,
+          generationConfig: {
+            stopSequences: [
+              "Thank you",
+              "Done",
+              "End",
+              "stuck in a loop",
+              "loop",
+            ],
+          },
+        });
       if (!model) {
         throw new Error(`Error retrieving model ${this.config.model}`);
       }
@@ -117,19 +139,28 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
     };
   }
 
-  async generateContentWithTools(userInput: string): Promise<GenerateContentResult> {
+  async generateContentWithTools(
+    userInput: string,
+  ): Promise<GenerateContentResult> {
     try {
-      await this.buildChatHistory(userInput, undefined, undefined, undefined, true);
+      await this.buildChatHistory(
+        userInput,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
       const prompt = createPrompt(userInput);
       const contents = Memory.get(COMMON.GEMINI_CHAT_HISTORY) as Content[];
       const tools: any = this.getTools();
       const model = this.getModel({ systemInstruction: prompt, tools });
-      const generateContentResponse: GenerateContentResult = await model.generateContent({
-        contents,
-        toolConfig: {
-          functionCallingConfig: { mode: FunctionCallingMode.AUTO },
-        },
-      });
+      const generateContentResponse: GenerateContentResult =
+        await model.generateContent({
+          contents,
+          toolConfig: {
+            functionCallingConfig: { mode: FunctionCallingMode.AUTO },
+          },
+        });
       return generateContentResponse;
     } catch (error: any) {
       throw Error(error);
@@ -150,7 +181,10 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
    * @param userInput The original user input.
    * @returns A promise that resolves to the final result string or undefined if an error occurs.
    */
-  private async processToolCalls(toolCalls: FunctionCall[], userInput: string): Promise<any> {
+  private async processToolCalls(
+    toolCalls: FunctionCall[],
+    userInput: string,
+  ): Promise<any> {
     let finalResult: string | undefined = undefined;
     try {
       let userQuery = userInput;
@@ -158,7 +192,8 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
 
       for (const functionCall of toolCalls) {
         try {
-          const functionResult = await this.handleSingleFunctionCall(functionCall);
+          const functionResult =
+            await this.handleSingleFunctionCall(functionCall);
 
           if (functionCall.name === "think") {
             const thought = functionResult?.content;
@@ -179,7 +214,13 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
 
           finalResult = userQuery;
 
-          await this.buildChatHistory(userQuery, functionCall.name, functionResult, undefined, false);
+          await this.buildChatHistory(
+            userQuery,
+            functionCall.name,
+            functionResult,
+            undefined,
+            false,
+          );
 
           const snapShot = this.createSnapShot({
             lastQuery: userQuery,
@@ -196,12 +237,12 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
           const retry = await vscode.window.showErrorMessage(
             `Function call failed: ${error.message}. Retry or abort?`,
             "Retry",
-            "Abort"
+            "Abort",
           );
 
           if (retry === "Retry") {
             finalResult = await this.fallBackToGroq(
-              `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`
+              `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`,
             );
           } else {
             finalResult = `Function call error: ${error.message}. Falling back to last response.`;
@@ -213,12 +254,14 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
     } catch (error) {
       console.error("Error processing tool calls", error);
       finalResult = await this.fallBackToGroq(
-        `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`
+        `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`,
       );
     }
   }
 
-  async processUserQuery(userInput: string): Promise<string | GenerateContentResult | undefined> {
+  async processUserQuery(
+    userInput: string,
+  ): Promise<string | GenerateContentResult | undefined> {
     let finalResult: string | GenerateContentResult | undefined;
     let userQuery = userInput;
     const MAX_BASE_CALLS = 5;
@@ -240,13 +283,25 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
 
       while (callCount < this.calculateDynamicCallLimit(userQuery)) {
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("TImeout Exceeded")), this.timeOutMs)
+          setTimeout(
+            () => reject(new Error("TImeout Exceeded")),
+            this.timeOutMs,
+          ),
         );
         const responsePromise = await this.generateContentWithTools(userQuery);
-        const result = (await Promise.race([responsePromise, timeoutPromise])) as GeminiModelResponseType;
+        const result = (await Promise.race([
+          responsePromise,
+          timeoutPromise,
+        ])) as GeminiModelResponseType;
         this.response = result;
         if (result && "response" in result) {
-          const { text, usageMetadata, functionCalls, candidates, promptFeedback } = result.response;
+          const {
+            text,
+            usageMetadata,
+            functionCalls,
+            candidates,
+            promptFeedback,
+          } = result.response;
           if ((functionCalls?.()?.length ?? 0) === 0) {
             finalResult = text();
             break;
@@ -256,20 +311,24 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
           const tokenCount = usageMetadata?.totalTokenCount ?? 0;
           const toolCalls = functionCalls ? functionCalls() : [];
           const currentCallSignatures = toolCalls
-            ? toolCalls.map((call) => `${call.name}:${JSON.stringify(call.args)}`).join(";")
+            ? toolCalls
+                .map((call) => `${call.name}:${JSON.stringify(call.args)}`)
+                .join(";")
             : "";
           if (this.lastFunctionCalls.has(currentCallSignatures)) {
             finalResult = await this.groqLLM.generateText(userInput);
             if (finalResult) {
               finalResult = await this.fallBackToGroq(
-                `User Input: ${this.userQuery} \n Plans: ${userInput} Write production ready code to demonstrate your solution`
+                `User Input: ${this.userQuery} \n Plans: ${userInput} Write production ready code to demonstrate your solution`,
               );
               return finalResult;
             }
           }
           this.lastFunctionCalls.add(currentCallSignatures);
           if (this.lastFunctionCalls.size > 10) {
-            this.lastFunctionCalls = new Set([...this.lastFunctionCalls].slice(-10));
+            this.lastFunctionCalls = new Set(
+              [...this.lastFunctionCalls].slice(-10),
+            );
           }
           if (toolCalls && toolCalls.length > 0) {
             finalResult = await this.processToolCalls(toolCalls, userQuery);
@@ -303,7 +362,10 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
       }
       const snapshot = Memory.get(COMMON.GEMINI_SNAPSHOT);
       if (snapshot?.length > 0) {
-        Memory.removeItems(COMMON.GEMINI_SNAPSHOT, Memory.get(COMMON.GEMINI_SNAPSHOT).length);
+        Memory.removeItems(
+          COMMON.GEMINI_SNAPSHOT,
+          Memory.get(COMMON.GEMINI_SNAPSHOT).length,
+        );
       }
       this.orchestrator.publish("onQuery", String(finalResult));
       return finalResult;
@@ -314,13 +376,16 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
       // );
       console.log("Error processing user query", error);
       finalResult = await this.fallBackToGroq(
-        `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`
+        `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`,
       );
       console.log("Model not responding at this time, please try again", error);
     }
   }
 
-  private async handleSingleFunctionCall(functionCall: FunctionCall, attempt: number = 0): Promise<any> {
+  private async handleSingleFunctionCall(
+    functionCall: FunctionCall,
+    attempt: number = 0,
+  ): Promise<any> {
     const MAX_RETRIES = 3;
     const args = functionCall.args as Record<string, any>;
     const name = functionCall.name;
@@ -339,7 +404,10 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
       };
     } catch (error: any) {
       if (attempt < MAX_RETRIES) {
-        console.warn(`Retry attempt ${attempt + 1} for function ${name}`, JSON.stringify({ error, args }));
+        console.warn(
+          `Retry attempt ${attempt + 1} for function ${name}`,
+          JSON.stringify({ error, args }),
+        );
         return this.handleSingleFunctionCall(functionCall, attempt + 1);
       }
     }
@@ -361,7 +429,7 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
     functionCall?: any,
     functionResponse?: any,
     chat?: ChatSession,
-    isInitialQuery: boolean = false
+    isInitialQuery: boolean = false,
   ): Promise<Content[]> {
     // Check if it makes sense to kind of seperate agent and Edit Mode memory, when switching.
     let chatHistory: any = Memory.get(COMMON.GEMINI_CHAT_HISTORY) || [];
@@ -387,15 +455,17 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
         Message.of({
           role: "model",
           parts: [{ functionCall }],
-        })
+        }),
       );
 
-      const observationResult = await chat.sendMessage(`Tool result: ${JSON.stringify(functionResponse)}`);
+      const observationResult = await chat.sendMessage(
+        `Tool result: ${JSON.stringify(functionResponse)}`,
+      );
       chatHistory.push(
         Message.of({
           role: "user",
           parts: [{ text: observationResult.response.text() }],
-        })
+        }),
       );
     }
     if (chatHistory.length > 50) chatHistory = chatHistory.slice(-50);
@@ -452,7 +522,9 @@ export class GeminiLLM extends BaseLLM<GeminiLLMSnapShot> implements vscode.Disp
           content: finalResult,
         });
 
-        let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY) ? Memory.get(COMMON.GROQ_CHAT_HISTORY) : [systemMessage];
+        let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
+          ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
+          : [systemMessage];
 
         chatHistory = [...chatHistory, systemMessage];
         this.orchestrator.publish("onQuery", String(finalResult));

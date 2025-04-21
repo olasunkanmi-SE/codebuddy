@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
 import { Orchestrator } from "../agents/orchestrator";
-import { FolderEntry, IContextInfo } from "../application/interfaces/workspace.interface";
+import {
+  FolderEntry,
+  IContextInfo,
+} from "../application/interfaces/workspace.interface";
 import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { AgentService } from "../services/agent-state";
@@ -28,7 +31,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     private readonly _extensionUri: vscode.Uri,
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     this.fileManager = FileManager.initialize(context, "files");
     this.fileService = FileService.getInstance();
@@ -46,10 +49,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onThinking(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onUpdate(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onError(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onSecretChange(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onActiveworkspaceUpdate(this.handleGenericEvents.bind(this)),
+      this.orchestrator.onSecretChange(
+        this.handleModelResponseEvent.bind(this),
+      ),
+      this.orchestrator.onActiveworkspaceUpdate(
+        this.handleGenericEvents.bind(this),
+      ),
       this.orchestrator.onFileUpload(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onStrategizing(this.handleModelResponseEvent.bind(this))
+      this.orchestrator.onStrategizing(
+        this.handleModelResponseEvent.bind(this),
+      ),
     );
   }
 
@@ -69,7 +78,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     webviewView.webview.options = webviewOptions;
 
     if (!this.apiKey) {
-      vscode.window.showErrorMessage("API key not configured. Check your settings.");
+      vscode.window.showErrorMessage(
+        "API key not configured. Check your settings.",
+      );
       return;
     }
 
@@ -82,7 +93,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
-    view.webview.html = getWebviewContent(this.currentWebView?.webview!, this._extensionUri);
+    view.webview.html = getWebviewContent(
+      this.currentWebView?.webview!,
+      this._extensionUri,
+    );
   }
 
   private async getFiles() {
@@ -97,8 +111,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   private async publishWorkSpace(): Promise<void> {
     try {
-      const filesAndDirs: IContextInfo = await this.workspaceService.getContextInfo(true);
-      const workspaceFiles: Map<string, FolderEntry[]> | undefined = filesAndDirs.workspaceFiles;
+      const filesAndDirs: IContextInfo =
+        await this.workspaceService.getContextInfo(true);
+      const workspaceFiles: Map<string, FolderEntry[]> | undefined =
+        filesAndDirs.workspaceFiles;
       if (!workspaceFiles) {
         this.logger.warn("There no files within the workspace");
         return;
@@ -120,7 +136,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           let response: any;
           switch (message.command) {
             case "user-input":
-              response = await this.generateResponse(message.message, message.metaData);
+              response = await this.generateResponse(
+                message.message,
+                message.metaData,
+              );
               if (response) {
                 await this.sendResponse(formatText(response), "bot");
               }
@@ -141,7 +160,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             default:
               throw new Error("Unknown command");
           }
-        })
+        }),
       );
     } catch (error) {
       this.logger.error("Message handler failed", error);
@@ -157,11 +176,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   public handleModelResponseEvent(event: IEventPayload) {
-    this.sendResponse(formatText(event.message), event.message === "folders" ? "bootstrap" : "bot");
+    this.sendResponse(
+      formatText(event.message),
+      event.message === "folders" ? "bootstrap" : "bot",
+    );
   }
-  abstract generateResponse(message?: string, metaData?: Record<string, any>): Promise<string | undefined>;
+  abstract generateResponse(
+    message?: string,
+    metaData?: Record<string, any>,
+  ): Promise<string | undefined>;
 
-  abstract sendResponse(response: string, currentChat?: string): Promise<boolean | undefined>;
+  abstract sendResponse(
+    response: string,
+    currentChat?: string,
+  ): Promise<boolean | undefined>;
 
   public dispose(): void {
     this.disposables.forEach((d) => d.dispose());
@@ -169,7 +197,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   async getContext(files: string[]) {
     try {
-      const filesContent: Map<string, string> | undefined = await this.fileService.getFilesContent(files);
+      const filesContent: Map<string, string> | undefined =
+        await this.fileService.getFilesContent(files);
       if (filesContent && filesContent.size > 0) {
         return Array.from(filesContent.values()).join("\n");
       }

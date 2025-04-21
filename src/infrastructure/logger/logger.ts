@@ -33,7 +33,11 @@ export interface ILoggerConfig {
 
 export interface ITelemetry {
   recordEvent(name: string, properties?: Record<string, any>): void;
-  recordMetric(name: string, value: number, tags?: Record<string, string>): void;
+  recordMetric(
+    name: string,
+    value: number,
+    tags?: Record<string, string>,
+  ): void;
   startSpan(name: string): ISpan;
 }
 
@@ -59,12 +63,20 @@ export class Logger {
   static instance: Logger;
   constructor(private readonly module: string) {}
 
-  public static initialize(module: string, config: Partial<ILoggerConfig>, telemetry?: ITelemetry): Logger {
+  public static initialize(
+    module: string,
+    config: Partial<ILoggerConfig>,
+    telemetry?: ITelemetry,
+  ): Logger {
     Logger.config = { ...Logger.config, ...config };
     if (Logger.config.enableFile && !Logger.config.filePath) {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
       if (workspaceFolder) {
-        const logDir = path.join(workspaceFolder.uri.fsPath, ".codebuddy", "logs");
+        const logDir = path.join(
+          workspaceFolder.uri.fsPath,
+          ".codebuddy",
+          "logs",
+        );
         if (!fs.existsSync(logDir)) {
           fs.mkdirSync(logDir, { recursive: true });
         }
@@ -151,7 +163,11 @@ export class Logger {
     const event = this.formatLogEvent(level, message, data);
     this.logToConsole(event);
     this.logToFile(event);
-    if (level === LogLevel.INFO || level === LogLevel.WARN || level === LogLevel.ERROR) {
+    if (
+      level === LogLevel.INFO ||
+      level === LogLevel.WARN ||
+      level === LogLevel.ERROR
+    ) {
       this.logToTelemetry(event);
     }
   }
@@ -179,12 +195,18 @@ export class Logger {
       this.info(`${operation} completed in ${duration}ms`);
 
       if (Logger.telemetry) {
-        Logger.telemetry.recordMetric(`duration.${this.module}.${operation}`, duration);
+        Logger.telemetry.recordMetric(
+          `duration.${this.module}.${operation}`,
+          duration,
+        );
       }
     };
   }
 
-  public traceOperation<T>(operation: string, fn: () => Promise<T>): Promise<T> {
+  public traceOperation<T>(
+    operation: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
     const span = Logger.telemetry?.startSpan(`${this.module}.${operation}`);
     const endTimer = this.startTimer(operation);
 

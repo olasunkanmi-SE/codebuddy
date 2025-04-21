@@ -15,7 +15,10 @@ export class FileStorage implements IStorage {
   private readonly storagePath: string;
 
   constructor() {
-    this.storagePath = path.join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "", ".codebuddy");
+    this.storagePath = path.join(
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "",
+      ".codebuddy",
+    );
     if (!fs.existsSync(this.storagePath)) {
       fs.mkdirSync(this.storagePath, { recursive: true });
     }
@@ -42,7 +45,11 @@ export class FileStorage implements IStorage {
   async set<T>(key: string, value: T): Promise<void> {
     try {
       const filePath = this.getFilePath(key);
-      await fs.promises.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8");
+      await fs.promises.writeFile(
+        filePath,
+        JSON.stringify(value, null, 2),
+        "utf-8",
+      );
     } catch (error) {
       console.error(`Error storing data for key ${key}:`, error);
       throw new Error(`Failed to store data: ${error}`);

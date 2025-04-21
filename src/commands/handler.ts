@@ -3,7 +3,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
-import { APP_CONFIG, COMMON, generativeAiModels } from "../application/constant";
+import {
+  APP_CONFIG,
+  COMMON,
+  generativeAiModels,
+} from "../application/constant";
 import { AnthropicWebViewProvider } from "../webview-providers/anthropic";
 import { GeminiWebViewProvider } from "../webview-providers/gemini";
 import { GroqWebViewProvider } from "../webview-providers/groq";
@@ -38,7 +42,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,
-    errorMessage?: string
+    errorMessage?: string,
   ) {
     this.context = _context;
     this.error = errorMessage;
@@ -69,13 +73,15 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     return getConfigValue(configKey);
   }
 
-  protected createModel(): { generativeAi: string; model: any; modelName: string } | undefined {
+  protected createModel():
+    | { generativeAi: string; model: any; modelName: string }
+    | undefined {
     try {
       let model;
       let modelName = "";
       if (!this.generativeAi) {
         vscodeErrorMessage(
-          "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
+          "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
         );
       }
       if (this.generativeAi === generativeAiModels.GROQ) {
@@ -83,7 +89,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         modelName = this.groqModel;
         if (!apiKey || !modelName) {
           vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
+            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
           );
         }
         model = this.createGroqModel(apiKey);
@@ -109,7 +115,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       return { generativeAi: this.generativeAi, model, modelName };
     } catch (error) {
       console.error("Error creating model:", error);
-      vscode.window.showErrorMessage("An error occurred while creating the model. Please try again.");
+      vscode.window.showErrorMessage(
+        "An error occurred while creating the model. Please try again.",
+      );
     }
   }
 
@@ -142,7 +150,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     return new Groq({ apiKey });
   }
 
-  protected async generateModelResponse(text: string): Promise<string | Anthropic.Messages.Message | undefined> {
+  protected async generateModelResponse(
+    text: string,
+  ): Promise<string | Anthropic.Messages.Message | undefined> {
     try {
       const activeModel = this.createModel();
       if (!activeModel) {
@@ -179,7 +189,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
 
       if (!response) {
         throw new Error(
-          "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly."
+          "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly.",
         );
       }
       if (this.action.includes("chart")) {
@@ -188,7 +198,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       return response;
     } catch (error) {
       this.logger.error("Error generating response:", error);
-      vscode.window.showErrorMessage("An error occurred while generating the response. Please try again.");
+      vscode.window.showErrorMessage(
+        "An error occurred while generating the response. Please try again.",
+      );
     }
   }
 
@@ -199,12 +211,19 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     return inputString;
   }
 
-  async generateGeminiResponse(model: any, text: string): Promise<string | undefined> {
+  async generateGeminiResponse(
+    model: any,
+    text: string,
+  ): Promise<string | undefined> {
     const result = await model.generateContent(text);
     return result ? await result.response.text() : undefined;
   }
 
-  private async anthropicResponse(model: Anthropic, generativeAiModel: string, userPrompt: string) {
+  private async anthropicResponse(
+    model: Anthropic,
+    generativeAiModel: string,
+    userPrompt: string,
+  ) {
     try {
       const response = await model.messages.create({
         model: generativeAiModel,
@@ -218,9 +237,15 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     }
   }
 
-  private async groqResponse(model: Groq, prompt: string, generativeAiModel: string): Promise<string | undefined> {
+  private async groqResponse(
+    model: Groq,
+    prompt: string,
+    generativeAiModel: string,
+  ): Promise<string | undefined> {
     try {
-      const chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY) ? Memory.get(COMMON.GROQ_CHAT_HISTORY) : [];
+      const chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY)
+        ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
+        : [];
       const params = {
         messages: [
           ...chatHistory,
@@ -232,7 +257,8 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         model: generativeAiModel,
       };
 
-      const completion: Groq.Chat.ChatCompletion = await model.chat.completions.create(params);
+      const completion: Groq.Chat.ChatCompletion =
+        await model.chat.completions.create(params);
       return completion.choices[0]?.message?.content ?? undefined;
     } catch (error) {
       this.logger.error("Error generating response:", error);
@@ -243,7 +269,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
 
   abstract createPrompt(text?: string): any;
 
-  async generateResponse(message?: string): Promise<string | Anthropic.Messages.Message | undefined> {
+  async generateResponse(
+    message?: string,
+  ): Promise<string | Anthropic.Messages.Message | undefined> {
     this.logger.info(this.action);
     let prompt;
     const selectedCode = this.getSelectedWindowArea();
@@ -255,7 +283,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     if (message && selectedCode) {
       prompt = await this.createPrompt(`${message} \n ${selectedCode}`);
     } else {
-      message ? (prompt = await this.createPrompt(message)) : (prompt = await this.createPrompt(selectedCode));
+      message
+        ? (prompt = await this.createPrompt(message))
+        : (prompt = await this.createPrompt(selectedCode));
     }
 
     if (!prompt) {
@@ -338,7 +368,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         placeHolder: "Enter instructions for CodeBuddy",
         ignoreFocusOut: true,
         validateInput: (text) => {
-          return text === "" ? "Enter instructions for CodeBuddy or press Escape to close chat box" : null;
+          return text === ""
+            ? "Enter instructions for CodeBuddy or press Escape to close chat box"
+            : null;
         },
       });
       return userPrompt;
@@ -350,7 +382,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   async execute(message?: string): Promise<void> {
     try {
       let prompt: string | undefined;
-      const response = (await this.generateResponse(prompt ? prompt : message)) as string;
+      const response = (await this.generateResponse(
+        prompt ? prompt : message,
+      )) as string;
       if (!response) {
         vscode.window.showErrorMessage("model not reponding, try again later");
         return;
@@ -383,7 +417,10 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           break;
       }
     } catch (error) {
-      this.logger.error("Error while passing model response to the webview", error);
+      this.logger.error(
+        "Error while passing model response to the webview",
+        error,
+      );
     }
   }
 }

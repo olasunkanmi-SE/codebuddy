@@ -66,7 +66,7 @@ export class UrlReranker {
     if (!title) return 0;
 
     const matches = UrlReranker.KEYWORDS.filter((keyword) =>
-      title.toLowerCase().includes(keyword.toLowerCase())
+      title.toLowerCase().includes(keyword.toLowerCase()),
     );
 
     return matches.length / UrlReranker.KEYWORDS.length;
@@ -97,7 +97,7 @@ export class UrlReranker {
 
     const codeBlockCount = this.countCodeBlocks(metadata.content);
     const hasAdequateExplanation = this.hasAdequateExplanation(
-      metadata.content
+      metadata.content,
     );
 
     return codeBlockCount + (hasAdequateExplanation ? 1 : 0);
@@ -130,7 +130,7 @@ export class UrlReranker {
    */
   calculateFinalScore(metadata: IPageMetada): number {
     const titleRelevanceScore = this.calculateTitleRelevanceScore(
-      metadata.title ?? ""
+      metadata.title ?? "",
     );
     const reputationScore = this.calculateSourceReputationScore(metadata);
     const contentQualityScore = this.calculateContentQualityScore(metadata);
