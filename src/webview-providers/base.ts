@@ -136,17 +136,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           let response: any;
           switch (message.command) {
             case "user-input":
-              if (message.metaData.mode === "Agent") {
-                response = await this.generateResponse(
-                  message.message,
-                  message.metaData,
-                );
-              } else {
-                response = await this.generateResponse(
-                  message.message,
-                  message.metaData,
-                );
-              }
+              response = await this.generateResponse(
+                message.message,
+                message.metaData,
+              );
               if (response) {
                 await this.sendResponse(formatText(response), "bot");
               }
@@ -161,12 +154,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               await this.orchestrator.publish("onModelChange", message);
               break;
             //Publish an event instead to prevent cyclic dependendency
-            // case "chat-history-import":
-            //   await this.agentService.saveChatHistory(
-            //     WebViewProviderManager.AgentId,
-            //     JSON.parse(message.message),
-            //   );
-            //   break;
+            case "messages-updated":
+              this.orchestrator.publish("onHistoryUpdated", message);
+              break;
             default:
               throw new Error("Unknown command");
           }

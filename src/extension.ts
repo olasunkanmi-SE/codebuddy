@@ -72,7 +72,7 @@ async function connectToDatabase(context: vscode.ExtensionContext) {
 
 async function createFileDB(context: vscode.ExtensionContext) {
   try {
-    const fileUploader = new FileManager(context, "patterns");
+    const fileUploader = new FileManager(context, "database");
     const files = await fileUploader.getFiles();
     if (!files?.find((file) => file.includes("dev.db"))) {
       await fileUploader.createFile("dev.db");
@@ -96,7 +96,6 @@ export async function activate(context: vscode.ExtensionContext) {
     logger.info(`Logged into GitHub as ${session?.account.label}`);
     Memory.getInstance();
 
-    // TODO This is broken. Need to Fix
     // const index = CodeIndexingService.createInstance();
     // Get each of the folders and call the next line for each
     // const result = await index.buildFunctionStructureMap();
@@ -235,6 +234,7 @@ export async function activate(context: vscode.ExtensionContext) {
         selectedGenerativeAiModel,
         apiKey,
         apiModel,
+        true,
       );
     }
     context.subscriptions.push(

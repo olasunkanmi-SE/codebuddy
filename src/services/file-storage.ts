@@ -12,11 +12,11 @@ export interface IStorage {
 }
 
 export class FileStorage implements IStorage {
-  private storagePath: string;
+  private readonly storagePath: string;
 
   constructor() {
     this.storagePath = path.join(
-      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "",
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "",
       ".codebuddy",
     );
     if (!fs.existsSync(this.storagePath)) {

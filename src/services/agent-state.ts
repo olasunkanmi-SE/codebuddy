@@ -5,7 +5,7 @@ import { FileStorage, IStorage } from "./file-storage";
 
 export class AgentService {
   private static instance: AgentService;
-  private storage: IStorage;
+  private readonly storage: IStorage;
 
   private constructor(storage: IStorage) {
     this.storage = storage;
