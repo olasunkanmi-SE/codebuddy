@@ -1,12 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import {
-  APP_CONFIG,
-  generativeAiModels,
-  OLA_ACTIONS,
-  USER_MESSAGE,
-} from "./application/constant";
+import { APP_CONFIG, generativeAiModels, OLA_ACTIONS, USER_MESSAGE } from "./application/constant";
 import { Comments } from "./commands/comment";
 import { ExplainCode } from "./commands/explain";
 import { FixError } from "./commands/fixError";
@@ -72,7 +67,7 @@ async function connectToDatabase(context: vscode.ExtensionContext) {
 
 async function createFileDB(context: vscode.ExtensionContext) {
   try {
-    const fileUploader = new FileManager(context, "patterns");
+    const fileUploader = new FileManager(context, "database");
     const files = await fileUploader.getFiles();
     if (!files?.find((file) => file.includes("dev.db"))) {
       await fileUploader.createFile("dev.db");
@@ -91,12 +86,10 @@ export async function activate(context: vscode.ExtensionContext) {
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     FileUploadService.initialize(apiKey);
     await credentials.initialize(context);
-    const session: vscode.AuthenticationSession | undefined =
-      await credentials.getSession();
+    const session: vscode.AuthenticationSession | undefined = await credentials.getSession();
     logger.info(`Logged into GitHub as ${session?.account.label}`);
     Memory.getInstance();
 
-    // TODO This is broken. Need to Fix
     // const index = CodeIndexingService.createInstance();
     // Get each of the folders and call the next line for each
     // const result = await index.buildFunctionStructureMap();
@@ -115,47 +108,17 @@ export async function activate(context: vscode.ExtensionContext) {
       generateCodeChart,
       inlineChat,
     } = OLA_ACTIONS;
-    const getComment = new Comments(
-      `${USER_MESSAGE} generates the code comments...`,
-      context,
-    );
-    const getInLineChat = new InLineChat(
-      `${USER_MESSAGE} generates a response...`,
-      context,
-    );
-    const generateOptimizeCode = new OptimizeCode(
-      `${USER_MESSAGE} optimizes the code...`,
-      context,
-    );
-    const generateRefactoredCode = new RefactorCode(
-      `${USER_MESSAGE} refactors the code...`,
-      context,
-    );
-    const explainCode = new ExplainCode(
-      `${USER_MESSAGE} explains the code...`,
-      context,
-    );
-    const generateReview = new ReviewCode(
-      `${USER_MESSAGE} reviews the code...`,
-      context,
-    );
-    const codeChartGenerator = new CodeChartGenerator(
-      `${USER_MESSAGE} creates the code chart...`,
-      context,
-    );
-    const generateCommitMessage = new GenerateCommitMessage(
-      `${USER_MESSAGE} generates a commit message...`,
-      context,
-    );
-    const generateInterviewQuestions = new InterviewMe(
-      `${USER_MESSAGE} generates interview questions...`,
-      context,
-    );
+    const getComment = new Comments(`${USER_MESSAGE} generates the code comments...`, context);
+    const getInLineChat = new InLineChat(`${USER_MESSAGE} generates a response...`, context);
+    const generateOptimizeCode = new OptimizeCode(`${USER_MESSAGE} optimizes the code...`, context);
+    const generateRefactoredCode = new RefactorCode(`${USER_MESSAGE} refactors the code...`, context);
+    const explainCode = new ExplainCode(`${USER_MESSAGE} explains the code...`, context);
+    const generateReview = new ReviewCode(`${USER_MESSAGE} reviews the code...`, context);
+    const codeChartGenerator = new CodeChartGenerator(`${USER_MESSAGE} creates the code chart...`, context);
+    const generateCommitMessage = new GenerateCommitMessage(`${USER_MESSAGE} generates a commit message...`, context);
+    const generateInterviewQuestions = new InterviewMe(`${USER_MESSAGE} generates interview questions...`, context);
 
-    const generateUnitTests = new GenerateUnitTest(
-      `${USER_MESSAGE} generates unit tests...`,
-      context,
-    );
+    const generateUnitTests = new GenerateUnitTest(`${USER_MESSAGE} generates unit tests...`, context);
 
     const actionMap = {
       [comment]: async () => await getComment.execute(),
@@ -165,29 +128,21 @@ export async function activate(context: vscode.ExtensionContext) {
       [interviewMe]: async () => await generateInterviewQuestions.execute(),
       [generateUnitTest]: async () => await generateUnitTests.execute(),
       [fix]: (errorMessage: string) =>
-        new FixError(
-          `${USER_MESSAGE} finds a solution to the error...`,
-          context,
-          errorMessage,
-        ).execute(errorMessage),
+        new FixError(`${USER_MESSAGE} finds a solution to the error...`, context, errorMessage).execute(errorMessage),
       [explain]: async () => await explainCode.execute(),
-      [commitMessage]: async () =>
-        await generateCommitMessage.execute("commitMessage"),
+      [commitMessage]: async () => await generateCommitMessage.execute("commitMessage"),
       [generateCodeChart]: async () => await codeChartGenerator.execute(),
       [inlineChat]: async () => await getInLineChat.execute(),
     };
 
-    let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
-      ([action, handler]) => vscode.commands.registerCommand(action, handler),
+    let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(([action, handler]) =>
+      vscode.commands.registerCommand(action, handler)
     );
 
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
 
     const quickFix = new CodeActionsProvider();
-    quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
-      { scheme: "file", language: "*" },
-      quickFix,
-    );
+    quickFixCodeAction = vscode.languages.registerCodeActionsProvider({ scheme: "file", language: "*" }, quickFix);
 
     agentEventEmmitter = new EventEmitter();
 
@@ -231,22 +186,12 @@ export async function activate(context: vscode.ExtensionContext) {
       const modelConfig = modelConfigurations[selectedGenerativeAiModel];
       const apiKey = getConfigValue(modelConfig.key);
       const apiModel = getConfigValue(modelConfig.model);
-      providerManager.initializeProvider(
-        selectedGenerativeAiModel,
-        apiKey,
-        apiModel,
-      );
+      providerManager.initializeProvider(selectedGenerativeAiModel, apiKey, apiModel, true);
     }
-    context.subscriptions.push(
-      ...subscriptions,
-      quickFixCodeAction,
-      agentEventEmmitter,
-    );
+    context.subscriptions.push(...subscriptions, quickFixCodeAction, agentEventEmmitter);
   } catch (error) {
     Memory.clear();
-    vscode.window.showErrorMessage(
-      "An Error occured while setting up generative AI model",
-    );
+    vscode.window.showErrorMessage("An Error occured while setting up generative AI model");
     console.log(error);
   }
 }

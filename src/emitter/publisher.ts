@@ -9,25 +9,16 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onPromptGenerated: vscode.Event<IEventPayload> = this.createEvent("onQuery");
   onThinking: vscode.Event<IEventPayload> = this.createEvent("onThinking");
   onResponse: vscode.Event<IEventPayload> = this.createEvent("onResponse");
-  onSecretChange: vscode.Event<IEventPayload> =
-    this.createEvent("onSecretChange");
+  onSecretChange: vscode.Event<IEventPayload> = this.createEvent("onSecretChange");
   onBootstrap: vscode.Event<IEventPayload> = this.createEvent("onBootstrap");
   onFileUpload: vscode.Event<IEventPayload> = this.createEvent("onFileUpload");
-  onFileProcessSuccess: vscode.Event<IEventPayload> = this.createEvent(
-    "onFileProcessSuccess",
-  );
-  onActiveworkspaceUpdate: vscode.Event<IEventPayload> = this.createEvent(
-    "onActiveworkspaceUpdate",
-  );
-  onFilesRetrieved: vscode.Event<IEventPayload> =
-    this.createEvent("onFilesRetrieved");
-  onStrategizing: vscode.Event<IEventPayload> =
-    this.createEvent("onStrategizing");
-  onModelChange: vscode.Event<IEventPayload> =
-    this.createEvent("onModelChange");
-  onModelChangeSuccess: vscode.Event<IEventPayload> = this.createEvent(
-    "onModelChangeSuccess",
-  );
+  onFileProcessSuccess: vscode.Event<IEventPayload> = this.createEvent("onFileProcessSuccess");
+  onActiveworkspaceUpdate: vscode.Event<IEventPayload> = this.createEvent("onActiveworkspaceUpdate");
+  onFilesRetrieved: vscode.Event<IEventPayload> = this.createEvent("onFilesRetrieved");
+  onStrategizing: vscode.Event<IEventPayload> = this.createEvent("onStrategizing");
+  onModelChange: vscode.Event<IEventPayload> = this.createEvent("onModelChange");
+  onModelChangeSuccess: vscode.Event<IEventPayload> = this.createEvent("onModelChangeSuccess");
+  onHistoryUpdated: vscode.Event<IEventPayload> = this.createEvent("onHistoryUpdated");
 
   /**
    * Emits a generic event with specified status, message, and optional data.

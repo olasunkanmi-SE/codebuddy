@@ -13,7 +13,8 @@ type AgentEventKeys =
   | "onFilesRetrieved"
   | "onStrategizing"
   | "onModelChange"
-  | "onModelChangeSuccess";
+  | "onModelChangeSuccess"
+  | "onHistoryUpdated";
 
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
