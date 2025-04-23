@@ -7,7 +7,7 @@
     "url": "https://olasunkanmi.app"
   },
   "publisher": "fiatinnovations",
-  "description": "CodeBuddy is an AI-powered coding assistant that helps developers write, review, and optimize code.",
+  "description": "CodeBuddy is a Visual Studio Code extension that enhances developer productivity through AI-powered code assistance. It provides intelligent code review, refactoring suggestions, optimization tips, and interactive chat capabilities powered by multiple AI models including Gemini, Groq, Anthropic, and Deepseek.",
   "version": "1.2.3",
   "engines": {
     "vscode": "^1.78.0"

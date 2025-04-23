@@ -32,6 +32,7 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
+import { SecretStorageService } from "./services/secret-storage";
 
 const {
   geminiKey,
@@ -84,6 +85,7 @@ async function createFileDB(context: vscode.ExtensionContext) {
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    const secretStorageService = new SecretStorageService(context);
     await createFileDB(context);
     await connectToDatabase(context);
     const credentials = new Credentials();
@@ -240,6 +242,7 @@ export async function activate(context: vscode.ExtensionContext) {
       ...subscriptions,
       quickFixCodeAction,
       agentEventEmmitter,
+      secretStorageService,
     );
   } catch (error) {
     Memory.clear();

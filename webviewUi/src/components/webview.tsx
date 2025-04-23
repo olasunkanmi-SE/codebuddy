@@ -86,6 +86,11 @@ export const WebviewUI = () => {
         case "onActiveworkspaceUpdate":
           setActiveEditor(message.message ?? "");
           break;
+        case "onConfigurationChange": {
+          //Listen for config change here
+          const data = JSON.parse(message.message);
+          return data;
+        }
         default:
           console.warn("Unknown message type", message.type);
       }
