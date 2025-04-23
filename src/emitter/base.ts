@@ -1,10 +1,12 @@
 import * as vscode from "vscode";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { IEventPayload } from "./interface";
 export class BaseEmitter<EventMap extends Record<string, IEventPayload>> {
   protected logger: Logger;
   constructor() {
-    this.logger = new Logger("BaseEmitter");
+    this.logger = Logger.initialize("CodeCommandHandler", {
+      minLevel: LogLevel.DEBUG,
+    });
   }
   private readonly emitters: Map<keyof EventMap, vscode.EventEmitter<any>> =
     new Map();

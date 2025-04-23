@@ -2,13 +2,15 @@ import * as vscode from "vscode";
 import { FSPROPS } from "../application/constant";
 import { IWorkspaceInfo } from "../application/interfaces";
 import { handleError } from "../utils/utils";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export class FileService {
   readonly logger: Logger;
   private static instance: FileService;
   constructor() {
-    this.logger = new Logger("FileSystemService");
+    this.logger = Logger.initialize("FileService", {
+      minLevel: LogLevel.DEBUG,
+    });
   }
 
   static getInstance() {

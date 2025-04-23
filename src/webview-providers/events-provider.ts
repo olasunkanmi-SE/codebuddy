@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { Logger } from "../infrastructure/logger/logger";
+import { LogLevel } from "../services/telemetry";
 
 type Ttopic = "bot" | "user-input";
 
@@ -13,7 +14,9 @@ export class WebViewEventsProvider {
   private readonly logger: Logger;
   constructor(private readonly webView: vscode.WebviewView) {
     // Note: Use factory method for the logger
-    this.logger = new Logger("WebViewEventsProvider");
+    this.logger = Logger.initialize("WebViewEventsProvider", {
+      minLevel: LogLevel.DEBUG,
+    });
   }
 
   public async postMessage(message: IPostMessage) {

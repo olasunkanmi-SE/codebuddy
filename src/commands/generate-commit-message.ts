@@ -101,6 +101,7 @@ export class GenerateCommitMessage extends CodeCommandHandler {
             If documentation or comments have been substantially modified, include this information.
             Avoid mentioning minor changes like code formatting, unless that's the primary purpose of the commit.
             When presented with a git diff, analyze it thoroughly and respond with a commit message formatted as described above. Your goal is to provide a clear, informative summary that helps developers quickly understand the nature and scope of the changes.
+            Return your response as a markdown and use the pre tags.
             Here is the gitDifference
             ${await this.getStagedDifferenceSummary()}`;
   }

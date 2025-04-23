@@ -4,7 +4,7 @@ import { COMMON } from "../application/constant";
 import { Memory } from "../memory/base";
 import { IMessageInput, Message } from "../llms/message";
 import { DeepseekLLM } from "../llms/deepseek/deepseek";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export class DeepseekWebViewProvider extends BaseWebViewProvider {
   public static readonly viewId = "chatView";
@@ -21,7 +21,9 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     protected baseUrl?: string,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
-    this.logger = new Logger("DeepseekWebViewProvider");
+    this.logger = Logger.initialize("DeepseekWebViewProvider", {
+      minLevel: LogLevel.DEBUG,
+    });
     this.deepseekLLM = DeepseekLLM.getInstance({
       apiKey: this.apiKey,
       model: this.generativeAiModel,

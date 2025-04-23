@@ -1,3 +1,5 @@
+import { ILLMConfig } from "../services/chat-history-manager";
+
 export const USER_MESSAGE = " ☕️ Hold on while CodeBuddy ";
 export enum OLA_ACTIONS {
   comment = "CodeBuddy.commentCode",
@@ -28,7 +30,7 @@ export enum COMMON {
 }
 export const GROQ_CONFIG = {
   temperature: 0.1,
-  max_tokens: 8192,
+  max_tokens: 6000,
   top_p: 1,
   stream: false,
   stop: ["thanks"],
@@ -361,3 +363,48 @@ const FILE_TYPE_PROMPTS: Record<string, string> = {
   json: "Parse this JSON file and provide a structured analysis:",
   default: "Extract all relevant information from this file:",
 };
+
+export const LLM_CONFIGS: Record<string, ILLMConfig> = {
+  gemini: {
+    botRole: "model",
+    userRole: "user",
+    formatMessage: (role, content) => ({ role, parts: [{ text: content }] }),
+  },
+  groq: {
+    botRole: "system",
+    userRole: "user",
+    formatMessage: (role, content) => ({ role, content }),
+  },
+  anthropic: {
+    botRole: "assistant",
+    userRole: "user",
+    formatMessage: (role, content) => ({ role, content }),
+  },
+};
+
+//Note, this kind of configuration can be used by orchestrator on where to direct the requests
+// export const LLM_CONFIGS: Record<string, LLMConfig> = {
+//   gemini: {
+//     botRole: "model",
+//     userRole: "user",
+//     chatFormat: "markdown",
+//     multiModalModel: "gemini-pro-vision",
+//     codeInterpreter: true,
+//     retriever: true,
+//     fileUpload: true,
+//     webSearch: true,
+//     functionCalling: true,
+//     codeInterpreterModel: "gemini-pro-vision",
+//     retrieverModel: "gemini-pro",
+//     webSearchModel: "gemini-pro",
+//     functionCallingModel: "gemini-pro",
+//     fileUploadModel: "gemini-pro-vision",
+//     fileUploadPrompt: (fileType: string) => {
+//       const prompt = FILE_TYPE_PROMPTS[fileType] || FILE_TYPE_PROMPTS.default;
+//       return `${prompt} \n\n ${fileType} file content:`;
+//     },
+//     fileUploadHandler: (fileType: string) => {
+//       return fileType === "pdf" ? "Upload PDF file" : "Upload file";
+//     },
+//   },
+// };

@@ -12,6 +12,8 @@ import { FileService } from "../services/file-system";
 import { WorkspaceService } from "../services/workspace-service";
 import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
+import { ChatHistoryManager } from "../services/chat-history-manager";
+import { LogLevel } from "../services/telemetry";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -26,6 +28,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly fileService: FileService;
   private readonly fileManager: FileManager;
   private readonly agentService: AgentService;
+  protected readonly chatHistoryManager: ChatHistoryManager;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -37,9 +40,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.fileService = FileService.getInstance();
     this._context = context;
     this.orchestrator = Orchestrator.getInstance();
-    this.logger = new Logger("BaseWebViewProvider");
+    this.logger = Logger.initialize("BaseWebViewProvider", {
+      minLevel: LogLevel.DEBUG,
+    });
     this.workspaceService = WorkspaceService.getInstance();
     this.agentService = AgentService.getInstance();
+    this.chatHistoryManager = ChatHistoryManager.getInstance();
     this.registerDisposables();
   }
 
@@ -206,5 +212,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       console.log(error);
       throw new Error(error.message);
     }
+  }
+
+  async modelChatHistory(
+    role: string,
+    message: string,
+    model: string,
+    key: string,
+  ): Promise<any[]> {
+    return this.chatHistoryManager.formatChatHistory(role, message, model, key);
   }
 }

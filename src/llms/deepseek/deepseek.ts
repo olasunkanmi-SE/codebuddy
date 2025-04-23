@@ -7,7 +7,7 @@ import { createPrompt } from "../../utils/prompt";
 import { BaseLLM } from "../base";
 import { ILlmConfig } from "../interface";
 import { Message } from "../message";
-import { Logger } from "../../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/chat";
 
@@ -41,7 +41,9 @@ export class DeepseekLLM
     });
     this.response = undefined;
     this.orchestrator = Orchestrator.getInstance();
-    this.logger = new Logger("DeepseekLLM");
+    this.logger = Logger.initialize("DeepseekLLM", {
+      minLevel: LogLevel.DEBUG,
+    });
     CodeBuddyToolProvider.initialize();
     this.initializeDisposable();
   }

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { Logger } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../agents/orchestrator";
+import { LogLevel } from "../services/telemetry";
 
 export class VSCodeSecretStorage {
   private readonly context: vscode.ExtensionContext;
@@ -10,7 +11,9 @@ export class VSCodeSecretStorage {
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
-    this.logger = new Logger("VSCodeSecretStorage");
+    this.logger = Logger.initialize("VSCodeSecretStorage", {
+      minLevel: LogLevel.DEBUG,
+    });
     this.orchestrator = Orchestrator.getInstance();
   }
 
