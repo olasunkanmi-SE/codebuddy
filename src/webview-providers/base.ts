@@ -65,6 +65,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onStrategizing(
         this.handleModelResponseEvent.bind(this),
       ),
+      this.orchestrator.onConfigurationChange(
+        this.handleGenericEvents.bind(this),
+      ),
     );
   }
 

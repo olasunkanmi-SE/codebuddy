@@ -47,7 +47,11 @@ export const APP_CONFIG = {
   grokModel: "grok.model",
   deepseekApiKey: "deepseek.apiKey",
   deepseekModel: "deepseek.model",
+  font: "font.family",
+  chatview: "chatview.theme",
+  chatviewFont: "chatview.font.size",
 };
+
 export enum generativeAiModels {
   GEMINI = "Gemini",
   GROQ = "Groq",
