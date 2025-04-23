@@ -22,16 +22,15 @@ import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { dbManager } from "./infrastructure/repository/database-manager";
 import { Memory } from "./memory/base";
+import { FileManager } from "./services/file-manager";
+import { FileUploadService } from "./services/file-upload";
+import { Credentials } from "./services/github-authentication";
+import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
 import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
-import { FileManager } from "./services/file-manager";
-import { FileUploadService } from "./services/file-upload";
-import { initializeGenerativeAiEnvironment } from "./services/generative-ai-model-manager";
-import { Credentials } from "./services/github-authentication";
-import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { WebViewProviderManager } from "./webview-providers/manager";
 
 const {

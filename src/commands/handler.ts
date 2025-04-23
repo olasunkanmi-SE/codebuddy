@@ -19,7 +19,7 @@ import {
   vscodeErrorMessage,
 } from "../utils/utils";
 import { Memory } from "../memory/base";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 interface ICodeCommandHandler {
   getApplicationConfig(configKey: string): string | undefined;
@@ -66,7 +66,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     this.anthropicApiKey = getConfigValue(anthropicApiKey);
     this.xGrokApiKey = getConfigValue(grokApiKey);
     this.xGrokModel = getConfigValue(grokModel);
-    this.logger = new Logger("CodeCommandHandler");
+    this.logger = Logger.initialize("CodeCommandHandler", {
+      minLevel: LogLevel.DEBUG,
+    });
   }
 
   getApplicationConfig(configKey: string): string | undefined {

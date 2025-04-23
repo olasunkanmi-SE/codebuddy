@@ -1,6 +1,6 @@
 import { Client, ResultSet, Row } from "@libsql/client";
 import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
-import { Logger } from "../logger/logger";
+import { Logger, LogLevel } from "../logger/logger";
 import { dbManager } from "./database-manager";
 import {
   createIndex,
@@ -14,7 +14,9 @@ export class CodeRepository implements ICodeRepository {
   private static instance: CodeRepository;
   private readonly logger: Logger;
   private constructor() {
-    this.logger = new Logger("CodeRepository");
+    this.logger = Logger.initialize("CodeRepository", {
+      minLevel: LogLevel.DEBUG,
+    });
     this.client = dbManager.getClient();
   }
 

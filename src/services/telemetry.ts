@@ -83,9 +83,7 @@ export class Logger {
         Logger.config.filePath = path.join(logDir, `codebuddy-${date}.log`);
       }
     }
-    if (!Logger.outputChannel) {
-      Logger.outputChannel = vscode.window.createOutputChannel("CodeBuddy");
-    }
+    Logger.outputChannel ??= vscode.window.createOutputChannel("CodeBuddy");
     Logger.telemetry = telemetry;
     Logger.sessionId = Logger.generateId();
     Logger.setTraceId(Logger.generateId());
@@ -127,7 +125,7 @@ export class Logger {
         Logger.outputChannel.appendLine(JSON.stringify(event.data, null, 2));
       }
     } else {
-      console.log(formattedMessage, event.data || "");
+      console.log(formattedMessage, event.data ?? "");
     }
   }
 

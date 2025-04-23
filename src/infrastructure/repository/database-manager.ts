@@ -1,13 +1,15 @@
 import { Client, createClient } from "@libsql/client";
 import * as vscode from "vscode";
-import { Logger } from "../logger/logger";
+import { Logger, LogLevel } from "../logger/logger";
 
 class DatabaseManager {
   private client: Client | undefined;
   private static instance: DatabaseManager;
   private readonly logger: Logger;
   private constructor() {
-    this.logger = new Logger("DatabaseManager");
+    this.logger = Logger.initialize("DatabaseManager", {
+      minLevel: LogLevel.DEBUG,
+    });
   }
 
   /**

@@ -45,31 +45,10 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     try {
       const type = participant === "bot" ? "bot-response" : "user-input";
       if (participant === "bot") {
-        this.chatHistory.push(
-          Message.of({
-            role: "system",
-            content: response,
-          }),
-        );
+        await this.modelChatHistory("system", response, "groq", "agentId");
       } else {
-        this.chatHistory.push(
-          Message.of({
-            role: "user",
-            content: response,
-          }),
-        );
+        await this.modelChatHistory("user", response, "groq", "agentId");
       }
-      if (this.chatHistory.length === 2) {
-        const chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
-          ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
-          : [];
-        Memory.set(COMMON.GROQ_CHAT_HISTORY, [
-          ...chatHistory,
-          ...this.chatHistory,
-        ]);
-      }
-      // Once the agent task is done, map the memory into the llm brain.
-      // Send the final answer to the webview here.
       return await this.currentWebView?.webview.postMessage({
         type,
         message: response,
@@ -89,17 +68,13 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         context = await this.getContext(metaData.context);
       }
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
-      const userMessage = Message.of({
-        role: "user",
-        content: `${message} \n context: ${context}`,
-      });
-      let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
-        ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
-        : [userMessage];
 
-      chatHistory = [...chatHistory, userMessage];
-
-      Memory.removeItems(COMMON.GROQ_CHAT_HISTORY);
+      let chatHistory = await this.modelChatHistory(
+        "user",
+        `${message} \n context: ${context}`,
+        "groq",
+        "agentId",
+      );
 
       const chatCompletion = this.model.chat.completions.create({
         messages: [...chatHistory],
@@ -108,6 +83,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         top_p,
         stream: false,
         stop,
+        max_tokens: GROQ_CONFIG.max_tokens,
       });
       const response = (await chatCompletion).choices[0]?.message?.content;
       return response ?? undefined;

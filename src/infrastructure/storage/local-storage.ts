@@ -1,12 +1,14 @@
 import * as vscode from "vscode";
-import { Logger } from "../logger/logger";
+import { Logger, LogLevel } from "../logger/logger";
 
 export class LocalStorageManager {
   private readonly localStorage: vscode.SecretStorage;
   private readonly logger: Logger;
   constructor(context: vscode.ExtensionContext) {
     this.localStorage = context.secrets;
-    this.logger = new Logger("localStorageManager");
+    this.logger = Logger.initialize("LocalStorageManager", {
+      minLevel: LogLevel.DEBUG,
+    });
     this.localStorage.onDidChange(this.handleOnChange.bind(this));
   }
 

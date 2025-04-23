@@ -5,7 +5,7 @@ import {
   RequestHeader,
 } from "../../application/constant";
 import { HttpRequestOptions } from "../../application/interfaces";
-import { Logger } from "../logger/logger";
+import { Logger, LogLevel } from "../logger/logger";
 import { IHttpClient } from "./http-service.interface";
 
 export class HttpClient implements IHttpClient {
@@ -13,7 +13,7 @@ export class HttpClient implements IHttpClient {
 
   private static instance: HttpClient;
   constructor() {
-    this.logger = new Logger("HttpClient");
+    this.logger = Logger.initialize("HttpClient", { minLevel: LogLevel.DEBUG });
   }
 
   static getInstance() {
