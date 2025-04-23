@@ -37,7 +37,7 @@ export class UrlReranker {
     this.query = _query;
     this.groqLLM = GroqLLM.getInstance({
       apiKey: getAPIKeyAndModel("groq").apiKey,
-      model: "llama-3.2-1b-preview",
+      model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",
     });
   }
 

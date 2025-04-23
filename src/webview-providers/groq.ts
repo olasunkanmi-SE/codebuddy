@@ -79,10 +79,20 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(message: string): Promise<string | undefined> {
+  async generateResponse(
+    message: string,
+    metaData?: any,
+  ): Promise<string | undefined> {
     try {
+      let context: string | undefined;
+      if (metaData?.context.length > 0) {
+        context = await this.getContext(metaData.context);
+      }
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
-      const userMessage = Message.of({ role: "user", content: message });
+      const userMessage = Message.of({
+        role: "user",
+        content: `${message} \n context: ${context}`,
+      });
       let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
         ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
         : [userMessage];

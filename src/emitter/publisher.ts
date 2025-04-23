@@ -28,6 +28,8 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onModelChangeSuccess: vscode.Event<IEventPayload> = this.createEvent(
     "onModelChangeSuccess",
   );
+  onHistoryUpdated: vscode.Event<IEventPayload> =
+    this.createEvent("onHistoryUpdated");
 
   /**
    * Emits a generic event with specified status, message, and optional data.

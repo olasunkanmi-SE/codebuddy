@@ -39,7 +39,6 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   private readonly xGrokApiKey: string;
   private readonly xGrokModel: string;
   private readonly logger: Logger;
-  // Todo Need to refactor. Only one instance of a model can be created at a time. Therefore no need to retrieve all model information, only retrieve the required model within the application
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,

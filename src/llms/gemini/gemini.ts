@@ -41,6 +41,7 @@ export class GeminiLLM
   private planSteps: string[] = [];
   private currentStepIndex = 0;
   private initialThought = "";
+  private userQuery = "";
 
   constructor(config: ILlmConfig) {
     super(config);
@@ -71,9 +72,7 @@ export class GeminiLLM
   }
 
   static getInstance(config: ILlmConfig) {
-    if (!GeminiLLM.instance) {
-      GeminiLLM.instance = new GeminiLLM(config);
-    }
+    GeminiLLM.instance ??= new GeminiLLM(config);
     return GeminiLLM.instance;
   }
 
@@ -242,7 +241,9 @@ export class GeminiLLM
           );
 
           if (retry === "Retry") {
-            continue; // Retry the current function call
+            finalResult = await this.fallBackToGroq(
+              `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`,
+            );
           } else {
             finalResult = `Function call error: ${error.message}. Falling back to last response.`;
             break; // Exit the loop and return the error result
@@ -253,7 +254,7 @@ export class GeminiLLM
     } catch (error) {
       console.error("Error processing tool calls", error);
       finalResult = await this.fallBackToGroq(
-        `User Input: ${userInput} \n Plans: ${this.initialThought ?? "Write production ready code to demonstrate your solution"}`,
+        `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`,
       );
     }
   }
@@ -317,7 +318,9 @@ export class GeminiLLM
           if (this.lastFunctionCalls.has(currentCallSignatures)) {
             finalResult = await this.groqLLM.generateText(userInput);
             if (finalResult) {
-              finalResult = await this.fallBackToGroq(userInput);
+              finalResult = await this.fallBackToGroq(
+                `User Input: ${this.userQuery} \n Plans: ${userInput} Write production ready code to demonstrate your solution`,
+              );
               return finalResult;
             }
           }
@@ -373,7 +376,7 @@ export class GeminiLLM
       // );
       console.log("Error processing user query", error);
       finalResult = await this.fallBackToGroq(
-        `${userInput} \n ${this.initialThought ?? "Write production ready code to demonstrate your solution"}`,
+        `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`,
       );
       console.log("Model not responding at this time, please try again", error);
     }
@@ -412,6 +415,7 @@ export class GeminiLLM
 
   async run(userQuery: string) {
     try {
+      this.userQuery = userQuery;
       const result = await this.processUserQuery(userQuery);
       return result;
     } catch (error) {
@@ -508,22 +512,28 @@ export class GeminiLLM
     Memory.delete(COMMON.GEMINI_SNAPSHOT);
   }
 
+  // Note: Call Groq provider directly. Remove from Gemini
   private async fallBackToGroq(userInput: string): Promise<string | undefined> {
-    let finalResult = await this.groqLLM.generateText(userInput);
-    if (finalResult) {
-      const systemMessage = Message.of({
-        role: "system",
-        content: finalResult,
-      });
+    try {
+      let finalResult = await this.groqLLM.generateText(userInput);
+      if (finalResult) {
+        const systemMessage = Message.of({
+          role: "system",
+          content: finalResult,
+        });
 
-      let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
-        ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
-        : [systemMessage];
+        let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
+          ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
+          : [systemMessage];
 
-      chatHistory = [...chatHistory, systemMessage];
-      this.orchestrator.publish("onQuery", String(finalResult));
+        chatHistory = [...chatHistory, systemMessage];
+        this.orchestrator.publish("onQuery", String(finalResult));
+      }
+      return finalResult;
+    } catch (error: any) {
+      this.logger.info(error.message);
+      throw new Error(error);
     }
-    return finalResult;
   }
 }
 

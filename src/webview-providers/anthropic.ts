@@ -68,13 +68,23 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(message: string): Promise<string | undefined> {
+  async generateResponse(
+    message: string,
+    metaData?: any,
+  ): Promise<string | undefined> {
     try {
+      let context: string | undefined;
+      if (metaData?.context.length > 0) {
+        context = await this.getContext(metaData.context);
+      }
       const { max_tokens } = GROQ_CONFIG;
       if (getGenerativeAiModel() === generativeAiModels.GROK) {
         this.baseUrl = getXGroKBaseURL();
       }
-      const userMessage = Message.of({ role: "user", content: message });
+      const userMessage = Message.of({
+        role: "user",
+        content: `${message} \n context: ${context}`,
+      });
       let chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY)
         ? Memory.get(COMMON.ANTHROPIC_CHAT_HISTORY)
         : [userMessage];

@@ -84,9 +84,7 @@ export class Logger {
         Logger.config.filePath = path.join(logDir, `codebuddy-${date}.log`);
       }
     }
-    if (!Logger.outputChannel) {
-      Logger.outputChannel = vscode.window.createOutputChannel("CodeBuddy");
-    }
+    Logger.outputChannel ??= vscode.window.createOutputChannel("CodeBuddy");
     Logger.telemetry = telemetry;
     Logger.sessionId = Logger.generateId();
     Logger.setTraceId(Logger.generateId());

@@ -239,7 +239,7 @@ vscode-button>.codicon {
   display: flex;
   gap: 16px;
   padding: 20px;
-  background-color: var(--vscode-editor-background);
+  /* background-color: var(--vscode-editor-background); */
   border-radius: 8px;
   max-width: 800px;
   margin-bottom: 15px;
@@ -555,9 +555,7 @@ hr {
 }
 
 .url-grid-container {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  /* Exactly 3 cards per row */
+  display: inline;
   gap: 20px;
   padding: 16px;
   width: 100%;
@@ -756,4 +754,3 @@ hr {
 .vscodePanels {
   height: 700px;
 }
-
