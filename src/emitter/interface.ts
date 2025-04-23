@@ -14,7 +14,8 @@ type AgentEventKeys =
   | "onStrategizing"
   | "onModelChange"
   | "onModelChangeSuccess"
-  | "onHistoryUpdated";
+  | "onHistoryUpdated"
+  | "onConfigurationChange";
 
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
