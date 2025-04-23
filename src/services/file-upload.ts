@@ -8,7 +8,7 @@ import {
 import * as path from "path";
 import * as vscode from "vscode";
 import { IEventPayload } from "../emitter/interface";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../agents/orchestrator";
 
 export class FileUploadService implements vscode.Disposable {
@@ -19,13 +19,16 @@ export class FileUploadService implements vscode.Disposable {
   private static readonly CACHE_MODEL = "gemini-1.5-flash-002";
   private readonly disposables: vscode.Disposable[] = [];
   private static instance: FileUploadService;
-  private readonly logger = new Logger("FileUploadService");
+  private readonly logger: Logger;
   constructor(private readonly apiKey: string) {
     this.ai = new GoogleGenAI({ apiKey: this.apiKey });
     this.orchestrator = Orchestrator.getInstance();
     this.disposables.push(
       this.orchestrator.onFileUpload(this.handleLocalFileUpload.bind(this)),
     );
+    this.logger = Logger.initialize("FileUploadService", {
+      minLevel: LogLevel.DEBUG,
+    });
   }
 
   static initialize(apiKey: string) {
@@ -156,6 +159,7 @@ export class FileUploadService implements vscode.Disposable {
     try {
       return await this.getDocCache(cacheName);
     } catch (error) {
+      this.logger.error("Error finding cache, creating a new one", error);
       return await this.createNewCache(fileContent);
     }
   }

@@ -6,7 +6,7 @@ import {
   IMappedCode,
   IMappedFunction,
 } from "../application/interfaces";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 /**
  * CodeMapper class responsible for transforming code structure into a simplified format
@@ -21,7 +21,9 @@ export class CodeStructureMapper {
    */
   constructor(code: ICodeMap) {
     this.code = code;
-    this.logger = new Logger("CodeRepository");
+    this.logger = Logger.initialize("CodeStructureMapper", {
+      minLevel: LogLevel.DEBUG,
+    });
   }
 
   /**

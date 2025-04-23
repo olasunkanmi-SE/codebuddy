@@ -7,7 +7,7 @@ import {
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { randomUUID } from "crypto";
 import { Orchestrator } from "../agents/orchestrator";
 
@@ -24,7 +24,9 @@ export class WorkspaceService implements IWorkspaceService {
   private readonly excludedFiles = ["package-lock.json", ".vscode", ".env"];
 
   private constructor() {
-    this.logger = new Logger(WorkspaceService.name);
+    this.logger = Logger.initialize("WorkspaceService", {
+      minLevel: LogLevel.DEBUG,
+    });
     this.orchestrator = Orchestrator.getInstance();
     this.setUpWorkspaceListeners();
   }

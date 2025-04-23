@@ -1,6 +1,6 @@
 // Create a new file: src/infrastructure/error/error-handler.ts
 
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export enum ErrorCode {
   API_ERROR = "API_ERROR",
@@ -47,7 +47,9 @@ export class RetryableOperation {
       ],
     },
   ) {
-    this.logger = new Logger("RetryableOperation");
+    this.logger = Logger.initialize("RetryableOperation", {
+      minLevel: LogLevel.DEBUG,
+    });
   }
 
   async execute<T>(

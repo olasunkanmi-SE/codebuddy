@@ -6,6 +6,7 @@ import { CodeStructureMapper } from "./code-structure.mapper";
 import { EmbeddingService } from "./embedding";
 import { TypeScriptAtsMapper } from "./typescript-ats.service";
 import { getAPIKeyAndModel } from "../utils/utils";
+import { LogLevel } from "./telemetry";
 
 /**
  * Provides a centralized service for managing code indexing, including building function structure maps,
@@ -17,7 +18,9 @@ export class CodeIndexingService {
   codeRepository: CodeRepository | undefined;
   private static instance: CodeIndexingService;
   constructor() {
-    this.logger = new Logger("CodeIndexingService");
+    this.logger = Logger.initialize("CodeIndexingService", {
+      minLevel: LogLevel.DEBUG,
+    });
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     this.embeddingService = new EmbeddingService(apiKey);
   }

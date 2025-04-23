@@ -2,19 +2,19 @@ import * as vscode from "vscode";
 import { Orchestrator } from "../agents/orchestrator";
 import { generativeAiModels } from "../application/constant";
 import { IEventPayload } from "../emitter/interface";
-import { AgentService } from "../services/agent-state";
-import { Logger } from "../services/telemetry";
+import { ChatHistoryManager } from "../services/chat-history-manager";
 import { getAPIKeyAndModel } from "../utils/utils";
 import { AnthropicWebViewProvider } from "./anthropic";
 import { BaseWebViewProvider } from "./base";
 import { DeepseekWebViewProvider } from "./deepseek";
 import { GeminiWebViewProvider } from "./gemini";
 import { GroqWebViewProvider } from "./groq";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export class WebViewProviderManager implements vscode.Disposable {
   private static instance: WebViewProviderManager;
   private currentProvider: BaseWebViewProvider | undefined;
-  private providerRegistry: Map<
+  private readonly providerRegistry: Map<
     string,
     new (
       extensionUri: vscode.Uri,
@@ -27,15 +27,16 @@ export class WebViewProviderManager implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private webviewViewProvider: vscode.WebviewViewProvider | undefined;
   protected readonly orchestrator: Orchestrator;
-  private readonly agentService: AgentService;
-  static AgentId = "agentId"; // TODO This is hardcoded for now,in upcoming versions, requests will be tagged to respective agents.
-  private readonly logger = new Logger(WebViewProviderManager.name);
+  protected readonly chatHistoryManager: ChatHistoryManager;
+
+  static readonly AgentId = "agentId"; // TODO This is hardcoded for now,in upcoming versions, requests will be tagged to respective agents.
+  private readonly logger: Logger;
 
   private constructor(
     private readonly extensionContext: vscode.ExtensionContext,
   ) {
     this.orchestrator = Orchestrator.getInstance();
-    this.agentService = AgentService.getInstance();
+    this.chatHistoryManager = ChatHistoryManager.getInstance();
     this.registerProviders();
     this.disposables.push(
       this.orchestrator.onModelChange(this.handleModelChange.bind(this)),
@@ -43,6 +44,9 @@ export class WebViewProviderManager implements vscode.Disposable {
     this.disposables.push(
       this.orchestrator.onHistoryUpdated(this.handleHistoryUpdate.bind(this)),
     );
+    this.logger = Logger.initialize("WebViewProviderManager", {
+      minLevel: LogLevel.DEBUG,
+    });
   }
 
   public static getInstance(
@@ -112,6 +116,12 @@ export class WebViewProviderManager implements vscode.Disposable {
     );
   }
 
+  private async getChatHistory() {
+    return await this.chatHistoryManager.getHistory(
+      WebViewProviderManager.AgentId,
+    );
+  }
+
   private async switchProvider(
     modelName: string,
     apiKey: string,
@@ -123,7 +133,7 @@ export class WebViewProviderManager implements vscode.Disposable {
       if (!newProvider) {
         return;
       }
-      const chatHistory = await this.getCurrentHistory();
+      const chatHistory = await this.getChatHistory();
       if (this.currentProvider) {
         this.currentProvider.dispose();
       }
@@ -131,7 +141,7 @@ export class WebViewProviderManager implements vscode.Disposable {
       if (this.webviewView) {
         await this.currentProvider.resolveWebviewView(this.webviewView);
       }
-      if (chatHistory.messages?.length > 0 && onload) {
+      if (chatHistory?.length > 0 && onload) {
         await this.restoreChatHistory();
       }
       const webviewProviderDisposable = this.registerWebViewProvider();
@@ -191,17 +201,10 @@ export class WebViewProviderManager implements vscode.Disposable {
     }
   }
 
-  private async getCurrentHistory(): Promise<any> {
-    const history = await this.agentService.getChatHistory(
-      WebViewProviderManager.AgentId,
-    );
-    return history;
-  }
-
   private async restoreChatHistory() {
-    const history = await this.getCurrentHistory();
+    const chatHistory = await this.getChatHistory();
     setTimeout(async () => {
-      const lastTenMessages = history.messages.slice(-10);
+      const lastTenMessages = chatHistory.slice(-10);
       await this.webviewView?.webview.postMessage({
         type: "chat-history",
         message: JSON.stringify(lastTenMessages),
@@ -209,16 +212,12 @@ export class WebViewProviderManager implements vscode.Disposable {
     }, 6000);
   }
 
-  async setCurrentHistory(data: any[]): Promise<void> {
-    await this.agentService.saveChatHistory(
-      WebViewProviderManager.AgentId,
-      data,
-    );
-  }
-
   async handleHistoryUpdate({ type, message }: IEventPayload) {
     if (message.command === "messages-updated" && message.messages?.length) {
-      await this.setCurrentHistory(message);
+      await this.chatHistoryManager.setHistory(
+        WebViewProviderManager.AgentId,
+        message.messages,
+      );
     }
   }
 

@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { IFileUploader } from "../application/interfaces";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../agents/orchestrator";
 
 export class FileManager implements IFileUploader {
@@ -14,7 +14,9 @@ export class FileManager implements IFileUploader {
     private readonly fileDir: string,
   ) {
     this.orchestrator = Orchestrator.getInstance();
-    this.logger = new Logger(FileManager.name);
+    this.logger = Logger.initialize("FileManager", {
+      minLevel: LogLevel.DEBUG,
+    });
     this.fileDir = path.join(this.context.extensionPath, this.fileDir);
     if (!fs.existsSync(this.fileDir)) {
       fs.mkdirSync(this.fileDir);

@@ -10,6 +10,7 @@ import { CodeRepository } from "../infrastructure/repository/code";
 import { getAPIKeyAndModel } from "./../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { WebSearchService } from "./web-search-service";
+import { LogLevel } from "./telemetry";
 
 export class ContextRetriever {
   private readonly codeRepository: CodeRepository;
@@ -23,7 +24,9 @@ export class ContextRetriever {
     this.codeRepository = CodeRepository.getInstance();
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     this.embeddingService = new EmbeddingService(apiKey);
-    this.logger = new Logger("ContextRetriever");
+    this.logger = Logger.initialize("ContextRetriever", {
+      minLevel: LogLevel.DEBUG,
+    });
     this.webSearchService = WebSearchService.getInstance();
     this.orchestrator = Orchestrator.getInstance();
   }

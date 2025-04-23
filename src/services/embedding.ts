@@ -5,7 +5,7 @@ import {
 } from "@google/generative-ai";
 import { EmbeddingsConfig } from "../application/constant";
 import { IFunctionData } from "../application/interfaces";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 interface EmbeddingServiceOptions {
   batchSize: number;
@@ -46,7 +46,9 @@ export class EmbeddingService {
     //update this to 120000
     this.requestInterval = (60 * 1000) / this.options.rateLimit;
     this.genAI = new GoogleGenerativeAI(this.apiKey);
-    this.logger = new Logger("EmbeddingService");
+    this.logger = Logger.initialize("EmbeddingService", {
+      minLevel: LogLevel.DEBUG,
+    });
     this.model = this.getModel("gemini-2.0-flash");
   }
 

@@ -35,29 +35,14 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
-        this.chatHistory.push(
-          Message.of({
-            role: "assistant",
-            content: response,
-          }),
+        await this.modelChatHistory(
+          "assistant",
+          response,
+          "anthropic",
+          "agentId",
         );
       } else {
-        this.chatHistory.push(
-          Message.of({
-            role: "user",
-            content: response,
-          }),
-        );
-      }
-
-      if (this.chatHistory.length === 2) {
-        const chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY)
-          ? Memory.get(COMMON.ANTHROPIC_CHAT_HISTORY)
-          : [];
-        Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, [
-          ...chatHistory,
-          ...this.chatHistory,
-        ]);
+        await this.modelChatHistory("user", response, "anthropic", "agentId");
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -81,17 +66,13 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       if (getGenerativeAiModel() === generativeAiModels.GROK) {
         this.baseUrl = getXGroKBaseURL();
       }
-      const userMessage = Message.of({
-        role: "user",
-        content: `${message} \n context: ${context}`,
-      });
-      let chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY)
-        ? Memory.get(COMMON.ANTHROPIC_CHAT_HISTORY)
-        : [userMessage];
 
-      chatHistory = [...chatHistory, userMessage];
-
-      Memory.removeItems(COMMON.ANTHROPIC_CHAT_HISTORY);
+      let chatHistory = await this.modelChatHistory(
+        "user",
+        `${message} \n context: ${context}`,
+        "anthropic",
+        "agentId",
+      );
 
       const chatCompletion = await this.model.messages.create({
         messages: [...chatHistory],
