@@ -231,7 +231,19 @@ export const WebviewUI = () => {
                 Active workspace:
                 {selectedContext.includes(activeEditor) ? "" : `${activeEditor}`}
               </small>
-              <small>{Array.from(new Set(selectedContext.split("@").join(", ").split(", "))).join(" ")}</small>
+              {selectedContext.length > 1 ? (
+                <small>
+                  {Array.from(new Set(selectedContext.split("@").join(", ").split(", "))).map((item) => {
+                    return item.length > 1 ? (
+                      <span className="attachment-icon" key={item}>
+                        {item}
+                      </span>
+                    ) : null;
+                  })}
+                </small>
+              ) : (
+                <></>
+              )}
             </span>
           </div>
           <WorkspaceSelector activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />

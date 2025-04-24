@@ -488,10 +488,10 @@ hr {
   cursor: pointer;
   color: #787c99;
   transition: color .3s ease;
-  border-radius: 9px;
+  border-radius: 6px;
   border: 1px solid;
-  border-color: rgb(47 47 47);
-  margin-top: 10px;
+  border-color: #363b54;
+  margin: 10px 2px 0px 2px;
 }
 
 .attachment-icon.active {
