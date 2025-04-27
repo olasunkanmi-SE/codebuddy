@@ -1,10 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
+import { Orchestrator } from "./agents/orchestrator";
 import {
   APP_CONFIG,
+  CODEBUDDY_ACTIONS,
   generativeAiModels,
-  OLA_ACTIONS,
   USER_MESSAGE,
 } from "./application/constant";
 import { Comments } from "./commands/comment";
@@ -23,7 +24,9 @@ import { dbManager } from "./infrastructure/repository/database-manager";
 import { Memory } from "./memory/base";
 import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
+import { FileWatcherService } from "./services/file-watcher";
 import { Credentials } from "./services/github-authentication";
+import { SecretStorageService } from "./services/secret-storage";
 import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
@@ -31,9 +34,6 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
-import { SecretStorageService } from "./services/secret-storage";
-import { FileWatcherService } from "./services/file-watcher";
-import { Orchestrator } from "./agents/orchestrator";
 
 const {
   geminiKey,
@@ -114,10 +114,9 @@ export async function activate(context: vscode.ExtensionContext) {
       explain,
       commitMessage,
       interviewMe,
-      generateUnitTest,
-      generateCodeChart,
+      generateDiagram,
       inlineChat,
-    } = OLA_ACTIONS;
+    } = CODEBUDDY_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
       context,
@@ -192,7 +191,7 @@ export async function activate(context: vscode.ExtensionContext) {
         orchestrator.publish("onCommitMessage");
         await generateCommitMessage.execute("commitMessage");
       },
-      [generateCodeChart]: async () => {
+      [generateDiagram]: async () => {
         orchestrator.publish("generateMermaidDiagram");
         await generateMermaidDiagram.execute();
       },
