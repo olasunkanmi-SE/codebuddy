@@ -20,6 +20,7 @@ import {
 } from "../utils/utils";
 import { Memory } from "../memory/base";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { Orchestrator } from "../agents/orchestrator";
 
 interface ICodeCommandHandler {
   getApplicationConfig(configKey: string): string | undefined;
@@ -28,6 +29,7 @@ interface ICodeCommandHandler {
 
 export abstract class CodeCommandHandler implements ICodeCommandHandler {
   context: vscode.ExtensionContext;
+  protected readonly orchestrator: Orchestrator;
   protected error?: string;
   private readonly generativeAi: string;
   private readonly geminiApiKey: string;
@@ -69,6 +71,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     this.logger = Logger.initialize("CodeCommandHandler", {
       minLevel: LogLevel.DEBUG,
     });
+    this.orchestrator = Orchestrator.getInstance();
   }
 
   getApplicationConfig(configKey: string): string | undefined {
@@ -156,6 +159,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     text: string,
   ): Promise<string | Anthropic.Messages.Message | undefined> {
     try {
+      if (text?.length > 0) {
+        this.orchestrator.publish("onUserPrompt", text);
+      }
       const activeModel = this.createModel();
       if (!activeModel) {
         throw new Error("Model not found. Check your settings.");

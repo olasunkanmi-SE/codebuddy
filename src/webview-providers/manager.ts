@@ -44,6 +44,9 @@ export class WebViewProviderManager implements vscode.Disposable {
     this.disposables.push(
       this.orchestrator.onHistoryUpdated(this.handleHistoryUpdate.bind(this)),
     );
+    this.disposables.push(
+      this.orchestrator.onClearHistory(this.handleClearHistory.bind(this)),
+    );
     this.logger = Logger.initialize("WebViewProviderManager", {
       minLevel: LogLevel.DEBUG,
     });
@@ -120,6 +123,16 @@ export class WebViewProviderManager implements vscode.Disposable {
     return await this.chatHistoryManager.getHistory(
       WebViewProviderManager.AgentId,
     );
+  }
+
+  private async clearHistory() {
+    return await this.chatHistoryManager.clearHistory(
+      WebViewProviderManager.AgentId,
+    );
+  }
+
+  private async handleClearHistory({ type, message }: IEventPayload) {
+    return this.clearHistory();
   }
 
   private async switchProvider(

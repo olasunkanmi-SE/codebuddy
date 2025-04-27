@@ -1,7 +1,7 @@
 import { ILLMConfig } from "../services/chat-history-manager";
 
 export const USER_MESSAGE = " ☕️ Hold on while CodeBuddy ";
-export enum OLA_ACTIONS {
+export enum CODEBUDDY_ACTIONS {
   comment = "CodeBuddy.commentCode",
   review = "CodeBuddy.reviewCode",
   refactor = "CodeBuddy.codeRefactor",
@@ -13,7 +13,7 @@ export enum OLA_ACTIONS {
   commitMessage = "CodeBuddy.generateCommitMessage",
   interviewMe = "CodeBuddy.interviewMe",
   generateUnitTest = "CodeBuddy.generateUnitTest",
-  generateCodeChart = "CodeBuddy.generateCodeChart",
+  generateDiagram = "CodeBuddy.generateMermaidDiagram",
   inlineChat = "CodeBuddy.inLineChat",
 }
 export enum COMMON {

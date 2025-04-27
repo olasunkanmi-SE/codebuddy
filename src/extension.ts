@@ -1,18 +1,18 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
+import { Orchestrator } from "./agents/orchestrator";
 import {
   APP_CONFIG,
+  CODEBUDDY_ACTIONS,
   generativeAiModels,
-  OLA_ACTIONS,
   USER_MESSAGE,
 } from "./application/constant";
 import { Comments } from "./commands/comment";
 import { ExplainCode } from "./commands/explain";
 import { FixError } from "./commands/fixError";
-import { CodeChartGenerator } from "./commands/generate-code-chart";
+import { GenerateMermaidDiagram } from "./commands/generate-code-chart";
 import { GenerateCommitMessage } from "./commands/generate-commit-message";
-import { GenerateUnitTest } from "./commands/generate-unit-test";
 import { InLineChat } from "./commands/inline-chat";
 import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
@@ -24,7 +24,9 @@ import { dbManager } from "./infrastructure/repository/database-manager";
 import { Memory } from "./memory/base";
 import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
+import { FileWatcherService } from "./services/file-watcher";
 import { Credentials } from "./services/github-authentication";
+import { SecretStorageService } from "./services/secret-storage";
 import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
@@ -32,8 +34,6 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
-import { SecretStorageService } from "./services/secret-storage";
-import { FileWatcherService } from "./services/file-watcher";
 
 const {
   geminiKey,
@@ -50,10 +50,11 @@ const {
 console.log(APP_CONFIG);
 
 const logger = Logger.initialize("extension", { minLevel: LogLevel.DEBUG });
-const f = new FileWatcherService();
+const fileWatcher = FileWatcherService.getInstance();
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
+let orchestrator = Orchestrator.getInstance();
 
 async function connectToDatabase(context: vscode.ExtensionContext) {
   try {
@@ -113,10 +114,9 @@ export async function activate(context: vscode.ExtensionContext) {
       explain,
       commitMessage,
       interviewMe,
-      generateUnitTest,
-      generateCodeChart,
+      generateDiagram,
       inlineChat,
-    } = OLA_ACTIONS;
+    } = CODEBUDDY_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
       context,
@@ -141,8 +141,8 @@ export async function activate(context: vscode.ExtensionContext) {
       `${USER_MESSAGE} reviews the code...`,
       context,
     );
-    const codeChartGenerator = new CodeChartGenerator(
-      `${USER_MESSAGE} creates the code chart...`,
+    const generateMermaidDiagram = new GenerateMermaidDiagram(
+      `${USER_MESSAGE} creates the mermaid diagram...`,
       context,
     );
     const generateCommitMessage = new GenerateCommitMessage(
@@ -154,29 +154,51 @@ export async function activate(context: vscode.ExtensionContext) {
       context,
     );
 
-    const generateUnitTests = new GenerateUnitTest(
-      `${USER_MESSAGE} generates unit tests...`,
-      context,
-    );
-
     const actionMap = {
-      [comment]: async () => await getComment.execute(),
-      [review]: async () => await generateReview.execute(),
-      [refactor]: async () => await generateRefactoredCode.execute(),
-      [optimize]: async () => await generateOptimizeCode.execute(),
-      [interviewMe]: async () => await generateInterviewQuestions.execute(),
-      [generateUnitTest]: async () => await generateUnitTests.execute(),
-      [fix]: (errorMessage: string) =>
+      [comment]: async () => {
+        orchestrator.publish("onCommenting");
+        await getComment.execute();
+      },
+      [review]: async () => {
+        orchestrator.publish("onReviewing");
+        await generateReview.execute();
+      },
+      [refactor]: async () => {
+        orchestrator.publish("onRefactoring");
+        await generateRefactoredCode.execute();
+      },
+      [optimize]: async () => {
+        orchestrator.publish("onOptimizing");
+        await generateOptimizeCode.execute();
+      },
+      [interviewMe]: async () => {
+        orchestrator.publish("onInterviewMe");
+        await generateInterviewQuestions.execute();
+      },
+      [fix]: (errorMessage: string) => {
+        orchestrator.publish("onFix");
         new FixError(
           `${USER_MESSAGE} finds a solution to the error...`,
           context,
           errorMessage,
-        ).execute(errorMessage),
-      [explain]: async () => await explainCode.execute(),
-      [commitMessage]: async () =>
-        await generateCommitMessage.execute("commitMessage"),
-      [generateCodeChart]: async () => await codeChartGenerator.execute(),
-      [inlineChat]: async () => await getInLineChat.execute(),
+        ).execute(errorMessage);
+      },
+      [explain]: async () => {
+        orchestrator.publish("onExplain");
+        await explainCode.execute();
+      },
+      [commitMessage]: async () => {
+        orchestrator.publish("onCommitMessage");
+        await generateCommitMessage.execute("commitMessage");
+      },
+      [generateDiagram]: async () => {
+        orchestrator.publish("generateMermaidDiagram");
+        await generateMermaidDiagram.execute();
+      },
+      [inlineChat]: async () => {
+        orchestrator.publish("onInlineChat");
+        await getInLineChat.execute();
+      },
     };
 
     let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
@@ -258,6 +280,6 @@ export async function activate(context: vscode.ExtensionContext) {
 export function deactivate(context: vscode.ExtensionContext) {
   quickFixCodeAction.dispose();
   agentEventEmmitter.dispose();
-  f.dispose();
+  fileWatcher.dispose();
   context.subscriptions.forEach((subscription) => subscription.dispose());
 }
