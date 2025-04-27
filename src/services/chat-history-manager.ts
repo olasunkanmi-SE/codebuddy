@@ -43,6 +43,10 @@ export class ChatHistoryManager {
     return history;
   }
 
+  async clearHistory(key: string): Promise<void> {
+    await this.agentService.clearAgentData(key);
+  }
+
   async setHistory(key: string, data: any[]): Promise<void> {
     await this.agentService.saveChatHistory(key, data);
   }

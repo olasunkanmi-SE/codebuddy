@@ -19,7 +19,7 @@ import {
   VSCodePanelView,
 } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { codeBuddyMode, modelOptions } from "../constants/constant";
 import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
@@ -30,6 +30,9 @@ import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
 import WorkspaceSelector from "./context";
+import TextInput from "./textInput";
+import ToggleButton from "./toggleButton";
+import Button from "./button";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -57,6 +60,9 @@ export const WebviewUI = () => {
   const [selectedContext, setSelectedContext] = useState("");
   const [folders, setFolders] = useState<any>("");
   const [activeEditor, setActiveEditor] = useState("");
+  const [username, setUsername] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const messageHandler = (event: any) => {
@@ -70,6 +76,17 @@ export const WebviewUI = () => {
               type: "bot",
               content: message.message,
               language: "Typescript",
+            },
+          ]);
+          break;
+        case "user-prompt":
+          setMessages((prevMessages) => [
+            ...(prevMessages || []),
+            {
+              type: "user",
+              // display only the user query with the highlighted code
+              content: message.message.split("\n").slice(0, 2),
+              alias: "O",
             },
           ]);
           break;
@@ -111,6 +128,13 @@ export const WebviewUI = () => {
     };
   }, [messages]);
 
+  const handleClearHistory = () => {
+    vsCode.postMessage({
+      command: "clear-history",
+      message: "",
+    });
+  };
+
   useEffect(() => {
     vsCode.postMessage({
       command: "messages-updated",
@@ -120,6 +144,16 @@ export const WebviewUI = () => {
 
   const handleContextChange = (value: string) => {
     setSelectedContext(value);
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUsername(e.target.value);
+  };
+
+  const handleToggle = (isActive: boolean) => {
+    setDarkMode(isActive);
+    // Apply theme change logic here
+    document.body.classList.toggle("dark-mode", isActive);
   };
 
   const handleModelChange = (e: any) => {
@@ -192,10 +226,10 @@ export const WebviewUI = () => {
           CHAT
         </VSCodePanelTab>
         <VSCodePanelTab id="tab-2" onClick={() => setActiveTab("tab-2")}>
-          HISTORY
+          SETTINGS
         </VSCodePanelTab>
         <VSCodePanelTab id="tab-3" onClick={() => setActiveTab("tab-3")}>
-          SETTINGS
+          FAQ
         </VSCodePanelTab>
         <VSCodePanelTab id="tab-4" onClick={() => setActiveTab("tab-4")}>
           OTHERS
@@ -225,7 +259,42 @@ export const WebviewUI = () => {
           </div>
         </VSCodePanelView>
 
-        <VSCodePanelView id="view-2">In Dev </VSCodePanelView>
+        <VSCodePanelView id="view-2">
+          <div>
+            <div className="horizontal-stack-setting">
+              <span> Nickname </span>
+              <span>
+                <TextInput
+                  ref={nameInputRef}
+                  onChange={handleNameChange}
+                  value={username}
+                  className="text-input"
+                  maxLength={10}
+                />
+              </span>
+              <span style={{ marginLeft: "5px" }}>
+                <Button
+                  onClick={handleClearHistory}
+                  initialText="save"
+                  clickedText="saving..."
+                  duration={2000}
+                ></Button>
+              </span>
+            </div>
+            <div className="horizontal-stack-setting">
+              {" "}
+              <span> Index Codebase </span>
+              <span>
+                {" "}
+                <ToggleButton
+                  label=""
+                  initialState={darkMode}
+                  onToggle={handleToggle}
+                />
+              </span>
+            </div>
+          </div>
+        </VSCodePanelView>
         <VSCodePanelView id="view-3">In Dev </VSCodePanelView>
         <VSCodePanelView id="view-4">In Dev </VSCodePanelView>
       </VSCodePanels>
@@ -244,7 +313,6 @@ export const WebviewUI = () => {
             <span>
               {selectedContext.length > 1 ? (
                 <>
-                  {" "}
                   <small>Context: </small>
                   <small>
                     {Array.from(
@@ -286,7 +354,7 @@ export const WebviewUI = () => {
           />
         </div>
         <div className="horizontal-stack">
-          <AttachmentIcon onClick={handleGetContext} />
+          <AttachmentIcon onClick={handleGetContext} disabled={true} />
           <ModelDropdown
             value={selectedModel}
             onChange={handleModelChange}
@@ -299,6 +367,12 @@ export const WebviewUI = () => {
             options={codeBuddyMode}
             id="cBuddymode"
           />
+          <Button
+            onClick={handleClearHistory}
+            initialText="Clear history"
+            clickedText="Clearing..."
+            duration={2000}
+          ></Button>
         </div>
       </div>
     </div>

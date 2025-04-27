@@ -20,8 +20,19 @@ type AgentEventKeys =
   | "onTextChange"
   | "OnSaveText"
   | "onFileRenamed"
-  | "onFileDeleted";
-
+  | "onFileDeleted"
+  | "onUserPrompt"
+  | "onClearHistory"
+  | "onOptimizing"
+  | "onInterviewMe"
+  | "onFix"
+  | "onExplain"
+  | "onCommitMessage"
+  | "generateMermaidDiagram"
+  | "onInlineChat"
+  | "onCommenting"
+  | "onReviewing"
+  | "onRefactoring";
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {

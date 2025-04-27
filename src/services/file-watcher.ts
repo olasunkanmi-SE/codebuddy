@@ -4,16 +4,24 @@ import { LogLevel } from "./telemetry";
 import { Orchestrator } from "../agents/orchestrator";
 
 export class FileWatcherService implements vscode.Disposable {
+  private static instance: FileWatcherService | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   protected logger: Logger;
   protected readonly orchestrator: Orchestrator;
 
-  constructor() {
+  private constructor() {
     this.orchestrator = Orchestrator.getInstance();
     this.logger = Logger.initialize(FileWatcherService.name, {
       minLevel: LogLevel.DEBUG,
     });
     this.registerDisposables();
+  }
+
+  public static getInstance(): FileWatcherService {
+    if (!FileWatcherService.instance) {
+      FileWatcherService.instance = new FileWatcherService();
+    }
+    return FileWatcherService.instance;
   }
 
   registerDisposables() {
@@ -75,5 +83,6 @@ export class FileWatcherService implements vscode.Disposable {
 
   dispose() {
     this.disposables.forEach((d) => d.dispose());
+    FileWatcherService.instance = undefined; // Allow re-initialization, optional
   }
 }

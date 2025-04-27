@@ -41,6 +41,24 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
     this.createEvent("onFileRenamed");
   onFileDeleted: vscode.Event<IEventPayload> =
     this.createEvent("onFileDeleted");
+  onUserPrompt: vscode.Event<IEventPayload> = this.createEvent("onUserPrompt");
+  onClearHistory: vscode.Event<IEventPayload> =
+    this.createEvent("onClearHistory");
+  onCommenting: vscode.Event<IEventPayload> = this.createEvent("onCommenting");
+  onReviewing: vscode.Event<IEventPayload> = this.createEvent("onReviewing");
+  onRefactoring: vscode.Event<IEventPayload> =
+    this.createEvent("onRefactoring");
+  onOptimizing: vscode.Event<IEventPayload> = this.createEvent("onOptimizing");
+  onInterviewMe: vscode.Event<IEventPayload> =
+    this.createEvent("onInterviewMe");
+  onFix: vscode.Event<IEventPayload> = this.createEvent("onFix");
+  onExplain: vscode.Event<IEventPayload> = this.createEvent("onExplain");
+  onCommitMessage: vscode.Event<IEventPayload> =
+    this.createEvent("onCommitMessage");
+  generateMermaidDiagram: vscode.Event<IEventPayload> = this.createEvent(
+    "generateMermaidDiagram",
+  );
+  onInlineChat: vscode.Event<IEventPayload> = this.createEvent("onInlineChat");
 
   /**
    * Emits a generic event with specified status, message, and optional data.

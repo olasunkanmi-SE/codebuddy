@@ -51,10 +51,10 @@ a:hover {
   color: #535bf2;
 }
 
-h1 {
+/* h1 {
   font-size: 3.2em;
   line-height: 1.1;
-}
+} */
 
 button {
   border-radius: 8px;
@@ -404,7 +404,7 @@ h6 {
   color: #7aa2f7;
   margin-top: 2rem;
   margin-bottom: 1rem;
-  font-weight: 600;
+  font-weight: 400;
 }
 
 /* Paragraphs and text */
@@ -480,6 +480,14 @@ hr {
   display: flex;
   justify-content: left;
   gap: 20px;
+}
+
+.horizontal-stack-setting {
+  display: flex;
+  justify-content: left;
+  gap: 20px;
+  margin-top: 20px;
+  margin-bottom: 20px;
 }
 
 /* New Attachment Icon Styles */
@@ -753,4 +761,111 @@ hr {
 
 .vscodePanels {
   height: 700px;
+}
+
+.text-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 2px solid var(--vscode-editor-background);
+  border-radius: 14px;
+  background-color: var(--vscode-input-background, #252526);
+  color: "inherit";
+}
+
+
+/* ToggleButton.css */
+.toggle-button-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle-button-label {
+  cursor: pointer;
+}
+
+.toggle-button {
+  position: relative;
+  display: inline-block;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.toggle-button.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.toggle-slider {
+  position: relative;
+  display: block;
+  height: 24px;
+  width: 48px;
+  border-radius: 12px;
+  background-color: '#424242';
+  transition: background-color 0.3s ease;
+}
+
+.toggle-button.active .toggle-slider {
+  background-color: var(--active-color, #4CAF50);
+}
+
+.toggle-slider::before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  border-radius: 50%;
+  background-color: white;
+  transition: transform 0.3s ease;
+}
+
+.toggle-button.active .toggle-slider::before {
+  transform: translateX(24px);
+}
+
+/* Size variants */
+.toggle-button-small .toggle-slider {
+  height: 16px;
+  width: 32px;
+  border-radius: 8px;
+}
+
+.toggle-button-small .toggle-slider::before {
+  height: 12px;
+  width: 12px;
+  left: 2px;
+  bottom: 2px;
+}
+
+.toggle-button-small.active .toggle-slider::before {
+  transform: translateX(16px);
+}
+
+.toggle-button-large .toggle-slider {
+  height: 32px;
+  width: 64px;
+  border-radius: 16px;
+}
+
+.toggle-button-large .toggle-slider::before {
+  height: 24px;
+  width: 24px;
+  left: 4px;
+  bottom: 4px;
+}
+
+.toggle-button-large.active .toggle-slider::before {
+  transform: translateX(32px);
+}
+
+.button {
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  color: var(--vscode-dropdown-foreground);
 }

@@ -94,12 +94,7 @@
         },
         {
           "when": "editorHasSelection",
-          "command": "CodeBuddy.generateUnitTest",
-          "group": "CodeBuddy"
-        },
-        {
-          "when": "editorHasSelection",
-          "command": "CodeBuddy.generateCodeChart",
+          "command": "CodeBuddy.generateMermaidDiagram",
           "group": "CodeBuddy"
         }
       ]
@@ -138,12 +133,8 @@
         "title": "CodeBuddy. Interview Me."
       },
       {
-        "command": "CodeBuddy.generateUnitTest",
-        "title": "CodeBuddy. Generate Unit Test."
-      },
-      {
-        "command": "CodeBuddy.generateCodeChart",
-        "title": "CodeBuddy. Generate Code Chart."
+        "command": "CodeBuddy.generateMermaidDiagram",
+        "title": "CodeBuddy. Mermaid diagram."
       }
     ],
     "viewsContainers": {

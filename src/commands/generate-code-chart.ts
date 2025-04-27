@@ -2,7 +2,7 @@ import { formatText } from "../utils/utils";
 import * as vscode from "vscode";
 import { CodeCommandHandler } from "./handler";
 
-export class CodeChartGenerator extends CodeCommandHandler {
+export class GenerateMermaidDiagram extends CodeCommandHandler {
   constructor(action: string, context: vscode.ExtensionContext) {
     super(action, context);
   }
