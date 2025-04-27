@@ -33,6 +33,14 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onConfigurationChange: vscode.Event<IEventPayload> = this.createEvent(
     "onConfigurationChange",
   );
+  onFileCreated: vscode.Event<IEventPayload> =
+    this.createEvent("onFileCreated");
+  onTextChange: vscode.Event<IEventPayload> = this.createEvent("onTextChange");
+  OnSaveText: vscode.Event<IEventPayload> = this.createEvent("OnSaveText");
+  onFileRenamed: vscode.Event<IEventPayload> =
+    this.createEvent("onFileRenamed");
+  onFileDeleted: vscode.Event<IEventPayload> =
+    this.createEvent("onFileDeleted");
 
   /**
    * Emits a generic event with specified status, message, and optional data.

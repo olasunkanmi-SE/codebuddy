@@ -176,8 +176,8 @@ export class FileService {
         } else {
           this.logger.warn(`File not found: ${fileName}`);
         }
-        return filesContent;
       }
+      return filesContent;
     } catch (error) {
       return filesContent;
     }
