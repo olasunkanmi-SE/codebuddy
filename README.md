@@ -129,21 +129,25 @@ flowchart TD
 
 ```
 .
-├── src/                         # Source code directory
-│   ├── agents/                  # AI agent implementations and orchestration
+├── src/                          # Source code directory
+│   ├── agents/                   # Agent orchestration and interfaces
 │   ├── application/             # Core application constants and interfaces
 │   ├── commands/                # Command implementations for VS Code extension
-│   ├── infrastructure/          # Core infrastructure components (HTTP, logging, storage)
-│   ├── llms/                    # Language model integrations (Anthropic, Gemini, Groq)
-│   ├── memory/                  # Memory management for AI context
-│   ├── providers/               # Provider implementations for different services
-│   ├── services/                # Business logic and core services
-│   └── webview/                 # VS Code webview implementation
-├── webviewUi/                   # React-based UI for the extension
-└── package.json                 # Project configuration and dependencies
+│   ├── infrastructure/          # Infrastructure layer (HTTP, logging, database)
+│   ├── llms/                    # Language model integrations (Anthropic, Deepseek, Gemini, Groq)
+│   ├── memory/                  # Memory management implementations
+│   ├── services/                # Core services (file management, authentication, etc.)
+│   ├── webview/                 # Webview UI components
+│   └── extension.ts             # Main extension entry point
+├── webviewUi/                   # React-based UI components
+│   ├── src/                     # UI source code
+│   └── package.json             # UI dependencies
+├── package.json                 # Main extension configuration and dependencies
+└── tsconfig.json               # TypeScript configuration
 ```
 
 ### Contribution
+
 1. Fork the repository. Make a branch from Development.
 2. npm install the packages
 3. Click Run, an option on your screen's top bar, then click Start Debugging. Run -> Start Debugging
@@ -167,7 +171,6 @@ flowchart TD
    - Select the Generative AI model (Gemini, Groq, Anthropic, or XGrok)
    - Enter the API key for your chosen model
    - Choose your preferred font family and chat view theme
-
 
 ### Troubleshooting
 
