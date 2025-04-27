@@ -73,6 +73,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.OnSaveText(this.handleWorkspaceUpdate.bind(this)),
       this.orchestrator.onFileRenamed(this.handleWorkspaceUpdate.bind(this)),
       this.orchestrator.onFileDeleted(this.handleWorkspaceUpdate.bind(this)),
+      this.orchestrator.onUserPrompt(this.handleUserPrompt.bind(this)),
     );
   }
 
@@ -127,6 +128,13 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     return this.publishWorkSpace();
   }
 
+  public async handleUserPrompt({ type, message }: IEventPayload) {
+    return await this.currentWebView?.webview.postMessage({
+      type: "user-prompt",
+      message,
+    });
+  }
+
   private async publishWorkSpace(): Promise<void> {
     try {
       const filesAndDirs: IContextInfo =
@@ -174,6 +182,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             //Publish an event instead to prevent cyclic dependendency
             case "messages-updated":
               this.orchestrator.publish("onHistoryUpdated", message);
+              break;
+            case "clear-history":
+              this.orchestrator.publish("onClearHistory", message);
               break;
             default:
               throw new Error("Unknown command");
