@@ -12,10 +12,16 @@ export interface ILLMConfig {
   formatMessage: (role: string, content: string) => any;
 }
 
+interface IChatHistory {
+  type: string;
+  content: string;
+  alias: string;
+}
+
 export class ChatHistoryManager {
   private readonly agentService: AgentService;
   private static instance: ChatHistoryManager;
-  chatHistory: any[] = [];
+  chatHistory: IChatHistory[] = [];
   constructor() {
     this.agentService = AgentService.getInstance();
   }
@@ -58,6 +64,12 @@ export class ChatHistoryManager {
     if (!chatHistory || chatHistory.length === 0) {
       this.chatHistory.push(config.formatMessage(role, message));
       return this.chatHistory;
+    }
+    if (chatHistory?.length) {
+      const recentHistory = chatHistory[chatHistory.length - 1];
+      if (recentHistory?.content) {
+        recentHistory.content = message;
+      }
     }
 
     for (const historyItem of chatHistory) {

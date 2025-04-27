@@ -33,6 +33,7 @@ import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
 import { SecretStorageService } from "./services/secret-storage";
+import { FileWatcherService } from "./services/file-watcher";
 
 const {
   geminiKey,
@@ -49,6 +50,7 @@ const {
 console.log(APP_CONFIG);
 
 const logger = Logger.initialize("extension", { minLevel: LogLevel.DEBUG });
+const f = new FileWatcherService();
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
@@ -256,5 +258,6 @@ export async function activate(context: vscode.ExtensionContext) {
 export function deactivate(context: vscode.ExtensionContext) {
   quickFixCodeAction.dispose();
   agentEventEmmitter.dispose();
+  f.dispose();
   context.subscriptions.forEach((subscription) => subscription.dispose());
 }

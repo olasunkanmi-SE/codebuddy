@@ -15,7 +15,12 @@ type AgentEventKeys =
   | "onModelChange"
   | "onModelChangeSuccess"
   | "onHistoryUpdated"
-  | "onConfigurationChange";
+  | "onConfigurationChange"
+  | "onFileCreated"
+  | "onTextChange"
+  | "OnSaveText"
+  | "onFileRenamed"
+  | "onFileDeleted";
 
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 

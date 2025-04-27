@@ -88,9 +88,9 @@ const WorkspaceSelector: React.FC<WorkspceSelectorProps> = ({
     }
   }
   const [isOpen, setIsOpen] = useState(false);
-  const [currentCategories, setCurrentCategories] = useState<WorkspceCategory[]>([
-    { id: "activeEditor", name: activeEditor },
-  ]);
+  const [currentCategories, setCurrentCategories] = useState<
+    WorkspceCategory[]
+  >([{ id: "activeEditor", name: activeEditor }]);
   const [breadcrumbs, setBreadcrumbs] = useState<WorkspceCategory[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState(initialValue);
@@ -107,16 +107,23 @@ const WorkspaceSelector: React.FC<WorkspceSelectorProps> = ({
 
     if (newValue.length > 0 && newValue.startsWith("@")) {
       const lastAtIndex = newValue.lastIndexOf("@");
-      const lastAtIsValidStart = lastAtIndex === 0 || newValue[lastAtIndex - 1] === " ";
+      const lastAtIsValidStart =
+        lastAtIndex === 0 || newValue[lastAtIndex - 1] === " ";
       setIsOpen(lastAtIsValidStart);
       if (!lastAtIsValidStart) {
         setIsOpen(false);
-        setCurrentCategories([{ id: "activeEditor", name: activeEditor }, ...workspaceFolders]);
+        setCurrentCategories([
+          { id: "activeEditor", name: activeEditor },
+          ...workspaceFolders,
+        ]);
         setBreadcrumbs([]);
       }
     } else {
       setIsOpen(false);
-      setCurrentCategories([{ id: "activeEditor", name: activeEditor }, ...workspaceFolders]);
+      setCurrentCategories([
+        { id: "activeEditor", name: activeEditor },
+        ...workspaceFolders,
+      ]);
       setBreadcrumbs([]);
     }
   };
@@ -138,7 +145,8 @@ const WorkspaceSelector: React.FC<WorkspceSelectorProps> = ({
       const parentCategories =
         newBreadcrumbs.length === 0
           ? workspaceFolders
-          : newBreadcrumbs[newBreadcrumbs.length - 1].children || workspaceFolders;
+          : newBreadcrumbs[newBreadcrumbs.length - 1].children ||
+            workspaceFolders;
 
       setCurrentCategories(parentCategories);
       setBreadcrumbs(newBreadcrumbs);
@@ -153,16 +161,24 @@ const WorkspaceSelector: React.FC<WorkspceSelectorProps> = ({
       const textBeforeCursor = inputValue.substring(0, cursorPosition);
       const lastAtIndex = textBeforeCursor.lastIndexOf("@");
 
-      if (lastAtIndex !== -1 && (lastAtIndex === 0 || textBeforeCursor[lastAtIndex - 1] === " ")) {
+      if (
+        lastAtIndex !== -1 &&
+        (lastAtIndex === 0 || textBeforeCursor[lastAtIndex - 1] === " ")
+      ) {
         const newInputValue =
-          textBeforeCursor.substring(0, lastAtIndex) + `@${item.name} ` + inputValue.substring(cursorPosition);
+          textBeforeCursor.substring(0, lastAtIndex) +
+          `@${item.name} ` +
+          inputValue.substring(cursorPosition);
         inputRef.current.value = newInputValue;
         setInputValue(newInputValue);
         onInputChange(newInputValue);
         inputRef.current.focus();
 
         const newCursorPosition = lastAtIndex + item.name.length + 2;
-        inputRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
+        inputRef.current.setSelectionRange(
+          newCursorPosition,
+          newCursorPosition
+        );
       } else {
         inputRef.current.value = `@${item.name}`;
         setInputValue(`@${item.name}`);
@@ -226,7 +242,11 @@ const WorkspaceSelector: React.FC<WorkspceSelectorProps> = ({
 
           <ul style={styles.list}>
             {currentCategories.map((category) => (
-              <li key={category.id} className="list-item" style={styles.listItem}>
+              <li
+                key={category.id}
+                className="list-item"
+                style={styles.listItem}
+              >
                 <button
                   onClick={() => navigateToCategory(category)}
                   style={{

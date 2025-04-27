@@ -68,6 +68,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onConfigurationChange(
         this.handleGenericEvents.bind(this),
       ),
+      this.orchestrator.onFileCreated(this.handleWorkspaceUpdate.bind(this)),
+      // this.orchestrator.onTextChange(this.handleWorkspaceUpdate.bind(this)),
+      this.orchestrator.OnSaveText(this.handleWorkspaceUpdate.bind(this)),
+      this.orchestrator.onFileRenamed(this.handleWorkspaceUpdate.bind(this)),
+      this.orchestrator.onFileDeleted(this.handleWorkspaceUpdate.bind(this)),
     );
   }
 
@@ -116,6 +121,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         message: JSON.stringify(files),
       });
     }
+  }
+
+  public async handleWorkspaceUpdate({ type, message }: IEventPayload) {
+    return this.publishWorkSpace();
   }
 
   private async publishWorkSpace(): Promise<void> {
