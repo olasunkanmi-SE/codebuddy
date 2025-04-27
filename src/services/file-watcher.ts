@@ -23,13 +23,13 @@ export class FileWatcherService implements vscode.Disposable {
       // ),
       vscode.workspace.onDidCreateFiles(this.handleFileCreatedEvent.bind(this)),
       vscode.workspace.onDidSaveTextDocument(
-        this.handleSaveTextEvent.bind(this)
+        this.handleSaveTextEvent.bind(this),
       ),
       vscode.workspace.onDidSaveTextDocument((e: vscode.TextDocument) => {
         this.handleSaveTextEvent.bind(this);
       }),
       vscode.workspace.onDidRenameFiles(this.handleFileRenamedEvent.bind(this)),
-      vscode.workspace.onDidDeleteFiles(this.handleFileDeletedEvent.bind(this)) // Add this line
+      vscode.workspace.onDidDeleteFiles(this.handleFileDeletedEvent.bind(this)), // Add this line
     );
   }
 
@@ -43,14 +43,14 @@ export class FileWatcherService implements vscode.Disposable {
   handleFileRenamedEvent(e: vscode.FileRenameEvent) {
     e.files.forEach((file) => {
       this.logger.debug(
-        `File renamed from ${file.oldUri.fsPath} to ${file.newUri.fsPath}`
+        `File renamed from ${file.oldUri.fsPath} to ${file.newUri.fsPath}`,
       );
       this.orchestrator.publish(
         "onFileRenamed",
         JSON.stringify({
           oldUri: file.oldUri.fsPath,
           newUri: file.newUri.fsPath,
-        })
+        }),
       );
     });
   }
