@@ -387,7 +387,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     }
   }
 
-  async execute(message?: string): Promise<void> {
+  async execute(message?: string, action?: string): Promise<void> {
     try {
       let prompt: string | undefined;
       const response = (await this.generateResponse(
@@ -405,17 +405,29 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       switch (this.generativeAi) {
         case generativeAiModels.GROQ:
           await GroqWebViewProvider.webView?.webview.postMessage({
+            type: "codebuddy-commands",
+            message: action,
+          });
+          await GroqWebViewProvider.webView?.webview.postMessage({
             type: "bot-response",
             message: formattedResponse,
           });
           break;
         case generativeAiModels.GEMINI:
           await GeminiWebViewProvider.webView?.webview.postMessage({
+            type: "codebuddy-commands",
+            message: action,
+          });
+          await GeminiWebViewProvider.webView?.webview.postMessage({
             type: "bot-response",
             message: formattedResponse,
           });
           break;
         case generativeAiModels.ANTHROPIC || generativeAiModels.GROK:
+          await AnthropicWebViewProvider.webView?.webview.postMessage({
+            type: "codebuddy-commands",
+            message: action,
+          });
           await AnthropicWebViewProvider.webView?.webview.postMessage({
             type: "bot-response",
             message: formattedResponse,

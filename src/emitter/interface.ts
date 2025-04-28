@@ -28,7 +28,7 @@ type AgentEventKeys =
   | "onFix"
   | "onExplain"
   | "onCommitMessage"
-  | "generateMermaidDiagram"
+  | "onGenerateMermaidDiagram"
   | "onInlineChat"
   | "onCommenting"
   | "onReviewing"

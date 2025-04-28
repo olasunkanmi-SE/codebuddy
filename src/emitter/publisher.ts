@@ -55,7 +55,7 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onExplain: vscode.Event<IEventPayload> = this.createEvent("onExplain");
   onCommitMessage: vscode.Event<IEventPayload> =
     this.createEvent("onCommitMessage");
-  generateMermaidDiagram: vscode.Event<IEventPayload> = this.createEvent(
+  onGenerateMermaidDiagram: vscode.Event<IEventPayload> = this.createEvent(
     "generateMermaidDiagram",
   );
   onInlineChat: vscode.Event<IEventPayload> = this.createEvent("onInlineChat");
