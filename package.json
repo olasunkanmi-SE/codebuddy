@@ -134,7 +134,7 @@
       },
       {
         "command": "CodeBuddy.generateMermaidDiagram",
-        "title": "CodeBuddy. Mermaid diagram."
+        "title": "CodeBuddy. Generate Mermaid diagram."
       }
     ],
     "viewsContainers": {
