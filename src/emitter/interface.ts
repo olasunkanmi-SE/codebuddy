@@ -32,7 +32,9 @@ type AgentEventKeys =
   | "onInlineChat"
   | "onCommenting"
   | "onReviewing"
-  | "onRefactoring";
+  | "onRefactoring"
+  | "onUpdateUserPreferences"
+  | "onGetUserPreferences";
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {
