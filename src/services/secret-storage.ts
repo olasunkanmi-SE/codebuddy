@@ -24,11 +24,11 @@ export class SecretStorageService implements vscode.Disposable {
     this.disposables.push(
       this.localStorage.onDidChange(this.handleSecretStorageChange.bind(this)),
       vscode.workspace.onDidChangeConfiguration(
-        this.handleConfigurationChange.bind(this)
+        this.handleConfigurationChange.bind(this),
       ),
       this.orchestrator.onUpdateUserPreferences(
-        this.handleUpdateSecrets.bind(this)
-      )
+        this.handleUpdateSecrets.bind(this),
+      ),
     );
   }
   /**
@@ -136,10 +136,10 @@ export class SecretStorageService implements vscode.Disposable {
     option: string,
     value: any,
     configurationTarget: vscode.ConfigurationTarget = vscode.ConfigurationTarget
-      .Global
+      .Global,
   ): Thenable<void> {
     this.logger.info(
-      `Updating configuration: ${option} to ${typeof value === "object" ? JSON.stringify(value) : value}`
+      `Updating configuration: ${option} to ${typeof value === "object" ? JSON.stringify(value) : value}`,
     );
     return vscode.workspace.getConfiguration().update(option, value);
   }
