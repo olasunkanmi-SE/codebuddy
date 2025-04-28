@@ -116,6 +116,13 @@ export const WebviewUI = () => {
           const data = JSON.parse(message.message);
           return data;
         }
+        case "onGetUserPreferences": {
+          const data = JSON.parse(message.message);
+          if (data.username) {
+            setUsername(data.username);
+          }
+          return data;
+        }
         default:
           console.warn("Unknown message type", message.type);
       }
@@ -129,9 +136,15 @@ export const WebviewUI = () => {
   }, [messages]);
 
   const handleClearHistory = () => {
+    setMessages([]);
+  };
+
+  const handleUserPreferences = () => {
     vsCode.postMessage({
-      command: "clear-history",
-      message: "",
+      command: "update-user-info",
+      message: JSON.stringify({
+        username,
+      }),
     });
   };
 
@@ -274,7 +287,7 @@ export const WebviewUI = () => {
               </span>
               <span style={{ marginLeft: "5px" }}>
                 <Button
-                  onClick={handleClearHistory}
+                  onClick={handleUserPreferences}
                   initialText="save"
                   clickedText="saving..."
                   duration={2000}
@@ -290,6 +303,7 @@ export const WebviewUI = () => {
                   label=""
                   initialState={darkMode}
                   onToggle={handleToggle}
+                  disabled={true}
                 />
               </span>
             </div>
