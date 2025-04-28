@@ -20,7 +20,7 @@ import {
 } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useEffect, useRef, useState } from "react";
-import { codeBuddyMode, modelOptions } from "../constants/constant";
+import { codeBuddyMode, faqItems, modelOptions } from "../constants/constant";
 import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
@@ -33,6 +33,7 @@ import WorkspaceSelector from "./context";
 import TextInput from "./textInput";
 import ToggleButton from "./toggleButton";
 import Button from "./button";
+import { FAQAccordion } from "./accordion";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -309,7 +310,21 @@ export const WebviewUI = () => {
             </div>
           </div>
         </VSCodePanelView>
-        <VSCodePanelView id="view-3">In Dev </VSCodePanelView>
+        <VSCodePanelView id="view-3">
+          <div>
+            <FAQAccordion
+              items={faqItems.map((i) => ({
+                question: i.question,
+                answer: (
+                  <div
+                    className="doc-content"
+                    dangerouslySetInnerHTML={{ __html: i.answer }}
+                  />
+                ),
+              }))}
+            />
+          </div>
+        </VSCodePanelView>
         <VSCodePanelView id="view-4">In Dev </VSCodePanelView>
       </VSCodePanels>
       <div
