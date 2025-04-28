@@ -14,6 +14,7 @@ import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
 import { ChatHistoryManager } from "../services/chat-history-manager";
 import { LogLevel } from "../services/telemetry";
+import { CODEBUDDY_ACTIONS } from "../application/constant";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {

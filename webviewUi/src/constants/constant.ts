@@ -94,7 +94,33 @@ export const faqItems: FAQItem[] = [
 
   {
     question: "CAN I DOWNLOAD MY CHAT HISTORY",
-    answer: `This version of codebuddy give the data back to the user by creating a gitignored file called .codebuddy. This file can be found at the root level of your application. It houses your chatHistory and in the future, your logs.`,
+    answer: `Yes you can. This version of codebuddy give the data back to the user by creating a gitignored file called .codebuddy. This file can be found at the root level of your application. It houses your chatHistory and in the future, your logs.`,
+  },
+  {
+    question: "WHAT IS THE ACTIVE WORKSPACE",
+    answer: `<p>The active workspace displays the current working workspace of the user within VS Code, providing the following benefits:</p>
+
+<ul>
+    <li><strong>Workspace Context:</strong>Your current workspace appears at the top of the file and directory hierarchy as you navigate through your codebase, making it easier to stay oriented</li>
+    <li><strong>Workspace Management:</strong> Particularly useful when different workspace is opened, as it confirms which project CodeBuddy is analyzing</li>
+</ul>
+`,
+  },
+  {
+    question:
+      "WHAT IS THE CHAT CONTEXT AND HOW CAN IT HELP ME TO ENHANCE MY CODING EXPERIENCE ",
+    answer: `
+
+<p>Chat Context in CodeBuddy is a powerful feature that allows you to add multiple files to provide relevant background information to the AI model when you ask questions. Here's how it works and why it's beneficial:</p>
+
+<h3>How Chat Context Works:</h3> <ul> <li>When working on complex code problems, you can select specific files from your workspace to include as "context"</li> <li>These files are bundled together and sent to the LLM (Gemini, Anthropic, or Groq) along with your question</li> <li>The AI can then analyze these files to understand your codebase's structure, dependencies, and implementation details</li> <li>This gives the AI a more comprehensive understanding of your project, enabling it to provide more accurate and contextually relevant answers</li> </ul>
+
+<h3>Benefits of Using Chat Context:</h3> <ul> <li><strong>More accurate responses:</strong> The AI can provide solutions that align with your existing code patterns and architectural decisions</li> <li><strong>Reduced explanation effort:</strong> Instead of describing your code structure in detail, you can simply include relevant files</li> <li><strong>Contextual debugging:</strong> Include error logs or problematic files to help the AI pinpoint issues faster</li> <li><strong>Project-aware recommendations:</strong> Receive suggestions that take into account your specific implementation, not just generic advice</li> <li><strong>Time savings:</strong> Eliminate back-and-forth exchanges where the AI requests more information about your code</li> </ul>
+
+<h3>When to Use Chat Context:</h3> <ul> <li>When debugging complex issues that span multiple files</li> <li>When asking how to implement a feature that needs to integrate with your existing code</li> <li>When seeking code optimization advice for specific parts of your application</li> <li>When requesting explanations about code functionality across different components</li> </ul>
+
+<p>By utilizing Chat Context, you transform CodeBuddy from a general coding assistant into a specialized collaborator that truly understands your unique project environment.</p> </div>
+`,
   },
 
   {

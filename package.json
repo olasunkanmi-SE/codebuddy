@@ -159,7 +159,7 @@
               "XGrok",
               "Deepseek"
             ],
-            "default": "Groq",
+            "default": "Gemini",
             "description": "Select Model"
           },
           "google.gemini.apiKeys": {
