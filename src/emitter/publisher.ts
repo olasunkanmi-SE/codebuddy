@@ -14,10 +14,10 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onBootstrap: vscode.Event<IEventPayload> = this.createEvent("onBootstrap");
   onFileUpload: vscode.Event<IEventPayload> = this.createEvent("onFileUpload");
   onFileProcessSuccess: vscode.Event<IEventPayload> = this.createEvent(
-    "onFileProcessSuccess"
+    "onFileProcessSuccess",
   );
   onActiveworkspaceUpdate: vscode.Event<IEventPayload> = this.createEvent(
-    "onActiveworkspaceUpdate"
+    "onActiveworkspaceUpdate",
   );
   onFilesRetrieved: vscode.Event<IEventPayload> =
     this.createEvent("onFilesRetrieved");
@@ -26,12 +26,12 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onModelChange: vscode.Event<IEventPayload> =
     this.createEvent("onModelChange");
   onModelChangeSuccess: vscode.Event<IEventPayload> = this.createEvent(
-    "onModelChangeSuccess"
+    "onModelChangeSuccess",
   );
   onHistoryUpdated: vscode.Event<IEventPayload> =
     this.createEvent("onHistoryUpdated");
   onConfigurationChange: vscode.Event<IEventPayload> = this.createEvent(
-    "onConfigurationChange"
+    "onConfigurationChange",
   );
   onFileCreated: vscode.Event<IEventPayload> =
     this.createEvent("onFileCreated");
@@ -56,14 +56,14 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onCommitMessage: vscode.Event<IEventPayload> =
     this.createEvent("onCommitMessage");
   generateMermaidDiagram: vscode.Event<IEventPayload> = this.createEvent(
-    "generateMermaidDiagram"
+    "generateMermaidDiagram",
   );
   onInlineChat: vscode.Event<IEventPayload> = this.createEvent("onInlineChat");
   onUpdateUserPreferences: vscode.Event<IEventPayload> = this.createEvent(
-    "onUpdateUserPreferences"
+    "onUpdateUserPreferences",
   );
   onGetUserPreferences: vscode.Event<IEventPayload> = this.createEvent(
-    "onGetUserPreferences"
+    "onGetUserPreferences",
   );
 
   /**
