@@ -99,7 +99,7 @@ export async function activate(context: vscode.ExtensionContext) {
       await credentials.getSession();
     logger.info(`Logged into GitHub as ${session?.account.label}`);
     Memory.getInstance();
-
+    // TODO for RAG codeIndexing incase user allows
     // const index = CodeIndexingService.createInstance();
     // Get each of the folders and call the next line for each
     // const result = await index.buildFunctionStructureMap();
@@ -156,48 +156,65 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const actionMap = {
       [comment]: async () => {
-        orchestrator.publish("onCommenting");
-        await getComment.execute();
+        await getComment.execute(
+          undefined,
+          "💭 Add a helpful comment to explain the code logic",
+        );
       },
       [review]: async () => {
-        orchestrator.publish("onReviewing");
-        await generateReview.execute();
+        await generateReview.execute(
+          undefined,
+          "🔍 Perform a thorough code review to ensure best practices",
+        );
       },
       [refactor]: async () => {
-        orchestrator.publish("onRefactoring");
-        await generateRefactoredCode.execute();
+        await generateRefactoredCode.execute(
+          undefined,
+          " 🔄 Improve code readability and maintainability",
+        );
       },
       [optimize]: async () => {
-        orchestrator.publish("onOptimizing");
-        await generateOptimizeCode.execute();
+        await generateOptimizeCode.execute(
+          undefined,
+          "⚡ optimize for performance and efficiency",
+        );
       },
       [interviewMe]: async () => {
-        orchestrator.publish("onInterviewMe");
-        await generateInterviewQuestions.execute();
+        await generateInterviewQuestions.execute(
+          undefined,
+          "📚 Prepare for technical interviews with relevant questions",
+        );
       },
       [fix]: (errorMessage: string) => {
-        orchestrator.publish("onFix");
         new FixError(
           `${USER_MESSAGE} finds a solution to the error...`,
           context,
           errorMessage,
-        ).execute(errorMessage);
+        ).execute(errorMessage, "🔧 Debug and fix the issue");
       },
       [explain]: async () => {
-        orchestrator.publish("onExplain");
-        await explainCode.execute();
+        await explainCode.execute(
+          undefined,
+          "💬 Get a clear and concise explanation of the code concept",
+        );
       },
       [commitMessage]: async () => {
-        orchestrator.publish("onCommitMessage");
-        await generateCommitMessage.execute("commitMessage");
+        await generateCommitMessage.execute(
+          undefined,
+          "🧪 generating commit message",
+        );
       },
       [generateDiagram]: async () => {
-        orchestrator.publish("generateMermaidDiagram");
-        await generateMermaidDiagram.execute();
+        await generateMermaidDiagram.execute(
+          undefined,
+          "📈 Visualize the code with a Mermaid diagram",
+        );
       },
       [inlineChat]: async () => {
-        orchestrator.publish("onInlineChat");
-        await getInLineChat.execute();
+        await getInLineChat.execute(
+          undefined,
+          "💬 Discuss and reason about your code with me",
+        );
       },
     };
 

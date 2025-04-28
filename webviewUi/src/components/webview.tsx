@@ -77,22 +77,37 @@ export const WebviewUI = () => {
               type: "bot",
               content: message.message,
               language: "Typescript",
-            },
-          ]);
-          break;
-        case "user-prompt":
-          setMessages((prevMessages) => [
-            ...(prevMessages || []),
-            {
-              type: "user",
-              // display only the user query with the highlighted code
-              content: message.message.split("\n").slice(0, 2),
               alias: "O",
             },
           ]);
           break;
+        // case "user-prompt":
+        //   setMessages((prevMessages) => [
+        //     ...(prevMessages || []),
+        //     {
+        //       type: "user",
+        //       // display only the user query with the highlighted code
+        //       content: message.message.split("\n").slice(0, 2),
+        //       alias: "O",
+        //     },
+        //   ]);
+        //   break;
         case "bootstrap":
           setFolders(message);
+          break;
+        case "codebuddy-commands":
+          setMessages((prevMessages) => [
+            ...(prevMessages || []),
+            {
+              type: "user",
+              content:
+                message.message.toLowerCase() === "inline chat"
+                  ? message.message.split("\n").slice(0, 2)
+                  : message.message,
+              language: "Typescript",
+              alias: "O",
+            },
+          ]);
           break;
         case "chat-history":
           try {
@@ -284,6 +299,7 @@ export const WebviewUI = () => {
                   value={username}
                   className="text-input"
                   maxLength={10}
+                  disabled={true}
                 />
               </span>
               <span style={{ marginLeft: "5px" }}>
@@ -292,6 +308,7 @@ export const WebviewUI = () => {
                   initialText="save"
                   clickedText="saving..."
                   duration={2000}
+                  disabled={true}
                 ></Button>
               </span>
             </div>
@@ -380,6 +397,7 @@ export const WebviewUI = () => {
             onInput={handleTextChange}
             placeholder="Ask Anything"
             onKeyDown={handleKeyDown}
+            style={{ background: "#16161e" }}
           />
         </div>
         <div className="horizontal-stack">

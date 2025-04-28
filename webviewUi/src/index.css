@@ -511,7 +511,7 @@ hr {
 }
 
 .textarea-container {
-  background: var(--input-background);
+  background: #16161e;
 }
 
 .url-container {

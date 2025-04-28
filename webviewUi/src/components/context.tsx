@@ -17,7 +17,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: "0.5rem",
     border: "2px solid var(--vscode-editor-background)",
     borderRadius: "4px",
-    backgroundColor: "var(--vscode-input-background, #252526)",
+    background: "#16161e",
     color: "inherit",
   },
   dropdown: {
