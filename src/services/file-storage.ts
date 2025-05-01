@@ -21,7 +21,11 @@ export class FileStorage implements IStorage {
   async createCodeBuddyFolder() {
     const workSpaceRoot =
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+    if (!workSpaceRoot) {
+      return;
+    }
     this.storagePath = path.join(workSpaceRoot, ".codebuddy");
+
     if (!fs.existsSync(this.storagePath)) {
       fs.mkdirSync(this.storagePath, { recursive: true });
     }

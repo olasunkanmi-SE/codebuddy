@@ -91,13 +91,13 @@ export async function activate(context: vscode.ExtensionContext) {
     const secretStorageService = new SecretStorageService(context);
     await createFileDB(context);
     await connectToDatabase(context);
-    const credentials = new Credentials();
+    // const credentials = new Credentials();
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     FileUploadService.initialize(apiKey);
-    await credentials.initialize(context);
-    const session: vscode.AuthenticationSession | undefined =
-      await credentials.getSession();
-    logger.info(`Logged into GitHub as ${session?.account.label}`);
+    // await credentials.initialize(context);
+    // const session: vscode.AuthenticationSession | undefined =
+    //   await credentials.getSession();
+    // logger.info(`Logged into GitHub as ${session?.account.label}`);
     Memory.getInstance();
     // TODO for RAG codeIndexing incase user allows
     // const index = CodeIndexingService.createInstance();
