@@ -48,9 +48,7 @@ export class CodeBuddyToolProvider {
   }
 
   public static initialize() {
-    if (!CodeBuddyToolProvider.instance) {
-      CodeBuddyToolProvider.instance = new CodeBuddyToolProvider();
-    }
+    CodeBuddyToolProvider.instance ??= new CodeBuddyToolProvider();
   }
 
   public static getTools(): CodeBuddyTool[] {

@@ -1,4 +1,5 @@
-import { LLM_CONFIGS } from "./../application/constant";
+import { Memory } from "../memory/base";
+import { FormattedMessage, LLM_CONFIGS } from "./../application/constant";
 import { AgentService } from "./agent-state";
 
 interface ChatMessage {
@@ -58,31 +59,25 @@ export class ChatHistoryManager {
     key: string,
   ): Promise<any[]> {
     const config = LLM_CONFIGS[model];
-    const chatHistory =
-      (await new Promise<any[]>((resolve) =>
-        setTimeout(async () => resolve(await this.getHistory(key)), 1000),
-      )) ?? [];
+    const existingHistory = Memory.get(key) ?? [];
 
-    this.chatHistory = [];
+    const formattedHistory: Record<string, ILLMConfig>[] = existingHistory.map(
+      (historyItem: FormattedMessage) => {
+        const currentRole =
+          historyItem.role === "user" ? config.userRole : config.botRole;
+        return config.formatMessage(
+          currentRole,
+          "content" in historyItem
+            ? historyItem.content
+            : historyItem.parts[0].text,
+        );
+      },
+    );
 
-    if (!chatHistory || chatHistory.length === 0) {
-      this.chatHistory.push(config.formatMessage(role, message));
-      return this.chatHistory;
-    }
-    if (chatHistory?.length) {
-      const recentHistory = chatHistory[chatHistory.length - 1];
-      if (recentHistory?.content) {
-        recentHistory.content = message;
-      }
-    }
+    const formattedNewMessage = config.formatMessage(role, message);
+    this.chatHistory = [...formattedHistory, formattedNewMessage];
 
-    for (const historyItem of chatHistory) {
-      const currentRole =
-        historyItem.type === "bot" ? config.botRole : config.userRole;
-      this.chatHistory.push(
-        config.formatMessage(currentRole, historyItem.content),
-      );
-    }
+    Memory.set(key, this.chatHistory);
 
     return this.chatHistory;
   }

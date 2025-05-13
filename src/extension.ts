@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { Orchestrator } from "./agents/orchestrator";
 import {
   APP_CONFIG,
   CODEBUDDY_ACTIONS,
@@ -54,22 +53,52 @@ const fileWatcher = FileWatcherService.getInstance();
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
-let orchestrator = Orchestrator.getInstance();
 
 async function connectToDatabase(context: vscode.ExtensionContext) {
+  const dbDir = path.join(context.extensionPath, "database");
+  const dbPath = path.join(dbDir, "dev.db");
+  const isWindows = dbPath.includes("\\");
+  const filePath = isWindows ? `file:/${dbPath}` : `file:${dbPath}`;
+
   try {
-    const dbDir = path.join(context.extensionPath, "database");
     if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir);
+      fs.mkdirSync(dbDir, { recursive: true });
     }
-    const dbPath = path.join(__dirname, "..", "database", "aii.db");
-    const urlPath = dbPath.replace(/\\/g, "/");
-    const isWindows = dbPath.includes("\\");
-    const filePath = isWindows ? `file:/${urlPath}` : `file:${urlPath}`;
-    await dbManager.connect(filePath);
-  } catch (error: any) {
-    logger.error("Unable to connect to DB", error);
-    throw new Error(error);
+  } catch (error) {
+    logger.error("Failed to create database directory", error);
+    vscode.window.showErrorMessage(
+      "Failed to create database directory. Using in-memory database.",
+    );
+    return await setupInMemoryDatabase();
+  }
+
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await dbManager.connect(filePath);
+      return;
+    } catch (error: any) {
+      logger.error(`Attempt ${attempt} to connect to DB failed`, error);
+      if (attempt === maxRetries) {
+        vscode.window.showErrorMessage(
+          "Failed to connect to database after multiple attempts. Using in-memory database.",
+        );
+        return await setupInMemoryDatabase();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Wait 500 milliseconds before retrying
+    }
+  }
+}
+
+async function setupInMemoryDatabase() {
+  try {
+    await dbManager.connect(":memory:");
+    vscode.window.showInformationMessage(
+      "Using in-memory database due to connection issues.",
+    );
+  } catch (error) {
+    logger.error("Failed to set up in-memory database", error);
+    throw new Error("Unable to connect to any database.");
   }
 }
 
@@ -157,31 +186,26 @@ export async function activate(context: vscode.ExtensionContext) {
     const actionMap = {
       [comment]: async () => {
         await getComment.execute(
-          undefined,
           "💭 Add a helpful comment to explain the code logic",
         );
       },
       [review]: async () => {
         await generateReview.execute(
-          undefined,
           "🔍 Perform a thorough code review to ensure best practices",
         );
       },
       [refactor]: async () => {
         await generateRefactoredCode.execute(
-          undefined,
           " 🔄 Improve code readability and maintainability",
         );
       },
       [optimize]: async () => {
         await generateOptimizeCode.execute(
-          undefined,
           "⚡ optimize for performance and efficiency",
         );
       },
       [interviewMe]: async () => {
         await generateInterviewQuestions.execute(
-          undefined,
           "📚 Prepare for technical interviews with relevant questions",
         );
       },
@@ -194,25 +218,19 @@ export async function activate(context: vscode.ExtensionContext) {
       },
       [explain]: async () => {
         await explainCode.execute(
-          undefined,
           "💬 Get a clear and concise explanation of the code concept",
         );
       },
       [commitMessage]: async () => {
-        await generateCommitMessage.execute(
-          undefined,
-          "🧪 generating commit message",
-        );
+        await generateCommitMessage.execute(undefined, "commitMessage");
       },
       [generateDiagram]: async () => {
         await generateMermaidDiagram.execute(
-          undefined,
           "📈 Visualize the code with a Mermaid diagram",
         );
       },
       [inlineChat]: async () => {
         await getInLineChat.execute(
-          undefined,
           "💬 Discuss and reason about your code with me",
         );
       },

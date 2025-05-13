@@ -194,10 +194,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "update-model-event":
               await this.orchestrator.publish("onModelChange", message);
               break;
-            //Publish an event instead to prevent cyclic dependendency
-            case "messages-updated":
-              this.orchestrator.publish("onHistoryUpdated", message);
-              break;
+            // Publish an event instead to prevent cyclic dependendency
+            // case "messages-updated":
+            //   this.orchestrator.publish("onHistoryUpdated", message);
+            //   break;
             case "clear-history":
               this.orchestrator.publish("onClearHistory", message);
               break;
