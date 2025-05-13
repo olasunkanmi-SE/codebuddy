@@ -1,4 +1,4 @@
-import { ResultSet } from "@libsql/client/.";
+import { ResultSet } from "@libsql/client/";
 import { IFunctionData } from "../application/interfaces";
 import { Logger } from "../infrastructure/logger/logger";
 import { CodeRepository } from "../infrastructure/repository/code";

@@ -1,4 +1,4 @@
-import { Row } from "@libsql/client/.";
+import { Row } from "@libsql/client/";
 import * as vscode from "vscode";
 import { Orchestrator } from "../agents/orchestrator";
 import {
