@@ -104,6 +104,13 @@ class DatabaseManager {
       return false;
     }
   }
+
+  public async close(): Promise<void> {
+    if (this.client) {
+      await this.client.close();
+      this.client = undefined;
+    }
+  }
 }
 
 export const dbManager = DatabaseManager.getInstance();

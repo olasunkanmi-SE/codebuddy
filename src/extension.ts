@@ -1,5 +1,3 @@
-import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
 import {
   APP_CONFIG,
@@ -19,9 +17,7 @@ import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
-import { dbManager } from "./infrastructure/repository/database-manager";
 import { Memory } from "./memory/base";
-import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
 import { FileWatcherService } from "./services/file-watcher";
 import { Credentials } from "./services/github-authentication";
@@ -33,6 +29,7 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
+import { InitDatabaseManager } from "./infrastructure/repository/init-db-manager";
 
 const {
   geminiKey,
@@ -54,72 +51,12 @@ const fileWatcher = FileWatcherService.getInstance();
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
 
-async function connectToDatabase(context: vscode.ExtensionContext) {
-  const dbDir = path.join(context.extensionPath, "database");
-  const dbPath = path.join(dbDir, "dev.db");
-  const isWindows = dbPath.includes("\\");
-  const filePath = isWindows ? `file:/${dbPath}` : `file:${dbPath}`;
-
-  try {
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-    }
-  } catch (error) {
-    logger.error("Failed to create database directory", error);
-    vscode.window.showErrorMessage(
-      "Failed to create database directory. Using in-memory database.",
-    );
-    return await setupInMemoryDatabase();
-  }
-
-  const maxRetries = 3;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      await dbManager.connect(filePath);
-      return;
-    } catch (error: any) {
-      logger.error(`Attempt ${attempt} to connect to DB failed`, error);
-      if (attempt === maxRetries) {
-        vscode.window.showErrorMessage(
-          "Failed to connect to database after multiple attempts. Using in-memory database.",
-        );
-        return await setupInMemoryDatabase();
-      }
-      await new Promise((resolve) => setTimeout(resolve, 500)); // Wait 500 milliseconds before retrying
-    }
-  }
-}
-
-async function setupInMemoryDatabase() {
-  try {
-    await dbManager.connect(":memory:");
-    vscode.window.showInformationMessage(
-      "Using in-memory database due to connection issues.",
-    );
-  } catch (error) {
-    logger.error("Failed to set up in-memory database", error);
-    throw new Error("Unable to connect to any database.");
-  }
-}
-
-async function createFileDB(context: vscode.ExtensionContext) {
-  try {
-    const fileUploader = new FileManager(context, "database");
-    const files = await fileUploader.getFiles();
-    if (!files?.find((file) => file.includes("dev.db"))) {
-      await fileUploader.createFile("dev.db");
-    }
-  } catch (error: any) {
-    logger.error("Unable to ", error);
-    throw new Error(error);
-  }
-}
-
 export async function activate(context: vscode.ExtensionContext) {
   try {
     const secretStorageService = new SecretStorageService(context);
-    await createFileDB(context);
-    await connectToDatabase(context);
+    const dbManager = InitDatabaseManager.getInstance();
+    await dbManager.initialize(context);
+
     const credentials = new Credentials();
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     FileUploadService.initialize(apiKey);
