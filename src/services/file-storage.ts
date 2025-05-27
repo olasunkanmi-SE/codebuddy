@@ -54,8 +54,6 @@ export class FileStorage implements IStorage {
 
         fs.writeFileSync(gitIgnorePath, newContent, "utf8");
         console.log(`Added ${pattern} to .gitignore`);
-      } else {
-        console.log(`${pattern} already exists in .gitignore`);
       }
     } else {
       fs.writeFileSync(

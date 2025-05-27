@@ -1,7 +1,4 @@
-import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
-import { Orchestrator } from "./agents/orchestrator";
 import {
   APP_CONFIG,
   CODEBUDDY_ACTIONS,
@@ -20,9 +17,7 @@ import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
-import { dbManager } from "./infrastructure/repository/database-manager";
 import { Memory } from "./memory/base";
-import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
 import { FileWatcherService } from "./services/file-watcher";
 import { Credentials } from "./services/github-authentication";
@@ -34,6 +29,7 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
+import { InitDatabaseManager } from "./infrastructure/repository/init-db-manager";
 
 const {
   geminiKey,
@@ -54,43 +50,13 @@ const fileWatcher = FileWatcherService.getInstance();
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
-let orchestrator = Orchestrator.getInstance();
-
-async function connectToDatabase(context: vscode.ExtensionContext) {
-  try {
-    const dbDir = path.join(context.extensionPath, "database");
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir);
-    }
-    const dbPath = path.join(__dirname, "..", "database", "aii.db");
-    const urlPath = dbPath.replace(/\\/g, "/");
-    const isWindows = dbPath.includes("\\");
-    const filePath = isWindows ? `file:/${urlPath}` : `file:${urlPath}`;
-    await dbManager.connect(filePath);
-  } catch (error: any) {
-    logger.error("Unable to connect to DB", error);
-    throw new Error(error);
-  }
-}
-
-async function createFileDB(context: vscode.ExtensionContext) {
-  try {
-    const fileUploader = new FileManager(context, "database");
-    const files = await fileUploader.getFiles();
-    if (!files?.find((file) => file.includes("dev.db"))) {
-      await fileUploader.createFile("dev.db");
-    }
-  } catch (error: any) {
-    logger.error("Unable to ", error);
-    throw new Error(error);
-  }
-}
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
     const secretStorageService = new SecretStorageService(context);
-    await createFileDB(context);
-    await connectToDatabase(context);
+    const dbManager = InitDatabaseManager.getInstance();
+    await dbManager.initialize(context);
+
     const credentials = new Credentials();
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     FileUploadService.initialize(apiKey);
@@ -157,31 +123,26 @@ export async function activate(context: vscode.ExtensionContext) {
     const actionMap = {
       [comment]: async () => {
         await getComment.execute(
-          undefined,
           "💭 Add a helpful comment to explain the code logic",
         );
       },
       [review]: async () => {
         await generateReview.execute(
-          undefined,
           "🔍 Perform a thorough code review to ensure best practices",
         );
       },
       [refactor]: async () => {
         await generateRefactoredCode.execute(
-          undefined,
           " 🔄 Improve code readability and maintainability",
         );
       },
       [optimize]: async () => {
         await generateOptimizeCode.execute(
-          undefined,
           "⚡ optimize for performance and efficiency",
         );
       },
       [interviewMe]: async () => {
         await generateInterviewQuestions.execute(
-          undefined,
           "📚 Prepare for technical interviews with relevant questions",
         );
       },
@@ -194,25 +155,19 @@ export async function activate(context: vscode.ExtensionContext) {
       },
       [explain]: async () => {
         await explainCode.execute(
-          undefined,
           "💬 Get a clear and concise explanation of the code concept",
         );
       },
       [commitMessage]: async () => {
-        await generateCommitMessage.execute(
-          undefined,
-          "🧪 generating commit message",
-        );
+        await generateCommitMessage.execute(undefined, "commitMessage");
       },
       [generateDiagram]: async () => {
         await generateMermaidDiagram.execute(
-          undefined,
           "📈 Visualize the code with a Mermaid diagram",
         );
       },
       [inlineChat]: async () => {
         await getInLineChat.execute(
-          undefined,
           "💬 Discuss and reason about your code with me",
         );
       },

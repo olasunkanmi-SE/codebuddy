@@ -10,9 +10,7 @@ export class Memory {
   }
 
   public static getInstance(): Memory {
-    if (!Memory.instance) {
-      return (Memory.instance = new Memory());
-    }
+    Memory.instance ??= new Memory();
     return Memory.instance;
   }
 

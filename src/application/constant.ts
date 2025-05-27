@@ -386,6 +386,10 @@ export const LLM_CONFIGS: Record<string, ILLMConfig> = {
   },
 };
 
+export type FormattedMessage =
+  | { role: string; parts: [{ text: string }] }
+  | { role: string; content: string };
+
 //Note, this kind of configuration can be used by orchestrator on where to direct the requests
 // export const LLM_CONFIGS: Record<string, LLMConfig> = {
 //   gemini: {
