@@ -288,6 +288,7 @@
     ]
   },
   "scripts": {
+    "build": "npm run compile && npm run format && npm run build:webview",
     "dev:webview": "cd webviewUi && npm run dev",
     "build:webview": "cd webviewUi && npm run build",
     "vscode:prepublish": "npm run compile",

@@ -7,14 +7,13 @@ import {
 import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { AgentService } from "../services/agent-state";
+import { ChatHistoryManager } from "../services/chat-history-manager";
 import { FileManager } from "../services/file-manager";
 import { FileService } from "../services/file-system";
+import { LogLevel } from "../services/telemetry";
 import { WorkspaceService } from "../services/workspace-service";
 import { formatText } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
-import { ChatHistoryManager } from "../services/chat-history-manager";
-import { LogLevel } from "../services/telemetry";
-import { CODEBUDDY_ACTIONS } from "../application/constant";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
