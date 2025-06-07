@@ -68,12 +68,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onConfigurationChange(
         this.handleGenericEvents.bind(this),
       ),
-      this.orchestrator.onFileCreated(this.handleWorkspaceUpdate.bind(this)),
+      // this.orchestrator.onFileCreated(this.handleWorkspaceUpdate.bind(this)),
       // this.orchestrator.onTextChange(this.handleWorkspaceUpdate.bind(this)),
 
-      this.orchestrator.OnSaveText(this.handleWorkspaceUpdate.bind(this)),
-      this.orchestrator.onFileRenamed(this.handleWorkspaceUpdate.bind(this)),
-      this.orchestrator.onFileDeleted(this.handleWorkspaceUpdate.bind(this)),
+      // this.orchestrator.OnSaveText(this.handleWorkspaceUpdate.bind(this)),
+      // this.orchestrator.onFileRenamed(this.handleWorkspaceUpdate.bind(this)),
+      // this.orchestrator.onFileDeleted(this.handleWorkspaceUpdate.bind(this)),
       this.orchestrator.onUserPrompt(this.handleUserPrompt.bind(this)),
       this.orchestrator.onGetUserPreferences(
         this.handleUserPreferences.bind(this),
@@ -106,9 +106,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.setWebviewHtml(this.currentWebView);
     this.setupMessageHandler(this.currentWebView);
     // Get the current workspace files from DB.
-    setTimeout(async () => {
-      await this.publishWorkSpace();
-    }, 3000);
     await this.getFiles();
   }
 
@@ -129,9 +126,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
   }
 
-  public async handleWorkspaceUpdate({ type, message }: IEventPayload) {
-    return this.publishWorkSpace();
-  }
+  // public async handleWorkspaceUpdate({ type, message }: IEventPayload) {
+  //   return this.publishWorkSpace();
+  // }
 
   public async handleUserPreferences({ type, message }: IEventPayload) {
     try {
@@ -152,7 +149,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   private async publishWorkSpace(): Promise<void> {
-    // Note instead of retrieveing the entire workspace, we can
     try {
       const filesAndDirs: IContextInfo =
         await this.workspaceService.getContextInfo(true);
@@ -172,13 +168,23 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
   }
 
+  private UserMessageCounter = 0;
+
   private async setupMessageHandler(_view: vscode.WebviewView): Promise<void> {
     try {
       this.disposables.push(
         _view.webview.onDidReceiveMessage(async (message) => {
           let response: any;
           switch (message.command) {
-            case "user-input":
+            case "user-input": {
+              this.UserMessageCounter += 1;
+              response = await this.generateResponse(
+                message.message,
+                message.metaData,
+              );
+              if (this.UserMessageCounter === 1) {
+                await this.publishWorkSpace();
+              }
               response = await this.generateResponse(
                 message.message,
                 message.metaData,
@@ -187,9 +193,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 await this.sendResponse(formatText(response), "bot");
               }
               break;
-            case "webview-ready":
-              await this.publishWorkSpace();
-              break;
+            }
+            // case "webview-ready":
+            //   await this.publishWorkSpace();
+            //   break;
             case "upload-file":
               await this.fileManager.uploadFileHandler();
               break;
