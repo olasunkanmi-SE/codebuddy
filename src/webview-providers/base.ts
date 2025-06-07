@@ -71,6 +71,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       ),
       this.orchestrator.onFileCreated(this.handleWorkspaceUpdate.bind(this)),
       // this.orchestrator.onTextChange(this.handleWorkspaceUpdate.bind(this)),
+
       this.orchestrator.OnSaveText(this.handleWorkspaceUpdate.bind(this)),
       this.orchestrator.onFileRenamed(this.handleWorkspaceUpdate.bind(this)),
       this.orchestrator.onFileDeleted(this.handleWorkspaceUpdate.bind(this)),
@@ -105,6 +106,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     this.setWebviewHtml(this.currentWebView);
     this.setupMessageHandler(this.currentWebView);
+    // Get the current workspace files from DB.
     setTimeout(async () => {
       await this.publishWorkSpace();
     }, 2000);
@@ -151,6 +153,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   private async publishWorkSpace(): Promise<void> {
+    // Note instead of retrieveing the entire workspace, we can
     try {
       const filesAndDirs: IContextInfo =
         await this.workspaceService.getContextInfo(true);

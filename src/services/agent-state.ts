@@ -36,6 +36,7 @@ export class AgentService {
     );
   }
 
+  // Save History in DB instead of in-memory
   async saveChatHistory(agentId: string, history: any[]): Promise<void> {
     return this.storage.set(
       `${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`,

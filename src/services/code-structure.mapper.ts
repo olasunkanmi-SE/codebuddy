@@ -84,7 +84,7 @@ export class CodeStructureMapper {
     try {
       return (codeEntry.functions?.length ?? 0) > 0
         ? codeEntry.functions
-        : primaryClass?.functions ?? [];
+        : (primaryClass?.functions ?? []);
     } catch (error) {
       this.logger.error("Error getting source functions:", error);
       throw error;

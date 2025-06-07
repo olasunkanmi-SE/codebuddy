@@ -225,6 +225,7 @@ export class WebViewProviderManager implements vscode.Disposable {
     }, 6000);
   }
 
+  // This update has to happen in the DB
   async handleHistoryUpdate({ type, message }: IEventPayload) {
     if (message.command === "messages-updated" && message.messages?.length) {
       await this.chatHistoryManager.setHistory(

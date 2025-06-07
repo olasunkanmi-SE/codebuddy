@@ -1,5 +1,3 @@
-import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
 import { Orchestrator } from "./agents/orchestrator";
 import {
@@ -20,7 +18,7 @@ import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
-import { dbManager } from "./infrastructure/repository/database-manager";
+import { dbManager } from "./infrastructure/repository/db-manager";
 import { Memory } from "./memory/base";
 import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
@@ -58,15 +56,12 @@ let orchestrator = Orchestrator.getInstance();
 
 async function connectToDatabase(context: vscode.ExtensionContext) {
   try {
-    const dbDir = path.join(context.extensionPath, "database");
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir);
+    console.log(process.versions);
+    const storagePath = context.globalStorageUri.fsPath;
+    dbManager.open(storagePath);
+    if (dbManager.healthCheck()) {
+      logger.info("Database connected successfully");
     }
-    const dbPath = path.join(__dirname, "..", "database", "aii.db");
-    const urlPath = dbPath.replace(/\\/g, "/");
-    const isWindows = dbPath.includes("\\");
-    const filePath = isWindows ? `file:/${urlPath}` : `file:${urlPath}`;
-    await dbManager.connect(filePath);
   } catch (error: any) {
     logger.error("Unable to connect to DB", error);
     throw new Error(error);

@@ -201,7 +201,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         );
       }
       if (this.action.includes("chart")) {
-        response = this.cleanGraphString(response);
+        if (typeof response === "string") {
+          response = this.cleanGraphString(response);
+        }
       }
       return response;
     } catch (error) {
@@ -231,7 +233,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     model: Anthropic,
     generativeAiModel: string,
     userPrompt: string,
-  ) {
+  ): Promise<string | undefined> {
     try {
       const response = await model.messages.create({
         model: generativeAiModel,
@@ -239,7 +241,16 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         max_tokens: 3024,
         messages: [{ role: "user", content: userPrompt }],
       });
-      return response.content[0].text;
+      const firstContent = response.content[0];
+      if (
+        firstContent &&
+        typeof firstContent === "object" &&
+        "text" in firstContent &&
+        typeof firstContent.text === "string"
+      ) {
+        return firstContent.text;
+      }
+      return undefined;
     } catch (error) {
       this.logger.error("Error generating response:", error);
     }
@@ -391,7 +402,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     try {
       let prompt: string | undefined;
       const response = (await this.generateResponse(
-        prompt ? prompt : message,
+        prompt ?? message,
       )) as string;
       if (!response) {
         vscode.window.showErrorMessage("model not reponding, try again later");
@@ -423,7 +434,8 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
             message: formattedResponse,
           });
           break;
-        case generativeAiModels.ANTHROPIC || generativeAiModels.GROK:
+        case generativeAiModels.ANTHROPIC:
+        case generativeAiModels.GROK:
           await AnthropicWebViewProvider.webView?.webview.postMessage({
             type: "codebuddy-commands",
             message: action,
@@ -432,6 +444,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
             type: "bot-response",
             message: formattedResponse,
           });
+          break;
         default:
           this.logger.error("Unknown generative AI", "");
           break;

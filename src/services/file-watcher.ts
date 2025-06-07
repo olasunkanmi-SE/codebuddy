@@ -4,6 +4,7 @@ import { LogLevel } from "./telemetry";
 import { Orchestrator } from "../agents/orchestrator";
 
 export class FileWatcherService implements vscode.Disposable {
+  //Note Look into this file watcher use this to update the DB
   private static instance: FileWatcherService | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   protected logger: Logger;
@@ -18,9 +19,7 @@ export class FileWatcherService implements vscode.Disposable {
   }
 
   public static getInstance(): FileWatcherService {
-    if (!FileWatcherService.instance) {
-      FileWatcherService.instance = new FileWatcherService();
-    }
+    FileWatcherService.instance ??= new FileWatcherService();
     return FileWatcherService.instance;
   }
 

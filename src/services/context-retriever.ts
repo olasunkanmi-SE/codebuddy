@@ -1,4 +1,3 @@
-import { Row } from "@libsql/client/.";
 import * as vscode from "vscode";
 import { Orchestrator } from "../agents/orchestrator";
 import {
@@ -9,8 +8,8 @@ import { Logger } from "../infrastructure/logger/logger";
 import { CodeRepository } from "../infrastructure/repository/code";
 import { getAPIKeyAndModel } from "./../utils/utils";
 import { EmbeddingService } from "./embedding";
-import { WebSearchService } from "./web-search-service";
 import { LogLevel } from "./telemetry";
+import { WebSearchService } from "./web-search-service";
 
 export class ContextRetriever {
   private readonly codeRepository: CodeRepository;
@@ -38,20 +37,20 @@ export class ContextRetriever {
     return ContextRetriever.instance;
   }
 
-  async retrieveContext(input: string): Promise<Row[] | undefined> {
-    try {
-      const embedding = await this.embeddingService.generateEmbedding(input);
-      this.logger.info("Retrieving context from DB");
-      // this.orchestrator.publish("onUpdate", "Retrieving context from DB");
-      return await this.codeRepository.searchSimilarFunctions(
-        embedding,
-        ContextRetriever.SEARCH_RESULT_COUNT,
-      );
-    } catch (error) {
-      this.logger.error("Unable to retrieve context", error);
-      throw error;
-    }
-  }
+  // async retrieveContext(input: string): Promise<Row[] | undefined> {
+  //   try {
+  //     const embedding = await this.embeddingService.generateEmbedding(input);
+  //     this.logger.info("Retrieving context from DB");
+  //     // this.orchestrator.publish("onUpdate", "Retrieving context from DB");
+  //     return await this.codeRepository.searchSimilarFunctions(
+  //       embedding,
+  //       ContextRetriever.SEARCH_RESULT_COUNT,
+  //     );
+  //   } catch (error) {
+  //     this.logger.error("Unable to retrieve context", error);
+  //     throw error;
+  //   }
+  // }
 
   async readFiles(
     fileConfigs: IFileToolConfig[],
