@@ -41,9 +41,7 @@ export class WebViewProviderManager implements vscode.Disposable {
     this.disposables.push(
       this.orchestrator.onModelChange(this.handleModelChange.bind(this)),
     );
-    this.disposables.push(
-      this.orchestrator.onHistoryUpdated(this.handleHistoryUpdate.bind(this)),
-    );
+    // this.disposables.push(this.orchestrator.onHistoryUpdated(this.handleHistoryUpdate.bind(this)));
     this.disposables.push(
       this.orchestrator.onClearHistory(this.handleClearHistory.bind(this)),
     );
@@ -217,12 +215,12 @@ export class WebViewProviderManager implements vscode.Disposable {
   private async restoreChatHistory() {
     const chatHistory = await this.getChatHistory();
     setTimeout(async () => {
-      const lastTenMessages = chatHistory.slice(-10);
+      // const lastTenMessages = chatHistory.slice(-10);
       await this.webviewView?.webview.postMessage({
         type: "chat-history",
-        message: JSON.stringify(lastTenMessages),
+        message: JSON.stringify(chatHistory),
       });
-    }, 6000);
+    }, 10000);
   }
 
   // This update has to happen in the DB
@@ -230,7 +228,7 @@ export class WebViewProviderManager implements vscode.Disposable {
     if (message.command === "messages-updated" && message.messages?.length) {
       await this.chatHistoryManager.setHistory(
         WebViewProviderManager.AgentId,
-        message.messages,
+        message.message,
       );
     }
   }

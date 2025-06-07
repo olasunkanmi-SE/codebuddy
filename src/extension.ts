@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { Orchestrator } from "./agents/orchestrator";
 import {
   APP_CONFIG,
   CODEBUDDY_ACTIONS,
@@ -20,7 +19,6 @@ import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { dbManager } from "./infrastructure/repository/db-manager";
 import { Memory } from "./memory/base";
-import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
 import { FileWatcherService } from "./services/file-watcher";
 import { Credentials } from "./services/github-authentication";
@@ -32,6 +30,7 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
+import { InitDatabaseManager } from "./infrastructure/repository/init-db-manager";
 
 const {
   geminiKey,
@@ -84,8 +83,9 @@ async function createFileDB(context: vscode.ExtensionContext) {
 export async function activate(context: vscode.ExtensionContext) {
   try {
     const secretStorageService = new SecretStorageService(context);
-    await createFileDB(context);
-    await connectToDatabase(context);
+    const dbManager = InitDatabaseManager.getInstance();
+    await dbManager.initialize(context);
+
     const credentials = new Credentials();
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     FileUploadService.initialize(apiKey);
@@ -152,31 +152,26 @@ export async function activate(context: vscode.ExtensionContext) {
     const actionMap = {
       [comment]: async () => {
         await getComment.execute(
-          undefined,
           "💭 Add a helpful comment to explain the code logic",
         );
       },
       [review]: async () => {
         await generateReview.execute(
-          undefined,
           "🔍 Perform a thorough code review to ensure best practices",
         );
       },
       [refactor]: async () => {
         await generateRefactoredCode.execute(
-          undefined,
           " 🔄 Improve code readability and maintainability",
         );
       },
       [optimize]: async () => {
         await generateOptimizeCode.execute(
-          undefined,
           "⚡ optimize for performance and efficiency",
         );
       },
       [interviewMe]: async () => {
         await generateInterviewQuestions.execute(
-          undefined,
           "📚 Prepare for technical interviews with relevant questions",
         );
       },
@@ -189,25 +184,19 @@ export async function activate(context: vscode.ExtensionContext) {
       },
       [explain]: async () => {
         await explainCode.execute(
-          undefined,
           "💬 Get a clear and concise explanation of the code concept",
         );
       },
       [commitMessage]: async () => {
-        await generateCommitMessage.execute(
-          undefined,
-          "🧪 generating commit message",
-        );
+        await generateCommitMessage.execute(undefined, "commitMessage");
       },
       [generateDiagram]: async () => {
         await generateMermaidDiagram.execute(
-          undefined,
           "📈 Visualize the code with a Mermaid diagram",
         );
       },
       [inlineChat]: async () => {
         await getInLineChat.execute(
-          undefined,
           "💬 Discuss and reason about your code with me",
         );
       },

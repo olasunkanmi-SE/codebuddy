@@ -12,12 +12,7 @@ export interface ExtensionMessage {
   payload: any;
 }
 
-import {
-  VSCodeTextArea,
-  VSCodePanels,
-  VSCodePanelTab,
-  VSCodePanelView,
-} from "@vscode/webview-ui-toolkit/react";
+import { VSCodeTextArea, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useEffect, useRef, useState } from "react";
 import { codeBuddyMode, faqItems, modelOptions } from "../constants/constant";
@@ -81,40 +76,12 @@ export const WebviewUI = () => {
             },
           ]);
           break;
-        // case "user-prompt":
-        //   setMessages((prevMessages) => [
-        //     ...(prevMessages || []),
-        //     {
-        //       type: "user",
-        //       // display only the user query with the highlighted code
-        //       content: message.message.split("\n").slice(0, 2),
-        //       alias: "O",
-        //     },
-        //   ]);
-        //   break;
         case "bootstrap":
           setFolders(message);
           break;
-        case "codebuddy-commands":
-          setMessages((prevMessages) => [
-            ...(prevMessages || []),
-            {
-              type: "user",
-              content:
-                message.message.toLowerCase() === "inline chat"
-                  ? message.message.split("\n").slice(0, 2)
-                  : message.message,
-              language: "Typescript",
-              alias: "O",
-            },
-          ]);
-          break;
         case "chat-history":
           try {
-            setMessages((prevMessages) => [
-              ...JSON.parse(message.message),
-              ...(prevMessages || []),
-            ]);
+            setMessages((prevMessages) => [...JSON.parse(message.message), ...(prevMessages || [])]);
           } catch (error: any) {
             console.log(error);
             throw new Error(error.message);
@@ -164,12 +131,14 @@ export const WebviewUI = () => {
     });
   };
 
-  useEffect(() => {
-    vsCode.postMessage({
-      command: "messages-updated",
-      messages,
-    });
-  }, [messages]);
+  // useEffect(() => {
+  //   if (messages.length > 0) {
+  //     vsCode.postMessage({
+  //       command: "messages-updated",
+  //       message: messages[messages.length - 1],
+  //     });
+  //   }
+  // }, [messages]);
 
   const handleContextChange = (value: string) => {
     setSelectedContext(value);
@@ -198,7 +167,7 @@ export const WebviewUI = () => {
     const newValue = e.target.value;
     setSelectedCodeBuddyMode(newValue);
     vsCode.postMessage({
-      command: "codebuddy-mode-change-event",
+      command: "codebuddy-model-change-event",
       message: newValue,
     });
   };
@@ -264,10 +233,7 @@ export const WebviewUI = () => {
           OTHERS
         </VSCodePanelTab>
 
-        <VSCodePanelView
-          id="view-1"
-          style={{ height: "calc(100vh - 55px)", position: "relative" }}
-        >
+        <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
           <div className="chat-content">
             <div className="dropdown-container">
               <div>
@@ -275,11 +241,7 @@ export const WebviewUI = () => {
                   msg.type === "bot" ? (
                     <BotMessage key={msg.content} content={msg.content} />
                   ) : (
-                    <UserMessage
-                      key={msg.content}
-                      message={msg.content}
-                      alias={msg.alias}
-                    />
+                    <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
                   )
                 )}
                 {isBotLoading && <BotIcon isBlinking={true} />}
@@ -317,12 +279,7 @@ export const WebviewUI = () => {
               <span> Index Codebase </span>
               <span>
                 {" "}
-                <ToggleButton
-                  label=""
-                  initialState={darkMode}
-                  onToggle={handleToggle}
-                  disabled={true}
-                />
+                <ToggleButton label="" initialState={darkMode} onToggle={handleToggle} disabled={true} />
               </span>
             </div>
           </div>
@@ -332,12 +289,7 @@ export const WebviewUI = () => {
             <FAQAccordion
               items={faqItems.map((i) => ({
                 question: i.question,
-                answer: (
-                  <div
-                    className="doc-content"
-                    dangerouslySetInnerHTML={{ __html: i.answer }}
-                  />
-                ),
+                answer: <div className="doc-content" dangerouslySetInnerHTML={{ __html: i.answer }} />,
               }))}
             />
           </div>
@@ -361,9 +313,7 @@ export const WebviewUI = () => {
                 <>
                   <small>Context: </small>
                   <small>
-                    {Array.from(
-                      new Set(selectedContext.split("@").join(", ").split(", "))
-                    ).map((item) => {
+                    {Array.from(new Set(selectedContext.split("@").join(", ").split(", "))).map((item) => {
                       return item.length > 1 ? (
                         <span className="attachment-icon" key={item}>
                           {item}
@@ -379,18 +329,12 @@ export const WebviewUI = () => {
           </div>
           <div className="horizontal-stack">
             <span className="currenFile">
-              <>
-                <small>Active workspace: </small>
-                <small className="attachment-icon">{activeEditor}</small>
-              </>
+              <small>Active workspace: </small>
+              <small className="attachment-icon">{activeEditor}</small>
             </span>
           </div>
 
-          <WorkspaceSelector
-            activeEditor={activeEditor}
-            onInputChange={handleContextChange}
-            folders={folders}
-          />
+          <WorkspaceSelector activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
 
           <VSCodeTextArea
             value={userInput}
@@ -402,12 +346,7 @@ export const WebviewUI = () => {
         </div>
         <div className="horizontal-stack">
           <AttachmentIcon onClick={handleGetContext} disabled={true} />
-          <ModelDropdown
-            value={selectedModel}
-            onChange={handleModelChange}
-            options={modelOptions}
-            id="model"
-          />
+          <ModelDropdown value={selectedModel} onChange={handleModelChange} options={modelOptions} id="model" />
           <ModelDropdown
             value={selectedCodeBuddyMode}
             onChange={handleCodeBuddyMode}
