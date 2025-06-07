@@ -1,35 +1,34 @@
 import { SchemaType } from "@google/generative-ai";
-import { ContextRetriever } from "../services/context-retriever";
 import { IFileToolConfig } from "../application/interfaces/agent.interface";
-import { Orchestrator } from "../agents/orchestrator";
+import { ContextRetriever } from "../services/context-retriever";
 
-class SearchTool {
-  constructor(private readonly contextRetriever?: ContextRetriever) {}
+// class SearchTool {
+//   constructor(private readonly contextRetriever?: ContextRetriever) {}
 
-  public async execute(query: string) {
-    return await this.contextRetriever?.retrieveContext(query);
-  }
+//   public async execute(query: string) {
+//     return await this.contextRetriever?.retrieveContext(query);
+//   }
 
-  config() {
-    return {
-      name: "search_vector_db",
-      description:
-        "Search the codebase knowledge base for information related to the user's query. Use this to find code snippets, architectural decisions, or existing solutions within the project.",
-      parameters: {
-        type: SchemaType.OBJECT,
-        properties: {
-          query: {
-            type: SchemaType.STRING,
-            description:
-              "The user's question or topic to search for in the codebase knowledge base.",
-          },
-        },
-        example: ["How is user authentication handled in this project?"],
-        required: ["query"],
-      },
-    };
-  }
-}
+//   config() {
+//     return {
+//       name: "search_vector_db",
+//       description:
+//         "Search the codebase knowledge base for information related to the user's query. Use this to find code snippets, architectural decisions, or existing solutions within the project.",
+//       parameters: {
+//         type: SchemaType.OBJECT,
+//         properties: {
+//           query: {
+//             type: SchemaType.STRING,
+//             description:
+//               "The user's question or topic to search for in the codebase knowledge base.",
+//           },
+//         },
+//         example: ["How is user authentication handled in this project?"],
+//         required: ["query"],
+//       },
+//     };
+//   }
+// }
 
 export class WebTool {
   constructor(private readonly contextRetriever?: ContextRetriever) {}
@@ -158,7 +157,7 @@ export class ThinkTool {
 }
 
 export const TOOL_CONFIGS = {
-  SearchTool: { tool: SearchTool, useContextRetriever: true },
+  // SearchTool: { tool: SearchTool, useContextRetriever: true },
   FileTool: { tool: FileTool, useContextRetriever: true },
   WebTool: { tool: WebTool, useContextRetriever: true },
   ThinkTool: { tool: ThinkTool, useContextRetriever: true },

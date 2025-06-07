@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { Orchestrator } from "./agents/orchestrator";
 import {
   APP_CONFIG,
   CODEBUDDY_ACTIONS,
@@ -17,7 +18,9 @@ import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
+import { dbManager } from "./infrastructure/repository/db-manager";
 import { Memory } from "./memory/base";
+import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
 import { FileWatcherService } from "./services/file-watcher";
 import { Credentials } from "./services/github-authentication";
@@ -29,7 +32,6 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
-import { InitDatabaseManager } from "./infrastructure/repository/init-db-manager";
 
 const {
   geminiKey,
@@ -50,20 +52,27 @@ const fileWatcher = FileWatcherService.getInstance();
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
+let orchestrator = Orchestrator.getInstance();
+
+// async function connectToDatabase(context: vscode.ExtensionContext) {
+//   try {
+//     console.log(process.versions);
+//     const storagePath = context.globalStorageUri.fsPath;
+//     dbManager.open(storagePath);
+//     if (dbManager.healthCheck()) {
+//       logger.info("Database connected successfully");
+//     }
+//   } catch (error: any) {
+//     logger.error("Unable to connect to DB", error);
+//     throw new Error(error);
+//   }
+// }
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
     const secretStorageService = new SecretStorageService(context);
-    const dbManager = InitDatabaseManager.getInstance();
-    await dbManager.initialize(context);
-
-    const credentials = new Credentials();
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     FileUploadService.initialize(apiKey);
-    await credentials.initialize(context);
-    const session: vscode.AuthenticationSession | undefined =
-      await credentials.getSession();
-    logger.info(`Logged into GitHub as ${session?.account.label}`);
     Memory.getInstance();
     // TODO for RAG codeIndexing incase user allows
     // const index = CodeIndexingService.createInstance();
@@ -123,26 +132,31 @@ export async function activate(context: vscode.ExtensionContext) {
     const actionMap = {
       [comment]: async () => {
         await getComment.execute(
+          undefined,
           "💭 Add a helpful comment to explain the code logic",
         );
       },
       [review]: async () => {
         await generateReview.execute(
+          undefined,
           "🔍 Perform a thorough code review to ensure best practices",
         );
       },
       [refactor]: async () => {
         await generateRefactoredCode.execute(
+          undefined,
           " 🔄 Improve code readability and maintainability",
         );
       },
       [optimize]: async () => {
         await generateOptimizeCode.execute(
+          undefined,
           "⚡ optimize for performance and efficiency",
         );
       },
       [interviewMe]: async () => {
         await generateInterviewQuestions.execute(
+          undefined,
           "📚 Prepare for technical interviews with relevant questions",
         );
       },
@@ -155,19 +169,25 @@ export async function activate(context: vscode.ExtensionContext) {
       },
       [explain]: async () => {
         await explainCode.execute(
+          undefined,
           "💬 Get a clear and concise explanation of the code concept",
         );
       },
       [commitMessage]: async () => {
-        await generateCommitMessage.execute(undefined, "commitMessage");
+        await generateCommitMessage.execute(
+          undefined,
+          "🧪 generating commit message",
+        );
       },
       [generateDiagram]: async () => {
         await generateMermaidDiagram.execute(
+          undefined,
           "📈 Visualize the code with a Mermaid diagram",
         );
       },
       [inlineChat]: async () => {
         await getInLineChat.execute(
+          undefined,
           "💬 Discuss and reason about your code with me",
         );
       },
@@ -239,6 +259,7 @@ export async function activate(context: vscode.ExtensionContext) {
       quickFixCodeAction,
       agentEventEmmitter,
       secretStorageService,
+      orchestrator,
     );
   } catch (error) {
     Memory.clear();
