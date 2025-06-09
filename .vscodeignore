@@ -9,3 +9,37 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+
+# Source files
+src/**
+!src/extension.ts
+!src/webview/**
+
+# Development tools
+node_modules/
+.vscode/
+.gitignore
+.git
+*.code-workspace
+*.tsbuildinfo
+*.map
+
+# Build configs
+esbuild.js
+esbuild.webview.cjs
+tsconfig.json
+tsconfig.webview.json
+
+# Tests
+test/**
+**/*.test.ts
+**/*.spec.ts
+
+# Miscellaneous
+.DS_Store
+*.log
+out/**/debug/**
+
+# Ensure webview output is included
+!webviewUi/dist/**
+
