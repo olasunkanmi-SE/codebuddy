@@ -6,8 +6,7 @@ import { Uri, Webview } from "vscode";
 // and ensure script integrity when using Content Security Policy (CSP)
 function getNonce() {
   let text = "";
-  const possible =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
@@ -17,18 +16,8 @@ function getNonce() {
 const nonce = getNonce();
 
 export const chartComponent = (webview: Webview, extensionUri: Uri) => {
-  const stylesUri = getUri(webview, extensionUri, [
-    "webviewUi",
-    "dist",
-    "assets",
-    "index.css",
-  ]);
-  const scriptUri = getUri(webview, extensionUri, [
-    "webviewUi",
-    "dist",
-    "assets",
-    "index.js",
-  ]);
+  const stylesUri = getUri(webview, extensionUri, ["dist", "webview", "assets", "index.css"]);
+  const scriptUri = getUri(webview, extensionUri, ["dist", "webview", "assets", "index.js"]);
   return `
     <html lang="en">
     <head>
