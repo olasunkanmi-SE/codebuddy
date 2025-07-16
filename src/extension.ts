@@ -70,10 +70,16 @@ let orchestrator = Orchestrator.getInstance();
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    const secretStorageService = new SecretStorageService(context);
+    // await connectToDatabase(context);
+    // const secretStorageService = new SecretStorageService(context);
+
+    // Initialize and start the orchestrator
+    orchestrator.start();
+
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     FileUploadService.initialize(apiKey);
     Memory.getInstance();
+
     // TODO for RAG codeIndexing incase user allows
     // const index = CodeIndexingService.createInstance();
     // Get each of the folders and call the next line for each
@@ -258,8 +264,9 @@ export async function activate(context: vscode.ExtensionContext) {
       ...subscriptions,
       quickFixCodeAction,
       agentEventEmmitter,
-      secretStorageService,
       orchestrator,
+      providerManager,
+      // secretStorageService,
     );
   } catch (error) {
     Memory.clear();
@@ -273,6 +280,12 @@ export async function activate(context: vscode.ExtensionContext) {
 export function deactivate(context: vscode.ExtensionContext) {
   quickFixCodeAction.dispose();
   agentEventEmmitter.dispose();
+  orchestrator.dispose();
   fileWatcher.dispose();
+
+  // Dispose provider manager
+  const providerManager = WebViewProviderManager.getInstance(context);
+  providerManager.dispose();
+
   context.subscriptions.forEach((subscription) => subscription.dispose());
 }

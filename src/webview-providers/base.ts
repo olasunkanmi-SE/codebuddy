@@ -46,10 +46,15 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.workspaceService = WorkspaceService.getInstance();
     this.agentService = AgentService.getInstance();
     this.chatHistoryManager = ChatHistoryManager.getInstance();
-    this.registerDisposables();
+    // Don't register disposables here - do it lazily when webview is resolved
   }
 
   registerDisposables() {
+    // Only register once per instance
+    if (this.disposables.length > 0) {
+      return;
+    }
+
     this.disposables.push(
       this.orchestrator.onResponse(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onThinking(this.handleModelResponseEvent.bind(this)),
@@ -68,12 +73,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onConfigurationChange(
         this.handleGenericEvents.bind(this),
       ),
-      // this.orchestrator.onFileCreated(this.handleWorkspaceUpdate.bind(this)),
-      // this.orchestrator.onTextChange(this.handleWorkspaceUpdate.bind(this)),
-
-      // this.orchestrator.OnSaveText(this.handleWorkspaceUpdate.bind(this)),
-      // this.orchestrator.onFileRenamed(this.handleWorkspaceUpdate.bind(this)),
-      // this.orchestrator.onFileDeleted(this.handleWorkspaceUpdate.bind(this)),
       this.orchestrator.onUserPrompt(this.handleUserPrompt.bind(this)),
       this.orchestrator.onGetUserPreferences(
         this.handleUserPreferences.bind(this),
@@ -85,6 +84,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     _view = webviewView;
     BaseWebViewProvider.webView = webviewView;
     this.currentWebView = webviewView;
+
+    // Register disposables only when webview is actually resolved
+    this.registerDisposables();
 
     const webviewOptions: vscode.WebviewOptions = {
       enableScripts: true,
@@ -178,6 +180,22 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           switch (message.command) {
             case "user-input": {
               this.UserMessageCounter += 1;
+
+              // Check if we should prune history for performance
+              if (this.UserMessageCounter % 10 === 0) {
+                const stats = await this.getChatHistoryStats("agentId");
+                if (
+                  stats.totalMessages > 100 ||
+                  stats.estimatedTokens > 16000
+                ) {
+                  this.logger.info(
+                    `High chat history usage detected: ${stats.totalMessages} messages, ${stats.estimatedTokens} tokens`,
+                  );
+                  // Optionally trigger manual pruning here
+                  // await this.pruneHistoryManually("agentId", { maxMessages: 50, maxTokens: 8000 });
+                }
+              }
+
               response = await this.generateResponse(
                 message.message,
                 message.metaData,
@@ -185,10 +203,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               if (this.UserMessageCounter === 1) {
                 await this.publishWorkSpace();
               }
-              response = await this.generateResponse(
-                message.message,
-                message.metaData,
-              );
               if (response) {
                 await this.sendResponse(formatText(response), "bot");
               }
@@ -208,6 +222,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             //   this.orchestrator.publish("onHistoryUpdated", message);
             //   break;
             case "clear-history":
+              await this.chatHistoryManager.clearHistory("agentId");
               this.orchestrator.publish("onClearHistory", message);
               break;
             case "update-user-info":
@@ -249,7 +264,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   ): Promise<boolean | undefined>;
 
   public dispose(): void {
+    this.logger.debug(
+      `Disposing BaseWebViewProvider with ${this.disposables.length} disposables`,
+    );
     this.disposables.forEach((d) => d.dispose());
+    this.disposables.length = 0; // Clear the array
   }
 
   async getContext(files: string[]) {
@@ -270,7 +289,46 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     message: string,
     model: string,
     key: string,
+    pruneConfig?: Partial<{
+      maxMessages: number;
+      maxTokens: number;
+      maxAgeHours: number;
+      preserveSystemMessages: boolean;
+    }>,
   ): Promise<any[]> {
-    return this.chatHistoryManager.formatChatHistory(role, message, model, key);
+    return this.chatHistoryManager.formatChatHistory(
+      role,
+      message,
+      model,
+      key,
+      pruneConfig,
+    );
+  }
+
+  // Get chat history stats for monitoring
+  async getChatHistoryStats(key: string): Promise<{
+    totalMessages: number;
+    estimatedTokens: number;
+    oldestMessageAge: number;
+    newestMessageAge: number;
+  }> {
+    return this.chatHistoryManager.getPruningStats(key);
+  }
+
+  // Manual pruning for performance optimization
+  async pruneHistoryManually(
+    key: string,
+    config?: {
+      maxMessages?: number;
+      maxTokens?: number;
+      maxAgeHours?: number;
+    },
+  ): Promise<void> {
+    await this.chatHistoryManager.pruneHistoryForKey(key, config);
+  }
+
+  // Initialize chat history with proper sync
+  async initializeChatHistory(key: string): Promise<any[]> {
+    return this.chatHistoryManager.initializeHistory(key);
   }
 }
