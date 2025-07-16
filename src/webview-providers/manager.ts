@@ -24,8 +24,9 @@ export class WebViewProviderManager implements vscode.Disposable {
     ) => BaseWebViewProvider
   > = new Map();
   private webviewView: vscode.WebviewView | undefined;
-  private disposables: vscode.Disposable[] = [];
+  private readonly disposables: vscode.Disposable[] = [];
   private webviewViewProvider: vscode.WebviewViewProvider | undefined;
+  private isInitialized = false;
   protected readonly orchestrator: Orchestrator;
   protected readonly chatHistoryManager: ChatHistoryManager;
 
@@ -38,16 +39,23 @@ export class WebViewProviderManager implements vscode.Disposable {
     this.orchestrator = Orchestrator.getInstance();
     this.chatHistoryManager = ChatHistoryManager.getInstance();
     this.registerProviders();
-    this.disposables.push(
-      this.orchestrator.onModelChange(this.handleModelChange.bind(this)),
-    );
-    // this.disposables.push(this.orchestrator.onHistoryUpdated(this.handleHistoryUpdate.bind(this)));
-    this.disposables.push(
-      this.orchestrator.onClearHistory(this.handleClearHistory.bind(this)),
-    );
+    // Don't register event listeners immediately - do it lazily
     this.logger = Logger.initialize("WebViewProviderManager", {
       minLevel: LogLevel.DEBUG,
     });
+  }
+
+  // Initialize event listeners only when needed
+  private initializeEventListeners(): void {
+    if (this.isInitialized) {
+      return;
+    }
+
+    this.disposables.push(
+      this.orchestrator.onModelChange(this.handleModelChange.bind(this)),
+      this.orchestrator.onClearHistory(this.handleClearHistory.bind(this)),
+    );
+    this.isInitialized = true;
   }
 
   public static getInstance(
@@ -186,6 +194,8 @@ export class WebViewProviderManager implements vscode.Disposable {
     model: string,
     onload: boolean,
   ): Promise<void> {
+    // Initialize event listeners when first provider is created
+    this.initializeEventListeners();
     await this.switchProvider(modelName, apiKey, model, onload);
   }
 
@@ -215,7 +225,6 @@ export class WebViewProviderManager implements vscode.Disposable {
   private async restoreChatHistory() {
     const chatHistory = await this.getChatHistory();
     setTimeout(async () => {
-      // const lastTenMessages = chatHistory.slice(-10);
       await this.webviewView?.webview.postMessage({
         type: "chat-history",
         message: JSON.stringify(chatHistory),
@@ -238,13 +247,22 @@ export class WebViewProviderManager implements vscode.Disposable {
   }
 
   dispose(): void {
+    console.log("WebViewProviderManager disposing...");
+
     if (this.currentProvider) {
       this.currentProvider.dispose();
+      this.currentProvider = undefined;
     }
+
     this.disposables.forEach((d) => d.dispose());
-    this.extensionContext.subscriptions.forEach((subscription) =>
-      subscription.dispose(),
-    );
-    this.disposables = [];
+    this.disposables.length = 0;
+    this.isInitialized = false;
+
+    // Note: Don't dispose extensionContext.subscriptions here as they're managed by VS Code
+
+    // Clear singleton instance if needed
+    if (WebViewProviderManager.instance === this) {
+      WebViewProviderManager.instance = undefined as any;
+    }
   }
 }
