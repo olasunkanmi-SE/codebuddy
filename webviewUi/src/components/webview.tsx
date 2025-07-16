@@ -20,7 +20,6 @@ import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
 import AttachmentIcon from "./attachmentIcon";
-import { BotIcon } from "./botIcon";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
@@ -29,6 +28,7 @@ import TextInput from "./textInput";
 import ToggleButton from "./toggleButton";
 import Button from "./button";
 import { FAQAccordion } from "./accordion";
+import { SkeletonLoader } from "./skeletonLoader";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -130,15 +130,6 @@ export const WebviewUI = () => {
       }),
     });
   };
-
-  // useEffect(() => {
-  //   if (messages.length > 0) {
-  //     vsCode.postMessage({
-  //       command: "messages-updated",
-  //       message: messages[messages.length - 1],
-  //     });
-  //   }
-  // }, [messages]);
 
   const handleContextChange = (value: string) => {
     setSelectedContext(value);
@@ -244,7 +235,7 @@ export const WebviewUI = () => {
                     <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
                   )
                 )}
-                {isBotLoading && <BotIcon isBlinking={true} />}
+                {isBotLoading && <SkeletonLoader />}
               </div>
             </div>
           </div>
