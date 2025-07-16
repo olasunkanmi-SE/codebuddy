@@ -386,6 +386,10 @@ export const LLM_CONFIGS: Record<string, ILLMConfig> = {
   },
 };
 
+export type FormattedMessage =
+  | { role: string; parts: [{ text: string }] }
+  | { role: string; content: string };
+
 //Note, this kind of configuration can be used by orchestrator on where to direct the requests
 // export const LLM_CONFIGS: Record<string, LLMConfig> = {
 //   gemini: {
@@ -412,3 +416,19 @@ export const LLM_CONFIGS: Record<string, ILLMConfig> = {
 //     },
 //   },
 // };
+
+export const CHAT_HISTORY_CONFIG = {
+  maxMessages: "chatHistory.maxMessages",
+  maxTokens: "chatHistory.maxTokens",
+  maxAgeHours: "chatHistory.maxAgeHours",
+  preserveSystemMessages: "chatHistory.preserveSystemMessages",
+  enableAutoPruning: "chatHistory.enableAutoPruning",
+};
+
+export const DEFAULT_PRUNING_CONFIG = {
+  maxMessages: 50,
+  maxTokens: 8000,
+  maxAgeHours: 24,
+  preserveSystemMessages: true,
+  enableAutoPruning: true,
+};

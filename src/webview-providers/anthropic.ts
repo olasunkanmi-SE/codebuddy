@@ -1,18 +1,18 @@
+import Anthropic from "@anthropic-ai/sdk";
 import * as vscode from "vscode";
-import { BaseWebViewProvider } from "./base";
 import {
   COMMON,
   generativeAiModels,
   GROQ_CONFIG,
 } from "../application/constant";
-import Anthropic from "@anthropic-ai/sdk";
+import { IMessageInput } from "../llms/message";
+import { Memory } from "../memory/base";
 import {
   createAnthropicClient,
   getGenerativeAiModel,
   getXGroKBaseURL,
 } from "../utils/utils";
-import { Memory } from "../memory/base";
-import { IMessageInput, Message } from "../llms/message";
+import { BaseWebViewProvider } from "./base";
 
 export class AnthropicWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
@@ -80,7 +80,16 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         max_tokens,
         stream: false,
       });
-      const response = chatCompletion.content[0].text;
+      const firstContent = chatCompletion.content[0];
+      let response = "";
+      if ("text" in firstContent && typeof firstContent.text === "string") {
+        response = firstContent.text;
+      } else if (
+        "content" in firstContent &&
+        typeof (firstContent as any).content === "string"
+      ) {
+        response = (firstContent as any).content;
+      }
       return response;
     } catch (error) {
       console.error(error);

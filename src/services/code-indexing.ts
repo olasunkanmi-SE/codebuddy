@@ -1,4 +1,3 @@
-import { ResultSet } from "@libsql/client/.";
 import { IFunctionData } from "../application/interfaces";
 import { Logger } from "../infrastructure/logger/logger";
 import { CodeRepository } from "../infrastructure/repository/code";
@@ -110,22 +109,22 @@ export class CodeIndexingService {
    * Inserts function data into the database using the CodeRepository.
    * @returns {Promise<ResultSet | undefined>} A promise that resolves with the result set or undefined.
    */
-  async insertFunctionsinDB(): Promise<ResultSet | undefined> {
-    await this.getCodeRepository();
-    if (!this.codeRepository) {
-      this.logger.info("Unable to connect to the DB");
-      throw new Error("Unable to connect to DB");
-    }
-    const dataToInsert = await this.generateEmbeddings();
-    if (dataToInsert?.length) {
-      const valuesString = dataToInsert
-        .map(
-          (value) =>
-            `('${value.className}', '${value.name}', '${value.path}', '${value.processedAt}', vector32('[${(value.embedding ?? []).join(",")}]'))`,
-        )
-        .join(",");
-      const result = await this.codeRepository?.insertFunctions(valuesString);
-      return result;
-    }
-  }
+  // async insertFunctionsinDB(): Promise<ResultSet | undefined> {
+  //   await this.getCodeRepository();
+  //   if (!this.codeRepository) {
+  //     this.logger.info("Unable to connect to the DB");
+  //     throw new Error("Unable to connect to DB");
+  //   }
+  //   const dataToInsert = await this.generateEmbeddings();
+  //   if (dataToInsert?.length) {
+  //     const valuesString = dataToInsert
+  //       .map(
+  //         (value) =>
+  //           `('${value.className}', '${value.name}', '${value.path}', '${value.processedAt}', vector32('[${(value.embedding ?? []).join(",")}]'))`,
+  //       )
+  //       .join(",");
+  //     const result = await this.codeRepository?.insertFunctions(valuesString);
+  //     return result;
+  //   }
+  // }
 }

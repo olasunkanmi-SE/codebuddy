@@ -1,11 +1,30 @@
+# Exclude everything by default
+*
+
+# Include only what you need
+!dist/**
+!images/**
+!README.md
+!LICENSE
+
+!package.json
+!node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js
+
+# Exclude all source, config, and dev files
+src/**
+test/**
+docs/**
+webviewUi/**
+node_modules/**
 .vscode/**
 .vscode-test/**
-src/**
-.gitignore
-.yarnrc
-.github
-vsc-extension-quickstart.md
-**/tsconfig.json
-**/.eslintrc.json
-**/*.map
-**/*.ts
+.github/
+*.log
+*.ts
+*.tsx
+*.js.map
+*.ts.map
+*.eslintrc.json
+tsconfig*.json
+yarn.lock
+package-lock.json

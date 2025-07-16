@@ -1,5 +1,3 @@
-import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
 import { Orchestrator } from "./agents/orchestrator";
 import {
@@ -20,7 +18,7 @@ import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
-import { dbManager } from "./infrastructure/repository/database-manager";
+import { dbManager } from "./infrastructure/repository/db-manager";
 import { Memory } from "./memory/base";
 import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
@@ -56,49 +54,32 @@ let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
 let orchestrator = Orchestrator.getInstance();
 
-async function connectToDatabase(context: vscode.ExtensionContext) {
-  try {
-    const dbDir = path.join(context.extensionPath, "database");
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir);
-    }
-    const dbPath = path.join(__dirname, "..", "database", "aii.db");
-    const urlPath = dbPath.replace(/\\/g, "/");
-    const isWindows = dbPath.includes("\\");
-    const filePath = isWindows ? `file:/${urlPath}` : `file:${urlPath}`;
-    await dbManager.connect(filePath);
-  } catch (error: any) {
-    logger.error("Unable to connect to DB", error);
-    throw new Error(error);
-  }
-}
-
-async function createFileDB(context: vscode.ExtensionContext) {
-  try {
-    const fileUploader = new FileManager(context, "database");
-    const files = await fileUploader.getFiles();
-    if (!files?.find((file) => file.includes("dev.db"))) {
-      await fileUploader.createFile("dev.db");
-    }
-  } catch (error: any) {
-    logger.error("Unable to ", error);
-    throw new Error(error);
-  }
-}
+// async function connectToDatabase(context: vscode.ExtensionContext) {
+//   try {
+//     console.log(process.versions);
+//     const storagePath = context.globalStorageUri.fsPath;
+//     dbManager.open(storagePath);
+//     if (dbManager.healthCheck()) {
+//       logger.info("Database connected successfully");
+//     }
+//   } catch (error: any) {
+//     logger.error("Unable to connect to DB", error);
+//     throw new Error(error);
+//   }
+// }
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    const secretStorageService = new SecretStorageService(context);
-    await createFileDB(context);
-    await connectToDatabase(context);
-    const credentials = new Credentials();
+    // await connectToDatabase(context);
+    // const secretStorageService = new SecretStorageService(context);
+
+    // Initialize and start the orchestrator
+    orchestrator.start();
+
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     FileUploadService.initialize(apiKey);
-    await credentials.initialize(context);
-    const session: vscode.AuthenticationSession | undefined =
-      await credentials.getSession();
-    logger.info(`Logged into GitHub as ${session?.account.label}`);
     Memory.getInstance();
+
     // TODO for RAG codeIndexing incase user allows
     // const index = CodeIndexingService.createInstance();
     // Get each of the folders and call the next line for each
@@ -283,7 +264,9 @@ export async function activate(context: vscode.ExtensionContext) {
       ...subscriptions,
       quickFixCodeAction,
       agentEventEmmitter,
-      secretStorageService,
+      orchestrator,
+      providerManager,
+      // secretStorageService,
     );
   } catch (error) {
     Memory.clear();
@@ -297,6 +280,12 @@ export async function activate(context: vscode.ExtensionContext) {
 export function deactivate(context: vscode.ExtensionContext) {
   quickFixCodeAction.dispose();
   agentEventEmmitter.dispose();
+  orchestrator.dispose();
   fileWatcher.dispose();
+
+  // Dispose provider manager
+  const providerManager = WebViewProviderManager.getInstance(context);
+  providerManager.dispose();
+
   context.subscriptions.forEach((subscription) => subscription.dispose());
 }

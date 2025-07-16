@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "CodeBuddy is a Visual Studio Code extension that enhances developer productivity through AI-powered code assistance. It provides intelligent code review, refactoring suggestions, optimization tips, and interactive chat capabilities powered by multiple AI models including Gemini, Groq, Anthropic, and Deepseek.",
-  "version": "2.0.0",
+  "version": "3.2.6",
   "engines": {
     "vscode": "^1.78.0"
   },
@@ -40,7 +40,7 @@
     "productivity"
   ],
   "homepage": "https://github.com/olasunkanmi-SE/codebuddy#readme",
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "views": {
       "codeBuddy-view-container": [
@@ -288,6 +288,8 @@
     ]
   },
   "scripts": {
+    "package": "node esbuild.js --production",
+    "build": "npm run compile && npm run format && npm run build:webview",
     "dev:webview": "cd webviewUi && npm run dev",
     "build:webview": "cd webviewUi && npm run build",
     "vscode:prepublish": "npm run compile",
@@ -296,7 +298,8 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "vscode-test",
-    "format": "prettier --write \"**/*.ts\""
+    "format": "prettier --write \"**/*.ts\"",
+    "rebuild": "./node_modules/.bin/electron-rebuild --version 35.2.1 -f -w better-sqlite3"
   },
   "devDependencies": {
     "@types/jsdom": "^21.1.7",
@@ -310,23 +313,25 @@
     "@typescript-eslint/parser": "^5.59.8",
     "@vscode/test-cli": "^0.0.8",
     "@vscode/test-electron": "^2.3.2",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^8.41.0",
     "mocha": "^10.2.0",
     "typescript": "^5.4.3"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.20.9",
+    "@anthropic-ai/sdk": "^0.52.0",
     "@google/genai": "^0.7.0",
     "@google/generative-ai": "^0.21.0",
     "@googleapis/customsearch": "^3.2.0",
-    "@libsql/client": "^0.14.0",
     "@mozilla/readability": "^0.4.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node-fetch": "^2.6.11",
     "@xenova/transformers": "^2.17.2",
     "axios": "^1.7.9",
+    "better-sqlite3": "^11.10.0",
     "dompurify": "^3.2.4",
     "dotenv": "^16.1.4",
-    "groq-sdk": "^0.3.3",
+    "groq-sdk": "^0.22.0",
     "jsdom": "^26.0.0",
     "markdown-it": "^14.1.0",
     "node-fetch": "^3.3.2",

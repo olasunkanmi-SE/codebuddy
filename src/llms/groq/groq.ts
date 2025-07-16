@@ -48,7 +48,7 @@ export class GroqLLM extends BaseLLM<any> implements vscode.Disposable {
         stop,
       });
       const response = (await chatCompletion).choices[0]?.message?.content;
-      return response;
+      return response ?? "";
     } catch (error: any) {
       this.logger.error(
         "Model not responding, please resend your question",
