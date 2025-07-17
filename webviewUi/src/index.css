@@ -578,6 +578,41 @@ hr {
   color: white;
 }
 
+/* Individual code block wrapper and header styles */
+.code-block-wrapper {
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  margin: 16px 0;
+  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+}
+
+.individual-code-header {
+  background-color: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.individual-code-header .copy-button {
+  margin-left: 0;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-color: #7aa2f7;
+}
+
+.individual-code-header .copy-button:hover {
+  background: #7aa2f7;
+  border-color: #7aa2f7;
+  color: white;
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  border-radius: 0 0 6px 6px;
+  background-color: var(--vscode-editor-background);
+}
+
 .download-button {
   border: 1px solid #28a745;
   background: transparent;
