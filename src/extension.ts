@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import { Orchestrator } from "./agents/orchestrator";
 import {
@@ -18,13 +20,9 @@ import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
-import { dbManager } from "./infrastructure/repository/db-manager";
 import { Memory } from "./memory/base";
-import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
 import { FileWatcherService } from "./services/file-watcher";
-import { Credentials } from "./services/github-authentication";
-import { SecretStorageService } from "./services/secret-storage";
 import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
@@ -54,26 +52,8 @@ let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
 let orchestrator = Orchestrator.getInstance();
 
-// async function connectToDatabase(context: vscode.ExtensionContext) {
-//   try {
-//     console.log(process.versions);
-//     const storagePath = context.globalStorageUri.fsPath;
-//     dbManager.open(storagePath);
-//     if (dbManager.healthCheck()) {
-//       logger.info("Database connected successfully");
-//     }
-//   } catch (error: any) {
-//     logger.error("Unable to connect to DB", error);
-//     throw new Error(error);
-//   }
-// }
-
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    // await connectToDatabase(context);
-    // const secretStorageService = new SecretStorageService(context);
-
-    // Initialize and start the orchestrator
     orchestrator.start();
 
     const { apiKey, model } = getAPIKeyAndModel("gemini");
@@ -278,6 +258,11 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate(context: vscode.ExtensionContext) {
+  console.log("Deactivating CodeBuddy extension...");
+
+  // Clear database history before deactivation
+  clearFileStorageData();
+
   quickFixCodeAction.dispose();
   agentEventEmmitter.dispose();
   orchestrator.dispose();
@@ -288,4 +273,30 @@ export function deactivate(context: vscode.ExtensionContext) {
   providerManager.dispose();
 
   context.subscriptions.forEach((subscription) => subscription.dispose());
+
+  console.log("CodeBuddy extension deactivated successfully");
+}
+
+/**
+ * Clears file storage data (.codebuddy folder contents)
+ */
+function clearFileStorageData() {
+  try {
+    const workSpaceRoot =
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+    const codeBuddyPath = path.join(workSpaceRoot, ".codebuddy");
+
+    if (fs.existsSync(codeBuddyPath)) {
+      const files = fs.readdirSync(codeBuddyPath);
+      files.forEach((file: string) => {
+        const filePath = path.join(codeBuddyPath, file);
+        if (fs.lstatSync(filePath).isFile()) {
+          fs.unlinkSync(filePath);
+        }
+      });
+      console.log(`Cleared ${files.length} files from .codebuddy folder`);
+    }
+  } catch (error) {
+    console.error("Error clearing file storage data:", error);
+  }
 }
