@@ -40,10 +40,15 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
           "assistant",
           response,
           "anthropic",
-          "agentId",
+          COMMON.SHARED_CHAT_HISTORY,
         );
       } else {
-        await this.modelChatHistory("user", response, "anthropic", "agentId");
+        await this.modelChatHistory(
+          "user",
+          response,
+          "anthropic",
+          COMMON.SHARED_CHAT_HISTORY,
+        );
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -75,7 +80,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         "user",
         standardizedPrompt,
         "anthropic",
-        "agentId",
+        COMMON.SHARED_CHAT_HISTORY,
       );
 
       const chatCompletion = await this.model.messages.create({
@@ -97,7 +102,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       return response;
     } catch (error) {
       console.error(error);
-      Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
+      Memory.set(COMMON.SHARED_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );

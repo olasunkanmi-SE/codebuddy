@@ -46,9 +46,19 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     try {
       const type = participant === "bot" ? "bot-response" : "user-input";
       if (participant === "bot") {
-        await this.modelChatHistory("system", response, "groq", "agentId");
+        await this.modelChatHistory(
+          "system",
+          response,
+          "groq",
+          COMMON.SHARED_CHAT_HISTORY,
+        );
       } else {
-        await this.modelChatHistory("user", response, "groq", "agentId");
+        await this.modelChatHistory(
+          "user",
+          response,
+          "groq",
+          COMMON.SHARED_CHAT_HISTORY,
+        );
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -77,7 +87,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         "user",
         standardizedPrompt,
         "groq",
-        "agentId",
+        COMMON.SHARED_CHAT_HISTORY,
       );
 
       const chatCompletion = this.model.chat.completions.create({
@@ -93,7 +103,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       return response ?? undefined;
     } catch (error) {
       console.error(error);
-      Memory.set(COMMON.GROQ_CHAT_HISTORY, []);
+      Memory.set(COMMON.SHARED_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );
