@@ -2,13 +2,14 @@
 import DOMPurify from "dompurify";
 import React from "react";
 import { BotIcon } from "./botIcon";
+import { DownloadIcon } from "./downloadIcon";
+import { downloadAsMarkdown } from "../utils/downloadMarkdown";
 import { IParseURL, parseUrl } from "../utils/parseUrl";
 import UrlCardList from "./urlCardList";
 
 interface CodeBlockProps {
   language?: string;
   content: string;
-  isLoading?: boolean;
 }
 
 export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
@@ -18,6 +19,19 @@ export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
   if (sanitizedContent.includes("favicon")) {
     parsedUrls = parseUrl(sanitizedContent);
   }
+
+  const handleDownload = () => {
+    console.log("Download button clicked");
+    console.log("Content length:", sanitizedContent.length);
+    console.log("Content preview:", sanitizedContent.substring(0, 100));
+
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+    const filename = `codebuddy-response-${timestamp}`;
+    console.log("Filename:", filename);
+
+    downloadAsMarkdown(sanitizedContent, filename);
+  };
+
   return (
     <>
       {content.includes("thinking") ? (
@@ -30,6 +44,9 @@ export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
         <div className="code-block">
           <div className="code-header">
             <span className="language-label">{language}</span>
+            <div className="header-buttons">
+              <DownloadIcon onClick={handleDownload} />
+            </div>
           </div>
           {parsedUrls.length > 0 ? (
             <div className="doc-content">
