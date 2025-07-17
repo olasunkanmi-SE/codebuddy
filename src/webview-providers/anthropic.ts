@@ -12,6 +12,7 @@ import {
   getGenerativeAiModel,
   getXGroKBaseURL,
 } from "../utils/utils";
+import { StandardizedPrompt } from "../utils/standardized-prompt";
 import { BaseWebViewProvider } from "./base";
 
 export class AnthropicWebViewProvider extends BaseWebViewProvider {
@@ -39,10 +40,15 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
           "assistant",
           response,
           "anthropic",
-          "agentId",
+          COMMON.SHARED_CHAT_HISTORY,
         );
       } else {
-        await this.modelChatHistory("user", response, "anthropic", "agentId");
+        await this.modelChatHistory(
+          "user",
+          response,
+          "anthropic",
+          COMMON.SHARED_CHAT_HISTORY,
+        );
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -67,11 +73,14 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         this.baseUrl = getXGroKBaseURL();
       }
 
+      // Create standardized prompt for user input
+      const standardizedPrompt = StandardizedPrompt.create(message, context);
+
       let chatHistory = await this.modelChatHistory(
         "user",
-        `${message} \n context: ${context}`,
+        standardizedPrompt,
         "anthropic",
-        "agentId",
+        COMMON.SHARED_CHAT_HISTORY,
       );
 
       const chatCompletion = await this.model.messages.create({
@@ -93,7 +102,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       return response;
     } catch (error) {
       console.error(error);
-      Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
+      Memory.set(COMMON.SHARED_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );

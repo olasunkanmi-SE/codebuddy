@@ -4,6 +4,7 @@ import { COMMON } from "../application/constant";
 import { GeminiLLM } from "../llms/gemini/gemini";
 import { IMessageInput } from "../llms/message";
 import { Memory } from "../memory/base";
+import { StandardizedPrompt } from "../utils/standardized-prompt";
 import { BaseWebViewProvider } from "./base";
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
@@ -34,16 +35,26 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
-        await this.modelChatHistory("model", response, "gemini", "agentId");
+        await this.modelChatHistory(
+          "model",
+          response,
+          "gemini",
+          COMMON.SHARED_CHAT_HISTORY,
+        );
       } else {
-        await this.modelChatHistory("user", response, "gemini", "agentId");
+        await this.modelChatHistory(
+          "user",
+          response,
+          "gemini",
+          COMMON.SHARED_CHAT_HISTORY,
+        );
       }
       return await this.currentWebView?.webview.postMessage({
         type,
         message: response,
       });
     } catch (error) {
-      Memory.set(COMMON.GEMINI_CHAT_HISTORY, []);
+      Memory.set(COMMON.SHARED_CHAT_HISTORY, []);
       console.error(error);
     }
   }
@@ -67,21 +78,24 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         return;
       }
 
+      // Create standardized prompt for user input
+      const enhancedPrompt = StandardizedPrompt.create(message, context);
+
       let chatHistory = await this.modelChatHistory(
         "user",
-        `${message} \n context: ${context}`,
+        enhancedPrompt,
         "gemini",
-        "agentId",
+        COMMON.SHARED_CHAT_HISTORY,
       );
 
       const chat = this.model.startChat({
         history: [...chatHistory],
       });
-      const result = await chat.sendMessage(message);
+      const result = await chat.sendMessage(enhancedPrompt);
       const response = result.response;
       return response.text();
     } catch (error) {
-      Memory.set(COMMON.GEMINI_CHAT_HISTORY, []);
+      Memory.set(COMMON.SHARED_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );

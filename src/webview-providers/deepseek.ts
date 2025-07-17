@@ -2,9 +2,10 @@ import * as vscode from "vscode";
 import { BaseWebViewProvider } from "./base";
 import { COMMON } from "../application/constant";
 import { Memory } from "../memory/base";
-import { IMessageInput, Message } from "../llms/message";
+import { IMessageInput } from "../llms/message";
 import { DeepseekLLM } from "../llms/deepseek/deepseek";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { StandardizedPrompt } from "../utils/standardized-prompt";
 
 export class DeepseekWebViewProvider extends BaseWebViewProvider {
   public static readonly viewId = "chatView";
@@ -39,29 +40,19 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
-        this.chatHistory.push(
-          Message.of({
-            role: "assistant",
-            content: response,
-          }),
+        await this.modelChatHistory(
+          "assistant",
+          response,
+          "deepseek",
+          COMMON.SHARED_CHAT_HISTORY,
         );
       } else {
-        this.chatHistory.push(
-          Message.of({
-            role: "user",
-            content: response,
-          }),
+        await this.modelChatHistory(
+          "user",
+          response,
+          "deepseek",
+          COMMON.SHARED_CHAT_HISTORY,
         );
-      }
-
-      if (this.chatHistory.length === 2) {
-        const chatHistory = Memory.has(COMMON.DEEPSEEK_CHAT_HISTORY)
-          ? Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY)
-          : [];
-        Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, [
-          ...chatHistory,
-          ...this.chatHistory,
-        ]);
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -69,7 +60,7 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
       });
     } catch (error) {
       this.logger.error("Error sending response", error);
-      Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, []);
+      Memory.set(COMMON.SHARED_CHAT_HISTORY, []);
       console.error(error);
     }
   }
@@ -85,23 +76,26 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
         return;
       }
 
-      const userMessage = Message.of({
-        role: "user",
-        content: message,
-      });
+      // Create standardized prompt for user input
+      const context =
+        metaData?.context?.length > 0
+          ? await this.getContext(metaData.context)
+          : undefined;
+      const standardizedPrompt = StandardizedPrompt.create(message, context);
 
-      let chatHistory = Memory.has(COMMON.DEEPSEEK_CHAT_HISTORY)
-        ? Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY)
-        : [userMessage];
+      // Use shared chat history like other providers
+      let chatHistory = await this.modelChatHistory(
+        "user",
+        standardizedPrompt,
+        "deepseek",
+        COMMON.SHARED_CHAT_HISTORY,
+      );
 
-      chatHistory = [...chatHistory, userMessage];
-
-      Memory.removeItems(COMMON.DEEPSEEK_CHAT_HISTORY);
       const result = await this.deepseekLLM.generateText(message);
       return result;
     } catch (error) {
       this.logger.error("Error generating response", error);
-      Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, []);
+      Memory.set(COMMON.SHARED_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );

@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { Orchestrator } from "../agents/orchestrator";
+import { COMMON } from "../application/constant";
 import {
   FolderEntry,
   IContextInfo,
@@ -29,6 +30,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly fileManager: FileManager;
   private readonly agentService: AgentService;
   protected readonly chatHistoryManager: ChatHistoryManager;
+  private workspacePublished = false; // Track if workspace has been published
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -109,6 +111,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.setupMessageHandler(this.currentWebView);
     // Get the current workspace files from DB.
     await this.getFiles();
+    // Publish workspace immediately on webview load
+    await this.publishWorkSpaceOnce();
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
@@ -170,6 +174,13 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
   }
 
+  private async publishWorkSpaceOnce(): Promise<void> {
+    if (!this.workspacePublished) {
+      await this.publishWorkSpace();
+      this.workspacePublished = true;
+    }
+  }
+
   private UserMessageCounter = 0;
 
   private async setupMessageHandler(_view: vscode.WebviewView): Promise<void> {
@@ -183,7 +194,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
               // Check if we should prune history for performance
               if (this.UserMessageCounter % 10 === 0) {
-                const stats = await this.getChatHistoryStats("agentId");
+                const stats = await this.getChatHistoryStats(
+                  COMMON.SHARED_CHAT_HISTORY,
+                );
                 if (
                   stats.totalMessages > 100 ||
                   stats.estimatedTokens > 16000
@@ -192,7 +205,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     `High chat history usage detected: ${stats.totalMessages} messages, ${stats.estimatedTokens} tokens`,
                   );
                   // Optionally trigger manual pruning here
-                  // await this.pruneHistoryManually("agentId", { maxMessages: 50, maxTokens: 8000 });
+                  // await this.pruneHistoryManually(COMMON.SHARED_CHAT_HISTORY, { maxMessages: 50, maxTokens: 8000 });
                 }
               }
 
@@ -200,17 +213,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 message.message,
                 message.metaData,
               );
-              if (this.UserMessageCounter === 1) {
-                await this.publishWorkSpace();
-              }
               if (response) {
                 await this.sendResponse(formatText(response), "bot");
               }
               break;
             }
-            // case "webview-ready":
-            //   await this.publishWorkSpace();
-            //   break;
+            case "webview-ready":
+              await this.publishWorkSpaceOnce();
+              break;
             case "upload-file":
               await this.fileManager.uploadFileHandler();
               break;
@@ -222,7 +232,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             //   this.orchestrator.publish("onHistoryUpdated", message);
             //   break;
             case "clear-history":
-              await this.chatHistoryManager.clearHistory("agentId");
+              await this.chatHistoryManager.clearHistory(
+                COMMON.SHARED_CHAT_HISTORY,
+              );
               this.orchestrator.publish("onClearHistory", message);
               break;
             case "update-user-info":
@@ -267,8 +279,19 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.logger.debug(
       `Disposing BaseWebViewProvider with ${this.disposables.length} disposables`,
     );
-    this.disposables.forEach((d) => d.dispose());
-    this.disposables.length = 0; // Clear the array
+    try {
+      this.disposables.forEach((d) => {
+        try {
+          d.dispose();
+        } catch (err) {
+          this.logger.error(`Error disposing of disposable: ${err}`);
+        }
+      });
+    } catch (error: any) {
+      this.logger.error(`Error during dispose: ${error.message}`);
+    } finally {
+      this.disposables.length = 0; // Clear the array
+    }
   }
 
   async getContext(files: string[]) {

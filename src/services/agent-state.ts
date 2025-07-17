@@ -1,7 +1,7 @@
 import { AgentState } from "../agents/interface";
 import { COMMON } from "../application/constant";
 import { GeminiLLMSnapShot } from "../llms/interface";
-import { FileStorage, IStorage } from "./file-storage";
+import { OptimizedFileStorage, IStorage } from "./file-storage-optimized";
 
 export class AgentService {
   private static instance: AgentService;
@@ -13,7 +13,7 @@ export class AgentService {
 
   public static getInstance(): AgentService {
     if (!AgentService.instance) {
-      AgentService.instance = new AgentService(new FileStorage());
+      AgentService.instance = new AgentService(new OptimizedFileStorage());
     }
     return AgentService.instance;
   }
