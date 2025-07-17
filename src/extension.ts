@@ -6,7 +6,6 @@ import {
   APP_CONFIG,
   CODEBUDDY_ACTIONS,
   generativeAiModels,
-  USER_MESSAGE,
 } from "./application/constant";
 import { Comments } from "./commands/comment";
 import { ExplainCode } from "./commands/explain";
@@ -81,46 +80,31 @@ export async function activate(context: vscode.ExtensionContext) {
       restart,
       reviewPR,
     } = CODEBUDDY_ACTIONS;
-    const getComment = new Comments(
-      `${USER_MESSAGE} generates the code comments...`,
-      context,
-    );
-    const getInLineChat = new InLineChat(
-      `${USER_MESSAGE} generates a response...`,
-      context,
-    );
+    const getComment = new Comments(CODEBUDDY_ACTIONS.comment, context);
+    const getInLineChat = new InLineChat(CODEBUDDY_ACTIONS.inlineChat, context);
     const generateOptimizeCode = new OptimizeCode(
-      `${USER_MESSAGE} optimizes the code...`,
+      CODEBUDDY_ACTIONS.optimize,
       context,
     );
     const generateRefactoredCode = new RefactorCode(
-      `${USER_MESSAGE} refactors the code...`,
+      CODEBUDDY_ACTIONS.refactor,
       context,
     );
-    const explainCode = new ExplainCode(
-      `${USER_MESSAGE} explains the code...`,
-      context,
-    );
-    const generateReview = new ReviewCode(
-      `${USER_MESSAGE} reviews the code...`,
-      context,
-    );
+    const explainCode = new ExplainCode(CODEBUDDY_ACTIONS.explain, context);
+    const generateReview = new ReviewCode(CODEBUDDY_ACTIONS.review, context);
     const generateMermaidDiagram = new GenerateMermaidDiagram(
-      `${USER_MESSAGE} creates the mermaid diagram...`,
+      CODEBUDDY_ACTIONS.generateDiagram,
       context,
     );
     const generateCommitMessage = new GenerateCommitMessage(
-      `${USER_MESSAGE} generates a commit message...`,
+      CODEBUDDY_ACTIONS.commitMessage,
       context,
     );
     const generateInterviewQuestions = new InterviewMe(
-      `${USER_MESSAGE} generates interview questions...`,
+      CODEBUDDY_ACTIONS.interviewMe,
       context,
     );
-    const reviewPRCommand = new ReviewPR(
-      `${USER_MESSAGE} reviews the pull request...`,
-      context,
-    );
+    const reviewPRCommand = new ReviewPR(CODEBUDDY_ACTIONS.reviewPR, context);
 
     const actionMap = {
       [comment]: async () => {
@@ -154,11 +138,10 @@ export async function activate(context: vscode.ExtensionContext) {
         );
       },
       [fix]: (errorMessage: string) => {
-        new FixError(
-          `${USER_MESSAGE} finds a solution to the error...`,
-          context,
+        new FixError(CODEBUDDY_ACTIONS.fix, context, errorMessage).execute(
           errorMessage,
-        ).execute(errorMessage, "🔧 Debug and fix the issue");
+          "🔧 Debug and fix the issue",
+        );
       },
       [explain]: async () => {
         await explainCode.execute(
