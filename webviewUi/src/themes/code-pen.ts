@@ -1,3 +1,8 @@
+import {
+  generateSkeletonLoaderCSS,
+  SKELETON_THEME_PRESETS,
+} from "./skeletonLoader";
+
 export const codePenCss = `/*
   codepen.io Embed Theme
   Author: Justin Perry <http://github.com/ourmaninamsterdam>
@@ -53,4 +58,6 @@ export const codePenCss = `/*
 
 .hljs-strong {
   font-weight: bold;
-}`;
+}
+
+${generateSkeletonLoaderCSS(SKELETON_THEME_PRESETS.codePen)}`;

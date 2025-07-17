@@ -1,3 +1,8 @@
+import {
+  generateSkeletonLoaderCSS,
+  SKELETON_THEME_PRESETS,
+} from "./skeletonLoader";
+
 export const tokyoNightCss = `/*!
   Theme: Tokyo-night-Dark
   origin: https://github.com/enkia/tokyo-night-vscode-theme
@@ -117,4 +122,6 @@ export const tokyoNightCss = `/*!
 
 .hljs-strong {
   font-weight: bold;
-}`;
+}
+
+${generateSkeletonLoaderCSS(SKELETON_THEME_PRESETS.tokyoNight)}`;

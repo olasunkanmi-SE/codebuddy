@@ -20,7 +20,6 @@ import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
 import AttachmentIcon from "./attachmentIcon";
-import { BotIcon } from "./botIcon";
 import { BotMessage } from "./botMessage";
 import { UserMessage } from "./personMessage";
 import { ModelDropdown } from "./select";
@@ -29,6 +28,7 @@ import TextInput from "./textInput";
 import ToggleButton from "./toggleButton";
 import Button from "./button";
 import { FAQAccordion } from "./accordion";
+import { SkeletonLoader } from "./skeletonLoader";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -62,7 +62,6 @@ export const WebviewUI = () => {
 
   useEffect(() => {
     const messageHandler = (event: any) => {
-      setIsBotLoading(true);
       const message = event.data;
       switch (message.type) {
         case "bot-response":
@@ -75,6 +74,7 @@ export const WebviewUI = () => {
               alias: "O",
             },
           ]);
+          setIsBotLoading(false);
           break;
         case "bootstrap":
           setFolders(message);
@@ -86,10 +86,10 @@ export const WebviewUI = () => {
             console.log(error);
             throw new Error(error.message);
           }
-
           break;
         case "error":
           console.error("Extension error", message.payload);
+          setIsBotLoading(false);
           break;
         case "onActiveworkspaceUpdate":
           setActiveEditor(message.message ?? "");
@@ -111,11 +111,14 @@ export const WebviewUI = () => {
       }
     };
     window.addEventListener("message", messageHandler);
-    highlightCodeBlocks(hljsApi, messages);
-    setIsBotLoading(false);
     return () => {
       window.removeEventListener("message", messageHandler);
     };
+  }, []);
+
+  // Separate effect for highlighting code blocks
+  useEffect(() => {
+    highlightCodeBlocks(hljsApi, messages);
   }, [messages]);
 
   const handleClearHistory = () => {
@@ -130,15 +133,6 @@ export const WebviewUI = () => {
       }),
     });
   };
-
-  // useEffect(() => {
-  //   if (messages.length > 0) {
-  //     vsCode.postMessage({
-  //       command: "messages-updated",
-  //       message: messages[messages.length - 1],
-  //     });
-  //   }
-  // }, [messages]);
 
   const handleContextChange = (value: string) => {
     setSelectedContext(value);
@@ -244,7 +238,7 @@ export const WebviewUI = () => {
                     <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
                   )
                 )}
-                {isBotLoading && <BotIcon isBlinking={true} />}
+                {isBotLoading && <SkeletonLoader />}
               </div>
             </div>
           </div>

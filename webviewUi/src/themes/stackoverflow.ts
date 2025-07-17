@@ -1,3 +1,8 @@
+import {
+  generateSkeletonLoaderCSS,
+  SKELETON_THEME_PRESETS,
+} from "./skeletonLoader";
+
 export const stackOverFlowCss = `/*!
   Theme: StackOverflow Dark
   Description: Dark theme as used on stackoverflow.com
@@ -123,4 +128,6 @@ export const stackOverFlowCss = `/*!
 .hljs-punctuation,
 .hljs-tag {
   /* purposely ignored */
-}`;
+}
+
+${generateSkeletonLoaderCSS(SKELETON_THEME_PRESETS.stackoverflow)}`;

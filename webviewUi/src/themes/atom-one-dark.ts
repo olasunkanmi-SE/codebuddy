@@ -1,3 +1,8 @@
+import {
+  generateSkeletonLoaderCSS,
+  SKELETON_THEME_PRESETS,
+} from "./skeletonLoader";
+
 export const oneDarkCss = `/*
 
 Atom One Dark by Daniel Gamage
@@ -91,4 +96,6 @@ hue-6-2: #e6c07b
 
 .hljs-link {
   text-decoration: underline;
-}`;
+}
+
+${generateSkeletonLoaderCSS(SKELETON_THEME_PRESETS.atomOneDark)}`;

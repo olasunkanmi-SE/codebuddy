@@ -1,3 +1,8 @@
+import {
+  generateSkeletonLoaderCSS,
+  SKELETON_THEME_PRESETS,
+} from "./skeletonLoader";
+
 export const githubDarkDimmed = `/*!
   Theme: GitHub Dark
   Description: Dark theme as seen on github.com
@@ -122,4 +127,6 @@ export const githubDarkDimmed = `/*!
 .hljs-punctuation,
 .hljs-tag {
     /* purposely ignored */
-}`;
+}
+
+${generateSkeletonLoaderCSS(SKELETON_THEME_PRESETS.githubDark)}`;

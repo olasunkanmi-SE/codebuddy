@@ -1,3 +1,8 @@
+import {
+  generateSkeletonLoaderCSS,
+  SKELETON_THEME_PRESETS,
+} from "./skeletonLoader";
+
 export const irBlack = `/*
   IR_Black style (c) Vasily Mikhailitchenko <vaskas@programica.ru>
 */
@@ -67,4 +72,6 @@ export const irBlack = `/*
 
 .hljs-strong {
   font-weight: bold;
-}`;
+}
+
+${generateSkeletonLoaderCSS(SKELETON_THEME_PRESETS.irBlack)}`;

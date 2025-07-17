@@ -1,3 +1,8 @@
+import {
+  generateSkeletonLoaderCSS,
+  SKELETON_THEME_PRESETS,
+} from "./skeletonLoader";
+
 export const nightOwlCss = `/*
 
 Night Owl for highlight.js (c) Carl Baxter <carl@cbax.tech>
@@ -176,4 +181,6 @@ SOFTWARE.
 .hljs-deletion {
   color: #EF535090;
   font-style: italic;
-}`;
+}
+
+${generateSkeletonLoaderCSS(SKELETON_THEME_PRESETS.nightOwl)}`;

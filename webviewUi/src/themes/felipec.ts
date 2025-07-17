@@ -1,3 +1,8 @@
+import {
+  generateSkeletonLoaderCSS,
+  SKELETON_THEME_PRESETS,
+} from "./skeletonLoader";
+
 export const felipecCss = `/*!
  * Theme: FelipeC
  * Author: (c) 2021 Felipe Contreras <felipe.contreras@gmail.com>
@@ -100,4 +105,6 @@ export const felipecCss = `/*!
 
 .hljs-emphasis {
   font-style: italic;
-}`;
+}
+
+${generateSkeletonLoaderCSS(SKELETON_THEME_PRESETS.felipec)}`;

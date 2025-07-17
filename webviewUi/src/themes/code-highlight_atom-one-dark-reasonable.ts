@@ -6,6 +6,11 @@ Original One Dark Syntax theme from https://github.com/atom/one-dark-syntax
 
 */
 
+import {
+  generateSkeletonLoaderCSS,
+  SKELETON_THEME_PRESETS,
+} from "./skeletonLoader";
+
 export const oneDarkReasonableCss: string = `
 .hljs {
     color: #abb2bf;
@@ -73,4 +78,6 @@ export const oneDarkReasonableCss: string = `
 }
 .hljs-link {
     text-decoration: underline;
-}`;
+}
+
+${generateSkeletonLoaderCSS(SKELETON_THEME_PRESETS.atomOneDark)}`;
