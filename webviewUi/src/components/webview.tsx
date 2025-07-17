@@ -62,7 +62,6 @@ export const WebviewUI = () => {
 
   useEffect(() => {
     const messageHandler = (event: any) => {
-      setIsBotLoading(true);
       const message = event.data;
       switch (message.type) {
         case "bot-response":
@@ -75,6 +74,7 @@ export const WebviewUI = () => {
               alias: "O",
             },
           ]);
+          setIsBotLoading(false);
           break;
         case "bootstrap":
           setFolders(message);
@@ -86,10 +86,10 @@ export const WebviewUI = () => {
             console.log(error);
             throw new Error(error.message);
           }
-
           break;
         case "error":
           console.error("Extension error", message.payload);
+          setIsBotLoading(false);
           break;
         case "onActiveworkspaceUpdate":
           setActiveEditor(message.message ?? "");
@@ -111,11 +111,14 @@ export const WebviewUI = () => {
       }
     };
     window.addEventListener("message", messageHandler);
-    highlightCodeBlocks(hljsApi, messages);
-    setIsBotLoading(false);
     return () => {
       window.removeEventListener("message", messageHandler);
     };
+  }, []);
+
+  // Separate effect for highlighting code blocks
+  useEffect(() => {
+    highlightCodeBlocks(hljsApi, messages);
   }, [messages]);
 
   const handleClearHistory = () => {

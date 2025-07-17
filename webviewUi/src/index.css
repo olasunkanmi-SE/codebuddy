@@ -276,6 +276,7 @@ vscode-button>.codicon {
   border-radius: 6px;
   font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
   margin: 16px 0;
+  position: relative;
 }
 
 .code-header {
@@ -285,6 +286,23 @@ vscode-button>.codicon {
   padding: 8px 16px;
   border-top-left-radius: 6px;
   border-top-right-radius: 6px;
+  position: relative;
+}
+
+.code-header .language-label {
+  flex: 1;
+}
+
+.header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.code-header .download-button,
+.code-header .copy-button {
+  flex-shrink: 0;
+  margin-left: 0;
 }
 
 .language-label {
@@ -545,15 +563,62 @@ hr {
   padding: 4px 8px;
   font-size: 12px;
   cursor: pointer;
-  margin-left: 12px;
+  margin-left: 8px;
   transition: background 0.3s ease, border-color 0.3s ease;
-  float: right;
+  background: transparent;
+  color: var(--vscode-editor-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .copy-button:hover {
   background: #494f69;
   border-color: #494f69;
   color: white;
+}
+
+.download-button {
+  border: 1px solid #28a745;
+  background: transparent;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-editor-foreground);
+  margin-left: 8px;
+}
+
+.download-button:hover {
+  background: #28a745;
+  border-color: #28a745;
+  color: white;
+}
+
+.download-button.downloading {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.download-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.download-button svg {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+}
+
+.download-text {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.8;
 }
 
 .app-container {

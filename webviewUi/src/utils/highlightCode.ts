@@ -48,7 +48,24 @@ export const highlightCodeBlocks = (hljsApi: HLJSApi, messages: any) => {
           }
         });
 
-        block.parentNode?.insertBefore(copyButton, block);
+        // Find the closest code-block parent and add the button to the header buttons container
+        const codeBlockParent = block.closest(".code-block");
+        if (codeBlockParent) {
+          const headerButtons =
+            codeBlockParent.querySelector(".header-buttons");
+          if (headerButtons) {
+            headerButtons.appendChild(copyButton);
+          } else {
+            const codeHeader = codeBlockParent.querySelector(".code-header");
+            if (codeHeader) {
+              codeHeader.appendChild(copyButton);
+            } else {
+              codeBlockParent.appendChild(copyButton);
+            }
+          }
+        } else {
+          block.parentNode?.insertBefore(copyButton, block);
+        }
       }
     } catch (error) {
       console.error("Highlighting failed:", error);

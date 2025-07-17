@@ -3,7 +3,7 @@ import { BotIcon } from "./botIcon";
 
 export const SkeletonLoader: React.FC = () => {
   return (
-    <div className="skeleton-loader">
+    <div className="skeleton-loader-container">
       <div className="skeleton-header">
         <BotIcon isBlinking={true} />
         <div className="skeleton-line skeleton-line-short"></div>
