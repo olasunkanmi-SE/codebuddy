@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import { Orchestrator } from "./agents/orchestrator";
 import {
@@ -16,15 +18,12 @@ import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
+import { ReviewPR } from "./commands/review-pr";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
-import { dbManager } from "./infrastructure/repository/db-manager";
 import { Memory } from "./memory/base";
-import { FileManager } from "./services/file-manager";
 import { FileUploadService } from "./services/file-upload";
 import { FileWatcherService } from "./services/file-watcher";
-import { Credentials } from "./services/github-authentication";
-import { SecretStorageService } from "./services/secret-storage";
 import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
@@ -54,26 +53,8 @@ let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
 let orchestrator = Orchestrator.getInstance();
 
-// async function connectToDatabase(context: vscode.ExtensionContext) {
-//   try {
-//     console.log(process.versions);
-//     const storagePath = context.globalStorageUri.fsPath;
-//     dbManager.open(storagePath);
-//     if (dbManager.healthCheck()) {
-//       logger.info("Database connected successfully");
-//     }
-//   } catch (error: any) {
-//     logger.error("Unable to connect to DB", error);
-//     throw new Error(error);
-//   }
-// }
-
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    // await connectToDatabase(context);
-    // const secretStorageService = new SecretStorageService(context);
-
-    // Initialize and start the orchestrator
     orchestrator.start();
 
     const { apiKey, model } = getAPIKeyAndModel("gemini");
@@ -97,6 +78,8 @@ export async function activate(context: vscode.ExtensionContext) {
       interviewMe,
       generateDiagram,
       inlineChat,
+      restart,
+      reviewPR,
     } = CODEBUDDY_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
@@ -132,6 +115,10 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     const generateInterviewQuestions = new InterviewMe(
       `${USER_MESSAGE} generates interview questions...`,
+      context,
+    );
+    const reviewPRCommand = new ReviewPR(
+      `${USER_MESSAGE} reviews the pull request...`,
       context,
     );
 
@@ -197,11 +184,25 @@ export async function activate(context: vscode.ExtensionContext) {
           "💬 Discuss and reason about your code with me",
         );
       },
+      [restart]: async () => {
+        await restartExtension(context);
+      },
+      [reviewPR]: async () => {
+        await reviewPRCommand.execute(
+          undefined,
+          "🔍 Conducting comprehensive pull request review",
+        );
+      },
     };
 
     let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
-      ([action, handler]) => vscode.commands.registerCommand(action, handler),
+      ([action, handler]) => {
+        console.log(`Registering command: ${action}`);
+        return vscode.commands.registerCommand(action, handler);
+      },
     );
+
+    console.log(`Total commands registered: ${subscriptions.length}`);
 
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
 
@@ -277,7 +278,67 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 }
 
+/**
+ * Restarts the extension by clearing state and reloading the window
+ */
+async function restartExtension(context: vscode.ExtensionContext) {
+  try {
+    console.log("Restarting CodeBuddy extension...");
+
+    // Show confirmation dialog
+    const choice = await vscode.window.showInformationMessage(
+      "Are you sure you want to restart the CodeBuddy extension?",
+      "Restart",
+      "Cancel",
+    );
+
+    if (choice === "Restart") {
+      // Clear extension state
+      clearFileStorageData();
+
+      // Dispose resources
+      if (quickFixCodeAction) {
+        quickFixCodeAction.dispose();
+      }
+      if (agentEventEmmitter) {
+        agentEventEmmitter.dispose();
+      }
+      if (orchestrator) {
+        orchestrator.dispose();
+      }
+      if (fileWatcher) {
+        fileWatcher.dispose();
+      }
+
+      // Show progress and reload window
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Restarting CodeBuddy...",
+          cancellable: false,
+        },
+        async (progress) => {
+          progress.report({ increment: 50, message: "Cleaning up..." });
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          progress.report({ increment: 100, message: "Reloading..." });
+          await vscode.commands.executeCommand("workbench.action.reloadWindow");
+        },
+      );
+    }
+  } catch (error) {
+    console.error("Error restarting extension:", error);
+    vscode.window.showErrorMessage(
+      "Failed to restart extension. Please reload VS Code manually.",
+    );
+  }
+}
+
 export function deactivate(context: vscode.ExtensionContext) {
+  console.log("Deactivating CodeBuddy extension...");
+
+  // Clear database history before deactivation
+  clearFileStorageData();
+
   quickFixCodeAction.dispose();
   agentEventEmmitter.dispose();
   orchestrator.dispose();
@@ -288,4 +349,30 @@ export function deactivate(context: vscode.ExtensionContext) {
   providerManager.dispose();
 
   context.subscriptions.forEach((subscription) => subscription.dispose());
+
+  console.log("CodeBuddy extension deactivated successfully");
+}
+
+/**
+ * Clears file storage data (.codebuddy folder contents)
+ */
+function clearFileStorageData() {
+  try {
+    const workSpaceRoot =
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+    const codeBuddyPath = path.join(workSpaceRoot, ".codebuddy");
+
+    if (fs.existsSync(codeBuddyPath)) {
+      const files = fs.readdirSync(codeBuddyPath);
+      files.forEach((file: string) => {
+        const filePath = path.join(codeBuddyPath, file);
+        if (fs.lstatSync(filePath).isFile()) {
+          fs.unlinkSync(filePath);
+        }
+      });
+      console.log(`Cleared ${files.length} files from .codebuddy folder`);
+    }
+  } catch (error) {
+    console.error("Error clearing file storage data:", error);
+  }
 }
