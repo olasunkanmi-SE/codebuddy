@@ -440,10 +440,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
 
     if (prompt && response) {
       let chatHistory;
+      const MAX_HISTORY_ITEMS = 20; // Limit chat history to prevent memory issues
+
       switch (model) {
-        case generativeAiModels.GEMINI:
+        case generativeAiModels.GEMINI: {
           chatHistory = getLatestChatHistory(COMMON.GEMINI_CHAT_HISTORY);
-          Memory.set(COMMON.GEMINI_CHAT_HISTORY, [
+          const newGeminiHistory = [
             ...chatHistory,
             {
               role: "user",
@@ -453,11 +455,20 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
               role: "model",
               parts: [{ text: response }],
             },
-          ]);
+          ];
+
+          // Trim history if too long (keep system messages at start)
+          const trimmedGeminiHistory =
+            newGeminiHistory.length > MAX_HISTORY_ITEMS
+              ? newGeminiHistory.slice(-MAX_HISTORY_ITEMS)
+              : newGeminiHistory;
+
+          Memory.set(COMMON.GEMINI_CHAT_HISTORY, trimmedGeminiHistory);
           break;
-        case generativeAiModels.GROQ:
+        }
+        case generativeAiModels.GROQ: {
           chatHistory = getLatestChatHistory(COMMON.GROQ_CHAT_HISTORY);
-          Memory.set(COMMON.GROQ_CHAT_HISTORY, [
+          const newGroqHistory = [
             ...chatHistory,
             {
               role: "user",
@@ -467,11 +478,19 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
               role: "system",
               content: response,
             },
-          ]);
+          ];
+
+          const trimmedGroqHistory =
+            newGroqHistory.length > MAX_HISTORY_ITEMS
+              ? newGroqHistory.slice(-MAX_HISTORY_ITEMS)
+              : newGroqHistory;
+
+          Memory.set(COMMON.GROQ_CHAT_HISTORY, trimmedGroqHistory);
           break;
-        case generativeAiModels.ANTHROPIC:
+        }
+        case generativeAiModels.ANTHROPIC: {
           chatHistory = getLatestChatHistory(COMMON.ANTHROPIC_CHAT_HISTORY);
-          Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, [
+          const newAnthropicHistory = [
             ...chatHistory,
             {
               role: "user",
@@ -481,11 +500,19 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
               role: "assistant",
               content: response,
             },
-          ]);
+          ];
+
+          const trimmedAnthropicHistory =
+            newAnthropicHistory.length > MAX_HISTORY_ITEMS
+              ? newAnthropicHistory.slice(-MAX_HISTORY_ITEMS)
+              : newAnthropicHistory;
+
+          Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, trimmedAnthropicHistory);
           break;
-        case generativeAiModels.GROK:
+        }
+        case generativeAiModels.GROK: {
           chatHistory = getLatestChatHistory(COMMON.ANTHROPIC_CHAT_HISTORY);
-          Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, [
+          const newGrokHistory = [
             ...chatHistory,
             {
               role: "user",
@@ -495,8 +522,16 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
               role: "assistant",
               content: response,
             },
-          ]);
+          ];
+
+          const trimmedGrokHistory =
+            newGrokHistory.length > MAX_HISTORY_ITEMS
+              ? newGrokHistory.slice(-MAX_HISTORY_ITEMS)
+              : newGrokHistory;
+
+          Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, trimmedGrokHistory);
           break;
+        }
         default:
           throw new Error(`Generative model ${model} not available`);
       }
