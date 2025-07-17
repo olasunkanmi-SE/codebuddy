@@ -29,6 +29,7 @@ import ToggleButton from "./toggleButton";
 import Button from "./button";
 import { FAQAccordion } from "./accordion";
 import { SkeletonLoader } from "./skeletonLoader";
+import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -52,6 +53,9 @@ export const WebviewUI = () => {
   const [userInput, setUserInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isBotLoading, setIsBotLoading] = useState(false);
+  const [commandAction, setCommandAction] = useState<string>("");
+  const [commandDescription, setCommandDescription] = useState<string>("");
+  const [isCommandExecuting, setIsCommandExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState("tab-1");
   const [selectedContext, setSelectedContext] = useState("");
   const [folders, setFolders] = useState<any>("");
@@ -75,6 +79,22 @@ export const WebviewUI = () => {
             },
           ]);
           setIsBotLoading(false);
+          setIsCommandExecuting(false);
+          setCommandAction("");
+          setCommandDescription("");
+          break;
+        case "codebuddy-commands":
+          // Handle command feedback - show what action is being performed
+          console.log("Command feedback received:", message.message);
+          setIsCommandExecuting(true);
+          if (typeof message.message === "object" && message.message.action && message.message.description) {
+            setCommandAction(message.message.action);
+            setCommandDescription(message.message.description);
+          } else {
+            // Fallback for legacy string format
+            setCommandAction(message.message || "Processing request");
+            setCommandDescription("CodeBuddy is analyzing your code and generating a response...");
+          }
           break;
         case "bootstrap":
           setFolders(message);
@@ -238,7 +258,10 @@ export const WebviewUI = () => {
                     <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
                   )
                 )}
-                {isBotLoading && <SkeletonLoader />}
+                {isCommandExecuting && (
+                  <CommandFeedbackLoader commandAction={commandAction} commandDescription={commandDescription} />
+                )}
+                {isBotLoading && !isCommandExecuting && <SkeletonLoader />}
               </div>
             </div>
           </div>
