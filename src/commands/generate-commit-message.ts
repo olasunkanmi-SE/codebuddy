@@ -1,87 +1,28 @@
-import simpleGit, { GitError, SimpleGit, SimpleGitOptions } from "simple-git";
-import { CodeCommandHandler } from "./handler";
 import * as vscode from "vscode";
+import { CodeCommandHandler } from "./handler";
+import { GitActions } from "../services/git-actions";
 import { formatText } from "../utils/utils";
 
 export class GenerateCommitMessage extends CodeCommandHandler {
+  private readonly gitActions: GitActions;
+
   constructor(action: string, context: vscode.ExtensionContext) {
     super(action, context);
+    this.gitActions = new GitActions();
   }
 
-  async getStagedDifferenceSummary() {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-
-    if (!workspaceFolders) {
-      vscode.window.showErrorMessage("No workspace folder is open");
-      return;
-    }
-
-    const rootPath = workspaceFolders[0].uri.fsPath;
-    const options: Partial<SimpleGitOptions> = {
-      binary: "git",
-      maxConcurrentProcesses: 6,
-      trimmed: false,
-      baseDir: rootPath,
-    };
+  /**
+   * Get staged differences summary using GitActions
+   */
+  async getStagedDifferenceSummary(): Promise<string> {
     try {
-      const git: SimpleGit = simpleGit(options);
-      const stagedDiffSummay = await git.diffSummary("--staged");
-
-      const fileDifferencePromises = stagedDiffSummay.files.map(
-        async (file) => {
-          try {
-            let fileDiff;
-            if (file.file.includes("_deleted_")) {
-              fileDiff = "File deleted";
-            } else {
-              fileDiff = await git.diff(["--staged"]);
-            }
-            return { file: file.file, diff: fileDiff, error: null };
-          } catch (error: any) {
-            if (
-              error instanceof GitError &&
-              error.message.includes(
-                "unknown revision or path not in the working tree",
-              )
-            ) {
-              try {
-                const fileContent = await git.catFile([
-                  "-p",
-                  `:0:${file.file}`,
-                ]);
-                return {
-                  file: file.file,
-                  diff: `New file: ${file.file}\n${fileContent}`,
-                  error: null,
-                };
-              } catch (catError: any) {
-                return {
-                  file: file.file,
-                  diff: null,
-                  error: `Error getting content for new file: ${catError.message}`,
-                };
-              }
-            } else {
-              return { file: file.file, diff: null, error: error.message };
-            }
-          }
-        },
-      );
-
-      const fileDiffs = await Promise.all(fileDifferencePromises);
-      let differenceSummary = "";
-
-      fileDiffs.forEach(({ file, diff, error }) => {
-        if (error) {
-          console.error(`Error: ${error}`);
-        } else {
-          differenceSummary = `\nFile: ${diff}`;
-        }
-      });
-      console.log({ differenceSummary });
-      return differenceSummary;
+      return await this.gitActions.getStagedDifferenceSummary();
     } catch (error) {
-      console.log(error);
+      console.error("Error getting staged differences:", error);
+      vscode.window.showErrorMessage(
+        "Failed to get staged changes. Please ensure you have staged changes.",
+      );
+      throw error;
     }
   }
 

@@ -15,6 +15,8 @@ export enum CODEBUDDY_ACTIONS {
   generateUnitTest = "CodeBuddy.generateUnitTest",
   generateDiagram = "CodeBuddy.generateMermaidDiagram",
   inlineChat = "CodeBuddy.inLineChat",
+  restart = "CodeBuddy.restart",
+  reviewPR = "CodeBuddy.reviewPR",
 }
 export enum COMMON {
   GROQ_CHAT_HISTORY = "groqChatHistory",

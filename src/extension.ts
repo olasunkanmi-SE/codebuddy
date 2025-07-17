@@ -18,6 +18,7 @@ import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
+import { ReviewPR } from "./commands/review-pr";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
@@ -77,6 +78,8 @@ export async function activate(context: vscode.ExtensionContext) {
       interviewMe,
       generateDiagram,
       inlineChat,
+      restart,
+      reviewPR,
     } = CODEBUDDY_ACTIONS;
     const getComment = new Comments(
       `${USER_MESSAGE} generates the code comments...`,
@@ -112,6 +115,10 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     const generateInterviewQuestions = new InterviewMe(
       `${USER_MESSAGE} generates interview questions...`,
+      context,
+    );
+    const reviewPRCommand = new ReviewPR(
+      `${USER_MESSAGE} reviews the pull request...`,
       context,
     );
 
@@ -177,11 +184,25 @@ export async function activate(context: vscode.ExtensionContext) {
           "💬 Discuss and reason about your code with me",
         );
       },
+      [restart]: async () => {
+        await restartExtension(context);
+      },
+      [reviewPR]: async () => {
+        await reviewPRCommand.execute(
+          undefined,
+          "🔍 Conducting comprehensive pull request review",
+        );
+      },
     };
 
     let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
-      ([action, handler]) => vscode.commands.registerCommand(action, handler),
+      ([action, handler]) => {
+        console.log(`Registering command: ${action}`);
+        return vscode.commands.registerCommand(action, handler);
+      },
     );
+
+    console.log(`Total commands registered: ${subscriptions.length}`);
 
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
 
@@ -254,6 +275,61 @@ export async function activate(context: vscode.ExtensionContext) {
       "An Error occured while setting up generative AI model",
     );
     console.log(error);
+  }
+}
+
+/**
+ * Restarts the extension by clearing state and reloading the window
+ */
+async function restartExtension(context: vscode.ExtensionContext) {
+  try {
+    console.log("Restarting CodeBuddy extension...");
+
+    // Show confirmation dialog
+    const choice = await vscode.window.showInformationMessage(
+      "Are you sure you want to restart the CodeBuddy extension?",
+      "Restart",
+      "Cancel",
+    );
+
+    if (choice === "Restart") {
+      // Clear extension state
+      clearFileStorageData();
+
+      // Dispose resources
+      if (quickFixCodeAction) {
+        quickFixCodeAction.dispose();
+      }
+      if (agentEventEmmitter) {
+        agentEventEmmitter.dispose();
+      }
+      if (orchestrator) {
+        orchestrator.dispose();
+      }
+      if (fileWatcher) {
+        fileWatcher.dispose();
+      }
+
+      // Show progress and reload window
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Restarting CodeBuddy...",
+          cancellable: false,
+        },
+        async (progress) => {
+          progress.report({ increment: 50, message: "Cleaning up..." });
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          progress.report({ increment: 100, message: "Reloading..." });
+          await vscode.commands.executeCommand("workbench.action.reloadWindow");
+        },
+      );
+    }
+  } catch (error) {
+    console.error("Error restarting extension:", error);
+    vscode.window.showErrorMessage(
+      "Failed to restart extension. Please reload VS Code manually.",
+    );
   }
 }
 
