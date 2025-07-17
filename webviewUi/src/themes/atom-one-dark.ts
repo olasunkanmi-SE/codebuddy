@@ -91,4 +91,64 @@ hue-6-2: #e6c07b
 
 .hljs-link {
   text-decoration: underline;
+}
+
+/* Skeleton Loader Styles */
+.skeleton-loader {
+  background: var(--vscode-editor-background, #282c34);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 8px 0;
+  border: 1px solid var(--vscode-widget-border, #3e4451);
+}
+
+.skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.skeleton-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-line {
+  height: 12px;
+  background: linear-gradient(90deg, 
+    var(--vscode-editor-background, #282c34) 0%,
+    var(--vscode-input-background, #3e4451) 50%,
+    var(--vscode-editor-background, #282c34) 100%
+  );
+  border-radius: 6px;
+  background-size: 200px 100%;
+  background-position: -200px 0;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-line-short {
+  width: 30%;
+}
+
+.skeleton-line-medium {
+  width: 60%;
+}
+
+.skeleton-line-long {
+  width: 80%;
+}
+
+.skeleton-line-full {
+  width: 100%;
+}
+
+@keyframes skeleton-pulse {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
 }`;
