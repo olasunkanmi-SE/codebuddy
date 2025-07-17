@@ -4,6 +4,7 @@ import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { Memory } from "../memory/base";
 import { BaseWebViewProvider } from "./base";
 import { IMessageInput, Message } from "../llms/message";
+import { StandardizedPrompt } from "../utils/standardized-prompt";
 
 export class GroqWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
@@ -69,9 +70,12 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       }
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
 
+      // Create standardized prompt for user input
+      const standardizedPrompt = StandardizedPrompt.create(message, context);
+
       let chatHistory = await this.modelChatHistory(
         "user",
-        `${message} \n context: ${context}`,
+        standardizedPrompt,
         "groq",
         "agentId",
       );

@@ -5,6 +5,7 @@ import { Memory } from "../memory/base";
 import { IMessageInput, Message } from "../llms/message";
 import { DeepseekLLM } from "../llms/deepseek/deepseek";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { StandardizedPrompt } from "../utils/standardized-prompt";
 
 export class DeepseekWebViewProvider extends BaseWebViewProvider {
   public static readonly viewId = "chatView";
@@ -85,9 +86,16 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
         return;
       }
 
+      // Create standardized prompt for user input
+      const context =
+        metaData?.context?.length > 0
+          ? await this.getContext(metaData.context)
+          : undefined;
+      const standardizedPrompt = StandardizedPrompt.create(message, context);
+
       const userMessage = Message.of({
         role: "user",
-        content: message,
+        content: standardizedPrompt,
       });
 
       let chatHistory = Memory.has(COMMON.DEEPSEEK_CHAT_HISTORY)

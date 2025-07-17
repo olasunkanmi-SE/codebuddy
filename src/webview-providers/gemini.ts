@@ -4,6 +4,7 @@ import { COMMON } from "../application/constant";
 import { GeminiLLM } from "../llms/gemini/gemini";
 import { IMessageInput } from "../llms/message";
 import { Memory } from "../memory/base";
+import { StandardizedPrompt } from "../utils/standardized-prompt";
 import { BaseWebViewProvider } from "./base";
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
@@ -67,9 +68,12 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         return;
       }
 
+      // Create standardized prompt for user input
+      const enhancedPrompt = StandardizedPrompt.create(message, context);
+
       let chatHistory = await this.modelChatHistory(
         "user",
-        `${message} \n context: ${context}`,
+        enhancedPrompt,
         "gemini",
         "agentId",
       );
@@ -77,7 +81,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       const chat = this.model.startChat({
         history: [...chatHistory],
       });
-      const result = await chat.sendMessage(message);
+      const result = await chat.sendMessage(enhancedPrompt);
       const response = result.response;
       return response.text();
     } catch (error) {

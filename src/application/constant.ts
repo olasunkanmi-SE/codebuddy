@@ -23,6 +23,7 @@ export enum COMMON {
   GEMINI_CHAT_HISTORY = "geminiChatHistory",
   ANTHROPIC_CHAT_HISTORY = "anthropicChatHistory",
   DEEPSEEK_CHAT_HISTORY = "deepseekChatHistory",
+  SHARED_CHAT_HISTORY = "sharedChatHistory", // Unified chat history for all providers
   USER_INPUT = "user-input",
   BOT = "bot",
   GEMINI_SNAPSHOT = "GeminiSnapshot",

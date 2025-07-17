@@ -12,6 +12,7 @@ import {
   getGenerativeAiModel,
   getXGroKBaseURL,
 } from "../utils/utils";
+import { StandardizedPrompt } from "../utils/standardized-prompt";
 import { BaseWebViewProvider } from "./base";
 
 export class AnthropicWebViewProvider extends BaseWebViewProvider {
@@ -67,9 +68,12 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         this.baseUrl = getXGroKBaseURL();
       }
 
+      // Create standardized prompt for user input
+      const standardizedPrompt = StandardizedPrompt.create(message, context);
+
       let chatHistory = await this.modelChatHistory(
         "user",
-        `${message} \n context: ${context}`,
+        standardizedPrompt,
         "anthropic",
         "agentId",
       );
