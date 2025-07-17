@@ -1,5 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 :root {
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light dark;
@@ -9,6 +11,34 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #16161e;
+}
+
+/* Improved typography */
+body {
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-variant-ligatures: common-ligatures;
+}
+
+/* Better headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #7aa2f7;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+/* Better paragraph text */
+p {
+  margin-bottom: 1.2rem;
+  color: #c0caf5;
+  line-height: 1.65;
 }
 
 
@@ -43,18 +73,15 @@
 
 a {
   font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+  color: #7dcfff;
+  text-decoration: none;
+  transition: color 0.2s ease;
 }
 
 a:hover {
-  color: #535bf2;
+  color: #bb9af7;
+  text-decoration: underline;
 }
-
-/* h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-} */
 
 button {
   border-radius: 8px;
@@ -135,7 +162,7 @@ vscode-text-area {
   border: 2px solid var(--vscode-editor-background);
   border-radius: 6px;
   padding: 8px 12px;
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
   line-height: 1.6;
   min-height: 36px;
@@ -331,7 +358,7 @@ code {
 }
 
 .doc-content {
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
   color: var(--vscode-editor-foreground);
   padding: 16px;
   text-align: left;
@@ -410,38 +437,6 @@ code {
 .doc-content p ol,
 .doc-content p ul {
   margin: 8px 0;
-}
-
-
-/* Headings */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  color: #7aa2f7;
-  margin-top: 2rem;
-  margin-bottom: 1rem;
-  font-weight: 400;
-}
-
-/* Paragraphs and text */
-p {
-  margin-bottom: 1.2rem;
-  color: #c0caf5;
-}
-
-/* Links */
-a {
-  color: #7dcfff;
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-a:hover {
-  color: #bb9af7;
-  text-decoration: underline;
 }
 
 
@@ -546,7 +541,7 @@ hr {
 .url-link {
   color: #007bff;
   font-size: 16px;
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
   text-decoration: none;
   word-wrap: break-word;
@@ -585,7 +580,7 @@ hr {
   border: 1px solid var(--vscode-panel-border);
   border-radius: 6px;
   margin: 16px 0;
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  font-family: "JetBrains Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
 }
 
 .individual-code-header {

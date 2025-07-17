@@ -64,6 +64,14 @@ export const WebviewUI = () => {
   const [darkMode, setDarkMode] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
+  // Signal webview is ready on mount
+  useEffect(() => {
+    vsCode.postMessage({
+      command: "webview-ready",
+      message: "Webview is ready",
+    });
+  }, []);
+
   useEffect(() => {
     const messageHandler = (event: any) => {
       const message = event.data;
