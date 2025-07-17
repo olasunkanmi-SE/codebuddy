@@ -12,14 +12,17 @@ export const highlightCodeBlocks = (hljsApi: HLJSApi, messages: any) => {
   if (!hljsApi || messages?.length <= 0) return;
   document.querySelectorAll("pre code:not(.hljs-done)").forEach((block) => {
     let language = null;
-    const languageClass = Array.from(block.classList).find((className) => className.startsWith("language-"));
+    const languageClass = Array.from(block.classList).find((className) =>
+      className.startsWith("language-"),
+    );
     if (languageClass) {
       language = languageClass.substring("language-".length);
     }
 
     try {
       const decodedCode = decodeHtml(block.textContent ?? "");
-      const detectedLanguage = language ?? hljsApi.highlightAuto(decodedCode).language;
+      const detectedLanguage =
+        language ?? hljsApi.highlightAuto(decodedCode).language;
       if (detectedLanguage != undefined) {
         const highlightedCode = hljsApi.highlight(decodedCode, {
           language: detectedLanguage,
@@ -62,7 +65,8 @@ export const highlightCodeBlocks = (hljsApi: HLJSApi, messages: any) => {
           codeHeader.style.alignItems = "center";
           codeHeader.style.padding = "0.5rem 1rem";
           codeHeader.style.backgroundColor = "var(--vscode-editor-background)";
-          codeHeader.style.borderBottom = "1px solid var(--vscode-panel-border)";
+          codeHeader.style.borderBottom =
+            "1px solid var(--vscode-panel-border)";
           codeHeader.style.fontSize = "0.875rem";
 
           // Add language label

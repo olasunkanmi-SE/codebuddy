@@ -235,14 +235,16 @@ vscode-button>.codicon {
   margin-right: 6px;
 }
 
+/* User Message Component Styles */
 .message-container {
   display: flex;
   gap: 16px;
-  padding: 20px;
-  /* background-color: var(--vscode-editor-background); */
+  padding: 16px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.015));
   border-radius: 8px;
   max-width: 800px;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
+  border: 1px solid transparent;
 }
 
 .avatar-container {
@@ -252,27 +254,26 @@ vscode-button>.codicon {
 .avatar {
   width: 32px;
   height: 32px;
-  background-color: #4a4a4a;
+  background-color: var(--vscode-button-background, #0e639c);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--vscode-button-foreground, #ffffff);
   font-size: 14px;
+  font-weight: 500;
 }
 
 .message-content {
   text-align: left;
   flex: 1;
   font-size: 14px;
-  line-height: 1.5;
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
-  margin-top: 5px;
+  line-height: 1.6;
+  color: var(--vscode-foreground);
+  margin-top: 2px;
 }
 
 .code-block {
-  /* background-color: #1a1b29; */
-  /* border: 1px solid var(--vscode-panel-border); */
   border-radius: 6px;
   font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
   margin: 16px 0;
@@ -962,6 +963,191 @@ hr {
 
 .toggle-button-large.active .toggle-slider::before {
   transform: translateX(32px);
+}
+
+/* Thinking component styles */
+.thinking-container {
+  margin: 16px 0;
+  border: 1px solid var(--vscode-widget-border, #454545);
+  border-radius: 4px;
+  background-color: var(--vscode-editor-background);
+  font-family: var(--vscode-font-family, inherit);
+}
+
+.thinking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.03));
+  border: none;
+  width: 100%;
+  text-align: left;
+  border-radius: 0;
+  transition: background-color 0.2s ease;
+}
+
+.thinking-header:hover {
+  background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.05));
+}
+
+.thinking-header:focus {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -2px;
+}
+
+.thinking-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thinking-icon {
+  font-size: 14px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.thinking-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vscode-foreground);
+}
+
+.thinking-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thinking-status {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.7;
+}
+
+.thinking-chevron {
+  font-size: 12px;
+  color: var(--vscode-icon-foreground, #cccccc);
+  transition: transform 0.2s ease;
+}
+
+.thinking-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.thinking-content {
+  border-top: 1px solid var(--vscode-widget-border, #454545);
+  padding: 12px;
+  background: var(--vscode-editor-background);
+}
+
+.thinking-content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--vscode-widget-border, #454545);
+}
+
+.thinking-expand-text {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.thinking-copy-button {
+  background: var(--vscode-button-background, #0e639c);
+  border: 1px solid transparent;
+  color: var(--vscode-button-foreground, #ffffff);
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.thinking-copy-button:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.thinking-copy-button:focus {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+.thinking-text {
+  color: var(--vscode-editor-foreground);
+  line-height: 1.6;
+  font-size: 13px;
+  background: var(--vscode-textCodeBlock-background, #1e1e1e);
+  padding: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--vscode-widget-border, #454545);
+  overflow-x: auto;
+  text-align: left;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.thinking-text p {
+  margin: 8px 0;
+  text-align: left;
+}
+
+.thinking-text p:first-child {
+  margin-top: 0;
+}
+
+.thinking-text p:last-child {
+  margin-bottom: 0;
+}
+
+.thinking-text code {
+  background-color: var(--vscode-textCodeBlock-background);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: inherit;
+  border: 1px solid var(--vscode-widget-border, #454545);
+  color: var(--vscode-textPreformat-foreground, #d4d4d4);
+  display: inline;
+}
+
+.thinking-text pre {
+  background-color: var(--vscode-textCodeBlock-background);
+  padding: 12px;
+  border-radius: 3px;
+  overflow-x: auto;
+  margin: 8px 0;
+  border: 1px solid var(--vscode-widget-border, #454545);
+  text-align: left;
+}
+
+.thinking-text pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+}
+
+/* Ensure all text elements are left-aligned */
+.thinking-text * {
+  text-align: left;
+}
+
+/* Better spacing for lists */
+.thinking-text ul,
+.thinking-text ol {
+  margin: 8px 0;
+  padding-left: 16px;
+  text-align: left;
+}
+
+.thinking-text li {
+  margin: 4px 0;
+  text-align: left;
 }
 
 .button {
