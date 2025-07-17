@@ -5,6 +5,7 @@ import { BotIcon } from "./botIcon";
 import { DownloadIcon } from "./downloadIcon";
 import { IParseURL, parseUrl } from "../utils/parseUrl";
 import UrlCardList from "./urlCardList";
+import { ThinkingComponent } from "./thinkingComponent";
 
 interface CodeBlockProps {
   language?: string;
@@ -22,7 +23,13 @@ export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
   const handleCopyMarkdown = async () => {
     try {
       // Use the original content directly since it's already in markdown format
-      const markdownContent = content || sanitizedContent;
+      let markdownContent = content;
+
+      // Remove thinking tags from the content when copying
+      // Handle both regular and HTML-encoded tags
+      markdownContent = markdownContent
+        .replace(/<think>([\s\S]*?)<\/think>/gi, "")
+        .replace(/&lt;think&gt;([\s\S]*?)&lt;\/think&gt;/gi, "");
 
       // If content is HTML, we need to convert it back to markdown
       // But if it's already markdown, use it as-is
@@ -54,7 +61,14 @@ export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
 
       // Fallback method
       try {
-        const markdownContent = content || sanitizedContent;
+        let markdownContent = content;
+
+        // Remove thinking tags from the content when copying
+        // Handle both regular and HTML-encoded tags
+        markdownContent = markdownContent
+          .replace(/<think>([\s\S]*?)<\/think>/gi, "")
+          .replace(/&lt;think&gt;([\s\S]*?)&lt;\/think&gt;/gi, "");
+
         let contentToCopy = markdownContent;
 
         if (markdownContent.includes("<") && markdownContent.includes(">")) {
@@ -114,7 +128,7 @@ export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
               <UrlCardList metadatas={parsedUrls} />
             </div>
           ) : (
-            <div className="doc-content" dangerouslySetInnerHTML={{ __html: sanitizedContent }} />
+            <ThinkingComponent content={content} />
           )}
         </div>
       )}
