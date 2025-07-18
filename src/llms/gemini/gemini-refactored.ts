@@ -10,7 +10,6 @@ import * as vscode from "vscode";
 import { COMMON } from "../../application/constant";
 import { CodeBuddyToolProvider } from "../../tools/factory/tool";
 import { createPrompt } from "../../utils/prompt";
-import { formatText } from "../../utils/utils";
 import { BaseLLM } from "../base";
 import { ILlmConfig } from "../interface";
 import { Logger } from "../../infrastructure/logger/logger";
@@ -353,18 +352,18 @@ export class GeminiLLM extends BaseLLM<IGeminiSnapshot> implements vscode.Dispos
 Based on the above web search results, use the think tool to analyze and synthesize this information before providing your final response.`;
                   // Instead of continuing, we'll let this be the final result of this turn
                   finalResult = nextQuery;
-                  this.orchestrator.publish("onResponse" as any, String(finalResult));
+                  this.orchestrator.publish("onResponse" as any, finalResult);
                   break;
                 }
 
                 // If forced execution fails, break and respond
                 finalResult = "I tried to execute a tool but failed. Please try rephrasing your request.";
-                this.orchestrator.publish("onResponse" as any, String(finalResult));
+                this.orchestrator.publish("onResponse" as any, finalResult);
                 break;
               }
 
               finalResult = textResponse;
-              this.orchestrator.publish("onResponse" as any, String(finalResult));
+              this.orchestrator.publish("onResponse" as any, finalResult);
               break;
             }
 
@@ -584,9 +583,8 @@ IMPORTANT: Format ALL code examples in proper markdown code blocks with appropri
       const result = await this.model.generateContent(prompt);
       const response = result.response.text();
 
-      // Use the formatText utility to convert markdown to HTML
-      const formattedResponse = formatText(response);
-      return this.formatToolResult("web_search_comprehensive", formattedResponse);
+      // Return the response as-is, let the webview provider handle formatting
+      return this.formatToolResult("web_search_comprehensive", response);
     } catch (error) {
       this.logger.error("Error generating comprehensive web search response", {
         error,
@@ -622,8 +620,8 @@ ${content}
 3. Implement with proper error handling and testing
 4. Consider scalability and performance implications`;
 
-    // Use formatText utility to convert markdown to HTML
-    return formatText(markdownContent);
+    // Return the markdown content as-is, let the webview provider handle formatting
+    return markdownContent;
   } /**
    * Forces the execution of the web_search tool and continues the conversation.
    */
@@ -643,11 +641,11 @@ ${content}
   }
 
   /**
-   * Checks if a tool returns HTML-formatted content that should not be JSON.stringify'd
+   * Checks if a tool returns formatted content that should not be JSON.stringify'd
    */
   private isHtmlFormattedTool(toolName: string): boolean {
-    const htmlFormattedTools = ["summarize_content", "web_search_comprehensive"];
-    return htmlFormattedTools.includes(toolName);
+    const formattedTools = ["summarize_content", "web_search_comprehensive"]; // Keep web_search_comprehensive to avoid JSON.stringify
+    return formattedTools.includes(toolName);
   } /**
    * Formats tool result content appropriately based on tool type
    */

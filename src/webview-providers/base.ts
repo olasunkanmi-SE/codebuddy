@@ -253,8 +253,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       /<br\s*\/?>/i, // Line breaks
     ];
 
-    return htmlIndicators.some((pattern) => pattern.test(content));
+    const hasHtmlTags = htmlIndicators.some((pattern) => pattern.test(content));
+
+    return hasHtmlTags;
   }
+
   abstract generateResponse(message?: string, metaData?: Record<string, any>): Promise<string | undefined>;
 
   abstract sendResponse(response: string, currentChat?: string): Promise<boolean | undefined>;

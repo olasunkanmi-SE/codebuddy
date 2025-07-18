@@ -1,6 +1,10 @@
 import markdownit from "markdown-it";
 import * as vscode from "vscode";
-import { APP_CONFIG, COMMON, generativeAiModels } from "../application/constant";
+import {
+  APP_CONFIG,
+  COMMON,
+  generativeAiModels,
+} from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
 import { Memory } from "../memory/base";
 
@@ -84,10 +88,15 @@ const isLikelySubheading = (line: string): boolean => {
     /^[A-Z][a-zA-Z\s]{8,40}$/,
   ];
 
-  return subheadingPatterns.some((pattern) => pattern.test(line.trim())) && !isLikelyHeader(line);
+  return (
+    subheadingPatterns.some((pattern) => pattern.test(line.trim())) &&
+    !isLikelyHeader(line)
+  );
 };
 
-export const getConfigValue: GetConfigValueType<any> = <T>(key: string): T | undefined => {
+export const getConfigValue: GetConfigValueType<any> = <T>(
+  key: string,
+): T | undefined => {
   return vscode.workspace.getConfiguration().get<T>(key);
 };
 
@@ -139,7 +148,11 @@ export const getGenerativeAiModel = (): string | undefined => {
   return getConfigValue("generativeAi.option");
 };
 
-export function getUri(webview: vscode.Webview, extensionUri: vscode.Uri, pathList: string[]) {
+export function getUri(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  pathList: string[],
+) {
   return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...pathList));
 }
 
@@ -148,7 +161,8 @@ export function getUri(webview: vscode.Webview, extensionUri: vscode.Uri, pathLi
 // and ensure script integrity when using Content Security Policy (CSP)
 export const getNonce = () => {
   let text = "";
-  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const possible =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
@@ -178,8 +192,17 @@ export const showInfoMessage = (message?: string): void => {
  * @returns {APIKeyConfig} An object containing the API key and the model name.
  * @throws {Error} If the API key is not found in the configuration.
  */
-export const getAPIKeyAndModel = (model: string): { apiKey: string; model?: string } => {
-  const { geminiKey, groqApiKey, groqModel, anthropicApiKey, geminiModel, anthropicModel } = APP_CONFIG;
+export const getAPIKeyAndModel = (
+  model: string,
+): { apiKey: string; model?: string } => {
+  const {
+    geminiKey,
+    groqApiKey,
+    groqModel,
+    anthropicApiKey,
+    geminiModel,
+    anthropicModel,
+  } = APP_CONFIG;
   let apiKey: string | undefined;
   let modelName: string | undefined;
 
@@ -203,10 +226,13 @@ export const getAPIKeyAndModel = (model: string): { apiKey: string; model?: stri
   }
 
   if (!apiKey) {
-    throw new Error(`API key not found for model: ${model}. Please add the API key in the extension configuration.`);
+    throw new Error(
+      `API key not found for model: ${model}. Please add the API key in the extension configuration.`,
+    );
   }
 
   return { apiKey, model: modelName };
 };
 
-export const generateQueryString = (query: string) => `q=${encodeURIComponent(query)}`;
+export const generateQueryString = (query: string) =>
+  `q=${encodeURIComponent(query)}`;
