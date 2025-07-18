@@ -1,28 +1,38 @@
-import { IToolConfig } from "../../application/interfaces/agent.interface";
+import {
+  IToolConfig,
+  ICodeBuddyToolConfig,
+} from "../../application/interfaces/agent.interface";
 import { ContextRetriever } from "../../services/context-retriever";
 import { CodeBuddyTool } from "../base";
 import { TOOL_CONFIGS } from "../tools";
+import { GenerativeModel } from "@google/generative-ai";
 
 export class ToolFactory {
   private readonly tools: Map<string, IToolConfig> = new Map();
   private readonly contextRetriever: ContextRetriever;
-  constructor() {
+  private readonly model?: GenerativeModel;
+
+  constructor(model?: GenerativeModel) {
     this.contextRetriever = ContextRetriever.initialize();
-    for (const [name, { tool, useContextRetriever }] of Object.entries(
-      TOOL_CONFIGS,
-    )) {
+    this.model = model;
+
+    for (const [
+      name,
+      { tool, useContextRetriever, useModel },
+    ] of Object.entries(TOOL_CONFIGS)) {
       const toolConfig = tool.prototype.config();
       this.register({
         ...toolConfig,
         name,
-        createInstance: useContextRetriever
-          ? (_, contextRetriever) => {
-              if (!contextRetriever) {
-                throw new Error(`Context retriever is needed for ${name}`);
-              }
-              return new tool(this.contextRetriever);
-            }
-          : () => new tool(),
+        createInstance: (config: ICodeBuddyToolConfig, retriever?: any) => {
+          if (useModel && this.model) {
+            return new (tool as any)(this.model);
+          } else if (useContextRetriever) {
+            return new (tool as any)(retriever || this.contextRetriever);
+          } else {
+            return new (tool as any)();
+          }
+        },
       });
     }
   }
@@ -43,12 +53,12 @@ export class CodeBuddyToolProvider {
 
   private static instance: CodeBuddyToolProvider | undefined;
 
-  private constructor() {
-    this.factory = new ToolFactory();
+  private constructor(model?: GenerativeModel) {
+    this.factory = new ToolFactory(model);
   }
 
-  public static initialize() {
-    CodeBuddyToolProvider.instance ??= new CodeBuddyToolProvider();
+  public static initialize(model?: GenerativeModel) {
+    CodeBuddyToolProvider.instance ??= new CodeBuddyToolProvider(model);
   }
 
   public static getTools(): CodeBuddyTool[] {

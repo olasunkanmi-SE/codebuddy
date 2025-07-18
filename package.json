@@ -314,6 +314,7 @@
     "@vscode/test-cli": "^0.0.8",
     "@vscode/test-electron": "^2.3.2",
     "electron-rebuild": "^3.2.9",
+    "esbuild": "^0.25.6",
     "eslint": "^8.41.0",
     "mocha": "^10.2.0",
     "typescript": "^5.4.3"

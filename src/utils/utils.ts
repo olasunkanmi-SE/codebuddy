@@ -1,10 +1,6 @@
 import markdownit from "markdown-it";
 import * as vscode from "vscode";
-import {
-  APP_CONFIG,
-  COMMON,
-  generativeAiModels,
-} from "../application/constant";
+import { APP_CONFIG, COMMON, generativeAiModels } from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
 import { Memory } from "../memory/base";
 
@@ -12,16 +8,86 @@ type GetConfigValueType<T> = (key: string) => T | undefined;
 
 export const formatText = (text?: string): string => {
   if (text) {
+    // Pre-process plain text to convert it to proper markdown
+    const markdownText = convertPlainTextToMarkdown(text);
+
     const md = markdownit();
-    const renderedText = md.render(text);
+    const renderedText = md.render(markdownText);
     return renderedText;
   }
   return "";
 };
 
-export const getConfigValue: GetConfigValueType<any> = <T>(
-  key: string,
-): T | undefined => {
+/**
+ * Converts plain text with visual formatting to proper markdown syntax
+ */
+const convertPlainTextToMarkdown = (text: string): string => {
+  let processed = text;
+
+  // Split into lines for processing
+  const lines = processed.split("\n");
+  const convertedLines = lines.map((line) => {
+    const trimmedLine = line.trim();
+
+    // Skip empty lines
+    if (trimmedLine === "") return line;
+
+    // Convert headers - look for lines that seem like headers (short, capitalized)
+    if (isLikelyHeader(trimmedLine)) {
+      // Determine header level based on context and length
+      if (trimmedLine.length < 30 && /^[A-Z]/.test(trimmedLine)) {
+        return `## ${trimmedLine}`;
+      }
+    }
+
+    // Convert bullet points with • to markdown
+    if (trimmedLine.startsWith("• ")) {
+      return `- ${trimmedLine.substring(2)}`;
+    }
+
+    // Convert numbered lists (1. 2. 3. etc.)
+    if (/^\d+\.\s/.test(trimmedLine)) {
+      return trimmedLine; // Already in correct format
+    }
+
+    // Convert lines that look like subheadings
+    if (isLikelySubheading(trimmedLine)) {
+      return `### ${trimmedLine}`;
+    }
+
+    return line;
+  });
+
+  return convertedLines.join("\n");
+};
+
+/**
+ * Determines if a line looks like a main header
+ */
+const isLikelyHeader = (line: string): boolean => {
+  // Headers are usually short, start with capital letter, and don't end with punctuation
+  const headerPatterns = [
+    /^(Key Points|Next Steps|Summary|Overview|Introduction|Conclusion|Results|Analysis|Implementation|Best Practices|Requirements|Features|Benefits|Challenges|Solutions|Recommendations)$/i,
+    /^[A-Z][a-zA-Z\s]{5,25}$/,
+  ];
+
+  return headerPatterns.some((pattern) => pattern.test(line.trim()));
+};
+
+/**
+ * Determines if a line looks like a subheading
+ */
+const isLikelySubheading = (line: string): boolean => {
+  // Subheadings are slightly longer than headers but still relatively short
+  const subheadingPatterns = [
+    /^(Example|Examples|Code|Implementation|Usage|Configuration|Setup|Installation|API|Database|Security|Performance|Testing|Deployment)$/i,
+    /^[A-Z][a-zA-Z\s]{8,40}$/,
+  ];
+
+  return subheadingPatterns.some((pattern) => pattern.test(line.trim())) && !isLikelyHeader(line);
+};
+
+export const getConfigValue: GetConfigValueType<any> = <T>(key: string): T | undefined => {
   return vscode.workspace.getConfiguration().get<T>(key);
 };
 
@@ -73,11 +139,7 @@ export const getGenerativeAiModel = (): string | undefined => {
   return getConfigValue("generativeAi.option");
 };
 
-export function getUri(
-  webview: vscode.Webview,
-  extensionUri: vscode.Uri,
-  pathList: string[],
-) {
+export function getUri(webview: vscode.Webview, extensionUri: vscode.Uri, pathList: string[]) {
   return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...pathList));
 }
 
@@ -86,8 +148,7 @@ export function getUri(
 // and ensure script integrity when using Content Security Policy (CSP)
 export const getNonce = () => {
   let text = "";
-  const possible =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
@@ -117,17 +178,8 @@ export const showInfoMessage = (message?: string): void => {
  * @returns {APIKeyConfig} An object containing the API key and the model name.
  * @throws {Error} If the API key is not found in the configuration.
  */
-export const getAPIKeyAndModel = (
-  model: string,
-): { apiKey: string; model?: string } => {
-  const {
-    geminiKey,
-    groqApiKey,
-    groqModel,
-    anthropicApiKey,
-    geminiModel,
-    anthropicModel,
-  } = APP_CONFIG;
+export const getAPIKeyAndModel = (model: string): { apiKey: string; model?: string } => {
+  const { geminiKey, groqApiKey, groqModel, anthropicApiKey, geminiModel, anthropicModel } = APP_CONFIG;
   let apiKey: string | undefined;
   let modelName: string | undefined;
 
@@ -151,13 +203,10 @@ export const getAPIKeyAndModel = (
   }
 
   if (!apiKey) {
-    throw new Error(
-      `API key not found for model: ${model}. Please add the API key in the extension configuration.`,
-    );
+    throw new Error(`API key not found for model: ${model}. Please add the API key in the extension configuration.`);
   }
 
   return { apiKey, model: modelName };
 };
 
-export const generateQueryString = (query: string) =>
-  `q=${encodeURIComponent(query)}`;
+export const generateQueryString = (query: string) => `q=${encodeURIComponent(query)}`;

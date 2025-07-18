@@ -1,6 +1,7 @@
 import { SchemaType } from "@google/generative-ai";
 import { IFileToolConfig } from "../application/interfaces/agent.interface";
 import { ContextRetriever } from "../services/context-retriever";
+import { SummarizeTool } from "./summarize";
 
 // class SearchTool {
 //   constructor(private readonly contextRetriever?: ContextRetriever) {}
@@ -34,7 +35,15 @@ export class WebTool {
   constructor(private readonly contextRetriever?: ContextRetriever) {}
 
   public async execute(query: string) {
-    return await this.contextRetriever?.webSearch(query);
+    console.log("WebTool execute called with:", query);
+    try {
+      const result = await this.contextRetriever?.webSearch(query);
+      console.log("WebTool result:", result ? "Success" : "No result");
+      return result;
+    } catch (error) {
+      console.error("WebTool execution error:", error);
+      throw error;
+    }
   }
 
   config() {
@@ -129,8 +138,8 @@ export class FileTool {
 // }
 
 export class ThinkTool {
-  public async execute(thought: string) {
-    return thought[0];
+  public async execute(thought: string[]) {
+    return thought.join("\n");
   }
 
   config() {
@@ -158,7 +167,12 @@ export class ThinkTool {
 
 export const TOOL_CONFIGS = {
   // SearchTool: { tool: SearchTool, useContextRetriever: true },
-  FileTool: { tool: FileTool, useContextRetriever: true },
-  WebTool: { tool: WebTool, useContextRetriever: true },
-  ThinkTool: { tool: ThinkTool, useContextRetriever: true },
+  FileTool: { tool: FileTool, useContextRetriever: true, useModel: false },
+  WebTool: { tool: WebTool, useContextRetriever: true, useModel: false },
+  ThinkTool: { tool: ThinkTool, useContextRetriever: false, useModel: false },
+  SummarizeTool: {
+    tool: SummarizeTool,
+    useContextRetriever: false,
+    useModel: true,
+  },
 };

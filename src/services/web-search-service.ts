@@ -49,20 +49,74 @@ export class WebSearchService {
     url: string,
   ): Promise<ArticleContent | undefined> {
     try {
-      const response = await axios.get(url, { timeout: 5000 });
+      const response = await axios.get(url, {
+        timeout: 5000,
+        headers: {
+          "User-Agent": this.userAgent,
+        },
+      });
       const html = response.data;
       const dom = new JSDOM(html);
-      const reader = new Readability(dom.window.document);
-      const article = reader.parse();
 
-      const content = article?.textContent
-        ? article.textContent.trim().slice(0, 10000)
-        : "No readable content found";
+      // Try Readability first
+      const content =
+        this.extractContentWithReadability(dom) ||
+        this.extractContentWithSelectors(dom) ||
+        this.extractContentFallback(dom, url);
+
       return { url, content: content.trim() };
     } catch (error: any) {
       this.logger.warn(`Failed to fetch ${url}: ${error.message}`, error);
-      return { url: "", content: "" };
+      return {
+        url: "",
+        content: `Error fetching content from ${url}: ${error.message}`,
+      };
     }
+  }
+
+  private extractContentWithReadability(dom: JSDOM): string | null {
+    const reader = new Readability(dom.window.document);
+    const article = reader.parse();
+
+    if (article?.textContent && article.textContent.trim().length > 100) {
+      return article.textContent.trim().slice(0, 10000);
+    }
+    return null;
+  }
+
+  private extractContentWithSelectors(dom: JSDOM): string | null {
+    const doc = dom.window.document;
+    const contentSelectors = [
+      "main",
+      "article",
+      ".content",
+      ".markdown-body",
+      ".docs-content",
+      '[role="main"]',
+      "body",
+    ];
+
+    for (const selector of contentSelectors) {
+      const element = doc.querySelector(selector);
+      if (element) {
+        const text = element.textContent || "";
+        if (text.trim().length > 100) {
+          return text.trim().slice(0, 10000);
+        }
+      }
+    }
+    return null;
+  }
+
+  private extractContentFallback(dom: JSDOM, url: string): string {
+    const doc = dom.window.document;
+    const allText = doc.body?.textContent || "";
+
+    if (allText.trim().length > 50) {
+      return allText.trim().slice(0, 10000);
+    }
+
+    return `Content could not be extracted from ${url}. This may be a JavaScript-rendered page or have restricted access.`;
   }
 
   private async fetchSearchResultMetadata(
@@ -141,7 +195,11 @@ export class WebSearchService {
         );
 
         favicon = await this.extractFavicon(faviconElement, origin, parsedUrl);
-      } catch (error) {
+      } catch (error: any) {
+        this.logger.warn(
+          `Error fetching page for metadata extraction (${url}): ${error.message}`,
+          error,
+        );
         favicon = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
         title = parsedUrl.hostname.slice(0, 20);
         return { url: url ?? "", favicon: favicon ?? "", title: title ?? "" };
@@ -227,7 +285,7 @@ export class WebSearchService {
     try {
       const pageMetadata = await this.fetchSearchResultMetadata(searchUrl);
       if (pageMetadata.length === 0) {
-        return `No web results found for "${query}" on Startpage.`;
+        return this.generateFallbackContent(query);
       }
       const excludedURLs = [
         "medium.com",
@@ -263,11 +321,35 @@ export class WebSearchService {
         .map((url) => this.fetchArticleContent(url));
       const contextResults = await Promise.all(contextPromises);
       const filteredContext = contextResults.filter((c) => c !== undefined);
-      return filteredContext.map((result) => result?.content).join("\n\n");
+      const combinedContent = filteredContext
+        .map((result) => result?.content)
+        .join("\n\n");
+
+      // If no meaningful content was extracted, provide a fallback
+      if (!combinedContent || combinedContent.trim().length < 100) {
+        return this.generateFallbackContent(query);
+      }
+
+      return combinedContent;
     } catch (error: any) {
       this.logger.info(`search error: ${error.message}`, error);
-      return "";
+      return this.generateFallbackContent(query);
     }
+  }
+
+  private generateFallbackContent(query: string): string {
+    return `I searched for "${query}" but couldn't retrieve detailed content from the web sources. This might be due to:
+
+1. **Dynamic content**: Many modern websites load content with JavaScript
+2. **Access restrictions**: Some sites block automated requests
+3. **Network issues**: Temporary connectivity problems
+
+However, I can still help you with general knowledge about "${query}". Please let me know if you'd like me to:
+- Provide general information about this topic
+- Help with specific implementation details
+- Suggest alternative approaches or resources
+
+What specific aspect of "${query}" would you like to explore?`;
   }
 
   readonly sortUrlsByPriority = (
@@ -287,7 +369,8 @@ export class WebSearchService {
         } else {
           otherUrls.push(m.url);
         }
-      } catch (error) {
+      } catch (error: any) {
+        this.logger.warn(`Invalid URL skipped: ${m.url}`, error);
         otherUrls.push(m.url);
       }
     });
