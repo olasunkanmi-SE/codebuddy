@@ -12,6 +12,7 @@ import { ExplainCode } from "./commands/explain";
 import { FixError } from "./commands/fixError";
 import { GenerateMermaidDiagram } from "./commands/generate-code-chart";
 import { GenerateCommitMessage } from "./commands/generate-commit-message";
+import { GenerateUnitTest } from "./commands/generate-unit-test";
 import { InLineChat } from "./commands/inline-chat";
 import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
@@ -76,6 +77,7 @@ export async function activate(context: vscode.ExtensionContext) {
       commitMessage,
       interviewMe,
       generateDiagram,
+      generateUnitTest,
       inlineChat,
       restart,
       reviewPR,
@@ -102,6 +104,10 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     const generateInterviewQuestions = new InterviewMe(
       CODEBUDDY_ACTIONS.interviewMe,
+      context,
+    );
+    const generateUnitTestCommand = new GenerateUnitTest(
+      CODEBUDDY_ACTIONS.generateUnitTest,
       context,
     );
     const reviewPRCommand = new ReviewPR(CODEBUDDY_ACTIONS.reviewPR, context);
@@ -159,6 +165,12 @@ export async function activate(context: vscode.ExtensionContext) {
         await generateMermaidDiagram.execute(
           undefined,
           "📈 Visualize the code with a Mermaid diagram",
+        );
+      },
+      [generateUnitTest]: async () => {
+        await generateUnitTestCommand.execute(
+          undefined,
+          "🧪 Generate comprehensive unit tests for the code",
         );
       },
       [inlineChat]: async () => {

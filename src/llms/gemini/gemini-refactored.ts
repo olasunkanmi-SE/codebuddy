@@ -32,14 +32,20 @@ type GeminiRunResult = string | GenerateContentResult | undefined;
 /**
  * Production-ready GeminiLLM class with improved architecture and error handling
  */
-export class GeminiLLM extends BaseLLM<IGeminiSnapshot> implements vscode.Disposable {
+export class GeminiLLM
+  extends BaseLLM<IGeminiSnapshot>
+  implements vscode.Disposable
+{
   private readonly generativeAi: GoogleGenerativeAI;
   private response: EmbedContentResponse | GenerateContentResult | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   private model: GenerativeModel | undefined;
   private readonly circuitBreaker: CircuitBreaker;
   private readonly chatHistoryManager: GeminiChatHistoryManager;
-  private readonly responseCache = new Map<string, { result: any; timestamp: number }>();
+  private readonly responseCache = new Map<
+    string,
+    { result: any; timestamp: number }
+  >();
 
   // Progress tracking
   private lastFunctionCalls: Set<string> = new Set();
@@ -65,14 +71,14 @@ export class GeminiLLM extends BaseLLM<IGeminiSnapshot> implements vscode.Dispos
       },
       cacheTTL: 300000, // 5 minutes
       enableCaching: true,
-    }
+    },
   ) {
     super(config);
     this.generativeAi = new GoogleGenerativeAI(this.config.apiKey);
     this.circuitBreaker = new CircuitBreaker(
       geminiConfig.circuitBreaker.failureThreshold,
       geminiConfig.circuitBreaker.resetTimeout,
-      geminiConfig.circuitBreaker.monitoringPeriod
+      geminiConfig.circuitBreaker.monitoringPeriod,
     );
     this.chatHistoryManager = new GeminiChatHistoryManager(this.memory);
     this.initializeDisposables();
@@ -93,9 +99,15 @@ export class GeminiLLM extends BaseLLM<IGeminiSnapshot> implements vscode.Dispos
     memory: IMemoryManager,
     orchestrator: IOrchestrator,
     fallbackLLM: IFallbackLLM,
-    geminiConfig?: IGeminiLLMConfig
+    geminiConfig?: IGeminiLLMConfig,
   ): GeminiLLM {
-    return new GeminiLLM(config, memory, orchestrator, fallbackLLM, geminiConfig);
+    return new GeminiLLM(
+      config,
+      memory,
+      orchestrator,
+      fallbackLLM,
+      geminiConfig,
+    );
   }
 
   /**
@@ -118,7 +130,10 @@ export class GeminiLLM extends BaseLLM<IGeminiSnapshot> implements vscode.Dispos
   /**
    * Generates text response
    */
-  public async generateText(prompt: string, instruction?: string): Promise<string> {
+  public async generateText(
+    prompt: string,
+    instruction?: string,
+  ): Promise<string> {
     try {
       return await this.circuitBreaker.execute(async () => {
         const model = this.getModel();
@@ -139,9 +154,16 @@ export class GeminiLLM extends BaseLLM<IGeminiSnapshot> implements vscode.Dispos
     try {
       this.model ??= this.generativeAi.getGenerativeModel({
         model: this.config.model,
-        systemInstruction: modelParams?.systemInstruction ?? this.config.systemInstruction,
+        systemInstruction:
+          modelParams?.systemInstruction ?? this.config.systemInstruction,
         generationConfig: {
-          stopSequences: ["Thank you", "Done", "End", "stuck in a loop", "loop"],
+          stopSequences: [
+            "Thank you",
+            "Done",
+            "End",
+            "stuck in a loop",
+            "loop",
+          ],
         },
       });
       return this.model;
@@ -173,9 +195,15 @@ export class GeminiLLM extends BaseLLM<IGeminiSnapshot> implements vscode.Dispos
   /**
    * Generates content with tools
    */
-  private async generateContentWithTools(userInput: string): Promise<GenerateContentResult> {
+  private async generateContentWithTools(
+    userInput: string,
+  ): Promise<GenerateContentResult> {
     try {
-      const chatHistory = await this.chatHistoryManager.buildChatHistory(userInput, COMMON.GEMINI_CHAT_HISTORY, true);
+      const chatHistory = await this.chatHistoryManager.buildChatHistory(
+        userInput,
+        COMMON.GEMINI_CHAT_HISTORY,
+        true,
+      );
 
       const prompt = createPrompt(userInput);
       const tools = this.getTools();
@@ -191,7 +219,13 @@ export class GeminiLLM extends BaseLLM<IGeminiSnapshot> implements vscode.Dispos
         systemInstruction: prompt,
         tools: [tools], // Wrap functionDeclarations in an array
         generationConfig: {
-          stopSequences: ["Thank you", "Done", "End", "stuck in a loop", "loop"],
+          stopSequences: [
+            "Thank you",
+            "Done",
+            "End",
+            "stuck in a loop",
+            "loop",
+          ],
         },
       });
 
@@ -304,7 +338,7 @@ export class GeminiLLM extends BaseLLM<IGeminiSnapshot> implements vscode.Dispos
         try {
           const result = await this.executeWithTimeout(
             () => this.generateContentWithTools(userQuery),
-            this.geminiConfig.timeoutMs
+            this.geminiConfig.timeoutMs,
           );
 
           this.response = result;
@@ -323,27 +357,37 @@ export class GeminiLLM extends BaseLLM<IGeminiSnapshot> implements vscode.Dispos
             if (toolCalls.length === 0) {
               const textResponse = text();
 
-              this.logger.debug("Model returned text response without function calls", {
-                response: textResponse,
-                userQuery: this.userQuery,
-                callCount,
-              });
-
-              // Check if the response mentions using tools without actually calling them
-              if (this.shouldForceToolCall(textResponse)) {
-                this.logger.warn("Model mentioned tools without calling them, forcing tool usage", {
+              this.logger.debug(
+                "Model returned text response without function calls",
+                {
                   response: textResponse,
                   userQuery: this.userQuery,
                   callCount,
-                });
+                },
+              );
+
+              // Check if the response mentions using tools without actually calling them
+              if (this.shouldForceToolCall(textResponse)) {
+                this.logger.warn(
+                  "Model mentioned tools without calling them, forcing tool usage",
+                  {
+                    response: textResponse,
+                    userQuery: this.userQuery,
+                    callCount,
+                  },
+                );
 
                 // Force direct tool execution instead of relying on the model
-                const forcedResult = await this.executeForcedTool(this.userQuery, textResponse);
+                const forcedResult = await this.executeForcedTool(
+                  this.userQuery,
+                  textResponse,
+                );
                 if (forcedResult) {
                   // For now, executeForcedTool primarily returns web_search results
                   // but we'll format it generically to handle future tools
                   const toolResultContent =
-                    typeof forcedResult === "string" && forcedResult.includes("<")
+                    typeof forcedResult === "string" &&
+                    forcedResult.includes("<")
                       ? forcedResult // Assume it's HTML formatted
                       : JSON.stringify(forcedResult);
 
@@ -357,7 +401,8 @@ Based on the above web search results, use the think tool to analyze and synthes
                 }
 
                 // If forced execution fails, break and respond
-                finalResult = "I tried to execute a tool but failed. Please try rephrasing your request.";
+                finalResult =
+                  "I tried to execute a tool but failed. Please try rephrasing your request.";
                 this.orchestrator.publish("onResponse" as any, finalResult);
                 break;
               }
@@ -370,7 +415,10 @@ Based on the above web search results, use the think tool to analyze and synthes
             // Check for repeated function call patterns
             const currentCallSignature = this.createCallSignature(toolCalls);
             if (this.lastFunctionCalls.has(currentCallSignature)) {
-              this.logger.warn("Detected repeated function calls, using fallback", { signature: currentCallSignature });
+              this.logger.warn(
+                "Detected repeated function calls, using fallback",
+                { signature: currentCallSignature },
+              );
               finalResult = await this.executeWithFallback(this.userQuery);
               break;
             }
@@ -379,7 +427,10 @@ Based on the above web search results, use the think tool to analyze and synthes
             this.pruneCallHistory();
 
             // Process tool calls
-            const toolResult = await this.processToolCalls(toolCalls, userQuery);
+            const toolResult = await this.processToolCalls(
+              toolCalls,
+              userQuery,
+            );
             if (toolResult.shouldBreak) {
               finalResult = toolResult.result;
               break;
@@ -429,7 +480,10 @@ Based on the above web search results, use the think tool to analyze and synthes
   /**
    * Processes tool calls with enhanced error handling
    */
-  private async processToolCalls(toolCalls: FunctionCall[], userInput: string): Promise<IQueryProcessingResult> {
+  private async processToolCalls(
+    toolCalls: FunctionCall[],
+    userInput: string,
+  ): Promise<IQueryProcessingResult> {
     for (const functionCall of toolCalls) {
       try {
         if (functionCall.name === "think") {
@@ -447,10 +501,14 @@ Based on the above web search results, use the think tool to analyze and synthes
   /**
    * Handles the 'think' tool call, including loop prevention and direct execution.
    */
-  private async handleThinkTool(functionCall: FunctionCall): Promise<IQueryProcessingResult> {
+  private async handleThinkTool(
+    functionCall: FunctionCall,
+  ): Promise<IQueryProcessingResult> {
     this.consecutiveThinkCalls++;
     if (this.consecutiveThinkCalls > 1) {
-      this.logger.warn("Loop detected: consecutive think calls. Forcing web_search.");
+      this.logger.warn(
+        "Loop detected: consecutive think calls. Forcing web_search.",
+      );
       this.consecutiveThinkCalls = 0; // Reset counter
       return this.forceWebSearch();
     }
@@ -467,20 +525,24 @@ Based on the above web search results, use the think tool to analyze and synthes
         planSteps: this.planSteps,
       });
 
-      const includesWebSearch = this.planSteps.some((step) => step.toLowerCase().includes("web_search"));
+      const includesWebSearch = this.planSteps.some((step) =>
+        step.toLowerCase().includes("web_search"),
+      );
       this.logger.debug("Checking if plan includes web_search", {
         includesWebSearch,
       });
 
       if (includesWebSearch) {
-        this.logger.info("Plan includes web_search, executing it directly and returning result.");
+        this.logger.info(
+          "Plan includes web_search, executing it directly and returning result.",
+        );
         return this.forceWebSearchAndRespond();
       }
 
       const nextQuery =
         this.planSteps.length > 0
           ? `You have completed your analysis. Based on your thinking: ${this.planSteps.join(
-              ". "
+              ". ",
             )}\nNow execute the appropriate tool or provide your final response.`
           : `You have completed your thinking. Now execute the appropriate tool or provide your final response.`;
       return { result: nextQuery, shouldBreak: false };
@@ -488,7 +550,10 @@ Based on the above web search results, use the think tool to analyze and synthes
 
     // For HTML formatted tools, publish directly and break the loop
     if (this.isHtmlFormattedTool(functionCall.name)) {
-      const toolResultContent = this.formatToolResult(functionCall.name, functionResult.content);
+      const toolResultContent = this.formatToolResult(
+        functionCall.name,
+        functionResult.content,
+      );
       this.orchestrator.publish("onResponse" as any, toolResultContent);
       return { result: toolResultContent, shouldBreak: true };
     }
@@ -503,10 +568,14 @@ Based on the above web search results, use the think tool to analyze and synthes
    * Forces the execution of the web_search tool and returns a comprehensive, production-ready response.
    */
   private async forceWebSearchAndRespond(): Promise<IQueryProcessingResult> {
-    const searchResult = await this.executeForcedTool(this.userQuery, "web_search");
+    const searchResult = await this.executeForcedTool(
+      this.userQuery,
+      "web_search",
+    );
     if (searchResult) {
       // Generate a comprehensive, senior engineer-level response
-      const comprehensiveResponse = await this.generateComprehensiveWebSearchResponse(searchResult);
+      const comprehensiveResponse =
+        await this.generateComprehensiveWebSearchResponse(searchResult);
       // Don't publish here - let the caller handle publishing to avoid duplicates
       return { result: comprehensiveResponse, shouldBreak: true };
     } else {
@@ -521,7 +590,9 @@ Based on the above web search results, use the think tool to analyze and synthes
    * Generates a comprehensive, production-ready response from web search results.
    * Written from the perspective of a senior software engineer.
    */
-  private async generateComprehensiveWebSearchResponse(searchResult: any): Promise<string> {
+  private async generateComprehensiveWebSearchResponse(
+    searchResult: any,
+  ): Promise<string> {
     const prompt = `You are a senior software engineer with deep expertise across multiple technologies and frameworks. Based on the following web search results, provide a comprehensive, production-ready response that would be suitable for a professional development environment.
 
 ## Response Guidelines
@@ -598,7 +669,10 @@ IMPORTANT: Format ALL code examples in proper markdown code blocks with appropri
    * Fallback method to format search results when AI generation fails.
    */
   private formatSearchResultFallback(searchResult: any): string {
-    const content = typeof searchResult === "string" ? searchResult : JSON.stringify(searchResult, null, 2);
+    const content =
+      typeof searchResult === "string"
+        ? searchResult
+        : JSON.stringify(searchResult, null, 2);
 
     // Create a simple markdown structure
     const markdownContent = `## Search Results
@@ -626,10 +700,14 @@ ${content}
    * Forces the execution of the web_search tool and continues the conversation.
    */
   private async forceWebSearch(): Promise<IQueryProcessingResult> {
-    const searchResult = await this.executeForcedTool(this.userQuery, "web_search");
+    const searchResult = await this.executeForcedTool(
+      this.userQuery,
+      "web_search",
+    );
     if (searchResult) {
       // Generate a comprehensive response and continue the conversation
-      const comprehensiveResponse = await this.generateComprehensiveWebSearchResponse(searchResult);
+      const comprehensiveResponse =
+        await this.generateComprehensiveWebSearchResponse(searchResult);
       const nextQuery = `Tool result: ${comprehensiveResponse}\n\nBased on these comprehensive results, please provide any additional insights or clarifications if needed.`;
       return { result: nextQuery, shouldBreak: false };
     } else {
@@ -650,17 +728,24 @@ ${content}
    * Formats tool result content appropriately based on tool type
    */
   private formatToolResult(toolName: string, content: any): string {
-    return this.isHtmlFormattedTool(toolName) ? content : JSON.stringify(content);
+    return this.isHtmlFormattedTool(toolName)
+      ? content
+      : JSON.stringify(content);
   }
 
   /**
    * Handles standard tool calls (non-think).
    */
-  private async handleStandardTool(functionCall: FunctionCall): Promise<IQueryProcessingResult> {
+  private async handleStandardTool(
+    functionCall: FunctionCall,
+  ): Promise<IQueryProcessingResult> {
     this.consecutiveThinkCalls = 0; // Reset think counter
     const functionResult = await this.handleSingleFunctionCall(functionCall);
 
-    const toolResultContent = this.formatToolResult(functionCall.name, functionResult.content);
+    const toolResultContent = this.formatToolResult(
+      functionCall.name,
+      functionResult.content,
+    );
 
     // For HTML formatted tools, publish directly and break the loop
     if (this.isHtmlFormattedTool(functionCall.name)) {
@@ -672,8 +757,16 @@ ${content}
 
 Based on the above results, use the think tool to analyze and synthesize this information before providing your final response.`;
 
-    await this.chatHistoryManager.buildChatHistory(nextQuery, COMMON.GEMINI_CHAT_HISTORY, false);
-    this.chatHistoryManager.addModelResponse(COMMON.GEMINI_CHAT_HISTORY, functionCall.name, functionResult);
+    await this.chatHistoryManager.buildChatHistory(
+      nextQuery,
+      COMMON.GEMINI_CHAT_HISTORY,
+      false,
+    );
+    this.chatHistoryManager.addModelResponse(
+      COMMON.GEMINI_CHAT_HISTORY,
+      functionCall.name,
+      functionResult,
+    );
 
     return { result: nextQuery, shouldBreak: false };
   }
@@ -681,7 +774,10 @@ Based on the above results, use the think tool to analyze and synthesize this in
   /**
    * Handles errors that occur during tool execution.
    */
-  private async handleToolError(error: any, functionCall: FunctionCall): Promise<IQueryProcessingResult> {
+  private async handleToolError(
+    error: any,
+    functionCall: FunctionCall,
+  ): Promise<IQueryProcessingResult> {
     this.logger.error("Error processing function call", {
       error,
       functionName: functionCall.name,
@@ -697,7 +793,7 @@ Based on the above results, use the think tool to analyze and synthesize this in
     const retry = await vscode.window.showErrorMessage(
       `Function call failed: ${error.message}. Retry or use fallback?`,
       "Retry",
-      "Use Fallback"
+      "Use Fallback",
     );
 
     if (retry === "Use Fallback") {
@@ -719,7 +815,7 @@ Based on the above results, use the think tool to analyze and synthesize this in
    */
   private async handleSingleFunctionCall(
     functionCall: FunctionCall,
-    attempt: number = 0
+    attempt: number = 0,
   ): Promise<IToolExecutionResult> {
     const args = functionCall.args as Record<string, any>;
     const name = functionCall.name;
@@ -774,7 +870,9 @@ Based on the above results, use the think tool to analyze and synthesize this in
         return this.handleSingleFunctionCall(functionCall, attempt + 1);
       }
 
-      throw new Error(`Function ${name} failed after ${this.geminiConfig.maxRetries} attempts: ${error.message}`);
+      throw new Error(
+        `Function ${name} failed after ${this.geminiConfig.maxRetries} attempts: ${error.message}`,
+      );
     }
   }
 
@@ -844,9 +942,12 @@ Based on the above results, use the think tool to analyze and synthesize this in
   /**
    * Executes operation with timeout
    */
-  private async executeWithTimeout<T>(operation: () => Promise<T>, timeoutMs: number): Promise<T> {
+  private async executeWithTimeout<T>(
+    operation: () => Promise<T>,
+    timeoutMs: number,
+  ): Promise<T> {
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Operation timeout")), timeoutMs)
+      setTimeout(() => reject(new Error("Operation timeout")), timeoutMs),
     );
 
     return Promise.race([operation(), timeoutPromise]);
@@ -859,7 +960,7 @@ Based on the above results, use the think tool to analyze and synthesize this in
     try {
       this.logger.info("Executing fallback LLM", { userInput });
       const result = await this.fallbackLLM.generateText(
-        `User Input: ${this.userQuery}\nPlans: ${userInput}\nWrite production ready code to demonstrate your solution`
+        `User Input: ${this.userQuery}\nPlans: ${userInput}\nWrite production ready code to demonstrate your solution`,
       );
 
       this.orchestrator.publish("onResponse" as any, result);
@@ -878,7 +979,9 @@ Based on the above results, use the think tool to analyze and synthesize this in
   }
 
   private createCallSignature(toolCalls: FunctionCall[]): string {
-    return toolCalls.map((call: FunctionCall) => `${call.name}:${JSON.stringify(call.args)}`).join(";");
+    return toolCalls
+      .map((call: FunctionCall) => `${call.name}:${JSON.stringify(call.args)}`)
+      .join(";");
   }
 
   private pruneCallHistory(): void {
@@ -919,7 +1022,11 @@ Based on the above results, use the think tool to analyze and synthesize this in
     }
   }
 
-  private saveSnapshot(lastQuery: string, lastCall: string, lastResult: any): void {
+  private saveSnapshot(
+    lastQuery: string,
+    lastCall: string,
+    lastResult: any,
+  ): void {
     const snapShot = this.createSnapShot({
       lastQuery,
       lastCall,
@@ -951,7 +1058,9 @@ Based on the above results, use the think tool to analyze and synthesize this in
     for (const line of lines) {
       const trimmed = line.trim();
       // Match numbered steps, bullet points, or lines starting with "I should" or "I will"
-      if (/^\d+\.\s|^Step\s+\d+:|^-\s|^\*\s|^(I should|I will)/i.test(trimmed)) {
+      if (
+        /^\d+\.\s|^Step\s+\d+:|^-\s|^\*\s|^(I should|I will)/i.test(trimmed)
+      ) {
         steps.push(trimmed);
       }
     }
@@ -981,12 +1090,16 @@ Based on the above results, use the think tool to analyze and synthesize this in
       "web_search tool",
     ];
 
-    const found = toolMentions.some((mention) => response.toLowerCase().includes(mention.toLowerCase()));
+    const found = toolMentions.some((mention) =>
+      response.toLowerCase().includes(mention.toLowerCase()),
+    );
 
     this.logger.debug("Checking if should force tool call", {
       response: response.substring(0, 200),
       found,
-      matchedMentions: toolMentions.filter((mention) => response.toLowerCase().includes(mention.toLowerCase())),
+      matchedMentions: toolMentions.filter((mention) =>
+        response.toLowerCase().includes(mention.toLowerCase()),
+      ),
     });
 
     return found;
@@ -995,18 +1108,27 @@ Based on the above results, use the think tool to analyze and synthesize this in
   /**
    * Generates a forced tool query based on the user's original query
    */
-  private generateForcedToolQuery(originalQuery: string, modelResponse: string): string {
+  private generateForcedToolQuery(
+    originalQuery: string,
+    modelResponse: string,
+  ): string {
     const lowerQuery = originalQuery.toLowerCase();
     const lowerResponse = modelResponse.toLowerCase();
 
     // Determine which tool to force based on context
-    if (lowerResponse.includes("web_search") || lowerResponse.includes("search the web")) {
+    if (
+      lowerResponse.includes("web_search") ||
+      lowerResponse.includes("search the web")
+    ) {
       if (lowerQuery.includes("news")) {
         return `You must call the web_search tool now. Use the function call syntax to search for latest world news. Do not explain or describe - just call the web_search tool with query "latest world news 2025".`;
       } else {
         return `You must call the web_search tool now. Use the function call syntax with an appropriate query based on: "${originalQuery}". Do not explain or describe - just call the web_search tool.`;
       }
-    } else if (lowerResponse.includes("analyze_files") || lowerResponse.includes("file analysis")) {
+    } else if (
+      lowerResponse.includes("analyze_files") ||
+      lowerResponse.includes("file analysis")
+    ) {
       return `You must call the analyze_files_for_question tool now. Use the function call syntax with the appropriate file configuration. Do not explain or describe - just call the tool.`;
     } else {
       // Default to web search for general queries
@@ -1017,15 +1139,23 @@ Based on the above results, use the think tool to analyze and synthesize this in
   /**
    * Executes tools directly when the model fails to call them
    */
-  private async executeForcedTool(originalQuery: string, modelResponse: string): Promise<any> {
+  private async executeForcedTool(
+    originalQuery: string,
+    modelResponse: string,
+  ): Promise<any> {
     const lowerQuery = originalQuery.toLowerCase();
     const lowerResponse = modelResponse.toLowerCase();
 
     try {
       // Determine which tool to execute based on context
-      if (lowerResponse.includes("web_search") || lowerResponse.includes("search the web")) {
+      if (
+        lowerResponse.includes("web_search") ||
+        lowerResponse.includes("search the web")
+      ) {
         const tools = CodeBuddyToolProvider.getTools();
-        const webTool = tools.find((tool) => tool.config().name === "web_search");
+        const webTool = tools.find(
+          (tool) => tool.config().name === "web_search",
+        );
 
         if (webTool) {
           let query = originalQuery;
@@ -1050,7 +1180,11 @@ Based on the above results, use the think tool to analyze and synthesize this in
   }
 
   private initializeDisposables(): void {
-    this.disposables.push(vscode.workspace.onDidChangeConfiguration(() => this.handleConfigurationChange()));
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration(() =>
+        this.handleConfigurationChange(),
+      ),
+    );
   }
 
   private handleConfigurationChange(): void {

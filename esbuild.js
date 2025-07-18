@@ -26,6 +26,35 @@ const copyAssetsPlugin = {
         fs.readdirSync(builtAssetsDir).forEach((file) => {
           fs.copyFileSync(path.join(builtAssetsDir, file), path.join(destDir, file));
         });
+        // Also copy jsdom xhr-sync-worker.js to dist and to dist/node_modules/jsdom/lib/jsdom/living/xhr so require.resolve works
+        const workerSrc = path.join(
+          __dirname,
+          "node_modules",
+          "jsdom",
+          "lib",
+          "jsdom",
+          "living",
+          "xhr",
+          "xhr-sync-worker.js"
+        );
+        const workerDestDist = path.join(__dirname, "dist", "xhr-sync-worker.js");
+        const workerDestNodeModules = path.join(
+          __dirname,
+          "dist",
+          "node_modules",
+          "jsdom",
+          "lib",
+          "jsdom",
+          "living",
+          "xhr",
+          "xhr-sync-worker.js"
+        );
+        if (fs.existsSync(workerSrc)) {
+          fs.copyFileSync(workerSrc, workerDestDist);
+          // Ensure the directory exists for the node_modules path
+          fs.mkdirSync(path.dirname(workerDestNodeModules), { recursive: true });
+          fs.copyFileSync(workerSrc, workerDestNodeModules);
+        }
       }
     });
   },
@@ -48,7 +77,7 @@ const nodeBuiltins = [
   "net",
   "os",
   "path",
-  // "punycode", // removed so it is bundled
+  // "punycode", // bundled by esbuild
   "querystring",
   "readline",
   "stream",
@@ -66,11 +95,28 @@ const nodeBuiltins = [
 const nodeModulesPlugin = {
   name: "node-modules",
   setup(build) {
-    // Remove punycode from externals so it is bundled
-    const filteredBuiltins = nodeBuiltins.filter((m) => m !== "punycode");
-    build.onResolve({ filter: new RegExp(`^(${filteredBuiltins.join("|")})$`) }, () => ({ external: true }));
-    build.onResolve({ filter: new RegExp(`^(${filteredBuiltins.join("|")})/`) }, () => ({ external: true }));
-    build.onResolve({ filter: /better-sqlite3|electron/ }, () => ({ external: true })); // jsdom removed
+    // Handle Node.js built-ins
+    build.onResolve({ filter: new RegExp(`^(${nodeBuiltins.join("|")})$`) }, () => ({ external: true }));
+    build.onResolve({ filter: new RegExp(`^(${nodeBuiltins.join("|")})/`) }, () => ({ external: true }));
+
+    // Keep these as external (native modules that cannot be bundled)
+    build.onResolve({ filter: /better-sqlite3|electron/ }, () => ({ external: true }));
+
+    build.onResolve({ filter: /xhr-sync-worker\.js$/ }, (args) => {
+      return { path: require.resolve("jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js") };
+    });
+
+    // Treat punycode imports as external so runtime uses node_modules/punycode
+    build.onResolve({ filter: /^punycode(\/.*)?$/ }, () => ({ external: true }));
+  },
+};
+
+const workerPlugin = {
+  name: "worker-plugin",
+  setup(build) {
+    build.onResolve({ filter: /xhr-sync-worker\.js$/ }, (args) => {
+      return { path: require.resolve("jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js") };
+    });
   },
 };
 
@@ -107,8 +153,11 @@ async function main() {
       "vscode",
       "better-sqlite3",
       "electron",
-      "./node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js",
-      // 'punycode' intentionally NOT external, so it is bundled
+      // Keep jsdom worker external
+      "jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js",
+      // Mark punycode imports as external so the NPM package in node_modules/punycode is used
+      "punycode",
+      "punycode/",
     ],
     format: "cjs",
     target: "node16",
@@ -119,6 +168,11 @@ async function main() {
     metafile: true,
     logLevel: "info",
     plugins: [nodeModulesPlugin, treeShakingPlugin],
+    // Additional optimization for production
+    ...(production && {
+      drop: ["console", "debugger"],
+      legalComments: "none",
+    }),
   });
 
   // Webview bundle
@@ -171,7 +225,7 @@ async function main() {
     } else {
       console.log("🚀 Building...");
       const startTime = Date.now();
-      const [mainResult, webviewResult] = await Promise.all([mainCtx.rebuild(), webviewCtx.rebuild()]);
+      const [,] = await Promise.all([mainCtx.rebuild(), webviewCtx.rebuild()]);
       const duration = Date.now() - startTime;
       console.log(`\n✨ Build completed in ${duration}ms`);
       if (production) {
