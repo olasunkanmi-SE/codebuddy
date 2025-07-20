@@ -137,6 +137,22 @@ export class WorkspaceService implements IWorkspaceService {
     };
   }
 
+  public async getAllFiles(): Promise<vscode.Uri[] | undefined> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+      return undefined;
+    }
+    const rootPath = workspaceFolders[0].uri;
+    const files = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(rootPath, "**/*"),
+      new vscode.RelativePattern(
+        rootPath,
+        "**/{node_modules,build,dist,.git,out}/**",
+      ),
+    );
+    return files;
+  }
+
   private async getFolderStructure(rootPath: string): Promise<FolderEntry> {
     try {
       return await this.traverseDirectoryForStructure(rootPath, rootPath);

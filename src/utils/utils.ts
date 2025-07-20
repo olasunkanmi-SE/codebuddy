@@ -10,13 +10,55 @@ import { Memory } from "../memory/base";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
-export const formatText = (text?: string): string => {
-  if (text) {
-    const md = markdownit();
-    const renderedText = md.render(text);
-    return renderedText;
+const fixIncompleteMarkdown = (text: string): string => {
+  let processedText = text;
+
+  // Fix incomplete bold/italic formatting
+  if (processedText.endsWith("**") || processedText.endsWith("*")) {
+    processedText = processedText.replace(/\*+$/, "");
   }
-  return "";
+
+  // Fix incomplete header formatting
+  const headerRegex = /#+ *$/;
+  if (headerRegex.exec(processedText)) {
+    processedText = processedText.replace(headerRegex, "");
+  }
+
+  return processedText;
+};
+
+const fixUnmatchedBoldFormatting = (text: string): string => {
+  const asteriskCount = (text.match(/\*\*/g) || []).length;
+  if (asteriskCount % 2 !== 0) {
+    const lastDoubleAsterisk = text.lastIndexOf("**");
+    if (lastDoubleAsterisk !== -1) {
+      const afterLastAsterisk = text.substring(lastDoubleAsterisk + 2);
+      // If there's content after the last ** and no closing **, add one
+      if (
+        afterLastAsterisk.trim().length > 0 &&
+        !afterLastAsterisk.includes("**")
+      ) {
+        return text + "**";
+      }
+    }
+  }
+  return text;
+};
+
+export const formatText = (text?: string): string => {
+  if (!text) return "";
+
+  try {
+    let processedText = fixIncompleteMarkdown(text);
+    processedText = fixUnmatchedBoldFormatting(processedText);
+
+    const md = markdownit();
+    return md.render(processedText);
+  } catch (error) {
+    // If markdown parsing fails, return the original text
+    console.warn("Markdown parsing failed, returning original text:", error);
+    return text;
+  }
 };
 
 export const getConfigValue: GetConfigValueType<any> = <T>(
