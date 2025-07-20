@@ -1,8 +1,6 @@
 import * as vscode from "vscode";
-import {
-  DocumentationGeneratorService,
-  DocumentationConfig,
-} from "../services/documentation-generator.service";
+import { DocumentationConfig } from "../interfaces/documentation.interface";
+import { DocumentationGeneratorService } from "../services/documentation-generator.service";
 
 /**
  * Command to generate intelligent documentation for the codebase
@@ -145,13 +143,16 @@ async function showDocumentationConfigDialog(): Promise<
 
   // Map selection to configuration
   const config: DocumentationConfig = {
+    includeReadme: false,
     includeArchitecture: false,
     includeAPI: false,
+    includeComponents: false,
     includeUsage: false,
     includeContributing: true,
     includeLicense: true,
     outputFormat: outputFormat.value as "markdown" | "html" | "both",
     diagramFormat: diagramFormat.value as "mermaid" | "plantuml" | "ascii",
+    outputDirectory: "docs",
   };
 
   switch (selection.label) {
