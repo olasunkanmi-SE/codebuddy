@@ -55,9 +55,28 @@ export const formatText = (text?: string): string => {
     const md = markdownit();
     return md.render(processedText);
   } catch (error) {
-    // If markdown parsing fails, return the original text
-    console.warn("Markdown parsing failed, returning original text:", error);
-    return text;
+    // If markdown parsing fails, provide a more robust fallback
+    console.warn(
+      "Markdown parsing failed, providing HTML-safe fallback:",
+      error,
+    );
+
+    // Create a safe HTML fallback with basic formatting
+    const safeFallback = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;")
+      .replace(/\n/g, "<br/>")
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Bold
+      .replace(/\*(.*?)\*/g, "<em>$1</em>") // Italic
+      .replace(/`(.*?)`/g, "<code>$1</code>") // Inline code
+      .replace(/^### (.*$)/gim, "<h3>$1</h3>") // H3
+      .replace(/^## (.*$)/gim, "<h2>$1</h2>") // H2
+      .replace(/^# (.*$)/gim, "<h1>$1</h1>"); // H1
+
+    return `<div class="markdown-fallback">${safeFallback}</div>`;
   }
 };
 

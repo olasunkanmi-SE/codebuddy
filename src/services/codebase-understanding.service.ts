@@ -67,16 +67,29 @@ export class CodebaseUnderstandingService {
     return CodebaseUnderstandingService.instance;
   }
 
-  public async analyzeWorkspace(): Promise<ICodebaseAnalysis | null> {
+  public async analyzeWorkspace(
+    cancellationToken?: vscode.CancellationToken,
+    progress?: vscode.Progress<{ message?: string; increment?: number }>,
+  ): Promise<ICodebaseAnalysis | null> {
     this.logger.info("Starting comprehensive workspace analysis...");
+
+    progress?.report({ message: "Checking cache...", increment: 5 });
 
     // Check cache first
     const cacheKey = "workspace-analysis";
     const cachedResult = await this.cache.get<ICodebaseAnalysis>(cacheKey);
     if (cachedResult) {
       this.logger.info("Returning cached workspace analysis");
+      progress?.report({ message: "Using cached analysis", increment: 100 });
       return cachedResult;
     }
+
+    // Check for cancellation
+    if (cancellationToken?.isCancellationRequested) {
+      return null;
+    }
+
+    progress?.report({ message: "Reading package.json...", increment: 10 });
 
     const packageJsonPath = await this.findFile("package.json");
     let dependencies: Record<string, string> = {};
@@ -99,31 +112,61 @@ export class CodebaseUnderstandingService {
       this.logger.warn("Could not find package.json in the workspace.");
     }
 
+    progress?.report({ message: "Identifying frameworks...", increment: 20 });
+
     const frameworks = this.identifyFrameworks(dependencies);
     const allFiles =
       (await this.workspaceService.getAllFiles())?.map(
         (file: vscode.Uri) => file.fsPath,
       ) || [];
 
+    // Check for cancellation before expensive operations
+    if (cancellationToken?.isCancellationRequested) {
+      return null;
+    }
+
     // Advanced analysis using strategy pattern
+    progress?.report({ message: "Analyzing API endpoints...", increment: 40 });
     this.logger.info("Performing AST analysis for API endpoints...");
     const apiStrategy = AnalysisStrategyFactory.getStrategy(
       AnalysisType.API_ENDPOINTS,
     );
     const apiEndpoints = await apiStrategy.analyze(allFiles);
 
+    if (cancellationToken?.isCancellationRequested) {
+      return null;
+    }
+
+    progress?.report({ message: "Analyzing data models...", increment: 60 });
     this.logger.info("Analyzing data models and relationships...");
     const modelStrategy = AnalysisStrategyFactory.getStrategy(
       AnalysisType.DATA_MODELS,
     );
     const dataModels = await modelStrategy.analyze(allFiles);
 
+    if (cancellationToken?.isCancellationRequested) {
+      return null;
+    }
+
+    progress?.report({
+      message: "Analyzing database schema...",
+      increment: 75,
+    });
     this.logger.info("Introspecting database schema...");
     const databaseSchema = await this.introspectDatabaseSchema(allFiles);
 
+    if (cancellationToken?.isCancellationRequested) {
+      return null;
+    }
+
+    progress?.report({
+      message: "Mapping domain relationships...",
+      increment: 85,
+    });
     this.logger.info("Mapping domain relationships...");
     const domainRelationships = await this.mapDomainRelationships(dataModels);
 
+    progress?.report({ message: "Finalizing analysis...", increment: 95 });
     this.logger.info(
       `Analysis complete. Found ${frameworks.length} frameworks, ${apiEndpoints.length} endpoints, ${dataModels.length} models`,
     );
@@ -179,13 +222,17 @@ export class CodebaseUnderstandingService {
     }
   }
 
-  public async getCodebaseContext(isWebview: boolean = true): Promise<string> {
+  public async getCodebaseContext(
+    isWebview: boolean = true,
+    cancellationToken?: vscode.CancellationToken,
+    progress?: vscode.Progress<{ message?: string; increment?: number }>,
+  ): Promise<string> {
     // Reset file reference tracking for each analysis
     this.fileReferenceIndex.clear();
     this.fileReferenceCounter = 0;
     this.isWebviewMode = isWebview;
 
-    const analysis = await this.analyzeWorkspace();
+    const analysis = await this.analyzeWorkspace(cancellationToken, progress);
 
     if (!analysis) {
       return "Could not analyze the codebase.";
