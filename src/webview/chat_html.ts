@@ -36,9 +36,9 @@ export const chartComponent = (webview: Webview, extensionUri: Uri) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; 
-      style-src 'unsafe-inline' 'self' ${webview.cspSource}; 
+      style-src 'unsafe-inline' 'self' ${webview.cspSource} https://fonts.googleapis.com; 
       script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com; 
-      font-src 'self' ${webview.cspSource}; 
+      font-src 'self' ${webview.cspSource} https://fonts.gstatic.com data:; 
       connect-src https:; 
       img-src 'self' ${webview.cspSource} vscode-resource: https: data:;">
     <link rel="stylesheet" type="text/css" href="${stylesUri}">

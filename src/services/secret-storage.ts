@@ -23,12 +23,9 @@ export class SecretStorageService implements vscode.Disposable {
   registerDisposables() {
     this.disposables.push(
       this.localStorage.onDidChange(this.handleSecretStorageChange.bind(this)),
-      vscode.workspace.onDidChangeConfiguration(
-        this.handleConfigurationChange.bind(this),
-      ),
-      this.orchestrator.onUpdateUserPreferences(
-        this.handleUpdateSecrets.bind(this),
-      ),
+      vscode.workspace.onDidChangeConfiguration(this.handleConfigurationChange.bind(this)),
+      this.orchestrator.onUpdateUserPreferences(this.handleUpdateSecrets.bind(this)),
+      this.orchestrator.onUpdateThemePreferences(this.handleUpdateThemePreferences.bind(this))
     );
   }
   /**
@@ -61,7 +58,29 @@ export class SecretStorageService implements vscode.Disposable {
 
   async publishPreferences() {
     const username = await this.get("codebuddy-username");
-    this.orchestrator.publish("onGetUserPreferences", username);
+    const theme = await this.get("codebuddy-theme");
+    const preferences = {
+      username,
+      theme: theme || "tokyo night", // default theme
+    };
+    this.orchestrator.publish("onGetUserPreferences", JSON.stringify(preferences));
+  }
+
+  /**
+   * Handles updating theme preferences received from an event payload.
+   * @param {IEventPayload} payload - Contains type and message data with theme
+   * @throws {Error} If message parsing fails
+   */
+  async handleUpdateThemePreferences({ type, message }: IEventPayload) {
+    try {
+      const theme = message.theme || message; // Handle both object and string formats
+      await this.add("codebuddy-theme", theme);
+      await this.publishPreferences();
+      this.logger.info(`Theme preference updated to: ${theme}`);
+    } catch (error) {
+      this.logger.error("Error updating theme preferences", error);
+      throw new Error("Error updating theme preferences");
+    }
   }
 
   /**
@@ -99,13 +118,10 @@ export class SecretStorageService implements vscode.Disposable {
    */
   private logConfigurationChange(configKey: string, messagePrefix: string) {
     const data: any = {};
-    const newValue = vscode.workspace
-      .getConfiguration()
-      .get<string | number>(configKey);
+    const newValue = vscode.workspace.getConfiguration().get<string | number>(configKey);
     const sensitiveValues = newValue ? "Configured" : "Not Configured";
     const logMessage =
-      typeof newValue === "string" &&
-      (configKey.endsWith("apiKey") || configKey.endsWith("apiKeys"))
+      typeof newValue === "string" && (configKey.endsWith("apiKey") || configKey.endsWith("apiKeys"))
         ? `${messagePrefix} ${sensitiveValues}`
         : `${messagePrefix} ${newValue}`;
     data[configKey] = newValue;
@@ -135,11 +151,10 @@ export class SecretStorageService implements vscode.Disposable {
   setConfig(
     option: string,
     value: any,
-    configurationTarget: vscode.ConfigurationTarget = vscode.ConfigurationTarget
-      .Global,
+    configurationTarget: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global
   ): Thenable<void> {
     this.logger.info(
-      `Updating configuration: ${option} to ${typeof value === "object" ? JSON.stringify(value) : value}`,
+      `Updating configuration: ${option} to ${typeof value === "object" ? JSON.stringify(value) : value}`
     );
     return vscode.workspace.getConfiguration().update(option, value);
   }
@@ -158,9 +173,7 @@ export class SecretStorageService implements vscode.Disposable {
    * @returns A promise that resolves when the configuration has been updated.
    */
   setModelOption(value: string): Thenable<void> {
-    return vscode.workspace
-      .getConfiguration()
-      .update("generativeAi.option", value, vscode.ConfigurationTarget.Global);
+    return vscode.workspace.getConfiguration().update("generativeAi.option", value, vscode.ConfigurationTarget.Global);
   }
 
   /**

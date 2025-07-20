@@ -133,27 +133,47 @@ ${question}
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src 'self';">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' 'self'; font-src 'self' data: https://fonts.gstatic.com; connect-src https:;">
             <title>Codebase Analysis</title>
             <style>
                 body { 
-                    font-family: var(--vscode-font-family); 
+                    font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
                     color: var(--vscode-foreground); 
                     background: var(--vscode-editor-background);
                     padding: 20px;
                     line-height: 1.6;
+                    font-size: 14px;
+                    -webkit-font-smoothing: antialiased;
+                    -moz-osx-font-smoothing: grayscale;
                 }
-                h1, h2, h3 { color: var(--vscode-titleBar-activeForeground); }
+                h1, h2, h3 { 
+                    color: var(--vscode-titleBar-activeForeground);
+                    font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
+                    font-weight: 600;
+                    letter-spacing: -0.025em;
+                }
                 code { 
+                    font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
                     background: var(--vscode-textCodeBlock-background); 
-                    padding: 2px 4px; 
-                    border-radius: 3px; 
+                    padding: 2px 6px; 
+                    border-radius: 4px;
+                    font-size: 13px;
+                    font-weight: 500;
                 }
                 pre { 
+                    font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
                     background: var(--vscode-textCodeBlock-background); 
-                    padding: 10px; 
-                    border-radius: 5px; 
-                    overflow-x: auto; 
+                    padding: 16px; 
+                    border-radius: 8px; 
+                    overflow-x: auto;
+                    font-size: 13px;
+                    line-height: 1.5;
+                    border: 1px solid var(--vscode-widget-border);
+                }
+                pre code {
+                    background: transparent;
+                    padding: 0;
+                    font-size: inherit;
                 }
                 blockquote { 
                     border-left: 4px solid var(--vscode-textLink-foreground); 
