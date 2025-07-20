@@ -18,6 +18,9 @@ export enum CODEBUDDY_ACTIONS {
   restart = "CodeBuddy.restart",
   reviewPR = "CodeBuddy.reviewPR",
   codebaseAnalysis = "CodeBuddy.codebaseAnalysis",
+  generateDocumentation = "CodeBuddy.generateDocumentation",
+  regenerateDocumentation = "CodeBuddy.regenerateDocumentation",
+  openDocumentation = "CodeBuddy.openDocumentation",
 }
 export enum COMMON {
   GROQ_CHAT_HISTORY = "groqChatHistory",

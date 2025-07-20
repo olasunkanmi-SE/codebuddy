@@ -31,6 +31,11 @@ import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
 import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
+import {
+  generateDocumentationCommand,
+  regenerateDocumentationCommand,
+  openDocumentationCommand,
+} from "./commands/generate-documentation";
 
 const {
   geminiKey,
@@ -81,6 +86,9 @@ export async function activate(context: vscode.ExtensionContext) {
       restart,
       reviewPR,
       codebaseAnalysis,
+      generateDocumentation,
+      regenerateDocumentation,
+      openDocumentation,
     } = CODEBUDDY_ACTIONS;
     const getComment = new Comments(CODEBUDDY_ACTIONS.comment, context);
     const getInLineChat = new InLineChat(CODEBUDDY_ACTIONS.inlineChat, context);
@@ -180,6 +188,15 @@ export async function activate(context: vscode.ExtensionContext) {
       },
       [codebaseAnalysis]: async () => {
         await architecturalRecommendationCommand();
+      },
+      [generateDocumentation]: async () => {
+        await generateDocumentationCommand();
+      },
+      [regenerateDocumentation]: async () => {
+        await regenerateDocumentationCommand();
+      },
+      [openDocumentation]: async () => {
+        await openDocumentationCommand();
       },
     };
 

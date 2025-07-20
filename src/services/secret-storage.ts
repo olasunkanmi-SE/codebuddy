@@ -23,9 +23,15 @@ export class SecretStorageService implements vscode.Disposable {
   registerDisposables() {
     this.disposables.push(
       this.localStorage.onDidChange(this.handleSecretStorageChange.bind(this)),
-      vscode.workspace.onDidChangeConfiguration(this.handleConfigurationChange.bind(this)),
-      this.orchestrator.onUpdateUserPreferences(this.handleUpdateSecrets.bind(this)),
-      this.orchestrator.onUpdateThemePreferences(this.handleUpdateThemePreferences.bind(this))
+      vscode.workspace.onDidChangeConfiguration(
+        this.handleConfigurationChange.bind(this),
+      ),
+      this.orchestrator.onUpdateUserPreferences(
+        this.handleUpdateSecrets.bind(this),
+      ),
+      this.orchestrator.onUpdateThemePreferences(
+        this.handleUpdateThemePreferences.bind(this),
+      ),
     );
   }
   /**
@@ -63,7 +69,10 @@ export class SecretStorageService implements vscode.Disposable {
       username,
       theme: theme || "tokyo night", // default theme
     };
-    this.orchestrator.publish("onGetUserPreferences", JSON.stringify(preferences));
+    this.orchestrator.publish(
+      "onGetUserPreferences",
+      JSON.stringify(preferences),
+    );
   }
 
   /**
@@ -118,10 +127,13 @@ export class SecretStorageService implements vscode.Disposable {
    */
   private logConfigurationChange(configKey: string, messagePrefix: string) {
     const data: any = {};
-    const newValue = vscode.workspace.getConfiguration().get<string | number>(configKey);
+    const newValue = vscode.workspace
+      .getConfiguration()
+      .get<string | number>(configKey);
     const sensitiveValues = newValue ? "Configured" : "Not Configured";
     const logMessage =
-      typeof newValue === "string" && (configKey.endsWith("apiKey") || configKey.endsWith("apiKeys"))
+      typeof newValue === "string" &&
+      (configKey.endsWith("apiKey") || configKey.endsWith("apiKeys"))
         ? `${messagePrefix} ${sensitiveValues}`
         : `${messagePrefix} ${newValue}`;
     data[configKey] = newValue;
@@ -151,10 +163,11 @@ export class SecretStorageService implements vscode.Disposable {
   setConfig(
     option: string,
     value: any,
-    configurationTarget: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global
+    configurationTarget: vscode.ConfigurationTarget = vscode.ConfigurationTarget
+      .Global,
   ): Thenable<void> {
     this.logger.info(
-      `Updating configuration: ${option} to ${typeof value === "object" ? JSON.stringify(value) : value}`
+      `Updating configuration: ${option} to ${typeof value === "object" ? JSON.stringify(value) : value}`,
     );
     return vscode.workspace.getConfiguration().update(option, value);
   }
@@ -173,7 +186,9 @@ export class SecretStorageService implements vscode.Disposable {
    * @returns A promise that resolves when the configuration has been updated.
    */
   setModelOption(value: string): Thenable<void> {
-    return vscode.workspace.getConfiguration().update("generativeAi.option", value, vscode.ConfigurationTarget.Global);
+    return vscode.workspace
+      .getConfiguration()
+      .update("generativeAi.option", value, vscode.ConfigurationTarget.Global);
   }
 
   /**
