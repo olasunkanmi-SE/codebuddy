@@ -1,7 +1,8 @@
 import * as vscode from "vscode";
 import { CodebaseUnderstandingService } from "../services/codebase-understanding.service";
 import { GeminiLLM } from "../llms/gemini/gemini";
-import { getAPIKeyAndModel } from "../utils/utils";
+import { getAPIKeyAndModel, formatText } from "../utils/utils";
+import { LLMOutputSanitizer } from "../utils/llm-output-sanitizer";
 
 export const architecturalRecommendationCommand = async () => {
   const codebaseUnderstandingService =
@@ -32,15 +33,21 @@ export const architecturalRecommendationCommand = async () => {
     {
       location: vscode.ProgressLocation.Notification,
       title: "Analyzing codebase to answer your question...",
-      cancellable: false,
+      cancellable: true,
     },
-    async (progress) => {
+    async (progress, token) => {
       progress.report({ increment: 0 });
 
-      // Get comprehensive codebase context (not for webview, so use direct file links)
-      const context =
-        await codebaseUnderstandingService.getCodebaseContext(false);
-      progress.report({ increment: 50 });
+      // Get comprehensive codebase context with progress reporting
+      const context = await codebaseUnderstandingService.getCodebaseContext(
+        false,
+        token,
+        progress,
+      );
+
+      if (token.isCancellationRequested) {
+        return;
+      }
 
       const prompt = `
 You are a senior software architect and full-stack developer with extensive experience analyzing codebases. Based on the comprehensive codebase analysis below, provide detailed, accurate answers to the user's question.
@@ -86,16 +93,102 @@ ${question}
       `.trim();
 
       const result = await gemini.generateText(prompt);
+      progress.report({ increment: 90 });
+
+      // Sanitize the LLM output before displaying in webview
+      const sanitizedContent = LLMOutputSanitizer.sanitizeLLMOutput(
+        result,
+        false,
+      );
+
+      // Format the content to HTML with markdown rendering
+      let formattedContent: string;
+      try {
+        formattedContent = formatText(sanitizedContent);
+      } catch (error) {
+        console.warn(
+          "Markdown parsing failed, falling back to plain text:",
+          error,
+        );
+        // Fallback to plain text if markdown parsing fails
+        formattedContent = `<pre>${LLMOutputSanitizer.sanitizeText(sanitizedContent)}</pre>`;
+      }
+
       progress.report({ increment: 100 });
 
       const panel = vscode.window.createWebviewPanel(
         "codebaseAnalysis",
         "Codebase Analysis & Recommendations",
         vscode.ViewColumn.One,
-        {},
+        {
+          enableScripts: false, // Disable scripts for security
+          localResourceRoots: [], // No local resources needed
+        },
       );
 
-      panel.webview.html = result;
+      // Create secure HTML wrapper with proper CSP
+      const secureHtml = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' 'self'; font-src 'self' data: https://fonts.gstatic.com; connect-src https:;">
+            <title>Codebase Analysis</title>
+            <style>
+                body { 
+                    font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
+                    color: var(--vscode-foreground); 
+                    background: var(--vscode-editor-background);
+                    padding: 20px;
+                    line-height: 1.6;
+                    font-size: 14px;
+                    -webkit-font-smoothing: antialiased;
+                    -moz-osx-font-smoothing: grayscale;
+                }
+                h1, h2, h3 { 
+                    color: var(--vscode-titleBar-activeForeground);
+                    font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
+                    font-weight: 600;
+                    letter-spacing: -0.025em;
+                }
+                code { 
+                    font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
+                    background: var(--vscode-textCodeBlock-background); 
+                    padding: 2px 6px; 
+                    border-radius: 4px;
+                    font-size: 13px;
+                    font-weight: 500;
+                }
+                pre { 
+                    font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
+                    background: var(--vscode-textCodeBlock-background); 
+                    padding: 16px; 
+                    border-radius: 8px; 
+                    overflow-x: auto;
+                    font-size: 13px;
+                    line-height: 1.5;
+                    border: 1px solid var(--vscode-widget-border);
+                }
+                pre code {
+                    background: transparent;
+                    padding: 0;
+                    font-size: inherit;
+                }
+                blockquote { 
+                    border-left: 4px solid var(--vscode-textLink-foreground); 
+                    margin: 0; 
+                    padding-left: 10px; 
+                }
+            </style>
+        </head>
+        <body>
+            ${formattedContent}
+        </body>
+        </html>
+      `;
+
+      panel.webview.html = secureHtml;
     },
   );
 };

@@ -15,7 +15,7 @@ export interface ExtensionMessage {
 import { VSCodeTextArea, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useEffect, useRef, useState } from "react";
-import { codeBuddyMode, faqItems, modelOptions } from "../constants/constant";
+import { codeBuddyMode, faqItems, modelOptions, themeOptions } from "../constants/constant";
 import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
@@ -46,11 +46,16 @@ const vsCode = (() => {
 })();
 
 export const WebviewUI = () => {
-  const css = getChatCss("tokyo night");
-  updateStyles(css);
+  const [selectedTheme, setSelectedTheme] = useState("tokyo night");
   const [selectedModel, setSelectedModel] = useState("Gemini");
   const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Ask");
   const [userInput, setUserInput] = useState("");
+
+  // Update CSS whenever theme changes
+  useEffect(() => {
+    const css = getChatCss(selectedTheme);
+    updateStyles(css);
+  }, [selectedTheme]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isBotLoading, setIsBotLoading] = useState(false);
   const [commandAction, setCommandAction] = useState<string>("");
@@ -124,8 +129,17 @@ export const WebviewUI = () => {
           if (data.username) {
             setUsername(data.username);
           }
+          if (data.theme) {
+            setSelectedTheme(data.theme);
+          }
           return data;
         }
+        case "theme-settings":
+          // Handle theme settings from extension
+          if (message.theme) {
+            setSelectedTheme(message.theme);
+          }
+          break;
         default:
           console.warn("Unknown message type", message.type);
       }
@@ -182,6 +196,16 @@ export const WebviewUI = () => {
     setSelectedCodeBuddyMode(newValue);
     vsCode.postMessage({
       command: "codebuddy-model-change-event",
+      message: newValue,
+    });
+  };
+
+  const handleThemeChange = (e: any) => {
+    const newValue = e.target.value;
+    setSelectedTheme(newValue);
+    // Optionally save theme preference to extension storage
+    vsCode.postMessage({
+      command: "theme-change-event",
       message: newValue,
     });
   };
@@ -370,6 +394,7 @@ export const WebviewUI = () => {
             options={codeBuddyMode}
             id="cBuddymode"
           />
+          <ModelDropdown value={selectedTheme} onChange={handleThemeChange} options={themeOptions} id="theme" />
           <Button
             onClick={handleClearHistory}
             initialText="Clear history"
