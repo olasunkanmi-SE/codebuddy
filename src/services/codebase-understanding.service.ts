@@ -3,6 +3,11 @@ import * as ts from "typescript";
 import { Logger } from "../infrastructure/logger/logger";
 import { LogLevel } from "./telemetry";
 import { WorkspaceService } from "./workspace-service";
+import { CodebaseAnalysisCache } from "./codebase-analysis-cache";
+import {
+  AnalysisStrategyFactory,
+  AnalysisType,
+} from "./analysis-strategies/analysis-strategy-factory";
 
 interface IApiEndpoint {
   method: string;
@@ -41,7 +46,8 @@ export class CodebaseUnderstandingService {
   private static instance: CodebaseUnderstandingService;
   private readonly logger: Logger;
   private readonly workspaceService: WorkspaceService;
-  private fileReferenceIndex: Map<string, number> = new Map();
+  private readonly cache: CodebaseAnalysisCache;
+  private readonly fileReferenceIndex: Map<string, number> = new Map();
   private fileReferenceCounter: number = 0;
   private isWebviewMode: boolean = true;
 
@@ -50,6 +56,7 @@ export class CodebaseUnderstandingService {
       minLevel: LogLevel.DEBUG,
     });
     this.workspaceService = WorkspaceService.getInstance();
+    this.cache = CodebaseAnalysisCache.getInstance();
   }
 
   public static getInstance(): CodebaseUnderstandingService {
@@ -62,6 +69,14 @@ export class CodebaseUnderstandingService {
 
   public async analyzeWorkspace(): Promise<ICodebaseAnalysis | null> {
     this.logger.info("Starting comprehensive workspace analysis...");
+
+    // Check cache first
+    const cacheKey = "workspace-analysis";
+    const cachedResult = await this.cache.get<ICodebaseAnalysis>(cacheKey);
+    if (cachedResult) {
+      this.logger.info("Returning cached workspace analysis");
+      return cachedResult;
+    }
 
     const packageJsonPath = await this.findFile("package.json");
     let dependencies: Record<string, string> = {};
@@ -90,12 +105,18 @@ export class CodebaseUnderstandingService {
         (file: vscode.Uri) => file.fsPath,
       ) || [];
 
-    // Advanced analysis
+    // Advanced analysis using strategy pattern
     this.logger.info("Performing AST analysis for API endpoints...");
-    const apiEndpoints = await this.discoverApiEndpoints(allFiles);
+    const apiStrategy = AnalysisStrategyFactory.getStrategy(
+      AnalysisType.API_ENDPOINTS,
+    );
+    const apiEndpoints = await apiStrategy.analyze(allFiles);
 
     this.logger.info("Analyzing data models and relationships...");
-    const dataModels = await this.analyzeDataModels(allFiles);
+    const modelStrategy = AnalysisStrategyFactory.getStrategy(
+      AnalysisType.DATA_MODELS,
+    );
+    const dataModels = await modelStrategy.analyze(allFiles);
 
     this.logger.info("Introspecting database schema...");
     const databaseSchema = await this.introspectDatabaseSchema(allFiles);
@@ -107,7 +128,7 @@ export class CodebaseUnderstandingService {
       `Analysis complete. Found ${frameworks.length} frameworks, ${apiEndpoints.length} endpoints, ${dataModels.length} models`,
     );
 
-    return {
+    const result = {
       frameworks,
       dependencies,
       files: allFiles,
@@ -116,6 +137,11 @@ export class CodebaseUnderstandingService {
       databaseSchema,
       domainRelationships,
     };
+
+    // Cache the result for 30 minutes
+    await this.cache.set(cacheKey, result, 30 * 60 * 1000, true);
+
+    return result;
   }
 
   private identifyFrameworks(dependencies: Record<string, string>): string[] {
@@ -1322,5 +1348,28 @@ ${this.formatFileReferenceIndex()}
     }
 
     return patterns;
+  }
+
+  /**
+   * Clear analysis cache - useful when workspace changes significantly
+   */
+  public clearCache(): void {
+    this.cache.clear();
+    this.logger.info("Codebase analysis cache cleared");
+  }
+
+  /**
+   * Clear specific cache patterns
+   */
+  public clearCachePattern(pattern: string): void {
+    this.cache.clearPattern(pattern);
+    this.logger.info(`Cache cleared for pattern: ${pattern}`);
+  }
+
+  /**
+   * Get cache statistics for debugging
+   */
+  public getCacheStats(): any {
+    return this.cache.getStats();
   }
 }

@@ -19,28 +19,28 @@ export class ReviewPR extends CodeCommandHandler {
     repository: any;
   }> {
     // Get the git extension
-    const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+    const gitExtension = vscode.extensions.getExtension("vscode.git")?.exports;
     const api = gitExtension?.getAPI(1);
 
     if (!api) {
-      throw new Error('Git extension not available');
+      throw new Error("Git extension not available");
     }
 
     // Get the repository for the current workspace
     const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
     if (!workspaceUri) {
-      throw new Error('No workspace folder found');
+      throw new Error("No workspace folder found");
     }
 
     const repository = api.getRepository(workspaceUri);
     if (!repository) {
-      throw new Error('No git repository found in workspace');
+      throw new Error("No git repository found in workspace");
     }
 
     // Get all changes (staged and unstaged)
     const changes = [
       ...repository.state.indexChanges,
-      ...repository.state.workingTreeChanges
+      ...repository.state.workingTreeChanges,
     ];
 
     return { changes, repository };
@@ -49,15 +49,22 @@ export class ReviewPR extends CodeCommandHandler {
   /**
    * Get changed files from VS Code's git integration
    */
-  private async getChangedFilesFromVSCode(): Promise<{ files: string[], content: string }> {
+  private async getChangedFilesFromVSCode(): Promise<{
+    files: string[];
+    content: string;
+  }> {
     try {
       // Use VS Code's workspace to find recently modified files
       const changedFiles: string[] = [];
       let content = "";
 
       // Get files modified in the last day (as a fallback approach)
-      const allFiles = await vscode.workspace.findFiles("**/*.{ts,js,tsx,jsx,json,md,py,java,cs,php}", "**/node_modules/**", 100);
-      
+      const allFiles = await vscode.workspace.findFiles(
+        "**/*.{ts,js,tsx,jsx,json,md,py,java,cs,php}",
+        "**/node_modules/**",
+        100,
+      );
+
       // Get file stats and filter by recent modifications
       const recentFiles = [];
       for (const fileUri of allFiles.slice(0, 20)) {
@@ -77,13 +84,14 @@ export class ReviewPR extends CodeCommandHandler {
         for (const fileUri of recentFiles.slice(0, 5)) {
           const relativePath = vscode.workspace.asRelativePath(fileUri);
           changedFiles.push(relativePath);
-          
+
           try {
             const document = await vscode.workspace.openTextDocument(fileUri);
             const fileContent = document.getText();
-            const truncatedContent = fileContent.length > 800 
-              ? fileContent.substring(0, 800) + "... [truncated]"
-              : fileContent;
+            const truncatedContent =
+              fileContent.length > 800
+                ? fileContent.substring(0, 800) + "... [truncated]"
+                : fileContent;
             content += `\n\n## File: ${relativePath}\n\`\`\`${this.getFileExtension(relativePath)}\n${truncatedContent}\n\`\`\``;
           } catch (error) {
             content += `\n\n## File: ${relativePath}\n[Error reading file: ${error}]`;
@@ -99,17 +107,28 @@ export class ReviewPR extends CodeCommandHandler {
   }
 
   private getFileExtension(filePath: string): string {
-    const ext = filePath.split('.').pop()?.toLowerCase();
+    const ext = filePath.split(".").pop()?.toLowerCase();
     switch (ext) {
-      case 'ts': case 'tsx': return 'typescript';
-      case 'js': case 'jsx': return 'javascript';
-      case 'py': return 'python';
-      case 'java': return 'java';
-      case 'cs': return 'csharp';
-      case 'php': return 'php';
-      case 'md': return 'markdown';
-      case 'json': return 'json';
-      default: return ext || 'text';
+      case "ts":
+      case "tsx":
+        return "typescript";
+      case "js":
+      case "jsx":
+        return "javascript";
+      case "py":
+        return "python";
+      case "java":
+        return "java";
+      case "cs":
+        return "csharp";
+      case "php":
+        return "php";
+      case "md":
+        return "markdown";
+      case "json":
+        return "json";
+      default:
+        return ext || "text";
     }
   }
 
@@ -170,45 +189,59 @@ export class ReviewPR extends CodeCommandHandler {
       try {
         // First, try to use VS Code's git integration
         const { changes, repository } = await this.getVSCodeGitChanges();
-        
+
         if (changes.length > 0) {
-          changedFiles = changes.map(change => {
-            const relativePath = vscode.workspace.asRelativePath(change.resourceUri);
-            return `${relativePath} (${change.decorations?.tooltip || 'modified'})`;
+          changedFiles = changes.map((change) => {
+            const relativePath = vscode.workspace.asRelativePath(
+              change.resourceUri,
+            );
+            return `${relativePath} (${change.decorations?.tooltip || "modified"})`;
           });
 
           // Get current branch info
-          branchInfo = `Current branch: ${repository.state.HEAD?.name || 'HEAD'}`;
+          branchInfo = `Current branch: ${repository.state.HEAD?.name || "HEAD"}`;
 
           // Get sample of changed file content for context
           const sampleFiles = changes.slice(0, 5); // Limit to first 5 files
           for (const change of sampleFiles) {
-            const filePath = vscode.workspace.asRelativePath(change.resourceUri);
+            const filePath = vscode.workspace.asRelativePath(
+              change.resourceUri,
+            );
             const content = await this.getFileContent(filePath);
-            const truncatedContent = content.length > 1000 
-              ? content.substring(0, 1000) + "... [truncated]"
-              : content;
-            
+            const truncatedContent =
+              content.length > 1000
+                ? content.substring(0, 1000) + "... [truncated]"
+                : content;
+
             diffContent += `\n\n## File: ${filePath}\n${truncatedContent}`;
           }
         }
       } catch (error) {
-        console.log("VS Code git integration failed, falling back to git commands:", error);
-        
+        console.log(
+          "VS Code git integration failed, falling back to git commands:",
+          error,
+        );
+
         // Fallback to the original git commands approach
         try {
           const targetBranch = await this.selectTargetBranch();
           if (targetBranch) {
-            const modifiedFiles = await this.gitActions.getModifiedFiles(targetBranch);
-            const prDiff = await this.gitActions.getPRDifferenceSummary(targetBranch);
-            const currentBranchInfo = await this.gitActions.getCurrentBranchInfo();
-            
+            const modifiedFiles =
+              await this.gitActions.getModifiedFiles(targetBranch);
+            const prDiff =
+              await this.gitActions.getPRDifferenceSummary(targetBranch);
+            const currentBranchInfo =
+              await this.gitActions.getCurrentBranchInfo();
+
             changedFiles = modifiedFiles;
             diffContent = prDiff;
             branchInfo = `${currentBranchInfo.current} → ${targetBranch}`;
           }
         } catch (fallbackError) {
-          console.error("Both VS Code git and fallback git commands failed:", fallbackError);
+          console.error(
+            "Both VS Code git and fallback git commands failed:",
+            fallbackError,
+          );
           // Continue with empty data but inform about the issue
         }
       }
@@ -221,7 +254,8 @@ export class ReviewPR extends CodeCommandHandler {
         if (content) {
           diffContent = content;
         } else {
-          diffContent = "Note: No recent changes detected. Performing general code quality assessment of workspace files.";
+          diffContent =
+            "Note: No recent changes detected. Performing general code quality assessment of workspace files.";
         }
       }
 
@@ -231,7 +265,7 @@ export class ReviewPR extends CodeCommandHandler {
 - **Branch Info**: ${branchInfo}
 - **Files Modified**: ${changedFiles.length} files
 - **Changed Files**: 
-${changedFiles.map(file => `  - ${file}`).join('\n')}
+${changedFiles.map((file) => `  - ${file}`).join("\n")}
 
 ## Review Areas
 Analyze for: **Code Quality** (readability, SOLID principles), **Security** (input validation, auth), **Performance** (algorithms, memory), **Architecture** (design patterns, complexity), **Testing** (coverage, edge cases).
@@ -300,7 +334,7 @@ ${diffContent}
 Provide comprehensive review with optimization examples above.`;
     } catch (error) {
       console.error("Error generating PR review prompt:", error);
-      
+
       // Return a basic prompt even if everything fails
       return `You are CodeBuddy, a senior software engineer conducting a code review. 
 

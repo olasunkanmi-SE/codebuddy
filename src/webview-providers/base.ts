@@ -11,6 +11,7 @@ import { ChatHistoryManager } from "../services/chat-history-manager";
 import { CodebaseUnderstandingService } from "../services/codebase-understanding.service";
 import { FileManager } from "../services/file-manager";
 import { FileService } from "../services/file-system";
+import { InputValidator } from "../services/input-validator";
 import { QuestionClassifierService } from "../services/question-classifier.service";
 import { LogLevel } from "../services/telemetry";
 import { WorkspaceService } from "../services/workspace-service";
@@ -33,6 +34,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected readonly chatHistoryManager: ChatHistoryManager;
   private readonly questionClassifier: QuestionClassifierService;
   private readonly codebaseUnderstanding: CodebaseUnderstandingService;
+  private readonly inputValidator: InputValidator;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -52,6 +54,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.chatHistoryManager = ChatHistoryManager.getInstance();
     this.questionClassifier = QuestionClassifierService.getInstance();
     this.codebaseUnderstanding = CodebaseUnderstandingService.getInstance();
+    this.inputValidator = InputValidator.getInstance();
     // Don't register disposables here - do it lazily when webview is resolved
   }
 
@@ -187,6 +190,47 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "user-input": {
               this.UserMessageCounter += 1;
 
+              // Validate user input for security
+              const validation = this.inputValidator.validateInput(
+                message.message,
+                "chat",
+              );
+
+              if (validation.blocked) {
+                this.logger.warn(
+                  "User input blocked due to security concerns",
+                  {
+                    originalLength: message.message.length,
+                    warnings: validation.warnings,
+                  },
+                );
+
+                await this.sendResponse(
+                  "⚠️ Your message contains potentially unsafe content and has been blocked. Please rephrase your question in a more direct way.",
+                  "bot",
+                );
+                break;
+              }
+
+              if (validation.warnings.length > 0) {
+                this.logger.info("User input sanitized", {
+                  warnings: validation.warnings,
+                  originalLength: message.message.length,
+                  sanitizedLength: validation.sanitizedInput.length,
+                });
+
+                // Optionally notify user about sanitization
+                if (validation.warnings.length > 2) {
+                  await this.sendResponse(
+                    "ℹ️ Your message has been modified for security. Some content was filtered.",
+                    "bot",
+                  );
+                }
+              }
+
+              // Use sanitized input
+              const sanitizedMessage = validation.sanitizedInput;
+
               // Check if we should prune history for performance
               if (this.UserMessageCounter % 10 === 0) {
                 const stats = await this.getChatHistoryStats("agentId");
@@ -203,7 +247,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
 
               response = await this.generateResponse(
-                await this.enhanceMessageWithCodebaseContext(message.message),
+                await this.enhanceMessageWithCodebaseContext(sanitizedMessage),
                 message.metaData,
               );
               if (this.UserMessageCounter === 1) {
