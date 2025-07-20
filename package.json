@@ -96,6 +96,10 @@
           "when": "editorHasSelection",
           "command": "CodeBuddy.generateMermaidDiagram",
           "group": "CodeBuddy"
+        },
+        {
+          "command": "CodeBuddy.codebaseAnalysis",
+          "group": "CodeBuddy"
         }
       ]
     },
@@ -135,6 +139,10 @@
       {
         "command": "CodeBuddy.generateMermaidDiagram",
         "title": "CodeBuddy. Generate Mermaid diagram."
+      },
+      {
+        "command": "CodeBuddy.codebaseAnalysis",
+        "title": "CodeBuddy. Analyze Codebase & Answer Questions"
       }
     ],
     "viewsContainers": {

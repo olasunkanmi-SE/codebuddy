@@ -113,13 +113,12 @@ export class GeminiLLM
           systemInstruction:
             modelParams?.systemInstruction ?? this.config.systemInstruction,
           generationConfig: {
-            stopSequences: [
-              "Thank you",
-              "Done",
-              "End",
-              "stuck in a loop",
-              "loop",
-            ],
+            maxOutputTokens: 8192, // Increase output token limit
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            // Minimize stop sequences to prevent premature truncation
+            stopSequences: ["stuck in a loop", "infinite loop detected"],
           },
         });
       if (!model) {
