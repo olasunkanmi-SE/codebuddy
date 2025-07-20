@@ -119,7 +119,8 @@ export const faqItems: FAQItem[] = [
 `,
   },
   {
-    question: "WHAT IS THE CHAT CONTEXT AND HOW CAN IT HELP ME TO ENHANCE MY CODING EXPERIENCE ",
+    question:
+      "WHAT IS THE CHAT CONTEXT AND HOW CAN IT HELP ME TO ENHANCE MY CODING EXPERIENCE ",
     answer: `
 
 <p>Chat Context in CodeBuddy is a powerful feature that allows you to add multiple files to provide relevant background information to the AI model when you ask questions. Here's how it works and why it's beneficial:</p>

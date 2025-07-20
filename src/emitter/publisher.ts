@@ -9,18 +9,32 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onPromptGenerated: vscode.Event<IEventPayload> = this.createEvent("onQuery");
   onThinking: vscode.Event<IEventPayload> = this.createEvent("onThinking");
   onResponse: vscode.Event<IEventPayload> = this.createEvent("onResponse");
-  onSecretChange: vscode.Event<IEventPayload> = this.createEvent("onSecretChange");
+  onSecretChange: vscode.Event<IEventPayload> =
+    this.createEvent("onSecretChange");
   onFileUpload: vscode.Event<IEventPayload> = this.createEvent("onFileUpload");
-  onActiveworkspaceUpdate: vscode.Event<IEventPayload> = this.createEvent("onActiveworkspaceUpdate");
-  onStrategizing: vscode.Event<IEventPayload> = this.createEvent("onStrategizing");
-  onModelChange: vscode.Event<IEventPayload> = this.createEvent("onModelChange");
-  onConfigurationChange: vscode.Event<IEventPayload> = this.createEvent("onConfigurationChange");
+  onActiveworkspaceUpdate: vscode.Event<IEventPayload> = this.createEvent(
+    "onActiveworkspaceUpdate",
+  );
+  onStrategizing: vscode.Event<IEventPayload> =
+    this.createEvent("onStrategizing");
+  onModelChange: vscode.Event<IEventPayload> =
+    this.createEvent("onModelChange");
+  onConfigurationChange: vscode.Event<IEventPayload> = this.createEvent(
+    "onConfigurationChange",
+  );
   onUserPrompt: vscode.Event<IEventPayload> = this.createEvent("onUserPrompt");
-  onClearHistory: vscode.Event<IEventPayload> = this.createEvent("onClearHistory");
+  onClearHistory: vscode.Event<IEventPayload> =
+    this.createEvent("onClearHistory");
   onInlineChat: vscode.Event<IEventPayload> = this.createEvent("onInlineChat");
-  onUpdateUserPreferences: vscode.Event<IEventPayload> = this.createEvent("onUpdateUserPreferences");
-  onGetUserPreferences: vscode.Event<IEventPayload> = this.createEvent("onGetUserPreferences");
-  onUpdateThemePreferences: vscode.Event<IEventPayload> = this.createEvent("onUpdateThemePreferences");
+  onUpdateUserPreferences: vscode.Event<IEventPayload> = this.createEvent(
+    "onUpdateUserPreferences",
+  );
+  onGetUserPreferences: vscode.Event<IEventPayload> = this.createEvent(
+    "onGetUserPreferences",
+  );
+  onUpdateThemePreferences: vscode.Event<IEventPayload> = this.createEvent(
+    "onUpdateThemePreferences",
+  );
 
   /**
    * Emits a generic event with specified status, message, and optional data.

@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "CodeBuddy is a Visual Studio Code extension that enhances developer productivity through AI-powered code assistance. It provides intelligent code review, refactoring suggestions, optimization tips, and interactive chat capabilities powered by multiple AI models including Gemini, Groq, Anthropic, and Deepseek.",
-  "version": "3.2.6",
+  "version": "3.4.4",
   "engines": {
     "vscode": "^1.78.0"
   },
@@ -100,6 +100,10 @@
         {
           "command": "CodeBuddy.codebaseAnalysis",
           "group": "CodeBuddy"
+        },
+        {
+          "command": "CodeBuddy.reviewPR",
+          "group": "CodeBuddy"
         }
       ]
     },
@@ -143,6 +147,10 @@
       {
         "command": "CodeBuddy.codebaseAnalysis",
         "title": "CodeBuddy. Analyze Codebase & Answer Questions"
+      },
+      {
+        "command": "CodeBuddy.reviewPR",
+        "title": "CodeBuddy. Review Pull Request"
       }
     ],
     "viewsContainers": {
