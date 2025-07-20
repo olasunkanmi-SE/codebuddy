@@ -30,6 +30,7 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
+import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
 
 const {
   geminiKey,
@@ -79,6 +80,7 @@ export async function activate(context: vscode.ExtensionContext) {
       inlineChat,
       restart,
       reviewPR,
+      codebaseAnalysis,
     } = CODEBUDDY_ACTIONS;
     const getComment = new Comments(CODEBUDDY_ACTIONS.comment, context);
     const getInLineChat = new InLineChat(CODEBUDDY_ACTIONS.inlineChat, context);
@@ -175,6 +177,9 @@ export async function activate(context: vscode.ExtensionContext) {
           undefined,
           "🔍 Conducting comprehensive pull request review",
         );
+      },
+      [codebaseAnalysis]: async () => {
+        await architecturalRecommendationCommand();
       },
     };
 

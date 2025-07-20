@@ -8,8 +8,10 @@ import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { AgentService } from "../services/agent-state";
 import { ChatHistoryManager } from "../services/chat-history-manager";
+import { CodebaseUnderstandingService } from "../services/codebase-understanding.service";
 import { FileManager } from "../services/file-manager";
 import { FileService } from "../services/file-system";
+import { QuestionClassifierService } from "../services/question-classifier.service";
 import { LogLevel } from "../services/telemetry";
 import { WorkspaceService } from "../services/workspace-service";
 import { formatText } from "../utils/utils";
@@ -29,6 +31,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly fileManager: FileManager;
   private readonly agentService: AgentService;
   protected readonly chatHistoryManager: ChatHistoryManager;
+  private readonly questionClassifier: QuestionClassifierService;
+  private readonly codebaseUnderstanding: CodebaseUnderstandingService;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -46,6 +50,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.workspaceService = WorkspaceService.getInstance();
     this.agentService = AgentService.getInstance();
     this.chatHistoryManager = ChatHistoryManager.getInstance();
+    this.questionClassifier = QuestionClassifierService.getInstance();
+    this.codebaseUnderstanding = CodebaseUnderstandingService.getInstance();
     // Don't register disposables here - do it lazily when webview is resolved
   }
 
@@ -197,14 +203,29 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
 
               response = await this.generateResponse(
-                message.message,
+                await this.enhanceMessageWithCodebaseContext(message.message),
                 message.metaData,
               );
               if (this.UserMessageCounter === 1) {
                 await this.publishWorkSpace();
               }
               if (response) {
-                await this.sendResponse(formatText(response), "bot");
+                console.log(
+                  `[DEBUG] Response from generateResponse: ${response.length} characters`,
+                );
+                const formattedResponse = formatText(response);
+                console.log(
+                  `[DEBUG] Formatted response: ${formattedResponse.length} characters`,
+                );
+                console.log(
+                  `[DEBUG] Original response ends with: "${response.slice(-100)}"`,
+                );
+
+                await this.sendResponse(formattedResponse, "bot");
+              } else {
+                console.log(
+                  `[DEBUG] No response received from generateResponse`,
+                );
               }
               break;
             }
@@ -262,6 +283,53 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     response: string,
     currentChat?: string,
   ): Promise<boolean | undefined>;
+
+  /**
+   * Enhances user messages with codebase context if the question is codebase-related
+   */
+  private async enhanceMessageWithCodebaseContext(
+    message: string,
+  ): Promise<string> {
+    try {
+      const questionAnalysis =
+        this.questionClassifier.categorizeQuestion(message);
+
+      if (!questionAnalysis.isCodebaseRelated) {
+        this.logger.debug(
+          "Question not codebase-related, returning original message",
+        );
+        return message;
+      }
+
+      this.logger.info(
+        `Detected codebase question with confidence: ${questionAnalysis.confidence}, categories: ${questionAnalysis.categories.join(", ")}`,
+      );
+
+      // Get comprehensive codebase context
+      const codebaseContext =
+        await this.codebaseUnderstanding.getCodebaseContext();
+
+      // Create enhanced prompt with codebase context
+      const enhancedMessage = `
+**User Question**: ${message}
+
+**Codebase Context** (Automatically included because your question is related to understanding this codebase):
+
+${codebaseContext}
+
+**Instructions for AI**: Use the codebase context above to provide accurate, specific answers about this project. Reference actual files, patterns, and implementations found in the codebase analysis. Use the provided clickable file references (e.g., [[1]], [[2]]) so users can navigate directly to the source code.
+
+IMPORTANT: Please provide a complete response. Do not truncate your answer mid-sentence or mid-word. Ensure your response is fully finished before ending.
+`.trim();
+
+      this.logger.debug("Enhanced message with codebase context");
+      return enhancedMessage;
+    } catch (error) {
+      this.logger.error("Error enhancing message with codebase context", error);
+      // Return original message if enhancement fails
+      return message;
+    }
+  }
 
   public dispose(): void {
     this.logger.debug(

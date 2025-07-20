@@ -3,7 +3,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
-import { APP_CONFIG, COMMON, generativeAiModels } from "../application/constant";
+import {
+  APP_CONFIG,
+  COMMON,
+  generativeAiModels,
+} from "../application/constant";
 import { AnthropicWebViewProvider } from "../webview-providers/anthropic";
 import { DeepseekWebViewProvider } from "../webview-providers/deepseek";
 import { GeminiWebViewProvider } from "../webview-providers/gemini";
@@ -18,6 +22,7 @@ import {
 import { Memory } from "../memory/base";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../agents/orchestrator";
+import { architecturalRecommendationCommand } from "./architectural-recommendation";
 
 interface ICodeCommandHandler {
   getApplicationConfig(configKey: string): string | undefined;
@@ -41,7 +46,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,
-    errorMessage?: string
+    errorMessage?: string,
   ) {
     this.context = _context;
     this.error = errorMessage;
@@ -84,7 +89,10 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   } {
     const { CODEBUDDY_ACTIONS } = require("../application/constant");
 
-    const commandDescriptions: Record<string, { action: string; description: string }> = {
+    const commandDescriptions: Record<
+      string,
+      { action: string; description: string }
+    > = {
       [CODEBUDDY_ACTIONS.comment]: {
         action: "Adding Code Comments",
         description:
@@ -97,7 +105,8 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       },
       [CODEBUDDY_ACTIONS.refactor]: {
         action: "Refactoring Code",
-        description: "CodeBuddy is applying SOLID principles and design patterns to improve code maintainability...",
+        description:
+          "CodeBuddy is applying SOLID principles and design patterns to improve code maintainability...",
       },
       [CODEBUDDY_ACTIONS.optimize]: {
         action: "Optimizing Performance",
@@ -106,7 +115,8 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       },
       [CODEBUDDY_ACTIONS.fix]: {
         action: "Fixing Code Issues",
-        description: "CodeBuddy is diagnosing the error and implementing defensive programming solutions...",
+        description:
+          "CodeBuddy is diagnosing the error and implementing defensive programming solutions...",
       },
       [CODEBUDDY_ACTIONS.explain]: {
         action: "Explaining Code Logic",
@@ -115,19 +125,23 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       },
       [CODEBUDDY_ACTIONS.commitMessage]: {
         action: "Generating Commit Message",
-        description: "CodeBuddy is analyzing your staged changes and crafting a professional commit message...",
+        description:
+          "CodeBuddy is analyzing your staged changes and crafting a professional commit message...",
       },
       [CODEBUDDY_ACTIONS.interviewMe]: {
         action: "Preparing Interview Questions",
-        description: "CodeBuddy is creating comprehensive technical interview questions based on your code...",
+        description:
+          "CodeBuddy is creating comprehensive technical interview questions based on your code...",
       },
       [CODEBUDDY_ACTIONS.generateUnitTest]: {
         action: "Generating Unit Tests",
-        description: "CodeBuddy is creating comprehensive test suites with edge cases and mocking strategies...",
+        description:
+          "CodeBuddy is creating comprehensive test suites with edge cases and mocking strategies...",
       },
       [CODEBUDDY_ACTIONS.generateDiagram]: {
         action: "Creating System Diagram",
-        description: "CodeBuddy is visualizing your code architecture with professional Mermaid diagrams...",
+        description:
+          "CodeBuddy is visualizing your code architecture with professional Mermaid diagrams...",
       },
       [CODEBUDDY_ACTIONS.reviewPR]: {
         action: "Reviewing Pull Request",
@@ -136,14 +150,21 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       },
       [CODEBUDDY_ACTIONS.inlineChat]: {
         action: "Processing Inline Request",
-        description: "CodeBuddy is analyzing your inline query and generating a contextual response...",
+        description:
+          "CodeBuddy is analyzing your inline query and generating a contextual response...",
+      },
+      [CODEBUDDY_ACTIONS.architecturalRecommendation]: {
+        action: "Generating Architectural Recommendations",
+        description:
+          "CodeBuddy is analyzing your codebase to provide architectural recommendations...",
       },
     };
 
     return (
       commandDescriptions[action] || {
         action: "Processing Request",
-        description: "CodeBuddy is analyzing your code and generating a response...",
+        description:
+          "CodeBuddy is analyzing your code and generating a response...",
       }
     );
   }
@@ -186,13 +207,15 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     }
   }
 
-  protected createModel(): { generativeAi: string; model: any; modelName: string } | undefined {
+  protected createModel():
+    | { generativeAi: string; model: any; modelName: string }
+    | undefined {
     try {
       let model;
       let modelName = "";
       if (!this.generativeAi) {
         vscodeErrorMessage(
-          "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
+          "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
         );
       }
       if (this.generativeAi === generativeAiModels.GROQ) {
@@ -200,7 +223,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         modelName = this.groqModel;
         if (!apiKey || !modelName) {
           vscodeErrorMessage(
-            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name"
+            "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
           );
         }
         model = this.createGroqModel(apiKey);
@@ -226,7 +249,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       return { generativeAi: this.generativeAi, model, modelName };
     } catch (error) {
       console.error("Error creating model:", error);
-      vscode.window.showErrorMessage("An error occurred while creating the model. Please try again.");
+      vscode.window.showErrorMessage(
+        "An error occurred while creating the model. Please try again.",
+      );
     }
   }
 
@@ -259,7 +284,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     return new Groq({ apiKey });
   }
 
-  protected async generateModelResponse(text: string): Promise<string | Anthropic.Messages.Message | undefined> {
+  protected async generateModelResponse(
+    text: string,
+  ): Promise<string | Anthropic.Messages.Message | undefined> {
     try {
       if (text?.length > 0) {
         this.orchestrator.publish("onUserPrompt", text);
@@ -299,7 +326,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
 
       if (!response) {
         throw new Error(
-          "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly."
+          "Could not generate response. Check your settings, ensure the API keys and Model Name is added properly.",
         );
       }
       if (this.action.includes("chart")) {
@@ -310,7 +337,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       return response;
     } catch (error) {
       this.logger.error("Error generating response:", error);
-      vscode.window.showErrorMessage("An error occurred while generating the response. Please try again.");
+      vscode.window.showErrorMessage(
+        "An error occurred while generating the response. Please try again.",
+      );
     }
   }
 
@@ -321,7 +350,10 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     return inputString;
   }
 
-  async generateGeminiResponse(model: any, text: string): Promise<string | undefined> {
+  async generateGeminiResponse(
+    model: any,
+    text: string,
+  ): Promise<string | undefined> {
     const result = await model.generateContent(text);
     return result ? await result.response.text() : undefined;
   }
@@ -329,7 +361,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   private async anthropicResponse(
     model: Anthropic,
     generativeAiModel: string,
-    userPrompt: string
+    userPrompt: string,
   ): Promise<string | undefined> {
     try {
       const response = await model.messages.create({
@@ -353,9 +385,15 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     }
   }
 
-  private async groqResponse(model: Groq, prompt: string, generativeAiModel: string): Promise<string | undefined> {
+  private async groqResponse(
+    model: Groq,
+    prompt: string,
+    generativeAiModel: string,
+  ): Promise<string | undefined> {
     try {
-      const chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY) ? Memory.get(COMMON.GROQ_CHAT_HISTORY) : [];
+      const chatHistory = Memory.has(COMMON.ANTHROPIC_CHAT_HISTORY)
+        ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
+        : [];
       const params = {
         messages: [
           ...chatHistory,
@@ -367,7 +405,8 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         model: generativeAiModel,
       };
 
-      const completion: Groq.Chat.ChatCompletion = await model.chat.completions.create(params);
+      const completion: Groq.Chat.ChatCompletion =
+        await model.chat.completions.create(params);
       return completion.choices[0]?.message?.content ?? undefined;
     } catch (error) {
       this.logger.error("Error generating response:", error);
@@ -378,7 +417,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
 
   abstract createPrompt(text?: string): any;
 
-  async generateResponse(message?: string): Promise<string | Anthropic.Messages.Message | undefined> {
+  async generateResponse(
+    message?: string,
+  ): Promise<string | Anthropic.Messages.Message | undefined> {
     this.logger.info(this.action);
     let prompt;
     const selectedCode = this.getSelectedWindowArea();
@@ -390,7 +431,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     if (message && selectedCode) {
       prompt = await this.createPrompt(`${message} \n ${selectedCode}`);
     } else {
-      message ? (prompt = await this.createPrompt(message)) : (prompt = await this.createPrompt(selectedCode));
+      message
+        ? (prompt = await this.createPrompt(message))
+        : (prompt = await this.createPrompt(selectedCode));
     }
 
     if (!prompt) {
@@ -473,7 +516,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         placeHolder: "Enter instructions for CodeBuddy",
         ignoreFocusOut: true,
         validateInput: (text) => {
-          return text === "" ? "Enter instructions for CodeBuddy or press Escape to close chat box" : null;
+          return text === ""
+            ? "Enter instructions for CodeBuddy or press Escape to close chat box"
+            : null;
         },
       });
       return userPrompt;
@@ -488,7 +533,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       await this.sendCommandFeedback(action || this.action);
 
       let prompt: string | undefined;
-      const response = (await this.generateResponse(prompt ?? message)) as string;
+      const response = (await this.generateResponse(
+        prompt ?? message,
+      )) as string;
       if (!response) {
         vscode.window.showErrorMessage("model not reponding, try again later");
         return;
@@ -529,7 +576,10 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           break;
       }
     } catch (error) {
-      this.logger.error("Error while passing model response to the webview", error);
+      this.logger.error(
+        "Error while passing model response to the webview",
+        error,
+      );
     }
   }
 }
