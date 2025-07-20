@@ -11,6 +11,18 @@ export const codeBuddyMode = [
   { value: "Ask", label: "Ask" },
 ];
 
+export const themeOptions = [
+  { value: "tokyo night", label: "Tokyo Night" },
+  { value: "Atom One Dark", label: "Atom One Dark" },
+  { value: "github dark", label: "GitHub Dark" },
+  { value: "night owl", label: "Night Owl" },
+  { value: "stackoverflow", label: "Stack Overflow" },
+  { value: "Code Pen", label: "Code Pen" },
+  { value: "ir black", label: "IR Black" },
+  { value: "felipec", label: "Felipec" },
+  { value: "Atom One Dark Reasonable", label: "Atom One Dark Reasonable" },
+];
+
 export const faqItems: FAQItem[] = [
   {
     question: "HOW DO I SET UP CODEBUDDY?",
@@ -107,8 +119,7 @@ export const faqItems: FAQItem[] = [
 `,
   },
   {
-    question:
-      "WHAT IS THE CHAT CONTEXT AND HOW CAN IT HELP ME TO ENHANCE MY CODING EXPERIENCE ",
+    question: "WHAT IS THE CHAT CONTEXT AND HOW CAN IT HELP ME TO ENHANCE MY CODING EXPERIENCE ",
     answer: `
 
 <p>Chat Context in CodeBuddy is a powerful feature that allows you to add multiple files to provide relevant background information to the AI model when you ask questions. Here's how it works and why it's beneficial:</p>

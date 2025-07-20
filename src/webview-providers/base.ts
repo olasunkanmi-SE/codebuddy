@@ -1,9 +1,6 @@
 import * as vscode from "vscode";
 import { Orchestrator } from "../agents/orchestrator";
-import {
-  FolderEntry,
-  IContextInfo,
-} from "../application/interfaces/workspace.interface";
+import { FolderEntry, IContextInfo } from "../application/interfaces/workspace.interface";
 import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { AgentService } from "../services/agent-state";
@@ -40,7 +37,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     private readonly _extensionUri: vscode.Uri,
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: vscode.ExtensionContext
   ) {
     this.fileManager = FileManager.initialize(context, "files");
     this.fileService = FileService.getInstance();
@@ -69,23 +66,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onThinking(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onUpdate(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onError(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onSecretChange(
-        this.handleModelResponseEvent.bind(this),
-      ),
-      this.orchestrator.onActiveworkspaceUpdate(
-        this.handleGenericEvents.bind(this),
-      ),
+      this.orchestrator.onSecretChange(this.handleModelResponseEvent.bind(this)),
+      this.orchestrator.onActiveworkspaceUpdate(this.handleGenericEvents.bind(this)),
       this.orchestrator.onFileUpload(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onStrategizing(
-        this.handleModelResponseEvent.bind(this),
-      ),
-      this.orchestrator.onConfigurationChange(
-        this.handleGenericEvents.bind(this),
-      ),
+      this.orchestrator.onStrategizing(this.handleModelResponseEvent.bind(this)),
+      this.orchestrator.onConfigurationChange(this.handleGenericEvents.bind(this)),
       this.orchestrator.onUserPrompt(this.handleUserPrompt.bind(this)),
-      this.orchestrator.onGetUserPreferences(
-        this.handleUserPreferences.bind(this),
-      ),
+      this.orchestrator.onGetUserPreferences(this.handleUserPreferences.bind(this)),
+      this.orchestrator.onUpdateThemePreferences(this.handleThemePreferences.bind(this))
     );
   }
 
@@ -108,9 +96,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     webviewView.webview.options = webviewOptions;
 
     if (!this.apiKey) {
-      vscode.window.showErrorMessage(
-        "API key not configured. Check your settings.",
-      );
+      vscode.window.showErrorMessage("API key not configured. Check your settings.");
       return;
     }
 
@@ -121,10 +107,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
-    view.webview.html = getWebviewContent(
-      this.currentWebView?.webview!,
-      this._extensionUri,
-    );
+    view.webview.html = getWebviewContent(this.currentWebView?.webview!, this._extensionUri);
   }
 
   private async getFiles() {
@@ -144,7 +127,18 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   public async handleUserPreferences({ type, message }: IEventPayload) {
     try {
       return await this.currentWebView?.webview.postMessage({
-        type: "user-preferences",
+        type: "onGetUserPreferences",
+        message,
+      });
+    } catch (error: any) {
+      this.logger.info(error);
+    }
+  }
+
+  public async handleThemePreferences({ type, message }: IEventPayload) {
+    try {
+      return await this.currentWebView?.webview.postMessage({
+        type: "theme-settings",
         message,
       });
     } catch (error: any) {
@@ -161,10 +155,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   private async publishWorkSpace(): Promise<void> {
     try {
-      const filesAndDirs: IContextInfo =
-        await this.workspaceService.getContextInfo(true);
-      const workspaceFiles: Map<string, FolderEntry[]> | undefined =
-        filesAndDirs.workspaceFiles;
+      const filesAndDirs: IContextInfo = await this.workspaceService.getContextInfo(true);
+      const workspaceFiles: Map<string, FolderEntry[]> | undefined = filesAndDirs.workspaceFiles;
       if (!workspaceFiles) {
         this.logger.warn("There no files within the workspace");
         return;
@@ -191,23 +183,17 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.UserMessageCounter += 1;
 
               // Validate user input for security
-              const validation = this.inputValidator.validateInput(
-                message.message,
-                "chat",
-              );
+              const validation = this.inputValidator.validateInput(message.message, "chat");
 
               if (validation.blocked) {
-                this.logger.warn(
-                  "User input blocked due to security concerns",
-                  {
-                    originalLength: message.message.length,
-                    warnings: validation.warnings,
-                  },
-                );
+                this.logger.warn("User input blocked due to security concerns", {
+                  originalLength: message.message.length,
+                  warnings: validation.warnings,
+                });
 
                 await this.sendResponse(
                   "⚠️ Your message contains potentially unsafe content and has been blocked. Please rephrase your question in a more direct way.",
-                  "bot",
+                  "bot"
                 );
                 break;
               }
@@ -223,7 +209,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 if (validation.warnings.length > 2) {
                   await this.sendResponse(
                     "ℹ️ Your message has been modified for security. Some content was filtered.",
-                    "bot",
+                    "bot"
                   );
                 }
               }
@@ -234,12 +220,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               // Check if we should prune history for performance
               if (this.UserMessageCounter % 10 === 0) {
                 const stats = await this.getChatHistoryStats("agentId");
-                if (
-                  stats.totalMessages > 100 ||
-                  stats.estimatedTokens > 16000
-                ) {
+                if (stats.totalMessages > 100 || stats.estimatedTokens > 16000) {
                   this.logger.info(
-                    `High chat history usage detected: ${stats.totalMessages} messages, ${stats.estimatedTokens} tokens`,
+                    `High chat history usage detected: ${stats.totalMessages} messages, ${stats.estimatedTokens} tokens`
                   );
                   // Optionally trigger manual pruning here
                   // await this.pruneHistoryManually("agentId", { maxMessages: 50, maxTokens: 8000 });
@@ -248,28 +231,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
               response = await this.generateResponse(
                 await this.enhanceMessageWithCodebaseContext(sanitizedMessage),
-                message.metaData,
+                message.metaData
               );
               if (this.UserMessageCounter === 1) {
                 await this.publishWorkSpace();
               }
               if (response) {
-                console.log(
-                  `[DEBUG] Response from generateResponse: ${response.length} characters`,
-                );
+                console.log(`[DEBUG] Response from generateResponse: ${response.length} characters`);
                 const formattedResponse = formatText(response);
-                console.log(
-                  `[DEBUG] Formatted response: ${formattedResponse.length} characters`,
-                );
-                console.log(
-                  `[DEBUG] Original response ends with: "${response.slice(-100)}"`,
-                );
+                console.log(`[DEBUG] Formatted response: ${formattedResponse.length} characters`);
+                console.log(`[DEBUG] Original response ends with: "${response.slice(-100)}"`);
 
                 await this.sendResponse(formattedResponse, "bot");
               } else {
-                console.log(
-                  `[DEBUG] No response received from generateResponse`,
-                );
+                console.log(`[DEBUG] No response received from generateResponse`);
               }
               break;
             }
@@ -294,10 +269,17 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               // In the future update to updateUserPreferences
               this.orchestrator.publish("onUpdateUserPreferences", message);
               break;
+            case "theme-change-event":
+              // Handle theme change and store in user preferences
+              this.logger.info(`Theme changed to: ${message.message}`);
+              this.orchestrator.publish("onUpdateThemePreferences", message.message, {
+                theme: message.message,
+              });
+              break;
             default:
               throw new Error("Unknown command");
           }
-        }),
+        })
       );
     } catch (error) {
       this.logger.error("Message handler failed", error);
@@ -313,45 +295,30 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   public handleModelResponseEvent(event: IEventPayload) {
-    this.sendResponse(
-      formatText(event.message),
-      event.message === "folders" ? "bootstrap" : "bot",
-    );
+    this.sendResponse(formatText(event.message), event.message === "folders" ? "bootstrap" : "bot");
   }
-  abstract generateResponse(
-    message?: string,
-    metaData?: Record<string, any>,
-  ): Promise<string | undefined>;
+  abstract generateResponse(message?: string, metaData?: Record<string, any>): Promise<string | undefined>;
 
-  abstract sendResponse(
-    response: string,
-    currentChat?: string,
-  ): Promise<boolean | undefined>;
+  abstract sendResponse(response: string, currentChat?: string): Promise<boolean | undefined>;
 
   /**
    * Enhances user messages with codebase context if the question is codebase-related
    */
-  private async enhanceMessageWithCodebaseContext(
-    message: string,
-  ): Promise<string> {
+  private async enhanceMessageWithCodebaseContext(message: string): Promise<string> {
     try {
-      const questionAnalysis =
-        this.questionClassifier.categorizeQuestion(message);
+      const questionAnalysis = this.questionClassifier.categorizeQuestion(message);
 
       if (!questionAnalysis.isCodebaseRelated) {
-        this.logger.debug(
-          "Question not codebase-related, returning original message",
-        );
+        this.logger.debug("Question not codebase-related, returning original message");
         return message;
       }
 
       this.logger.info(
-        `Detected codebase question with confidence: ${questionAnalysis.confidence}, categories: ${questionAnalysis.categories.join(", ")}`,
+        `Detected codebase question with confidence: ${questionAnalysis.confidence}, categories: ${questionAnalysis.categories.join(", ")}`
       );
 
       // Get comprehensive codebase context
-      const codebaseContext =
-        await this.codebaseUnderstanding.getCodebaseContext();
+      const codebaseContext = await this.codebaseUnderstanding.getCodebaseContext();
 
       // Create enhanced prompt with codebase context
       const enhancedMessage = `
@@ -376,17 +343,14 @@ IMPORTANT: Please provide a complete response. Do not truncate your answer mid-s
   }
 
   public dispose(): void {
-    this.logger.debug(
-      `Disposing BaseWebViewProvider with ${this.disposables.length} disposables`,
-    );
+    this.logger.debug(`Disposing BaseWebViewProvider with ${this.disposables.length} disposables`);
     this.disposables.forEach((d) => d.dispose());
     this.disposables.length = 0; // Clear the array
   }
 
   async getContext(files: string[]) {
     try {
-      const filesContent: Map<string, string> | undefined =
-        await this.fileService.getFilesContent(files);
+      const filesContent: Map<string, string> | undefined = await this.fileService.getFilesContent(files);
       if (filesContent && filesContent.size > 0) {
         return Array.from(filesContent.values()).join("\n");
       }
@@ -406,15 +370,9 @@ IMPORTANT: Please provide a complete response. Do not truncate your answer mid-s
       maxTokens: number;
       maxAgeHours: number;
       preserveSystemMessages: boolean;
-    }>,
+    }>
   ): Promise<any[]> {
-    return this.chatHistoryManager.formatChatHistory(
-      role,
-      message,
-      model,
-      key,
-      pruneConfig,
-    );
+    return this.chatHistoryManager.formatChatHistory(role, message, model, key, pruneConfig);
   }
 
   // Get chat history stats for monitoring
@@ -434,7 +392,7 @@ IMPORTANT: Please provide a complete response. Do not truncate your answer mid-s
       maxMessages?: number;
       maxTokens?: number;
       maxAgeHours?: number;
-    },
+    }
   ): Promise<void> {
     await this.chatHistoryManager.pruneHistoryForKey(key, config);
   }

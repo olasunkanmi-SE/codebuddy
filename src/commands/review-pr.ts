@@ -58,25 +58,49 @@ export class ReviewPR extends CodeCommandHandler {
       const changedFiles: string[] = [];
       let content = "";
 
-      // Get files modified in the last day (as a fallback approach)
+      // Optimized file retrieval: only fetch files modified in the last 24 hours
+      const now = Date.now();
+      const oneDayAgo = now - 24 * 60 * 60 * 1000; // 24 hours ago
+
+      // First get all potential files (limit to reduce I/O)
       const allFiles = await vscode.workspace.findFiles(
         "**/*.{ts,js,tsx,jsx,json,md,py,java,cs,php}",
         "**/node_modules/**",
-        100,
+        50, // Reduced from 100 to limit initial fetch
       );
 
-      // Get file stats and filter by recent modifications
-      const recentFiles = [];
-      for (const fileUri of allFiles.slice(0, 20)) {
-        try {
-          const stat = await vscode.workspace.fs.stat(fileUri);
-          const isRecent = Date.now() - stat.mtime < 24 * 60 * 60 * 1000; // Last 24 hours
-          if (isRecent) {
-            recentFiles.push(fileUri);
+      // Filter files based on last modified time more efficiently
+      const recentFiles: vscode.Uri[] = [];
+      const batchSize = 10; // Process files in batches to avoid blocking
+
+      for (let i = 0; i < allFiles.length; i += batchSize) {
+        const batch = allFiles.slice(i, i + batchSize);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (fileUri) => {
+            try {
+              const stat = await vscode.workspace.fs.stat(fileUri);
+              if (stat.mtime >= oneDayAgo && stat.mtime <= now) {
+                return fileUri;
+              }
+            } catch (error) {
+              console.error(
+                `Error getting file stat for ${fileUri.fsPath}:`,
+                error,
+              );
+            }
+            return null;
+          }),
+        );
+
+        // Collect successful results
+        batchResults.forEach((result) => {
+          if (result.status === "fulfilled" && result.value) {
+            recentFiles.push(result.value);
           }
-        } catch (error) {
-          // Skip files we can't read
-        }
+        });
+
+        // Stop if we have enough files
+        if (recentFiles.length >= 10) break;
       }
 
       // If we have recent files, use them
@@ -242,6 +266,22 @@ export class ReviewPR extends CodeCommandHandler {
             "Both VS Code git and fallback git commands failed:",
             fallbackError,
           );
+
+          // Provide user-friendly error notification
+          vscode.window
+            .showErrorMessage(
+              "Failed to retrieve file changes. Please ensure Git is properly configured and accessible. " +
+                "The review will proceed with recently modified files as a fallback.",
+              "View Output",
+            )
+            .then((selection) => {
+              if (selection === "View Output") {
+                vscode.window.showInformationMessage(
+                  "Check the VS Code Developer Console (Help > Toggle Developer Tools) for detailed error information.",
+                );
+              }
+            });
+
           // Continue with empty data but inform about the issue
         }
       }
