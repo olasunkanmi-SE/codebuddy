@@ -56,7 +56,7 @@ export class ChatHistoryRepository {
     try {
       const results = this.dbService.executeSqlAll(
         "SELECT * FROM chat_history WHERE agent_id = ? ORDER BY timestamp ASC",
-        [agentId]
+        [agentId],
       );
 
       return results.map((row: any) => ({
@@ -111,7 +111,7 @@ export class ChatHistoryRepository {
       type: string;
       sessionId?: string;
       metadata?: any;
-    }
+    },
   ): void {
     try {
       const insertStmt = `
@@ -136,7 +136,10 @@ export class ChatHistoryRepository {
    */
   public clear(agentId: string): void {
     try {
-      this.dbService.executeSqlCommand("DELETE FROM chat_history WHERE agent_id = ?", [agentId]);
+      this.dbService.executeSqlCommand(
+        "DELETE FROM chat_history WHERE agent_id = ?",
+        [agentId],
+      );
     } catch (error) {
       console.warn(`Failed to clear chat history for agent ${agentId}:`, error);
     }
@@ -160,7 +163,7 @@ export class ChatHistoryRepository {
     try {
       const results = this.dbService.executeSqlAll(
         "SELECT * FROM chat_history WHERE agent_id = ? ORDER BY timestamp DESC LIMIT ?",
-        [agentId, limit]
+        [agentId, limit],
       );
 
       const reversedResults = [...results].reverse();
@@ -173,7 +176,10 @@ export class ChatHistoryRepository {
         metadata: row.metadata ? JSON.parse(row.metadata) : null,
       }));
     } catch (error) {
-      console.warn(`Failed to get recent chat history for agent ${agentId}:`, error);
+      console.warn(
+        `Failed to get recent chat history for agent ${agentId}:`,
+        error,
+      );
       return [];
     }
   }
@@ -186,7 +192,10 @@ export class ChatHistoryRepository {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
-      this.dbService.executeSqlCommand("DELETE FROM chat_history WHERE timestamp < ?", [cutoffDate.toISOString()]);
+      this.dbService.executeSqlCommand(
+        "DELETE FROM chat_history WHERE timestamp < ?",
+        [cutoffDate.toISOString()],
+      );
     } catch (error) {
       console.warn("Failed to cleanup old chat history:", error);
     }
