@@ -8,6 +8,7 @@ import {
   CodebaseAnalysisWorkerData,
   AnalysisResult,
 } from "./codebase-analysis-worker";
+import { ErrorHandler } from "../utils/error-handling";
 
 export interface PersistentCodebaseAnalysis {
   frameworks: string[];
@@ -65,13 +66,12 @@ export class PersistentCodebaseUnderstandingService {
    * Initialize the service
    */
   async initialize(): Promise<void> {
-    try {
-      await this.databaseService.initialize();
-      this.logger.info("Persistent codebase understanding service initialized");
-    } catch (error) {
-      this.logger.error("Failed to initialize service", error);
-      throw error;
-    }
+    await ErrorHandler.handleAsyncError(
+      async () => await this.databaseService.initialize(),
+      "Failed to initialize persistent codebase understanding service",
+      this.logger,
+    );
+    this.logger.info("Persistent codebase understanding service initialized");
   }
 
   /**
@@ -348,19 +348,32 @@ export class PersistentCodebaseUnderstandingService {
     stats: any;
   }> {
     try {
+      this.logger.info("Getting analysis summary...");
+
       const gitState = await this.databaseService.getCurrentGitState();
+      this.logger.info(
+        `Git state: ${gitState ? JSON.stringify(gitState) : "null"}`,
+      );
+
       const stats = await this.databaseService.getStats();
+      this.logger.info(`Database stats: ${JSON.stringify(stats)}`);
 
       let hasCache = false;
       let lastAnalysis: string | undefined;
 
       if (gitState) {
+        this.logger.info("Checking for cached analysis...");
         const cached =
           await this.databaseService.getCachedCodebaseAnalysis(gitState);
         if (cached?.analysisMetadata) {
           hasCache = true;
           lastAnalysis = cached.analysisMetadata.createdAt;
+          this.logger.info(`Found cached analysis from: ${lastAnalysis}`);
+        } else {
+          this.logger.info("No cached analysis found");
         }
+      } else {
+        this.logger.warn("No git state available");
       }
 
       return {

@@ -30,7 +30,11 @@ import * as path from "path";
  */
 export interface WorkerMessage {
   /** Message type identifier */
-  type: "ANALYZE_CODEBASE" | "ANALYSIS_COMPLETE" | "ANALYSIS_ERROR" | "ANALYSIS_PROGRESS";
+  type:
+    | "ANALYZE_CODEBASE"
+    | "ANALYSIS_COMPLETE"
+    | "ANALYSIS_ERROR"
+    | "ANALYSIS_PROGRESS";
   /** Message payload data */
   payload?: any;
   /** Error message if applicable */
@@ -147,8 +151,12 @@ export class CodebaseAnalysisWorker {
    */
   async analyzeCodebase(
     data: CodebaseAnalysisWorkerData,
-    onProgress: (progress: { current: number; total: number; message: string }) => void,
-    cancellationToken?: vscode.CancellationToken
+    onProgress: (progress: {
+      current: number;
+      total: number;
+      message: string;
+    }) => void,
+    cancellationToken?: vscode.CancellationToken,
   ): Promise<AnalysisResult> {
     if (this.isRunning) {
       throw new Error("Analysis already in progress");
@@ -171,7 +179,11 @@ export class CodebaseAnalysisWorker {
    */
   private async performAnalysis(
     data: CodebaseAnalysisWorkerData,
-    onProgress: (progress: { current: number; total: number; message: string }) => void
+    onProgress: (progress: {
+      current: number;
+      total: number;
+      message: string;
+    }) => void,
   ): Promise<AnalysisResult> {
     onProgress({
       current: 0,
@@ -187,11 +199,9 @@ export class CodebaseAnalysisWorker {
       message: `Found ${files.length} files to analyze...`,
     });
 
-    if (this.currentCancellationToken?.isCancellationRequested) {
-      throw new Error("Analysis cancelled");
-    }
+    this.checkCancellation();
 
-    // Step 2: Analyze package.json and dependencies
+    // Step 2: Analyze dependencies
     const dependencies = await this.analyzeDependencies(data.workspacePath);
     onProgress({
       current: 20,
@@ -204,6 +214,85 @@ export class CodebaseAnalysisWorker {
     onProgress({ current: 30, total: 100, message: "Detecting frameworks..." });
 
     // Step 4: Analyze file contents
+    const analysisResults = await this.analyzeFileContents(files, onProgress);
+
+    onProgress({
+      current: 80,
+      total: 100,
+      message: "Analyzing database schema...",
+    });
+
+    // Step 5: Analyze database schema
+    const databaseSchema = await this.analyzeDatabaseSchema(
+      files,
+      analysisResults.fileContents,
+    );
+
+    onProgress({
+      current: 90,
+      total: 100,
+      message: "Building domain relationships...",
+    });
+
+    // Step 6: Build domain relationships
+    const domainRelationships = this.buildDomainRelationships(
+      analysisResults.dataModels,
+      analysisResults.apiEndpoints,
+    );
+
+    // Step 7: Calculate complexity
+    const complexity = this.calculateComplexity(
+      files.length,
+      analysisResults.totalLines,
+      Object.keys(dependencies).length,
+    );
+
+    onProgress({ current: 100, total: 100, message: "Analysis complete!" });
+
+    return {
+      frameworks,
+      dependencies,
+      files,
+      apiEndpoints: analysisResults.apiEndpoints,
+      dataModels: analysisResults.dataModels,
+      databaseSchema,
+      domainRelationships,
+      fileContents: analysisResults.fileContents,
+      summary: {
+        totalFiles: files.length,
+        totalLines: analysisResults.totalLines,
+        languageDistribution: analysisResults.languageDistribution,
+        complexity,
+      },
+    };
+  }
+
+  /**
+   * Check if analysis should be cancelled
+   */
+  private checkCancellation(): void {
+    if (this.currentCancellationToken?.isCancellationRequested) {
+      throw new Error("Analysis cancelled");
+    }
+  }
+
+  /**
+   * Analyze file contents and extract relevant information
+   */
+  private async analyzeFileContents(
+    files: string[],
+    onProgress: (progress: {
+      current: number;
+      total: number;
+      message: string;
+    }) => void,
+  ): Promise<{
+    fileContents: Map<string, string>;
+    apiEndpoints: any[];
+    dataModels: any[];
+    totalLines: number;
+    languageDistribution: Record<string, number>;
+  }> {
     const fileContents = new Map<string, string>();
     const apiEndpoints: any[] = [];
     const dataModels: any[] = [];
@@ -211,9 +300,7 @@ export class CodebaseAnalysisWorker {
     const languageDistribution: Record<string, number> = {};
 
     for (let i = 0; i < files.length; i++) {
-      if (this.currentCancellationToken?.isCancellationRequested) {
-        throw new Error("Analysis cancelled");
-      }
+      this.checkCancellation();
 
       const file = files[i];
       const progress = 30 + (i / files.length) * 50; // 30-80% of total progress
@@ -224,24 +311,18 @@ export class CodebaseAnalysisWorker {
       });
 
       try {
-        const content = await fs.promises.readFile(file, "utf-8");
-        fileContents.set(file, content);
+        const fileAnalysis = await this.analyzeSingleFile(file);
 
-        // Count lines
-        const lines = content.split("\n").length;
-        totalLines += lines;
+        fileContents.set(file, fileAnalysis.content);
+        totalLines += fileAnalysis.lines;
 
-        // Language distribution
+        // Update language distribution
         const ext = path.extname(file).toLowerCase();
         languageDistribution[ext] = (languageDistribution[ext] || 0) + 1;
 
-        // Extract API endpoints
-        const endpoints = this.extractApiEndpoints(file, content);
-        apiEndpoints.push(...endpoints);
-
-        // Extract data models
-        const models = this.extractDataModels(file, content);
-        dataModels.push(...models);
+        // Collect endpoints and models
+        apiEndpoints.push(...fileAnalysis.endpoints);
+        dataModels.push(...fileAnalysis.models);
 
         // Yield control to prevent blocking
         if (i % 10 === 0) {
@@ -252,56 +333,54 @@ export class CodebaseAnalysisWorker {
       }
     }
 
-    onProgress({
-      current: 80,
-      total: 100,
-      message: "Analyzing database schema...",
-    });
-
-    // Step 5: Analyze database schema
-    const databaseSchema = await this.analyzeDatabaseSchema(files, fileContents);
-
-    onProgress({
-      current: 90,
-      total: 100,
-      message: "Building domain relationships...",
-    });
-
-    // Step 6: Build domain relationships
-    const domainRelationships = this.buildDomainRelationships(dataModels, apiEndpoints);
-
-    // Step 7: Calculate complexity
-    const complexity = this.calculateComplexity(files.length, totalLines, Object.keys(dependencies).length);
-
-    onProgress({ current: 100, total: 100, message: "Analysis complete!" });
-
     return {
-      frameworks,
-      dependencies,
-      files,
+      fileContents,
       apiEndpoints,
       dataModels,
-      databaseSchema,
-      domainRelationships,
-      fileContents,
-      summary: {
-        totalFiles: files.length,
-        totalLines,
-        languageDistribution,
-        complexity,
-      },
+      totalLines,
+      languageDistribution,
+    };
+  }
+
+  /**
+   * Analyze a single file for content, endpoints, and models
+   */
+  private async analyzeSingleFile(filePath: string): Promise<{
+    content: string;
+    lines: number;
+    endpoints: any[];
+    models: any[];
+  }> {
+    const content = await fs.promises.readFile(filePath, "utf-8");
+    const lines = content.split("\n").length;
+
+    // Extract API endpoints and data models
+    const endpoints = this.extractApiEndpoints(filePath, content);
+    const models = this.extractDataModels(filePath, content);
+
+    return {
+      content,
+      lines,
+      endpoints,
+      models,
     };
   }
 
   /**
    * Find all relevant files in the workspace
    */
-  private async findRelevantFiles(data: CodebaseAnalysisWorkerData): Promise<string[]> {
+  private async findRelevantFiles(
+    data: CodebaseAnalysisWorkerData,
+  ): Promise<string[]> {
     const files: string[] = [];
 
     for (const pattern of data.filePatterns) {
       try {
-        const uris = await vscode.workspace.findFiles(pattern, `{${data.excludePatterns.join(",")}}`, data.maxFiles);
+        const uris = await vscode.workspace.findFiles(
+          pattern,
+          `{${data.excludePatterns.join(",")}}`,
+          data.maxFiles,
+        );
 
         files.push(...uris.map((uri) => uri.fsPath));
       } catch (error) {
@@ -316,14 +395,18 @@ export class CodebaseAnalysisWorker {
   /**
    * Analyze package.json and other dependency files
    */
-  private async analyzeDependencies(workspacePath: string): Promise<Record<string, string>> {
+  private async analyzeDependencies(
+    workspacePath: string,
+  ): Promise<Record<string, string>> {
     const dependencies: Record<string, string> = {};
 
     // Analyze package.json
     const packageJsonPath = path.join(workspacePath, "package.json");
     if (fs.existsSync(packageJsonPath)) {
       try {
-        const packageJson = JSON.parse(await fs.promises.readFile(packageJsonPath, "utf-8"));
+        const packageJson = JSON.parse(
+          await fs.promises.readFile(packageJsonPath, "utf-8"),
+        );
         Object.assign(dependencies, packageJson.dependencies || {});
         Object.assign(dependencies, packageJson.devDependencies || {});
       } catch (error) {
@@ -336,7 +419,9 @@ export class CodebaseAnalysisWorker {
     if (fs.existsSync(requirementsPath)) {
       try {
         const content = await fs.promises.readFile(requirementsPath, "utf-8");
-        const lines = content.split("\n").filter((line) => line.trim() && !line.startsWith("#"));
+        const lines = content
+          .split("\n")
+          .filter((line) => line.trim() && !line.startsWith("#"));
         for (const line of lines) {
           const [name, version] = line.split("==");
           if (name && version) {
@@ -354,7 +439,10 @@ export class CodebaseAnalysisWorker {
   /**
    * Detect frameworks based on files and dependencies
    */
-  private async detectFrameworks(files: string[], dependencies: Record<string, string>): Promise<string[]> {
+  private async detectFrameworks(
+    files: string[],
+    dependencies: Record<string, string>,
+  ): Promise<string[]> {
     const frameworks: Set<string> = new Set();
 
     // Framework detection based on dependencies
@@ -505,7 +593,10 @@ export class CodebaseAnalysisWorker {
   /**
    * Analyze database schema from files
    */
-  private async analyzeDatabaseSchema(files: string[], fileContents: Map<string, string>): Promise<any> {
+  private async analyzeDatabaseSchema(
+    files: string[],
+    fileContents: Map<string, string>,
+  ): Promise<any> {
     const schema = {
       tables: [] as any[],
       relationships: [] as any[],
@@ -562,7 +653,10 @@ export class CodebaseAnalysisWorker {
   /**
    * Build domain relationships between entities
    */
-  private buildDomainRelationships(dataModels: any[], apiEndpoints: any[]): any[] {
+  private buildDomainRelationships(
+    dataModels: any[],
+    apiEndpoints: any[],
+  ): any[] {
     const relationships: any[] = [];
 
     // Simple relationship detection based on naming patterns
@@ -574,7 +668,8 @@ export class CodebaseAnalysisWorker {
         for (const otherModel of dataModels) {
           if (
             otherModel.name !== model.name &&
-            (prop.type.includes(otherModel.name) || prop.name.toLowerCase().includes(otherModel.name.toLowerCase()))
+            (prop.type.includes(otherModel.name) ||
+              prop.name.toLowerCase().includes(otherModel.name.toLowerCase()))
           ) {
             relatedEntities.push(otherModel.name);
           }
@@ -598,9 +693,10 @@ export class CodebaseAnalysisWorker {
   private calculateComplexity(
     fileCount: number,
     lineCount: number,
-    dependencyCount: number
+    dependencyCount: number,
   ): "low" | "medium" | "high" {
-    const complexityScore = fileCount * 0.3 + lineCount * 0.0001 + dependencyCount * 0.5;
+    const complexityScore =
+      fileCount * 0.3 + lineCount * 0.0001 + dependencyCount * 0.5;
 
     if (complexityScore > 100) return "high";
     if (complexityScore > 50) return "medium";

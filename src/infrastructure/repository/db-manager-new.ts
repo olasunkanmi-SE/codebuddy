@@ -1,10 +1,12 @@
+import * as fs from "fs";
+import * as path from "path";
 import { Logger, LogLevel } from "../logger/logger";
 
 export class DbManager {
-  private readonly db: any = undefined;
+  private db: any = undefined;
   private static instance: DbManager;
   private readonly logger: Logger;
-  private readonly dbPath: string | undefined;
+  private dbPath: string | undefined;
 
   private constructor() {
     this.logger = Logger.initialize("DbManager", {

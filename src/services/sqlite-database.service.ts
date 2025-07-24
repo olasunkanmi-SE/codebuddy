@@ -5,20 +5,6 @@ import { Logger } from "../infrastructure/logger/logger";
 import { LogLevel } from "./telemetry";
 import { PersistentCodebaseAnalysis } from "./persistent-codebase-understanding.service";
 
-// We'll use a simple SQLite wrapper - in production you might want to use better-sqlite3
-interface SqliteDatabase {
-  exec(sql: string): void;
-  prepare(sql: string): SqliteStatement;
-  close(): void;
-}
-
-interface SqliteStatement {
-  run(...params: any[]): { changes: number; lastInsertRowid: number };
-  get(...params: any[]): any;
-  all(...params: any[]): any[];
-  finalize(): void;
-}
-
 interface CodebaseSnapshot {
   id?: number;
   workspace_path: string;
@@ -41,9 +27,10 @@ interface GitState {
 
 export class SqliteDatabaseService {
   private static instance: SqliteDatabaseService;
-  private db: SqliteDatabase | null = null;
+  private db: any = null; // sql.js Database instance
   private readonly logger: Logger;
   private dbPath: string = "";
+  private SQL: any = null; // sql.js instance
 
   private constructor() {
     this.logger = Logger.initialize("SqliteDatabaseService", {
@@ -63,32 +50,75 @@ export class SqliteDatabaseService {
    */
   async initialize(): Promise<void> {
     try {
+      this.logger.info("Starting SQLite database initialization...");
+
+      // Initialize sql.js
+      this.logger.info("Initializing sql.js...");
+      const initSqlJs = (await import("sql.js")).default;
+
+      // Configure sql.js with the WASM file location
+      // In the bundled extension, the WASM file is in the same directory as extension.js
+      const wasmPath = path.join(__dirname, "sql-wasm.wasm");
+      this.logger.info(`Looking for WASM file at: ${wasmPath}`);
+
+      this.SQL = await initSqlJs({
+        locateFile: (file: string) => {
+          if (file.endsWith(".wasm")) {
+            return wasmPath;
+          }
+          return file;
+        },
+      });
+
       // Create database in workspace or extension global storage
       const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (workspaceRoot) {
+        this.logger.info(`Using workspace root: ${workspaceRoot}`);
         const codebuddyDir = path.join(workspaceRoot, ".codebuddy");
         if (!fs.existsSync(codebuddyDir)) {
+          this.logger.info(`Creating .codebuddy directory: ${codebuddyDir}`);
           fs.mkdirSync(codebuddyDir, { recursive: true });
         }
         this.dbPath = path.join(codebuddyDir, "codebase_analysis.db");
       } else {
+        this.logger.info("No workspace root, using extension global storage");
         // Fallback to extension global storage
-        this.dbPath = path.join(
-          __dirname,
-          "..",
-          "..",
-          "database",
-          "codebase_analysis.db",
-        );
+        const dbDir = path.join(__dirname, "..", "..", "database");
+        if (!fs.existsSync(dbDir)) {
+          this.logger.info(`Creating database directory: ${dbDir}`);
+          fs.mkdirSync(dbDir, { recursive: true });
+        }
+        this.dbPath = path.join(dbDir, "codebase_analysis.db");
       }
 
-      // For now, we'll use a simple file-based JSON storage as SQLite substitute
-      // In production, you'd use a proper SQLite driver like better-sqlite3
+      this.logger.info(`Database path: ${this.dbPath}`);
+
+      // Initialize SQLite database
+      this.logger.info("Creating Database instance with sql.js...");
+
+      // Load existing database if it exists
+      let data: Uint8Array | undefined = undefined;
+      if (fs.existsSync(this.dbPath)) {
+        this.logger.info("Loading existing database file...");
+        const buffer = fs.readFileSync(this.dbPath);
+        data = new Uint8Array(buffer);
+      }
+
+      this.db = new this.SQL.Database(data);
+
+      // Create tables and indexes
+      this.logger.info("Creating database tables...");
       await this.createTables();
 
-      this.logger.info(`Database initialized at: ${this.dbPath}`);
+      this.logger.info(
+        `SQLite database initialized successfully at: ${this.dbPath}`,
+      );
     } catch (error) {
       this.logger.error("Failed to initialize database", error);
+      if (error instanceof Error) {
+        this.logger.error(`Error message: ${error.message}`);
+        this.logger.error(`Error stack: ${error.stack}`);
+      }
       throw error;
     }
   }
@@ -97,28 +127,61 @@ export class SqliteDatabaseService {
    * Create necessary tables for codebase analysis
    */
   private async createTables(): Promise<void> {
-    // For now, we'll simulate table creation by ensuring the database directory exists
-    const dbDir = path.dirname(this.dbPath);
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
+    if (!this.db) {
+      throw new Error("Database not initialized");
     }
 
-    // Initialize with empty data structure if file doesn't exist
-    if (!fs.existsSync(this.dbPath)) {
-      const initialData = {
-        codebase_snapshots: [],
-        metadata: {
-          version: "1.0.0",
-          created_at: new Date().toISOString(),
-        },
-      };
-      await fs.promises.writeFile(
-        this.dbPath,
-        JSON.stringify(initialData, null, 2),
-      );
+    // Create codebase_snapshots table
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS codebase_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_path TEXT NOT NULL,
+        git_branch TEXT NOT NULL,
+        git_commit_hash TEXT NOT NULL,
+        git_diff_hash TEXT NOT NULL,
+        analysis_data TEXT NOT NULL,
+        file_count INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        last_accessed TEXT NOT NULL
+      )
+    `);
+
+    // Create indexes for better performance
+    this.db.run(`
+      CREATE INDEX IF NOT EXISTS idx_workspace_path 
+      ON codebase_snapshots (workspace_path)
+    `);
+
+    this.db.run(`
+      CREATE INDEX IF NOT EXISTS idx_git_state 
+      ON codebase_snapshots (workspace_path, git_branch, git_commit_hash, git_diff_hash)
+    `);
+
+    this.db.run(`
+      CREATE INDEX IF NOT EXISTS idx_last_accessed 
+      ON codebase_snapshots (last_accessed)
+    `);
+
+    this.logger.debug("SQLite database tables and indexes created");
+
+    // Save the database to disk
+    this.saveToDisk();
+  }
+
+  /**
+   * Save the in-memory database to disk
+   */
+  private saveToDisk(): void {
+    if (!this.db) {
+      return;
     }
 
-    this.logger.debug("Database tables initialized");
+    try {
+      const data = this.db.export();
+      fs.writeFileSync(this.dbPath, data);
+    } catch (error) {
+      this.logger.error("Failed to save database to disk", error);
+    }
   }
 
   /**
@@ -127,6 +190,7 @@ export class SqliteDatabaseService {
   async getCurrentGitState(): Promise<GitState | null> {
     try {
       const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      this.logger.info(`Workspace root: ${workspaceRoot}`);
       if (!workspaceRoot) {
         return null;
       }
@@ -141,6 +205,8 @@ export class SqliteDatabaseService {
         const branch = repo.state.HEAD?.name || "main";
         const commitHash = repo.state.HEAD?.commit || "";
 
+        this.logger.info(`Git branch: ${branch}, commit: ${commitHash}`);
+
         // Get file count and create a simple diff hash
         const files = await vscode.workspace.findFiles(
           "**/*.{ts,js,tsx,jsx,json,py,java,cs,php,md}",
@@ -151,23 +217,32 @@ export class SqliteDatabaseService {
         const fileCount = files.length;
         const diffHash = await this.createDiffHash(files);
 
-        return {
+        this.logger.info(`File count: ${fileCount}, diff hash: ${diffHash}`);
+
+        const gitState = {
           branch,
           commitHash,
           diffHash,
           fileCount,
           workspacePath: workspaceRoot,
         };
+
+        this.logger.info(`Generated git state: ${JSON.stringify(gitState)}`);
+        return gitState;
       }
 
       // Fallback without git extension
-      return {
+      this.logger.warn("Git extension not available, using fallback git state");
+      const fallbackState = {
         branch: "unknown",
         commitHash: "unknown",
         diffHash: await this.createSimpleDiffHash(),
         fileCount: 0,
         workspacePath: workspaceRoot,
       };
+
+      this.logger.info(`Fallback git state: ${JSON.stringify(fallbackState)}`);
+      return fallbackState;
     } catch (error) {
       this.logger.error("Failed to get git state", error);
       return null;
@@ -219,38 +294,58 @@ export class SqliteDatabaseService {
     gitState: GitState,
     analysisData: any,
   ): Promise<void> {
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+
     try {
-      const data = await this.readDatabase();
+      const now = new Date().toISOString();
 
-      const snapshot: CodebaseSnapshot = {
-        workspace_path: gitState.workspacePath,
-        git_branch: gitState.branch,
-        git_commit_hash: gitState.commitHash,
-        git_diff_hash: gitState.diffHash,
-        analysis_data: JSON.stringify(analysisData),
-        file_count: gitState.fileCount,
-        created_at: new Date().toISOString(),
-        last_accessed: new Date().toISOString(),
-      };
-
-      // Remove old snapshots for the same workspace to save space
-      data.codebase_snapshots = data.codebase_snapshots.filter(
-        (s: CodebaseSnapshot) => s.workspace_path !== gitState.workspacePath,
+      // Remove old snapshots for the same workspace first
+      this.db.run(
+        `DELETE FROM codebase_snapshots 
+         WHERE workspace_path = ? AND NOT (git_branch = ? AND git_commit_hash = ? AND git_diff_hash = ?)`,
+        [
+          gitState.workspacePath,
+          gitState.branch,
+          gitState.commitHash,
+          gitState.diffHash,
+        ],
       );
 
-      // Add new snapshot
-      data.codebase_snapshots.push(snapshot);
+      // Insert new snapshot
+      this.db.run(
+        `INSERT OR REPLACE INTO codebase_snapshots 
+         (workspace_path, git_branch, git_commit_hash, git_diff_hash, analysis_data, file_count, created_at, last_accessed)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          gitState.workspacePath,
+          gitState.branch,
+          gitState.commitHash,
+          gitState.diffHash,
+          JSON.stringify(analysisData),
+          gitState.fileCount,
+          now,
+          now,
+        ],
+      );
 
-      // Keep only the most recent 5 snapshots
-      data.codebase_snapshots = data.codebase_snapshots
-        .sort(
-          (a: CodebaseSnapshot, b: CodebaseSnapshot) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        )
-        .slice(0, 5);
+      // Clean up old snapshots (keep only latest 10 per workspace)
+      this.db.run(
+        `DELETE FROM codebase_snapshots 
+         WHERE id NOT IN (
+           SELECT id FROM codebase_snapshots 
+           WHERE workspace_path = ? 
+           ORDER BY created_at DESC 
+           LIMIT 10
+         ) AND workspace_path = ?`,
+        [gitState.workspacePath, gitState.workspacePath],
+      );
 
-      await this.writeDatabase(data);
-      this.logger.info("Codebase analysis saved to database");
+      // Save to disk
+      this.saveToDisk();
+
+      this.logger.info("Codebase analysis saved to SQLite database");
     } catch (error) {
       this.logger.error("Failed to save codebase analysis", error);
       throw error;
@@ -263,25 +358,103 @@ export class SqliteDatabaseService {
   async getCachedCodebaseAnalysis(
     gitState: GitState,
   ): Promise<PersistentCodebaseAnalysis | null> {
-    try {
-      const data = await this.readDatabase();
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
 
-      const snapshot = data.codebase_snapshots.find(
-        (s: CodebaseSnapshot) =>
-          s.workspace_path === gitState.workspacePath &&
-          s.git_branch === gitState.branch &&
-          s.git_diff_hash === gitState.diffHash,
+    try {
+      this.logger.info(
+        `Looking for cached analysis for: workspace=${gitState.workspacePath}, branch=${gitState.branch}, diffHash=${gitState.diffHash}`,
       );
 
-      if (snapshot) {
-        // Update last accessed time
-        snapshot.last_accessed = new Date().toISOString();
-        await this.writeDatabase(data);
+      // First, let's see what's actually in the database
+      const allStmt = this.db.prepare(`
+        SELECT workspace_path, git_branch, git_diff_hash, created_at 
+        FROM codebase_snapshots 
+        ORDER BY created_at DESC
+      `);
 
-        this.logger.info("Found valid cached codebase analysis");
+      this.logger.info("All snapshots in database:");
+      while (allStmt.step()) {
+        const row = allStmt.getAsObject();
+        this.logger.info(`  - ${JSON.stringify(row)}`);
+      }
+      allStmt.free();
+
+      // Find matching snapshot with exact match first
+      const stmt = this.db.prepare(`
+        SELECT analysis_data, id 
+        FROM codebase_snapshots 
+        WHERE workspace_path = ? AND git_branch = ? AND git_diff_hash = ?
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `);
+
+      stmt.bind([gitState.workspacePath, gitState.branch, gitState.diffHash]);
+
+      if (stmt.step()) {
+        const snapshot = stmt.getAsObject() as {
+          analysis_data: string;
+          id: number;
+        };
+        stmt.free();
+
+        // Update last accessed time
+        this.db.run(
+          `UPDATE codebase_snapshots 
+           SET last_accessed = ? 
+           WHERE id = ?`,
+          [new Date().toISOString(), snapshot.id],
+        );
+
+        // Save to disk
+        this.saveToDisk();
+
+        this.logger.info(
+          "Found valid cached codebase analysis with exact match",
+        );
         return JSON.parse(snapshot.analysis_data);
       }
+      stmt.free();
 
+      // If no exact match, try without diff_hash (less strict)
+      this.logger.info("No exact match found, trying without diff_hash...");
+      const looseStmt = this.db.prepare(`
+        SELECT analysis_data, id 
+        FROM codebase_snapshots 
+        WHERE workspace_path = ? AND git_branch = ?
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `);
+
+      looseStmt.bind([gitState.workspacePath, gitState.branch]);
+
+      if (looseStmt.step()) {
+        const snapshot = looseStmt.getAsObject() as {
+          analysis_data: string;
+          id: number;
+        };
+        looseStmt.free();
+
+        // Update last accessed time
+        this.db.run(
+          `UPDATE codebase_snapshots 
+           SET last_accessed = ? 
+           WHERE id = ?`,
+          [new Date().toISOString(), snapshot.id],
+        );
+
+        // Save to disk
+        this.saveToDisk();
+
+        this.logger.info(
+          "Found valid cached codebase analysis with loose match (ignoring diff hash)",
+        );
+        return JSON.parse(snapshot.analysis_data);
+      }
+      looseStmt.free();
+
+      this.logger.info("No cached codebase analysis found");
       return null;
     } catch (error) {
       this.logger.error("Failed to get cached codebase analysis", error);
@@ -293,18 +466,33 @@ export class SqliteDatabaseService {
    * Check if codebase has significantly changed
    */
   async hasSignificantChanges(gitState: GitState): Promise<boolean> {
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+
     try {
-      const data = await this.readDatabase();
+      const stmt = this.db.prepare(`
+        SELECT git_commit_hash, git_diff_hash, file_count
+        FROM codebase_snapshots 
+        WHERE workspace_path = ? AND git_branch = ?
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `);
 
-      const lastSnapshot = data.codebase_snapshots.find(
-        (s: CodebaseSnapshot) =>
-          s.workspace_path === gitState.workspacePath &&
-          s.git_branch === gitState.branch,
-      );
+      stmt.bind([gitState.workspacePath, gitState.branch]);
 
-      if (!lastSnapshot) {
+      if (!stmt.step()) {
+        stmt.free();
         return true; // No previous snapshot, consider it a significant change
       }
+
+      const lastSnapshot = stmt.getAsObject() as {
+        git_commit_hash: string;
+        git_diff_hash: string;
+        file_count: number;
+      };
+
+      stmt.free();
 
       // Check if commit hash changed
       if (lastSnapshot.git_commit_hash !== gitState.commitHash) {
@@ -337,53 +525,25 @@ export class SqliteDatabaseService {
   async cleanupOldSnapshots(
     maxAge: number = 7 * 24 * 60 * 60 * 1000,
   ): Promise<void> {
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+
     try {
-      const data = await this.readDatabase();
-      const cutoffDate = new Date(Date.now() - maxAge);
+      const cutoffDate = new Date(Date.now() - maxAge).toISOString();
 
-      const initialCount = data.codebase_snapshots.length;
-      data.codebase_snapshots = data.codebase_snapshots.filter(
-        (s: CodebaseSnapshot) => new Date(s.last_accessed) > cutoffDate,
-      );
+      // Delete old snapshots
+      this.db.run(`DELETE FROM codebase_snapshots WHERE last_accessed < ?`, [
+        cutoffDate,
+      ]);
 
-      const removedCount = initialCount - data.codebase_snapshots.length;
-      if (removedCount > 0) {
-        await this.writeDatabase(data);
-        this.logger.info(`Cleaned up ${removedCount} old snapshots`);
-      }
+      // Save to disk
+      this.saveToDisk();
+
+      this.logger.info(`Cleaned up old snapshots`);
     } catch (error) {
       this.logger.error("Failed to cleanup old snapshots", error);
     }
-  }
-
-  /**
-   * Read database file
-   */
-  private async readDatabase(): Promise<any> {
-    try {
-      const content = await fs.promises.readFile(this.dbPath, "utf-8");
-      return JSON.parse(content);
-    } catch (error) {
-      // Return empty structure if file doesn't exist
-      this.logger.info(
-        "Database file not found, creating new structure",
-        error instanceof Error ? error.message : String(error),
-      );
-      return {
-        codebase_snapshots: [],
-        metadata: {
-          version: "1.0.0",
-          created_at: new Date().toISOString(),
-        },
-      };
-    }
-  }
-
-  /**
-   * Write database file
-   */
-  private async writeDatabase(data: any): Promise<void> {
-    await fs.promises.writeFile(this.dbPath, JSON.stringify(data, null, 2));
   }
 
   /**
@@ -395,33 +555,45 @@ export class SqliteDatabaseService {
     newestSnapshot: string;
     totalSize: number;
   }> {
-    try {
-      const data = await this.readDatabase();
-      const snapshots = data.codebase_snapshots;
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
 
-      if (snapshots.length === 0) {
-        return {
-          totalSnapshots: 0,
-          oldestSnapshot: "",
-          newestSnapshot: "",
-          totalSize: 0,
-        };
+    try {
+      // Get count and date statistics
+      const stmt = this.db.prepare(`
+        SELECT 
+          COUNT(*) as totalSnapshots,
+          MIN(created_at) as oldestSnapshot,
+          MAX(created_at) as newestSnapshot
+        FROM codebase_snapshots
+      `);
+
+      stmt.step();
+      const results = stmt.getAsObject() as {
+        totalSnapshots: number;
+        oldestSnapshot: string | null;
+        newestSnapshot: string | null;
+      };
+
+      stmt.free();
+
+      // Get database file size
+      let totalSize = 0;
+      try {
+        if (fs.existsSync(this.dbPath)) {
+          const stat = await fs.promises.stat(this.dbPath);
+          totalSize = stat.size;
+        }
+      } catch (error) {
+        this.logger.warn("Failed to get database file size", error);
       }
 
-      const dates = snapshots.map(
-        (s: CodebaseSnapshot) => new Date(s.created_at),
-      );
-      const stat = await fs.promises.stat(this.dbPath);
-
       return {
-        totalSnapshots: snapshots.length,
-        oldestSnapshot: new Date(
-          Math.min(...dates.map((d: Date) => d.getTime())),
-        ).toISOString(),
-        newestSnapshot: new Date(
-          Math.max(...dates.map((d: Date) => d.getTime())),
-        ).toISOString(),
-        totalSize: stat.size,
+        totalSnapshots: results.totalSnapshots || 0,
+        oldestSnapshot: results.oldestSnapshot || "",
+        newestSnapshot: results.newestSnapshot || "",
+        totalSize,
       };
     } catch (error) {
       this.logger.error("Failed to get database stats", error);
@@ -439,6 +611,8 @@ export class SqliteDatabaseService {
    */
   async close(): Promise<void> {
     if (this.db) {
+      // Save to disk before closing
+      this.saveToDisk();
       this.db.close();
       this.db = null;
     }
