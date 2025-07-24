@@ -20,7 +20,7 @@ export class WebViewProviderManager implements vscode.Disposable {
       extensionUri: vscode.Uri,
       apiKey: string,
       model: string,
-      context: vscode.ExtensionContext
+      context: vscode.ExtensionContext,
     ) => BaseWebViewProvider
   > = new Map();
   private webviewView: vscode.WebviewView | undefined;
@@ -33,7 +33,9 @@ export class WebViewProviderManager implements vscode.Disposable {
   static readonly AgentId = "agentId"; // TODO This is hardcoded for now,in upcoming versions, requests will be tagged to respective agents.
   private readonly logger: Logger;
 
-  private constructor(private readonly extensionContext: vscode.ExtensionContext) {
+  private constructor(
+    private readonly extensionContext: vscode.ExtensionContext,
+  ) {
     this.orchestrator = Orchestrator.getInstance();
     this.chatHistoryManager = ChatHistoryManager.getInstance();
     this.registerProviders();
@@ -51,14 +53,18 @@ export class WebViewProviderManager implements vscode.Disposable {
 
     this.disposables.push(
       this.orchestrator.onModelChange(this.handleModelChange.bind(this)),
-      this.orchestrator.onClearHistory(this.handleClearHistory.bind(this))
+      this.orchestrator.onClearHistory(this.handleClearHistory.bind(this)),
     );
     this.isInitialized = true;
   }
 
-  public static getInstance(extensionContext: vscode.ExtensionContext): WebViewProviderManager {
+  public static getInstance(
+    extensionContext: vscode.ExtensionContext,
+  ): WebViewProviderManager {
     if (!WebViewProviderManager.instance) {
-      WebViewProviderManager.instance = new WebViewProviderManager(extensionContext);
+      WebViewProviderManager.instance = new WebViewProviderManager(
+        extensionContext,
+      );
     }
     return WebViewProviderManager.instance;
   }
@@ -66,9 +72,18 @@ export class WebViewProviderManager implements vscode.Disposable {
   private registerProviders(): void {
     this.providerRegistry.set(generativeAiModels.GEMINI, GeminiWebViewProvider);
     this.providerRegistry.set(generativeAiModels.GROQ, GroqWebViewProvider);
-    this.providerRegistry.set(generativeAiModels.ANTHROPIC, AnthropicWebViewProvider);
-    this.providerRegistry.set(generativeAiModels.GROK, AnthropicWebViewProvider);
-    this.providerRegistry.set(generativeAiModels.DEEPSEEK, DeepseekWebViewProvider);
+    this.providerRegistry.set(
+      generativeAiModels.ANTHROPIC,
+      AnthropicWebViewProvider,
+    );
+    this.providerRegistry.set(
+      generativeAiModels.GROK,
+      AnthropicWebViewProvider,
+    );
+    this.providerRegistry.set(
+      generativeAiModels.DEEPSEEK,
+      DeepseekWebViewProvider,
+    );
   }
 
   registerWebViewProvider(): vscode.Disposable | undefined {
@@ -85,35 +100,53 @@ export class WebViewProviderManager implements vscode.Disposable {
       const disposable = vscode.window.registerWebviewViewProvider(
         BaseWebViewProvider.viewId,
         this.webviewViewProvider,
-        { webviewOptions: { retainContextWhenHidden: true } }
+        { webviewOptions: { retainContextWhenHidden: true } },
       );
       this.disposables.push(disposable);
       return disposable;
     }
   }
 
-  private createProvider(modelName: string, apiKey: string, model: string): BaseWebViewProvider | undefined {
+  private createProvider(
+    modelName: string,
+    apiKey: string,
+    model: string,
+  ): BaseWebViewProvider | undefined {
     const providerClass = this.providerRegistry.get(modelName);
     if (!providerClass) {
       this.logger.warn(`Provider for model type ${modelName} not found`);
       return;
     }
-    return new providerClass(this.extensionContext.extensionUri, apiKey, model, this.extensionContext);
+    return new providerClass(
+      this.extensionContext.extensionUri,
+      apiKey,
+      model,
+      this.extensionContext,
+    );
   }
 
   private async getChatHistory() {
-    return await this.chatHistoryManager.getHistory(WebViewProviderManager.AgentId);
+    return await this.chatHistoryManager.getHistory(
+      WebViewProviderManager.AgentId,
+    );
   }
 
   private async clearHistory() {
-    return await this.chatHistoryManager.clearHistory(WebViewProviderManager.AgentId);
+    return await this.chatHistoryManager.clearHistory(
+      WebViewProviderManager.AgentId,
+    );
   }
 
   private async handleClearHistory({ type, message }: IEventPayload) {
     return this.clearHistory();
   }
 
-  private async switchProvider(modelName: string, apiKey: string, model: string, onload: boolean): Promise<void> {
+  private async switchProvider(
+    modelName: string,
+    apiKey: string,
+    model: string,
+    onload: boolean,
+  ): Promise<void> {
     try {
       const newProvider = this.createProvider(modelName, apiKey, model);
       if (!newProvider) {
@@ -140,7 +173,7 @@ export class WebViewProviderManager implements vscode.Disposable {
         JSON.stringify({
           success: true,
           modelName,
-        })
+        }),
       );
     } catch (error: any) {
       this.logger.error(`Error switching provider: ${error}`);
@@ -149,13 +182,18 @@ export class WebViewProviderManager implements vscode.Disposable {
         JSON.stringify({
           success: false,
           modelName,
-        })
+        }),
       );
       throw new Error(error);
     }
   }
 
-  async initializeProvider(modelName: string, apiKey: string, model: string, onload: boolean): Promise<void> {
+  async initializeProvider(
+    modelName: string,
+    apiKey: string,
+    model: string,
+    onload: boolean,
+  ): Promise<void> {
     // Initialize event listeners when first provider is created
     this.initializeEventListeners();
     await this.switchProvider(modelName, apiKey, model, onload);
@@ -195,7 +233,9 @@ export class WebViewProviderManager implements vscode.Disposable {
           message: JSON.stringify(chatHistory),
         });
 
-        this.logger.debug(`Restored ${chatHistory.length} chat messages immediately`);
+        this.logger.debug(
+          `Restored ${chatHistory.length} chat messages immediately`,
+        );
       } else {
         this.logger.warn("Webview not available for chat history restoration");
       }
@@ -215,7 +255,10 @@ export class WebViewProviderManager implements vscode.Disposable {
   // This update has to happen in the DB
   async handleHistoryUpdate({ type, message }: IEventPayload) {
     if (message.command === "messages-updated" && message.messages?.length) {
-      await this.chatHistoryManager.setHistory(WebViewProviderManager.AgentId, message.message);
+      await this.chatHistoryManager.setHistory(
+        WebViewProviderManager.AgentId,
+        message.message,
+      );
     }
   }
 

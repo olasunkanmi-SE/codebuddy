@@ -89,7 +89,7 @@ export class ChatHistoryWorker {
   async processRequest(
     operation: ChatHistoryWorkerOperation,
     data: ChatHistoryWorkerData,
-    requestId: string
+    requestId: string,
   ): Promise<any> {
     if (this.isProcessing) {
       throw new Error("Worker is busy processing another request");
@@ -161,7 +161,8 @@ export class ChatHistoryWorker {
           const history = this.chatHistoryRepo.get(agentId);
           resolve(history || []);
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           console.error(`Failed to get chat history: ${errorMessage}`);
           reject(new Error(`Failed to get chat history: ${errorMessage}`));
         }
@@ -172,7 +173,10 @@ export class ChatHistoryWorker {
   /**
    * Save chat history for an agent
    */
-  private async saveChatHistory(agentId: string, history: any[]): Promise<void> {
+  private async saveChatHistory(
+    agentId: string,
+    history: any[],
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         try {
@@ -192,7 +196,8 @@ export class ChatHistoryWorker {
           this.chatHistoryRepo.set(agentId, formattedHistory);
           resolve();
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           console.error(`Failed to save chat history: ${errorMessage}`);
           reject(new Error(`Failed to save chat history: ${errorMessage}`));
         }
@@ -210,7 +215,8 @@ export class ChatHistoryWorker {
           this.chatHistoryRepo.clear(agentId);
           resolve();
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           console.error(`Failed to clear chat history: ${errorMessage}`);
           reject(new Error(`Failed to clear chat history: ${errorMessage}`));
         }
@@ -229,7 +235,7 @@ export class ChatHistoryWorker {
       alias?: string;
       sessionId?: string;
       metadata?: any;
-    }
+    },
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -246,7 +252,8 @@ export class ChatHistoryWorker {
           });
           resolve();
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           console.error(`Failed to add chat message: ${errorMessage}`);
           reject(new Error(`Failed to add chat message: ${errorMessage}`));
         }
@@ -257,16 +264,22 @@ export class ChatHistoryWorker {
   /**
    * Get recent chat history for an agent
    */
-  private async getRecentHistory(agentId: string, limit: number): Promise<any[]> {
+  private async getRecentHistory(
+    agentId: string,
+    limit: number,
+  ): Promise<any[]> {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         try {
           const history = this.chatHistoryRepo.getRecent(agentId, limit);
           resolve(history || []);
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           console.error(`Failed to get recent chat history: ${errorMessage}`);
-          reject(new Error(`Failed to get recent chat history: ${errorMessage}`));
+          reject(
+            new Error(`Failed to get recent chat history: ${errorMessage}`),
+          );
         }
       }, 0);
     });
@@ -282,9 +295,12 @@ export class ChatHistoryWorker {
           this.chatHistoryRepo.cleanup(daysToKeep);
           resolve();
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           console.error(`Failed to cleanup old chat history: ${errorMessage}`);
-          reject(new Error(`Failed to cleanup old chat history: ${errorMessage}`));
+          reject(
+            new Error(`Failed to cleanup old chat history: ${errorMessage}`),
+          );
         }
       }, 0);
     });
@@ -309,7 +325,9 @@ export class ChatHistoryWorker {
    */
   cancel(): void {
     if (this.isProcessing) {
-      console.warn(`Cancelling chat history operation: ${this.currentRequestId}`);
+      console.warn(
+        `Cancelling chat history operation: ${this.currentRequestId}`,
+      );
       this.isProcessing = false;
       this.currentRequestId = null;
     }

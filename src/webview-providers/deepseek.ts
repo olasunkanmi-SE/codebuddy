@@ -18,7 +18,7 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     apiKey: string,
     generativeAiModel: string,
     context: vscode.ExtensionContext,
-    protected baseUrl?: string
+    protected baseUrl?: string,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.logger = Logger.initialize("DeepseekWebViewProvider", {
@@ -42,17 +42,22 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
         Message.of({
           role: msg.role === "user" ? "user" : "assistant",
           content: msg.content,
-        })
+        }),
       );
 
-      this.logger.debug(`Updated Deepseek chatHistory array with ${this.chatHistory.length} messages`);
+      this.logger.debug(
+        `Updated Deepseek chatHistory array with ${this.chatHistory.length} messages`,
+      );
     } catch (error) {
       this.logger.warn("Failed to update Deepseek chat history array:", error);
       this.chatHistory = []; // Reset to empty on error
     }
   }
 
-  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
+  public async sendResponse(
+    response: string,
+    currentChat: string,
+  ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -60,20 +65,25 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
           Message.of({
             role: "assistant",
             content: response,
-          })
+          }),
         );
       } else {
         this.chatHistory.push(
           Message.of({
             role: "user",
             content: response,
-          })
+          }),
         );
       }
 
       if (this.chatHistory.length === 2) {
-        const chatHistory = Memory.has(COMMON.DEEPSEEK_CHAT_HISTORY) ? Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY) : [];
-        Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, [...chatHistory, ...this.chatHistory]);
+        const chatHistory = Memory.has(COMMON.DEEPSEEK_CHAT_HISTORY)
+          ? Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY)
+          : [];
+        Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, [
+          ...chatHistory,
+          ...this.chatHistory,
+        ]);
       }
       return await this.currentWebView?.webview.postMessage({
         type,
@@ -86,7 +96,10 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(message: string, metaData?: any): Promise<string | undefined> {
+  async generateResponse(
+    message: string,
+    metaData?: any,
+  ): Promise<string | undefined> {
     try {
       if (metaData) {
         this.orchestrator.publish("onThinking", "...thinking");
@@ -111,7 +124,9 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     } catch (error) {
       this.logger.error("Error generating response", error);
       Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage("Model not responding, please resend your question");
+      vscode.window.showErrorMessage(
+        "Model not responding, please resend your question",
+      );
       return;
     }
   }
