@@ -22,7 +22,6 @@ import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
 import { FileUploadService } from "./services/file-upload";
-import { FileWatcherService } from "./services/file-watcher";
 import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
@@ -52,7 +51,6 @@ const {
 console.log(APP_CONFIG);
 
 const logger = Logger.initialize("extension", { minLevel: LogLevel.DEBUG });
-const fileWatcher = FileWatcherService.getInstance();
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
@@ -311,9 +309,6 @@ async function restartExtension(context: vscode.ExtensionContext) {
       if (orchestrator) {
         orchestrator.dispose();
       }
-      if (fileWatcher) {
-        fileWatcher.dispose();
-      }
 
       // Show progress and reload window
       await vscode.window.withProgress(
@@ -347,7 +342,6 @@ export function deactivate(context: vscode.ExtensionContext) {
   quickFixCodeAction.dispose();
   agentEventEmmitter.dispose();
   orchestrator.dispose();
-  fileWatcher.dispose();
 
   // Dispose provider manager
   const providerManager = WebViewProviderManager.getInstance(context);
