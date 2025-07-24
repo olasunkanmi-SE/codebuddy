@@ -32,7 +32,11 @@ import { AnalysisResult as FileAnalysisResult } from "./analyzers/index";
  */
 export interface WorkerMessage {
   /** Message type identifier */
-  type: "ANALYZE_CODEBASE" | "ANALYSIS_COMPLETE" | "ANALYSIS_ERROR" | "ANALYSIS_PROGRESS";
+  type:
+    | "ANALYZE_CODEBASE"
+    | "ANALYSIS_COMPLETE"
+    | "ANALYSIS_ERROR"
+    | "ANALYSIS_PROGRESS";
   /** Message payload data */
   payload?: any;
   /** Error message if applicable */
@@ -152,8 +156,12 @@ export class CodebaseAnalysisWorker {
    */
   async analyzeCodebase(
     data: CodebaseAnalysisWorkerData,
-    onProgress: (progress: { current: number; total: number; message: string }) => void,
-    cancellationToken?: vscode.CancellationToken
+    onProgress: (progress: {
+      current: number;
+      total: number;
+      message: string;
+    }) => void,
+    cancellationToken?: vscode.CancellationToken,
   ): Promise<AnalysisResult> {
     if (this.isRunning) {
       throw new Error("Analysis already in progress");
@@ -176,7 +184,11 @@ export class CodebaseAnalysisWorker {
    */
   private async performAnalysis(
     data: CodebaseAnalysisWorkerData,
-    onProgress: (progress: { current: number; total: number; message: string }) => void
+    onProgress: (progress: {
+      current: number;
+      total: number;
+      message: string;
+    }) => void,
   ): Promise<AnalysisResult> {
     onProgress({
       current: 0,
@@ -216,7 +228,10 @@ export class CodebaseAnalysisWorker {
     });
 
     // Step 5: Analyze database schema
-    const databaseSchema = await this.analyzeDatabaseSchema(files, analysisResults.fileContents);
+    const databaseSchema = await this.analyzeDatabaseSchema(
+      files,
+      analysisResults.fileContents,
+    );
 
     onProgress({
       current: 90,
@@ -225,13 +240,16 @@ export class CodebaseAnalysisWorker {
     });
 
     // Step 6: Build domain relationships
-    const domainRelationships = this.buildDomainRelationships(analysisResults.dataModels, analysisResults.apiEndpoints);
+    const domainRelationships = this.buildDomainRelationships(
+      analysisResults.dataModels,
+      analysisResults.apiEndpoints,
+    );
 
     // Step 7: Calculate complexity
     const complexity = this.calculateComplexity(
       files.length,
       analysisResults.totalLines,
-      Object.keys(dependencies).length
+      Object.keys(dependencies).length,
     );
 
     onProgress({ current: 100, total: 100, message: "Analysis complete!" });
@@ -268,7 +286,11 @@ export class CodebaseAnalysisWorker {
    */
   private async analyzeFileContents(
     files: string[],
-    onProgress: (progress: { current: number; total: number; message: string }) => void
+    onProgress: (progress: {
+      current: number;
+      total: number;
+      message: string;
+    }) => void,
   ): Promise<{
     fileContents: Map<string, string>;
     apiEndpoints: any[];
@@ -309,7 +331,11 @@ export class CodebaseAnalysisWorker {
 
         // Process structured analysis results
         if (fileAnalysis.analysis) {
-          this.processStructuredAnalysis(fileAnalysis.analysis, file, dataModels);
+          this.processStructuredAnalysis(
+            fileAnalysis.analysis,
+            file,
+            dataModels,
+          );
         }
 
         // Yield control to prevent blocking
@@ -352,7 +378,10 @@ export class CodebaseAnalysisWorker {
           analysis = analyzer.analyze(content, filePath);
         }
       } catch (error) {
-        console.warn(`Failed to run structured analysis on ${filePath}:`, error);
+        console.warn(
+          `Failed to run structured analysis on ${filePath}:`,
+          error,
+        );
       }
 
       // Extract API endpoints and data models with error handling
@@ -362,7 +391,10 @@ export class CodebaseAnalysisWorker {
       try {
         endpoints = this.extractApiEndpoints(filePath, content);
       } catch (error) {
-        console.warn(`Failed to extract API endpoints from ${filePath}:`, error);
+        console.warn(
+          `Failed to extract API endpoints from ${filePath}:`,
+          error,
+        );
       }
 
       try {
@@ -389,7 +421,7 @@ export class CodebaseAnalysisWorker {
         }
       }
       throw new Error(
-        `Failed to analyze file ${filePath}: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to analyze file ${filePath}: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   }
@@ -397,7 +429,11 @@ export class CodebaseAnalysisWorker {
   /**
    * Process structured analysis results from file analyzers
    */
-  private processStructuredAnalysis(analysis: FileAnalysisResult, filePath: string, dataModels: any[]): void {
+  private processStructuredAnalysis(
+    analysis: FileAnalysisResult,
+    filePath: string,
+    dataModels: any[],
+  ): void {
     // Extract classes as data models if they have properties
     if (analysis.classes) {
       for (const classInfo of analysis.classes) {
@@ -443,8 +479,21 @@ export class CodebaseAnalysisWorker {
   /**
    * Check if a function might be an API endpoint
    */
-  private isPotentialApiEndpoint(functionName: string, filePath: string): boolean {
-    const apiKeywords = ["get", "post", "put", "delete", "patch", "handler", "controller", "route", "api"];
+  private isPotentialApiEndpoint(
+    functionName: string,
+    filePath: string,
+  ): boolean {
+    const apiKeywords = [
+      "get",
+      "post",
+      "put",
+      "delete",
+      "patch",
+      "handler",
+      "controller",
+      "route",
+      "api",
+    ];
     const lowerName = functionName.toLowerCase();
     const lowerPath = filePath.toLowerCase();
 
@@ -454,19 +503,25 @@ export class CodebaseAnalysisWorker {
         lowerPath.includes(keyword) ||
         lowerPath.includes("api") ||
         lowerPath.includes("route") ||
-        lowerPath.includes("controller")
+        lowerPath.includes("controller"),
     );
   }
 
   /**
    * Find all relevant files in the workspace
    */
-  private async findRelevantFiles(data: CodebaseAnalysisWorkerData): Promise<string[]> {
+  private async findRelevantFiles(
+    data: CodebaseAnalysisWorkerData,
+  ): Promise<string[]> {
     const files: string[] = [];
 
     for (const pattern of data.filePatterns) {
       try {
-        const uris = await vscode.workspace.findFiles(pattern, `{${data.excludePatterns.join(",")}}`, data.maxFiles);
+        const uris = await vscode.workspace.findFiles(
+          pattern,
+          `{${data.excludePatterns.join(",")}}`,
+          data.maxFiles,
+        );
 
         files.push(...uris.map((uri) => uri.fsPath));
       } catch (error) {
@@ -481,14 +536,18 @@ export class CodebaseAnalysisWorker {
   /**
    * Analyze package.json and other dependency files
    */
-  private async analyzeDependencies(workspacePath: string): Promise<Record<string, string>> {
+  private async analyzeDependencies(
+    workspacePath: string,
+  ): Promise<Record<string, string>> {
     const dependencies: Record<string, string> = {};
 
     // Analyze package.json
     const packageJsonPath = path.join(workspacePath, "package.json");
     if (fs.existsSync(packageJsonPath)) {
       try {
-        const packageJson = JSON.parse(await fs.promises.readFile(packageJsonPath, "utf-8"));
+        const packageJson = JSON.parse(
+          await fs.promises.readFile(packageJsonPath, "utf-8"),
+        );
         Object.assign(dependencies, packageJson.dependencies || {});
         Object.assign(dependencies, packageJson.devDependencies || {});
       } catch (error) {
@@ -501,7 +560,9 @@ export class CodebaseAnalysisWorker {
     if (fs.existsSync(requirementsPath)) {
       try {
         const content = await fs.promises.readFile(requirementsPath, "utf-8");
-        const lines = content.split("\n").filter((line) => line.trim() && !line.startsWith("#"));
+        const lines = content
+          .split("\n")
+          .filter((line) => line.trim() && !line.startsWith("#"));
         for (const line of lines) {
           const [name, version] = line.split("==");
           if (name && version) {
@@ -519,7 +580,10 @@ export class CodebaseAnalysisWorker {
   /**
    * Detect frameworks based on files and dependencies
    */
-  private async detectFrameworks(files: string[], dependencies: Record<string, string>): Promise<string[]> {
+  private async detectFrameworks(
+    files: string[],
+    dependencies: Record<string, string>,
+  ): Promise<string[]> {
     const frameworks: Set<string> = new Set();
 
     // Framework detection based on dependencies
@@ -681,7 +745,10 @@ export class CodebaseAnalysisWorker {
   /**
    * Analyze database schema from files
    */
-  private async analyzeDatabaseSchema(files: string[], fileContents: Map<string, string>): Promise<any> {
+  private async analyzeDatabaseSchema(
+    files: string[],
+    fileContents: Map<string, string>,
+  ): Promise<any> {
     const schema = {
       tables: [] as any[],
       relationships: [] as any[],
@@ -738,7 +805,10 @@ export class CodebaseAnalysisWorker {
   /**
    * Build domain relationships between entities
    */
-  private buildDomainRelationships(dataModels: any[], apiEndpoints: any[]): any[] {
+  private buildDomainRelationships(
+    dataModels: any[],
+    apiEndpoints: any[],
+  ): any[] {
     const relationships: any[] = [];
 
     // Simple relationship detection based on naming patterns
@@ -750,7 +820,8 @@ export class CodebaseAnalysisWorker {
         for (const otherModel of dataModels) {
           if (
             otherModel.name !== model.name &&
-            (prop.type.includes(otherModel.name) || prop.name.toLowerCase().includes(otherModel.name.toLowerCase()))
+            (prop.type.includes(otherModel.name) ||
+              prop.name.toLowerCase().includes(otherModel.name.toLowerCase()))
           ) {
             relatedEntities.push(otherModel.name);
           }
@@ -774,9 +845,10 @@ export class CodebaseAnalysisWorker {
   private calculateComplexity(
     fileCount: number,
     lineCount: number,
-    dependencyCount: number
+    dependencyCount: number,
   ): "low" | "medium" | "high" {
-    const complexityScore = fileCount * 0.3 + lineCount * 0.0001 + dependencyCount * 0.5;
+    const complexityScore =
+      fileCount * 0.3 + lineCount * 0.0001 + dependencyCount * 0.5;
 
     if (complexityScore > 100) return "high";
     if (complexityScore > 50) return "medium";

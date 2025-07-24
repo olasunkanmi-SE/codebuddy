@@ -1,11 +1,12 @@
 import { FileAnalyzer, AnalysisResult } from "./index";
 
 export class TypeScriptAnalyzer implements FileAnalyzer {
-  private readonly importRegex = /import\s+[^'"]*from\s+['"]([^'"]+)['"]/gi;
-  private readonly exportRegex = /export\s+(?:default\s+)?(?:class|function|const|interface|type|enum)\s+(\w+)/gi;
-  private readonly classRegex = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{/gi;
-  private readonly functionRegex = /function\s+(\w+)\s*\([^)]*\)/gi;
-  private readonly methodRegex = /(?:public|private|protected)?\s*(\w+)\s*\([^)]*\)\s*[:?]/gi;
+  private static readonly importRegex = /import\s+[^'"]*from\s+['"]([^'"]+)['"]/gi;
+  private static readonly exportRegex =
+    /export\s+(?:default\s+)?(?:class|function|const|interface|type|enum)\s+(\w+)/gi;
+  private static readonly classRegex = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{/gi;
+  private static readonly functionRegex = /function\s+(\w+)\s*\([^)]*\)/gi;
+  private static readonly methodRegex = /(?:public|private|protected)?\s*(\w+)\s*\([^)]*\)\s*[:?]/gi;
 
   canAnalyze(filePath: string): boolean {
     return /\.(ts|tsx)$/.test(filePath);
@@ -29,9 +30,9 @@ export class TypeScriptAnalyzer implements FileAnalyzer {
 
   private extractImports(content: string): string[] {
     const imports: string[] = [];
-    this.importRegex.lastIndex = 0;
+    TypeScriptAnalyzer.importRegex.lastIndex = 0;
     let match;
-    while ((match = this.importRegex.exec(content)) !== null) {
+    while ((match = TypeScriptAnalyzer.importRegex.exec(content)) !== null) {
       imports.push(match[1]);
     }
     return imports;
@@ -39,9 +40,9 @@ export class TypeScriptAnalyzer implements FileAnalyzer {
 
   private extractExports(content: string): string[] {
     const exports: string[] = [];
-    this.exportRegex.lastIndex = 0;
+    TypeScriptAnalyzer.exportRegex.lastIndex = 0;
     let match;
-    while ((match = this.exportRegex.exec(content)) !== null) {
+    while ((match = TypeScriptAnalyzer.exportRegex.exec(content)) !== null) {
       exports.push(match[1]);
     }
     return exports;
@@ -49,9 +50,9 @@ export class TypeScriptAnalyzer implements FileAnalyzer {
 
   private extractClasses(content: string): any[] {
     const classes: any[] = [];
-    this.classRegex.lastIndex = 0;
+    TypeScriptAnalyzer.classRegex.lastIndex = 0;
     let match;
-    while ((match = this.classRegex.exec(content)) !== null) {
+    while ((match = TypeScriptAnalyzer.classRegex.exec(content)) !== null) {
       classes.push({
         name: match[1],
         extends: match[2] || null,
@@ -59,7 +60,7 @@ export class TypeScriptAnalyzer implements FileAnalyzer {
           ? match[3]
               .trim()
               .split(",")
-              .map((i) => i.trim())
+              .map((i: string) => i.trim())
           : [],
         methods: this.extractMethods(content, match.index),
       });
@@ -69,9 +70,9 @@ export class TypeScriptAnalyzer implements FileAnalyzer {
 
   private extractFunctions(content: string): any[] {
     const functions: any[] = [];
-    this.functionRegex.lastIndex = 0;
+    TypeScriptAnalyzer.functionRegex.lastIndex = 0;
     let match;
-    while ((match = this.functionRegex.exec(content)) !== null) {
+    while ((match = TypeScriptAnalyzer.functionRegex.exec(content)) !== null) {
       functions.push({
         name: match[1],
         type: "function",
@@ -84,9 +85,9 @@ export class TypeScriptAnalyzer implements FileAnalyzer {
     const methods: any[] = [];
     const classContent = content.slice(classStartIndex);
 
-    this.methodRegex.lastIndex = 0;
+    TypeScriptAnalyzer.methodRegex.lastIndex = 0;
     let match;
-    while ((match = this.methodRegex.exec(classContent)) !== null) {
+    while ((match = TypeScriptAnalyzer.methodRegex.exec(classContent)) !== null) {
       // Stop if we've gone beyond the class definition
       const nextClassIndex = classContent.indexOf("class ", match.index + 1);
       if (nextClassIndex !== -1 && nextClassIndex < match.index) {

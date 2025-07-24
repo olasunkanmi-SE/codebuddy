@@ -38,12 +38,24 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
       };
 
       // Stub the individual analysis methods to return mock data
-      sandbox.stub(service as any, "identifyFrameworks").returns(mockAnalysis.frameworks);
-      sandbox.stub(service as any, "discoverApiEndpoints").resolves(mockAnalysis.apiEndpoints);
-      sandbox.stub(service as any, "analyzeDataModels").resolves(mockAnalysis.dataModels);
-      sandbox.stub(service as any, "introspectDatabaseSchema").resolves(mockAnalysis.databaseSchema);
-      sandbox.stub(service as any, "mapDomainRelationships").resolves(mockAnalysis.domainRelationships);
-      sandbox.stub(service as any, "findFile").resolves(vscode.Uri.file("/test/package.json"));
+      sandbox
+        .stub(service as any, "identifyFrameworks")
+        .returns(mockAnalysis.frameworks);
+      sandbox
+        .stub(service as any, "discoverApiEndpoints")
+        .resolves(mockAnalysis.apiEndpoints);
+      sandbox
+        .stub(service as any, "analyzeDataModels")
+        .resolves(mockAnalysis.dataModels);
+      sandbox
+        .stub(service as any, "introspectDatabaseSchema")
+        .resolves(mockAnalysis.databaseSchema);
+      sandbox
+        .stub(service as any, "mapDomainRelationships")
+        .resolves(mockAnalysis.domainRelationships);
+      sandbox
+        .stub(service as any, "findFile")
+        .resolves(vscode.Uri.file("/test/package.json"));
 
       // First call - should perform full analysis
       const result1 = await service.analyzeWorkspace();
@@ -62,14 +74,18 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
       mockWorkspaceOperations(sandbox);
 
       // Stub analysis methods
-      const mockFrameworks = sandbox.stub(service as any, "identifyFrameworks").returns(["React"]);
+      const mockFrameworks = sandbox
+        .stub(service as any, "identifyFrameworks")
+        .returns(["React"]);
       sandbox.stub(service as any, "discoverApiEndpoints").resolves([]);
       sandbox.stub(service as any, "analyzeDataModels").resolves([]);
       sandbox
         .stub(service as any, "introspectDatabaseSchema")
         .resolves({ tables: [], relationships: [], migrations: [] });
       sandbox.stub(service as any, "mapDomainRelationships").resolves([]);
-      sandbox.stub(service as any, "findFile").resolves(vscode.Uri.file("/test/package.json"));
+      sandbox
+        .stub(service as any, "findFile")
+        .resolves(vscode.Uri.file("/test/package.json"));
 
       // First call
       await service.analyzeWorkspace();
@@ -114,7 +130,9 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
       mockWorkspaceOperations(sandbox);
 
       // Stub cache to throw error
-      const cacheStub = sandbox.stub(cache, "get").rejects(new Error("Cache error"));
+      const cacheStub = sandbox
+        .stub(cache, "get")
+        .rejects(new Error("Cache error"));
 
       // Stub analysis methods
       sandbox.stub(service as any, "identifyFrameworks").returns(["React"]);
@@ -124,7 +142,9 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
         .stub(service as any, "introspectDatabaseSchema")
         .resolves({ tables: [], relationships: [], migrations: [] });
       sandbox.stub(service as any, "mapDomainRelationships").resolves([]);
-      sandbox.stub(service as any, "findFile").resolves(vscode.Uri.file("/test/package.json"));
+      sandbox
+        .stub(service as any, "findFile")
+        .resolves(vscode.Uri.file("/test/package.json"));
 
       // Should not throw error and should perform analysis
       const result = await service.analyzeWorkspace();
@@ -147,7 +167,9 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
         .stub(service as any, "introspectDatabaseSchema")
         .resolves({ tables: [], relationships: [], migrations: [] });
       sandbox.stub(service as any, "mapDomainRelationships").resolves([]);
-      sandbox.stub(service as any, "findFile").resolves(vscode.Uri.file("/test/package.json"));
+      sandbox
+        .stub(service as any, "findFile")
+        .resolves(vscode.Uri.file("/test/package.json"));
 
       // Should not throw error
       const result = await service.analyzeWorkspace();
@@ -168,11 +190,21 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
       };
 
       sandbox.stub(service as any, "identifyFrameworks").returns(["React"]);
-      sandbox.stub(service as any, "discoverApiEndpoints").callsFake(createSlowAnalysis);
-      sandbox.stub(service as any, "analyzeDataModels").callsFake(createSlowAnalysis);
-      sandbox.stub(service as any, "introspectDatabaseSchema").callsFake(createSlowAnalysis);
-      sandbox.stub(service as any, "mapDomainRelationships").callsFake(createSlowAnalysis);
-      sandbox.stub(service as any, "findFile").resolves(vscode.Uri.file("/test/package.json"));
+      sandbox
+        .stub(service as any, "discoverApiEndpoints")
+        .callsFake(createSlowAnalysis);
+      sandbox
+        .stub(service as any, "analyzeDataModels")
+        .callsFake(createSlowAnalysis);
+      sandbox
+        .stub(service as any, "introspectDatabaseSchema")
+        .callsFake(createSlowAnalysis);
+      sandbox
+        .stub(service as any, "mapDomainRelationships")
+        .callsFake(createSlowAnalysis);
+      sandbox
+        .stub(service as any, "findFile")
+        .resolves(vscode.Uri.file("/test/package.json"));
 
       // First call (should be slower)
       const start1 = Date.now();
@@ -187,7 +219,7 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
       // Cached call should be significantly faster
       assert.ok(
         duration2 < duration1 / 2,
-        `Cached call (${duration2}ms) should be faster than uncached call (${duration1}ms)`
+        `Cached call (${duration2}ms) should be faster than uncached call (${duration1}ms)`,
       );
     });
   });
@@ -200,7 +232,9 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
       name: "test-workspace",
       index: 0,
     };
-    sandbox.stub(vscode.workspace, "workspaceFolders").value([mockWorkspaceFolder]);
+    sandbox
+      .stub(vscode.workspace, "workspaceFolders")
+      .value([mockWorkspaceFolder]);
 
     // Mock file system operations for the native fs module
     const mockPackageJson = JSON.stringify({
@@ -213,7 +247,10 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
     sandbox.stub(fs, "existsSync").returns(true);
 
     // Mock workspace service
-    const mockFiles = [vscode.Uri.file("/test/file1.ts"), vscode.Uri.file("/test/file2.ts")];
+    const mockFiles = [
+      vscode.Uri.file("/test/file1.ts"),
+      vscode.Uri.file("/test/file2.ts"),
+    ];
 
     sandbox.stub(vscode.workspace, "findFiles").resolves(mockFiles);
   }

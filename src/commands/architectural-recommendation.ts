@@ -4,18 +4,65 @@ import { GeminiLLM } from "../llms/gemini/gemini";
 import { getAPIKeyAndModel, formatText } from "../utils/utils";
 import { LLMOutputSanitizer } from "../utils/llm-output-sanitizer";
 
-export const architecturalRecommendationCommand = async () => {
-  const persistentCodebaseService =
-    PersistentCodebaseUnderstandingService.getInstance();
+/**
+ * Determines if analysis cache should be refreshed based on age and availability
+ */
+async function shouldRefreshAnalysis(summary: any): Promise<boolean> {
+  if (!summary.hasCache) {
+    return true;
+  }
+
+  if (summary.lastAnalysis) {
+    const lastAnalysisDate = new Date(summary.lastAnalysis);
+    const hoursSinceAnalysis = (Date.now() - lastAnalysisDate.getTime()) / (1000 * 60 * 60);
+    return hoursSinceAnalysis > 24;
+  }
+
+  return false;
+}
+
+/**
+ * Prompts user for cache refresh decision when analysis is stale
+ */
+async function getUserCacheDecision(summary: any): Promise<"use" | "refresh" | "cancel"> {
+  if (!summary.hasCache) {
+    const choice = await vscode.window.showInformationMessage(
+      "No cached analysis found. This will take some time to analyze your codebase.",
+      "Analyze Now",
+      "Cancel"
+    );
+    return choice === "Analyze Now" ? "refresh" : "cancel";
+  }
+
+  if (summary.lastAnalysis) {
+    const lastAnalysisDate = new Date(summary.lastAnalysis);
+    const hoursSinceAnalysis = (Date.now() - lastAnalysisDate.getTime()) / (1000 * 60 * 60);
+
+    if (hoursSinceAnalysis > 24) {
+      const choice = await vscode.window.showInformationMessage(
+        `Cached analysis is ${Math.round(hoursSinceAnalysis)} hours old. Would you like to refresh it?`,
+        "Use Cache",
+        "Refresh Analysis",
+        "Cancel"
+      );
+
+      if (choice === "Cancel") return "cancel";
+      return choice === "Refresh Analysis" ? "refresh" : "use";
+    }
+  }
+
+  return "use";
+}
+
+export async function architecturalRecommendationCommand(): Promise<void> {
+  const persistentCodebaseService = PersistentCodebaseUnderstandingService.getInstance();
 
   // Initialize the service if not already done
   try {
     await persistentCodebaseService.initialize();
   } catch (error) {
     const errorMessage = "Failed to initialize codebase analysis service.";
-    vscode.window.showErrorMessage(
-      `${errorMessage} ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
+    vscode.window.showErrorMessage(`${errorMessage} ${error instanceof Error ? error.message : "Unknown error"}`);
     return;
   }
 
@@ -43,38 +90,13 @@ export const architecturalRecommendationCommand = async () => {
 
   // Check if we should force refresh or use cache
   const summary = await persistentCodebaseService.getAnalysisSummary();
-  let useCache = true;
+  const cacheDecision = await getUserCacheDecision(summary);
 
-  if (!summary.hasCache) {
-    const choice = await vscode.window.showInformationMessage(
-      "No cached analysis found. This will take some time to analyze your codebase.",
-      "Analyze Now",
-      "Cancel",
-    );
-    if (choice !== "Analyze Now") {
-      return;
-    }
-    useCache = false;
-  } else if (summary.lastAnalysis) {
-    const lastAnalysisDate = new Date(summary.lastAnalysis);
-    const hoursSinceAnalysis =
-      (Date.now() - lastAnalysisDate.getTime()) / (1000 * 60 * 60);
-
-    if (hoursSinceAnalysis > 24) {
-      const choice = await vscode.window.showInformationMessage(
-        `Cached analysis is ${Math.round(hoursSinceAnalysis)} hours old. Would you like to refresh it?`,
-        "Use Cache",
-        "Refresh Analysis",
-        "Cancel",
-      );
-
-      if (choice === "Cancel") {
-        return;
-      } else if (choice === "Refresh Analysis") {
-        useCache = false;
-      }
-    }
+  if (cacheDecision === "cancel") {
+    return;
   }
+
+  const useCache = cacheDecision === "use";
 
   await vscode.window.withProgress(
     {
@@ -100,8 +122,10 @@ export const architecturalRecommendationCommand = async () => {
           message: "Preparing analysis context...",
         });
 
-        // Create context from persistent analysis
+        // Create context from persistent analysis with sanitization
         const context = createContextFromAnalysis(analysis);
+        const sanitizedContext = context.replace(/`/g, "\\`").replace(/\${/g, "\\${");
+        const sanitizedQuestion = question.replace(/`/g, "\\`").replace(/\${/g, "\\${");
 
         if (token.isCancellationRequested) {
           return;
@@ -113,10 +137,10 @@ export const architecturalRecommendationCommand = async () => {
 You are a senior software architect and full-stack developer with extensive experience analyzing codebases. Based on the comprehensive codebase analysis below, provide detailed, accurate answers to the user's question.
 
 **Comprehensive Codebase Analysis:**
-${context}
+${sanitizedContext}
 
 **User's Question:**
-${question}
+${sanitizedQuestion}
 
 **Instructions:**
 1. **Analyze the question type**:
@@ -155,20 +179,14 @@ ${question}
         progress.report({ increment: 90 });
 
         // Sanitize the LLM output before displaying in webview
-        const sanitizedContent = LLMOutputSanitizer.sanitizeLLMOutput(
-          result,
-          false,
-        );
+        const sanitizedContent = LLMOutputSanitizer.sanitizeLLMOutput(result, false);
 
         // Format the content to HTML with markdown rendering
         let formattedContent: string;
         try {
           formattedContent = formatText(sanitizedContent);
         } catch (error) {
-          console.warn(
-            "Markdown parsing failed, falling back to plain text:",
-            error,
-          );
+          console.warn("Markdown parsing failed, falling back to plain text:", error);
           // Fallback to plain text if markdown parsing fails
           formattedContent = `<pre>${LLMOutputSanitizer.sanitizeText(sanitizedContent)}</pre>`;
         }
@@ -182,7 +200,7 @@ ${question}
           {
             enableScripts: false, // Disable scripts for security
             localResourceRoots: [], // No local resources needed
-          },
+          }
         );
 
         // Create secure HTML wrapper with proper CSP
@@ -251,12 +269,12 @@ ${question}
       } catch (error) {
         console.error("Error in architectural recommendation:", error);
         vscode.window.showErrorMessage(
-          `Failed to analyze codebase: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Failed to analyze codebase: ${error instanceof Error ? error.message : "Unknown error"}`
         );
       }
-    },
+    }
   );
-};
+}
 
 /**
  * Create analysis context from persistent analysis data
@@ -287,10 +305,7 @@ function createContextFromAnalysis(analysis: any): string {
     analysis.apiEndpoints.length > 0
       ? analysis.apiEndpoints
           .slice(0, 15) // Limit endpoints
-          .map(
-            (endpoint: any) =>
-              `- ${endpoint.method} ${endpoint.path} (${endpoint.file})`,
-          )
+          .map((endpoint: any) => `- ${endpoint.method} ${endpoint.path} (${endpoint.file})`)
           .join("\n")
       : "No API endpoints detected",
     ``,
@@ -298,9 +313,7 @@ function createContextFromAnalysis(analysis: any): string {
     analysis.dataModels.length > 0
       ? analysis.dataModels
           .slice(0, 10) // Limit models
-          .map(
-            (model: any) => `- ${model.name} (${model.type}) - ${model.file}`,
-          )
+          .map((model: any) => `- ${model.name} (${model.type}) - ${model.file}`)
           .join("\n")
       : "No data models detected",
     ``,
@@ -308,10 +321,7 @@ function createContextFromAnalysis(analysis: any): string {
     analysis.files.length > 0
       ? analysis.files
           .slice(0, 30) // Limit files shown
-          .map(
-            (file: string, index: number) =>
-              `[[${index + 1}]](${file}) ${file}`,
-          )
+          .map((file: string, index: number) => `[[${index + 1}]](${file}) ${file}`)
           .join("\n")
       : "No files analyzed",
     ``,

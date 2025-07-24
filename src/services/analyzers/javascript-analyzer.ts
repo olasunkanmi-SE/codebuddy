@@ -1,11 +1,11 @@
 import { FileAnalyzer, AnalysisResult } from "./index";
 
 export class JavaScriptAnalyzer implements FileAnalyzer {
-  private readonly importRegex = /(?:import|require)\s*\(?['"]([^'"]+)['"]\)?/gi;
-  private readonly exportRegex =
+  private static readonly importRegex = /(?:import|require)\s*\(?['"]([^'"]+)['"]\)?/gi;
+  private static readonly exportRegex =
     /(?:export|module\.exports)\s*[=.]?\s*(?:default\s+)?(?:class|function|const)?\s*(\w+)?/gi;
-  private readonly functionRegex = /function\s+(\w+)\s*\([^)]*\)/gi;
-  private readonly classRegex = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{/gi;
+  private static readonly functionRegex = /function\s+(\w+)\s*\([^)]*\)/gi;
+  private static readonly classRegex = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{/gi;
 
   canAnalyze(filePath: string): boolean {
     return /\.(js|jsx|mjs|cjs)$/.test(filePath);
@@ -29,9 +29,9 @@ export class JavaScriptAnalyzer implements FileAnalyzer {
 
   private extractImports(content: string): string[] {
     const imports: string[] = [];
-    this.importRegex.lastIndex = 0;
+    JavaScriptAnalyzer.importRegex.lastIndex = 0;
     let match;
-    while ((match = this.importRegex.exec(content)) !== null) {
+    while ((match = JavaScriptAnalyzer.importRegex.exec(content)) !== null) {
       imports.push(match[1]);
     }
     return imports;
@@ -39,9 +39,9 @@ export class JavaScriptAnalyzer implements FileAnalyzer {
 
   private extractExports(content: string): string[] {
     const exports: string[] = [];
-    this.exportRegex.lastIndex = 0;
+    JavaScriptAnalyzer.exportRegex.lastIndex = 0;
     let match;
-    while ((match = this.exportRegex.exec(content)) !== null) {
+    while ((match = JavaScriptAnalyzer.exportRegex.exec(content)) !== null) {
       if (match[1]) {
         exports.push(match[1]);
       }
@@ -51,9 +51,9 @@ export class JavaScriptAnalyzer implements FileAnalyzer {
 
   private extractFunctions(content: string): any[] {
     const functions: any[] = [];
-    this.functionRegex.lastIndex = 0;
+    JavaScriptAnalyzer.functionRegex.lastIndex = 0;
     let match;
-    while ((match = this.functionRegex.exec(content)) !== null) {
+    while ((match = JavaScriptAnalyzer.functionRegex.exec(content)) !== null) {
       functions.push({
         name: match[1],
         type: "function",
@@ -64,9 +64,9 @@ export class JavaScriptAnalyzer implements FileAnalyzer {
 
   private extractClasses(content: string): any[] {
     const classes: any[] = [];
-    this.classRegex.lastIndex = 0;
+    JavaScriptAnalyzer.classRegex.lastIndex = 0;
     let match;
-    while ((match = this.classRegex.exec(content)) !== null) {
+    while ((match = JavaScriptAnalyzer.classRegex.exec(content)) !== null) {
       classes.push({
         name: match[1],
         extends: match[2] || null,

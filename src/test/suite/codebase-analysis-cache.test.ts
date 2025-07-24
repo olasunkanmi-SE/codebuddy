@@ -90,7 +90,9 @@ suite("CodebaseAnalysisCache Tests", () => {
 
       // First call - return initial files
       mockFindFiles.onFirstCall().resolves([mockUri1]);
-      mockStat.onFirstCall().resolves({ mtime: 1000, size: 100 } as vscode.FileStat);
+      mockStat
+        .onFirstCall()
+        .resolves({ mtime: 1000, size: 100 } as vscode.FileStat);
 
       const testData = { workspace: "dependent" };
       await cache.set("workspace-test", testData, 60000, true);
@@ -101,8 +103,12 @@ suite("CodebaseAnalysisCache Tests", () => {
 
       // Second call - return changed files (different mtime)
       mockFindFiles.onSecondCall().resolves([mockUri1, mockUri2]);
-      mockStat.onSecondCall().resolves({ mtime: 2000, size: 200 } as vscode.FileStat);
-      mockStat.onThirdCall().resolves({ mtime: 1500, size: 150 } as vscode.FileStat);
+      mockStat
+        .onSecondCall()
+        .resolves({ mtime: 2000, size: 200 } as vscode.FileStat);
+      mockStat
+        .onThirdCall()
+        .resolves({ mtime: 1500, size: 150 } as vscode.FileStat);
 
       // Should be invalidated due to workspace change
       result = await cache.get("workspace-test");

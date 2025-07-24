@@ -32,7 +32,10 @@ export class ConfigAnalyzer implements FileAnalyzer {
   private analyzePackageJson(content: string): AnalysisResult {
     try {
       const pkg = JSON.parse(content);
-      const dependencies = [...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.devDependencies || {})];
+      const dependencies = [
+        ...Object.keys(pkg.dependencies || {}),
+        ...Object.keys(pkg.devDependencies || {}),
+      ];
 
       return {
         dependencies,

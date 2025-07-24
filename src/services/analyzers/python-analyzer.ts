@@ -1,9 +1,9 @@
 import { FileAnalyzer, AnalysisResult } from "./index";
 
 export class PythonAnalyzer implements FileAnalyzer {
-  private readonly importRegex = /(?:from\s+([^\s]+)\s+import|import\s+([^\s,]+))/gi;
-  private readonly classRegex = /class\s+(\w+)(?:\([^)]*\))?\s*:/gi;
-  private readonly functionRegex = /def\s+(\w+)\s*\([^)]*\)\s*:/gi;
+  private static readonly importRegex = /(?:from\s+([^\s]+)\s+import|import\s+([^\s,]+))/gi;
+  private static readonly classRegex = /class\s+(\w+)(?:\([^)]*\))?\s*:/gi;
+  private static readonly functionRegex = /def\s+(\w+)\s*\([^)]*\)\s*:/gi;
 
   canAnalyze(filePath: string): boolean {
     return filePath.endsWith(".py");
@@ -23,9 +23,9 @@ export class PythonAnalyzer implements FileAnalyzer {
 
   private extractImports(content: string): string[] {
     const imports: string[] = [];
-    this.importRegex.lastIndex = 0;
+    PythonAnalyzer.importRegex.lastIndex = 0;
     let match;
-    while ((match = this.importRegex.exec(content)) !== null) {
+    while ((match = PythonAnalyzer.importRegex.exec(content)) !== null) {
       imports.push(match[1] || match[2]);
     }
     return imports;
@@ -33,9 +33,9 @@ export class PythonAnalyzer implements FileAnalyzer {
 
   private extractClasses(content: string): any[] {
     const classes: any[] = [];
-    this.classRegex.lastIndex = 0;
+    PythonAnalyzer.classRegex.lastIndex = 0;
     let match;
-    while ((match = this.classRegex.exec(content)) !== null) {
+    while ((match = PythonAnalyzer.classRegex.exec(content)) !== null) {
       classes.push({
         name: match[1],
         type: "class",
@@ -46,9 +46,9 @@ export class PythonAnalyzer implements FileAnalyzer {
 
   private extractFunctions(content: string): any[] {
     const functions: any[] = [];
-    this.functionRegex.lastIndex = 0;
+    PythonAnalyzer.functionRegex.lastIndex = 0;
     let match;
-    while ((match = this.functionRegex.exec(content)) !== null) {
+    while ((match = PythonAnalyzer.functionRegex.exec(content)) !== null) {
       functions.push({
         name: match[1],
         type: "function",

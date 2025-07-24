@@ -13,7 +13,9 @@ export class AnalyzerFactory {
   ];
 
   getAnalyzer(filePath: string): FileAnalyzer | null {
-    return this.analyzers.find((analyzer) => analyzer.canAnalyze(filePath)) || null;
+    return (
+      this.analyzers.find((analyzer) => analyzer.canAnalyze(filePath)) || null
+    );
   }
 
   getAllAnalyzers(): FileAnalyzer[] {

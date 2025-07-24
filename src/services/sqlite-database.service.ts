@@ -5,6 +5,9 @@ import { Logger } from "../infrastructure/logger/logger";
 import { LogLevel } from "./telemetry";
 import { PersistentCodebaseAnalysis } from "./persistent-codebase-understanding.service";
 
+// Database table names
+const CODEBASE_SNAPSHOTS_TABLE = "codebase_snapshots";
+
 interface CodebaseSnapshot {
   id?: number;
   workspace_path: string;
@@ -110,9 +113,7 @@ export class SqliteDatabaseService {
       this.logger.info("Creating database tables...");
       await this.createTables();
 
-      this.logger.info(
-        `SQLite database initialized successfully at: ${this.dbPath}`,
-      );
+      this.logger.info(`SQLite database initialized successfully at: ${this.dbPath}`);
     } catch (error) {
       this.logger.error("Failed to initialize database", error);
       if (error instanceof Error) {
@@ -133,7 +134,7 @@ export class SqliteDatabaseService {
 
     // Create codebase_snapshots table
     this.db.run(`
-      CREATE TABLE IF NOT EXISTS codebase_snapshots (
+      CREATE TABLE IF NOT EXISTS ${CODEBASE_SNAPSHOTS_TABLE} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         workspace_path TEXT NOT NULL,
         git_branch TEXT NOT NULL,
@@ -149,12 +150,12 @@ export class SqliteDatabaseService {
     // Create indexes for better performance
     this.db.run(`
       CREATE INDEX IF NOT EXISTS idx_workspace_path 
-      ON codebase_snapshots (workspace_path)
+      ON ${CODEBASE_SNAPSHOTS_TABLE} (workspace_path)
     `);
 
     this.db.run(`
       CREATE INDEX IF NOT EXISTS idx_git_state 
-      ON codebase_snapshots (workspace_path, git_branch, git_commit_hash, git_diff_hash)
+      ON ${CODEBASE_SNAPSHOTS_TABLE} (workspace_path, git_branch, git_commit_hash, git_diff_hash)
     `);
 
     this.db.run(`
@@ -202,8 +203,7 @@ export class SqliteDatabaseService {
       }
 
       // Use VS Code's git extension API if available
-      const gitExtension =
-        vscode.extensions.getExtension("vscode.git")?.exports;
+      const gitExtension = vscode.extensions.getExtension("vscode.git")?.exports;
       const git = gitExtension?.getAPI(1);
 
       if (git && git.repositories.length > 0) {
@@ -217,7 +217,7 @@ export class SqliteDatabaseService {
         const files = await vscode.workspace.findFiles(
           "**/*.{ts,js,tsx,jsx,json,py,java,cs,php,md}",
           "**/node_modules/**",
-          1000,
+          1000
         );
 
         const fileCount = files.length;
@@ -268,7 +268,7 @@ export class SqliteDatabaseService {
           } catch {
             return uri.fsPath;
           }
-        }),
+        })
       );
 
       const combinedString = fileStats.join("|");
@@ -296,10 +296,7 @@ export class SqliteDatabaseService {
   /**
    * Save codebase analysis to database
    */
-  async saveCodebaseAnalysis(
-    gitState: GitState,
-    analysisData: any,
-  ): Promise<void> {
+  async saveCodebaseAnalysis(gitState: GitState, analysisData: any): Promise<void> {
     if (!this.db) {
       throw new Error("Database not initialized");
     }
@@ -311,12 +308,7 @@ export class SqliteDatabaseService {
       this.db.run(
         `DELETE FROM codebase_snapshots 
          WHERE workspace_path = ? AND NOT (git_branch = ? AND git_commit_hash = ? AND git_diff_hash = ?)`,
-        [
-          gitState.workspacePath,
-          gitState.branch,
-          gitState.commitHash,
-          gitState.diffHash,
-        ],
+        [gitState.workspacePath, gitState.branch, gitState.commitHash, gitState.diffHash]
       );
 
       // Insert new snapshot
@@ -333,7 +325,7 @@ export class SqliteDatabaseService {
           gitState.fileCount,
           now,
           now,
-        ],
+        ]
       );
 
       // Clean up old snapshots (keep only latest 10 per workspace)
@@ -345,7 +337,7 @@ export class SqliteDatabaseService {
            ORDER BY created_at DESC 
            LIMIT 10
          ) AND workspace_path = ?`,
-        [gitState.workspacePath, gitState.workspacePath],
+        [gitState.workspacePath, gitState.workspacePath]
       );
 
       // Save to disk
@@ -361,16 +353,14 @@ export class SqliteDatabaseService {
   /**
    * Get cached codebase analysis if valid
    */
-  async getCachedCodebaseAnalysis(
-    gitState: GitState,
-  ): Promise<PersistentCodebaseAnalysis | null> {
+  async getCachedCodebaseAnalysis(gitState: GitState): Promise<PersistentCodebaseAnalysis | null> {
     if (!this.db) {
       throw new Error("Database not initialized");
     }
 
     try {
       this.logger.info(
-        `Looking for cached analysis for: workspace=${gitState.workspacePath}, branch=${gitState.branch}, diffHash=${gitState.diffHash}`,
+        `Looking for cached analysis for: workspace=${gitState.workspacePath}, branch=${gitState.branch}, diffHash=${gitState.diffHash}`
       );
 
       // First, let's see what's actually in the database
@@ -410,15 +400,13 @@ export class SqliteDatabaseService {
           `UPDATE codebase_snapshots 
            SET last_accessed = ? 
            WHERE id = ?`,
-          [new Date().toISOString(), snapshot.id],
+          [new Date().toISOString(), snapshot.id]
         );
 
         // Save to disk
         this.saveToDisk();
 
-        this.logger.info(
-          "Found valid cached codebase analysis with exact match",
-        );
+        this.logger.info("Found valid cached codebase analysis with exact match");
         return JSON.parse(snapshot.analysis_data);
       }
       stmt.free();
@@ -447,15 +435,13 @@ export class SqliteDatabaseService {
           `UPDATE codebase_snapshots 
            SET last_accessed = ? 
            WHERE id = ?`,
-          [new Date().toISOString(), snapshot.id],
+          [new Date().toISOString(), snapshot.id]
         );
 
         // Save to disk
         this.saveToDisk();
 
-        this.logger.info(
-          "Found valid cached codebase analysis with loose match (ignoring diff hash)",
-        );
+        this.logger.info("Found valid cached codebase analysis with loose match (ignoring diff hash)");
         return JSON.parse(snapshot.analysis_data);
       }
       looseStmt.free();
@@ -511,9 +497,7 @@ export class SqliteDatabaseService {
       }
 
       // Check if file count changed significantly (>10%)
-      const fileCountChange =
-        Math.abs(lastSnapshot.file_count - gitState.fileCount) /
-        lastSnapshot.file_count;
+      const fileCountChange = Math.abs(lastSnapshot.file_count - gitState.fileCount) / lastSnapshot.file_count;
       if (fileCountChange > 0.1) {
         return true;
       }
@@ -528,9 +512,7 @@ export class SqliteDatabaseService {
   /**
    * Clean up old snapshots
    */
-  async cleanupOldSnapshots(
-    maxAge: number = 7 * 24 * 60 * 60 * 1000,
-  ): Promise<void> {
+  async cleanupOldSnapshots(maxAge: number = 7 * 24 * 60 * 60 * 1000): Promise<void> {
     if (!this.db) {
       throw new Error("Database not initialized");
     }
@@ -539,9 +521,7 @@ export class SqliteDatabaseService {
       const cutoffDate = new Date(Date.now() - maxAge).toISOString();
 
       // Delete old snapshots
-      this.db.run(`DELETE FROM codebase_snapshots WHERE last_accessed < ?`, [
-        cutoffDate,
-      ]);
+      this.db.run(`DELETE FROM codebase_snapshots WHERE last_accessed < ?`, [cutoffDate]);
 
       // Save to disk
       this.saveToDisk();
@@ -609,6 +589,63 @@ export class SqliteDatabaseService {
         newestSnapshot: "",
         totalSize: 0,
       };
+    }
+  }
+
+  /**
+   * Execute SQL query that returns results (SELECT)
+   */
+  executeSql(query: string, params: any[] = []): any[] {
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+
+    try {
+      const stmt = this.db.prepare(query);
+      const results = stmt.getAsObject(params);
+      stmt.free();
+      return Array.isArray(results) ? results : [results];
+    } catch (error) {
+      this.logger.error(`SQL execution failed: ${query}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Execute SQL command that doesn't return results (INSERT, UPDATE, DELETE)
+   */
+  executeSqlCommand(query: string, params: any[] = []): { changes: number; lastInsertRowid: number } {
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+
+    try {
+      const stmt = this.db.prepare(query);
+      const result = stmt.run(params);
+      stmt.free();
+      return result;
+    } catch (error) {
+      this.logger.error(`SQL command execution failed: ${query}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Execute SQL query and get all results
+   */
+  executeSqlAll(query: string, params: any[] = []): any[] {
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+
+    try {
+      const stmt = this.db.prepare(query);
+      const results = stmt.all(params);
+      stmt.free();
+      return results;
+    } catch (error) {
+      this.logger.error(`SQL query execution failed: ${query}`, error);
+      throw error;
     }
   }
 
