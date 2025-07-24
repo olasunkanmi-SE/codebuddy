@@ -2,7 +2,7 @@ import { AgentState } from "../agents/interface";
 import { COMMON } from "../application/constant";
 import { GeminiLLMSnapShot } from "../llms/interface";
 import { FileStorage, IStorage } from "./file-storage";
-import { ChatHistoryWorker } from "./chat-history-worker";
+import { ChatHistoryWorker, ChatHistoryWorkerOperation } from "./chat-history-worker";
 
 export class AgentService {
   private static instance: AgentService;
@@ -22,9 +22,7 @@ export class AgentService {
   }
 
   async getState(agentId: string): Promise<AgentState | undefined> {
-    return this.storage.get<AgentState>(
-      `${COMMON.AGENT_STATE_PREFIX}_${agentId}`,
-    );
+    return this.storage.get<AgentState>(`${COMMON.AGENT_STATE_PREFIX}_${agentId}`);
   }
 
   async saveState(agentId: string, state: AgentState): Promise<void> {
@@ -36,19 +34,15 @@ export class AgentService {
       // Use the chat history worker for async operations
       const requestId = `get-${agentId}-${Date.now()}`;
       const history = await this.chatHistoryWorker.processRequest(
-        "GET_CHAT_HISTORY",
+        ChatHistoryWorkerOperation.GET_CHAT_HISTORY,
         { agentId },
-        requestId,
+        requestId
       );
       return history || [];
     } catch (error) {
       console.warn(`Failed to get chat history for agent ${agentId}:`, error);
       // Fallback to file storage for backward compatibility
-      return (
-        (await this.storage.get<any[]>(
-          `${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`,
-        )) || []
-      );
+      return (await this.storage.get<any[]>(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`)) || [];
     }
   }
 
@@ -58,23 +52,17 @@ export class AgentService {
       // Use the chat history worker for async operations
       const requestId = `save-${agentId}-${Date.now()}`;
       await this.chatHistoryWorker.processRequest(
-        "SAVE_CHAT_HISTORY",
+        ChatHistoryWorkerOperation.SAVE_CHAT_HISTORY,
         { agentId, history },
-        requestId,
+        requestId
       );
 
       // Also save to file storage for backward compatibility during transition
-      await this.storage.set(
-        `${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`,
-        history,
-      );
+      await this.storage.set(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`, history);
     } catch (error) {
       console.warn(`Failed to save chat history for agent ${agentId}:`, error);
       // Fallback to file storage only
-      await this.storage.set(
-        `${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`,
-        history,
-      );
+      await this.storage.set(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`, history);
     }
   }
 
@@ -86,9 +74,9 @@ export class AgentService {
       // Use the chat history worker for async operations
       const requestId = `clear-${agentId}-${Date.now()}`;
       await this.chatHistoryWorker.processRequest(
-        "CLEAR_CHAT_HISTORY",
+        ChatHistoryWorkerOperation.CLEAR_CHAT_HISTORY,
         { agentId },
-        requestId,
+        requestId
       );
 
       // Also clear from file storage for backward compatibility
@@ -111,15 +99,15 @@ export class AgentService {
       alias?: string;
       sessionId?: string;
       metadata?: any;
-    },
+    }
   ): Promise<void> {
     try {
       // Use the chat history worker for async operations
       const requestId = `add-${agentId}-${Date.now()}`;
       await this.chatHistoryWorker.processRequest(
-        "ADD_CHAT_MESSAGE",
+        ChatHistoryWorkerOperation.ADD_CHAT_MESSAGE,
         { agentId, message },
-        requestId,
+        requestId
       );
     } catch (error) {
       console.warn(`Failed to add chat message for agent ${agentId}:`, error);
@@ -129,24 +117,18 @@ export class AgentService {
   /**
    * Get recent chat history for an agent (optimized for performance)
    */
-  async getRecentChatHistory(
-    agentId: string,
-    limit: number = 50,
-  ): Promise<any[]> {
+  async getRecentChatHistory(agentId: string, limit: number = 50): Promise<any[]> {
     try {
       // Use the chat history worker for async operations
       const requestId = `recent-${agentId}-${Date.now()}`;
       const history = await this.chatHistoryWorker.processRequest(
-        "GET_RECENT_HISTORY",
+        ChatHistoryWorkerOperation.GET_RECENT_HISTORY,
         { agentId, config: { limit } },
-        requestId,
+        requestId
       );
       return history || [];
     } catch (error) {
-      console.warn(
-        `Failed to get recent chat history for agent ${agentId}:`,
-        error,
-      );
+      console.warn(`Failed to get recent chat history for agent ${agentId}:`, error);
       // Fallback to regular getChatHistory
       const fullHistory = await this.getChatHistory(agentId);
       return fullHistory.slice(-limit);
@@ -161,9 +143,9 @@ export class AgentService {
       // Use the chat history worker for async operations
       const requestId = `cleanup-${Date.now()}`;
       await this.chatHistoryWorker.processRequest(
-        "CLEANUP_OLD_HISTORY",
+        ChatHistoryWorkerOperation.CLEANUP_OLD_HISTORY,
         { agentId: "", config: { daysToKeep } },
-        requestId,
+        requestId
       );
     } catch (error) {
       console.warn("Failed to cleanup old chat history:", error);
@@ -171,15 +153,10 @@ export class AgentService {
   }
 
   async getSnapshot(agentId: string): Promise<GeminiLLMSnapShot | undefined> {
-    return this.storage.get<GeminiLLMSnapShot>(
-      `${COMMON.SNAPSHOT_PREFIX}_${agentId}`,
-    );
+    return this.storage.get<GeminiLLMSnapShot>(`${COMMON.SNAPSHOT_PREFIX}_${agentId}`);
   }
 
-  async saveSnapshot(
-    agentId: string,
-    snapshot: GeminiLLMSnapShot,
-  ): Promise<void> {
+  async saveSnapshot(agentId: string, snapshot: GeminiLLMSnapShot): Promise<void> {
     return this.storage.set(`${COMMON.SNAPSHOT_PREFIX}_${agentId}`, snapshot);
   }
 
@@ -188,15 +165,12 @@ export class AgentService {
     try {
       const requestId = `clear-agent-${agentId}-${Date.now()}`;
       await this.chatHistoryWorker.processRequest(
-        "CLEAR_CHAT_HISTORY",
+        ChatHistoryWorkerOperation.CLEAR_CHAT_HISTORY,
         { agentId },
-        requestId,
+        requestId
       );
     } catch (error) {
-      console.warn(
-        `Failed to clear chat history from SQLite for agent ${agentId}:`,
-        error,
-      );
+      console.warn(`Failed to clear chat history from SQLite for agent ${agentId}:`, error);
     }
 
     // Clear from file storage
