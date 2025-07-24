@@ -56,12 +56,9 @@ export class AgentService {
         { agentId, history },
         requestId
       );
-
-      // Also save to file storage for backward compatibility during transition
-      await this.storage.set(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`, history);
     } catch (error) {
       console.warn(`Failed to save chat history for agent ${agentId}:`, error);
-      // Fallback to file storage only
+      // Fallback to file storage only for catastrophic database failures
       await this.storage.set(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`, history);
     }
   }
@@ -78,12 +75,9 @@ export class AgentService {
         { agentId },
         requestId
       );
-
-      // Also clear from file storage for backward compatibility
-      await this.storage.delete(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`);
     } catch (error) {
       console.warn(`Failed to clear chat history for agent ${agentId}:`, error);
-      // Fallback to file storage only
+      // Fallback to file storage only for catastrophic database failures
       await this.storage.delete(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`);
     }
   }
@@ -161,7 +155,7 @@ export class AgentService {
   }
 
   async clearAgentData(agentId: string): Promise<void> {
-    // Clear chat history using worker
+    // Clear chat history using worker (primary storage)
     try {
       const requestId = `clear-agent-${agentId}-${Date.now()}`;
       await this.chatHistoryWorker.processRequest(
@@ -173,9 +167,23 @@ export class AgentService {
       console.warn(`Failed to clear chat history from SQLite for agent ${agentId}:`, error);
     }
 
-    // Clear from file storage
+    // Clear other agent data from file storage (not chat history - that's in SQLite now)
     await this.storage.delete(`${COMMON.AGENT_STATE_PREFIX}_${agentId}`);
-    await this.storage.delete(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`);
     await this.storage.delete(`${COMMON.SNAPSHOT_PREFIX}_${agentId}`);
+
+    // Only clear chat history from file storage if SQLite failed
+    try {
+      const hasHistoryInDb = await this.chatHistoryWorker.processRequest(
+        ChatHistoryWorkerOperation.GET_CHAT_HISTORY,
+        { agentId },
+        `check-${agentId}-${Date.now()}`
+      );
+      if (!hasHistoryInDb || hasHistoryInDb.length === 0) {
+        await this.storage.delete(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`);
+      }
+    } catch {
+      // If we can't check SQLite, clear file storage as fallback
+      await this.storage.delete(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`);
+    }
   }
 }

@@ -1,17 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import * as vscode from "vscode";
-import {
-  COMMON,
-  generativeAiModels,
-  GROQ_CONFIG,
-} from "../application/constant";
-import { IMessageInput } from "../llms/message";
+import { COMMON, generativeAiModels, GROQ_CONFIG } from "../application/constant";
+import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
-import {
-  createAnthropicClient,
-  getGenerativeAiModel,
-  getXGroKBaseURL,
-} from "../utils/utils";
+import { createAnthropicClient, getGenerativeAiModel, getXGroKBaseURL } from "../utils/utils";
 import { BaseWebViewProvider } from "./base";
 
 export class AnthropicWebViewProvider extends BaseWebViewProvider {
@@ -22,25 +14,37 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     apiKey: string,
     generativeAiModel: string,
     context: vscode.ExtensionContext,
-    protected baseUrl?: string,
+    protected baseUrl?: string
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.model = createAnthropicClient(this.apiKey, this.baseUrl);
   }
 
-  public async sendResponse(
-    response: string,
-    currentChat: string,
-  ): Promise<boolean | undefined> {
+  /**
+   * Override to update Anthropic-specific chatHistory array
+   */
+  protected async updateProviderChatHistory(history: any[]): Promise<void> {
+    try {
+      // Convert to Anthropic's IMessageInput format
+      this.chatHistory = history.map((msg: any) =>
+        Message.of({
+          role: msg.role === "user" ? "user" : "assistant",
+          content: msg.content,
+        })
+      );
+
+      this.logger.debug(`Updated Anthropic chatHistory array with ${this.chatHistory.length} messages`);
+    } catch (error) {
+      this.logger.warn("Failed to update Anthropic chat history array:", error);
+      this.chatHistory = []; // Reset to empty on error
+    }
+  }
+
+  public async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
-        await this.modelChatHistory(
-          "assistant",
-          response,
-          "anthropic",
-          "agentId",
-        );
+        await this.modelChatHistory("assistant", response, "anthropic", "agentId");
       } else {
         await this.modelChatHistory("user", response, "anthropic", "agentId");
       }
@@ -53,10 +57,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(
-    message: string,
-    metaData?: any,
-  ): Promise<string | undefined> {
+  async generateResponse(message: string, metaData?: any): Promise<string | undefined> {
     try {
       let context: string | undefined;
       if (metaData?.context.length > 0) {
@@ -71,7 +72,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         "user",
         `${message} \n context: ${context}`,
         "anthropic",
-        "agentId",
+        "agentId"
       );
 
       const chatCompletion = await this.model.messages.create({
@@ -84,19 +85,14 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       let response = "";
       if ("text" in firstContent && typeof firstContent.text === "string") {
         response = firstContent.text;
-      } else if (
-        "content" in firstContent &&
-        typeof (firstContent as any).content === "string"
-      ) {
+      } else if ("content" in firstContent && typeof (firstContent as any).content === "string") {
         response = (firstContent as any).content;
       }
       return response;
     } catch (error) {
       console.error(error);
       Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
-      );
+      vscode.window.showErrorMessage("Model not responding, please resend your question");
     }
   }
 

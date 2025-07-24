@@ -12,12 +12,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
   readonly metaData?: Record<string, any>;
   private readonly gemini: GeminiLLM;
 
-  constructor(
-    extensionUri: vscode.Uri,
-    apiKey: string,
-    generativeAiModel: string,
-    context: vscode.ExtensionContext,
-  ) {
+  constructor(extensionUri: vscode.Uri, apiKey: string, generativeAiModel: string, context: vscode.ExtensionContext) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.gemini = GeminiLLM.getInstance({
       apiKey: this.apiKey,
@@ -27,21 +22,32 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     this.model = this.gemini.getModel();
   }
 
-  async sendResponse(
-    response: string,
-    currentChat: string,
-  ): Promise<boolean | undefined> {
+  /**
+   * Override to update Gemini-specific chatHistory array
+   */
+  protected async updateProviderChatHistory(history: any[]): Promise<void> {
+    try {
+      // Convert to Gemini's IMessageInput format
+      this.chatHistory = history.map((msg: any) => ({
+        role: msg.role === "user" ? "user" : "model",
+        content: msg.content,
+        timestamp: msg.timestamp,
+        metadata: msg.metadata,
+      }));
+
+      this.logger.debug(`Updated Gemini chatHistory array with ${this.chatHistory.length} messages`);
+    } catch (error) {
+      this.logger.warn("Failed to update Gemini chat history array:", error);
+      this.chatHistory = []; // Reset to empty on error
+    }
+  }
+
+  async sendResponse(response: string, currentChat: string): Promise<boolean | undefined> {
     try {
       // Log response information for debugging
-      console.log(
-        `[DEBUG] Response length: ${response?.length || 0} characters`,
-      );
-      console.log(
-        `[DEBUG] Response ends with: "${response?.slice(-50) || "empty"}"`,
-      );
-      console.log(
-        `[DEBUG] Response contains ** count: ${(response?.match(/\*\*/g) || []).length}`,
-      );
+      console.log(`[DEBUG] Response length: ${response?.length || 0} characters`);
+      console.log(`[DEBUG] Response ends with: "${response?.slice(-50) || "empty"}"`);
+      console.log(`[DEBUG] Response contains ** count: ${(response?.match(/\*\*/g) || []).length}`);
 
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
@@ -59,14 +65,9 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     }
   }
 
-  async generateResponse(
-    message: string,
-    metaData?: any,
-  ): Promise<string | undefined> {
+  async generateResponse(message: string, metaData?: any): Promise<string | undefined> {
     try {
-      console.log(
-        `[DEBUG] Generating response for message length: ${message?.length || 0}`,
-      );
+      console.log(`[DEBUG] Generating response for message length: ${message?.length || 0}`);
 
       let context: string | undefined;
       if (metaData?.context.length > 0) {
@@ -74,20 +75,11 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       }
       if (metaData?.mode === "Agent") {
         this.orchestrator.publish("onThinking", "...thinking");
-        await this.gemini.run(
-          context
-            ? JSON.stringify(`${message} \n context: ${context}`)
-            : JSON.stringify(message),
-        );
+        await this.gemini.run(context ? JSON.stringify(`${message} \n context: ${context}`) : JSON.stringify(message));
         return;
       }
 
-      let chatHistory = await this.modelChatHistory(
-        "user",
-        `${message} \n context: ${context}`,
-        "gemini",
-        "agentId",
-      );
+      let chatHistory = await this.modelChatHistory("user", `${message} \n context: ${context}`, "gemini", "agentId");
 
       const chat = this.model.startChat({
         history: [...chatHistory],
@@ -98,12 +90,8 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       const response = result.response;
       const responseText = response.text();
 
-      console.log(
-        `[DEBUG] Received response length: ${responseText?.length || 0} characters`,
-      );
-      console.log(
-        `[DEBUG] Response ends with: "${responseText?.slice(-50) || "empty"}"`,
-      );
+      console.log(`[DEBUG] Received response length: ${responseText?.length || 0} characters`);
+      console.log(`[DEBUG] Response ends with: "${responseText?.slice(-50) || "empty"}"`);
 
       // Check if response seems incomplete (ends with incomplete markdown or abruptly)
       const unclosedBoldRegex = /\*\*[^*]*$/;
@@ -129,9 +117,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
 
       if (seemsIncomplete) {
         console.warn(`[DEBUG] Response seems incomplete, attempting retry...`);
-        console.warn(
-          `[DEBUG] Problematic ending: "${responseText?.slice(-100)}"`,
-        );
+        console.warn(`[DEBUG] Problematic ending: "${responseText?.slice(-100)}"`);
 
         try {
           // Try a fresh chat session for retry to avoid context issues
@@ -146,21 +132,13 @@ IMPORTANT: Make sure your response is complete and doesn't cut off mid-sentence 
           const retryResult = await retryChat.sendMessage(retryPrompt);
           const retryResponse = retryResult.response.text();
 
-          console.log(
-            `[DEBUG] Retry response length: ${retryResponse?.length || 0} characters`,
-          );
-          console.log(
-            `[DEBUG] Retry response ends with: "${retryResponse?.slice(-50) || "empty"}"`,
-          );
+          console.log(`[DEBUG] Retry response length: ${retryResponse?.length || 0} characters`);
+          console.log(`[DEBUG] Retry response ends with: "${retryResponse?.slice(-50) || "empty"}"`);
 
           // If retry is also incomplete, return the longer of the two
-          const retryIncomplete =
-            retryResponse &&
-            incompletePatterns.some((pattern) => pattern.exec(retryResponse));
+          const retryIncomplete = retryResponse && incompletePatterns.some((pattern) => pattern.exec(retryResponse));
           if (retryIncomplete && responseText.length > retryResponse.length) {
-            console.warn(
-              `[DEBUG] Retry also incomplete, returning original response`,
-            );
+            console.warn(`[DEBUG] Retry also incomplete, returning original response`);
             return responseText;
           }
 
@@ -175,9 +153,7 @@ IMPORTANT: Make sure your response is complete and doesn't cut off mid-sentence 
     } catch (error) {
       console.error(`[DEBUG] Error in generateResponse:`, error);
       Memory.set(COMMON.GEMINI_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
-      );
+      vscode.window.showErrorMessage("Model not responding, please resend your question");
       console.error(error);
       return;
     }
