@@ -1,9 +1,13 @@
-import { dbManager } from "./db-manager";
-
+/**
+ * Simple in-memory chat history repository
+ * This replaces the database-dependent implementation for better maintainability
+ */
 export class ChatHistoryRepository {
   private static instance: ChatHistoryRepository;
+  private readonly historyCache: Map<string, any[]> = new Map();
+
   private constructor() {
-    this.ensureTable();
+    // No database setup needed for in-memory implementation
   }
 
   public static getInstance(): ChatHistoryRepository {
@@ -13,38 +17,22 @@ export class ChatHistoryRepository {
     return ChatHistoryRepository.instance;
   }
 
-  private ensureTable() {
-    dbManager.run(`CREATE TABLE IF NOT EXISTS chat_history (
-      agent_id TEXT PRIMARY KEY,
-      history TEXT
-    )`);
-  }
-
   public get(agentId: string): any[] {
-    const row = dbManager.get(
-      `SELECT history FROM chat_history WHERE agent_id = ?`,
-      agentId,
-    ) as { history?: string } | undefined;
-    if (row?.history) {
-      try {
-        return JSON.parse(row.history);
-      } catch {
-        return [];
-      }
-    }
-    return [];
+    return this.historyCache.get(agentId) || [];
   }
 
   public set(agentId: string, history: any[]): void {
-    dbManager.run(
-      `INSERT INTO chat_history (agent_id, history) VALUES (?, ?)
-        ON CONFLICT(agent_id) DO UPDATE SET history=excluded.history`,
-      agentId,
-      JSON.stringify(history),
-    );
+    this.historyCache.set(agentId, [...history]); // Create a copy to avoid mutations
   }
 
   public clear(agentId: string): void {
-    dbManager.run(`DELETE FROM chat_history WHERE agent_id = ?`, agentId);
+    this.historyCache.delete(agentId);
+  }
+
+  /**
+   * Clear all chat history (useful for cleanup)
+   */
+  public clearAll(): void {
+    this.historyCache.clear();
   }
 }

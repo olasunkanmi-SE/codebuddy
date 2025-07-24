@@ -162,6 +162,12 @@ export class SqliteDatabaseService {
       ON codebase_snapshots (last_accessed)
     `);
 
+    // Composite index for workspace_path + git_branch (for loose cache lookups)
+    this.db.run(`
+      CREATE INDEX IF NOT EXISTS idx_workspace_branch 
+      ON codebase_snapshots (workspace_path, git_branch)
+    `);
+
     this.logger.debug("SQLite database tables and indexes created");
 
     // Save the database to disk

@@ -12,15 +12,10 @@ export const architecturalRecommendationCommand = async () => {
   try {
     await persistentCodebaseService.initialize();
   } catch (error) {
-    console.error("Failed to initialize codebase analysis service:", error);
-    let errorMessage = "Failed to initialize codebase analysis service.";
-
-    if (error instanceof Error) {
-      errorMessage += ` Error: ${error.message}`;
-      console.error("Error stack:", error.stack);
-    }
-
-    vscode.window.showErrorMessage(errorMessage);
+    const errorMessage = "Failed to initialize codebase analysis service.";
+    vscode.window.showErrorMessage(
+      `${errorMessage} ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
     return;
   }
 

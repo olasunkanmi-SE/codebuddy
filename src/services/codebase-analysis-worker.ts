@@ -19,6 +19,8 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
+import { AnalyzerFactory } from "./analyzers/analyzer-factory";
+import { AnalysisResult as FileAnalysisResult } from "./analyzers/index";
 
 /**
  * Message types for communication between main thread and worker
@@ -30,11 +32,7 @@ import * as path from "path";
  */
 export interface WorkerMessage {
   /** Message type identifier */
-  type:
-    | "ANALYZE_CODEBASE"
-    | "ANALYSIS_COMPLETE"
-    | "ANALYSIS_ERROR"
-    | "ANALYSIS_PROGRESS";
+  type: "ANALYZE_CODEBASE" | "ANALYSIS_COMPLETE" | "ANALYSIS_ERROR" | "ANALYSIS_PROGRESS";
   /** Message payload data */
   payload?: any;
   /** Error message if applicable */
@@ -142,8 +140,11 @@ export class CodebaseAnalysisWorker {
   private isRunning = false;
 
   /** Flag indicating if current analysis should be cancelled */
-  private shouldCancel = false;
+  private readonly shouldCancel = false;
   private currentCancellationToken?: vscode.CancellationToken;
+
+  /** Factory for creating file-specific analyzers */
+  private readonly analyzerFactory = new AnalyzerFactory();
 
   /**
    * Start codebase analysis in a "background" process
@@ -151,12 +152,8 @@ export class CodebaseAnalysisWorker {
    */
   async analyzeCodebase(
     data: CodebaseAnalysisWorkerData,
-    onProgress: (progress: {
-      current: number;
-      total: number;
-      message: string;
-    }) => void,
-    cancellationToken?: vscode.CancellationToken,
+    onProgress: (progress: { current: number; total: number; message: string }) => void,
+    cancellationToken?: vscode.CancellationToken
   ): Promise<AnalysisResult> {
     if (this.isRunning) {
       throw new Error("Analysis already in progress");
@@ -179,11 +176,7 @@ export class CodebaseAnalysisWorker {
    */
   private async performAnalysis(
     data: CodebaseAnalysisWorkerData,
-    onProgress: (progress: {
-      current: number;
-      total: number;
-      message: string;
-    }) => void,
+    onProgress: (progress: { current: number; total: number; message: string }) => void
   ): Promise<AnalysisResult> {
     onProgress({
       current: 0,
@@ -223,10 +216,7 @@ export class CodebaseAnalysisWorker {
     });
 
     // Step 5: Analyze database schema
-    const databaseSchema = await this.analyzeDatabaseSchema(
-      files,
-      analysisResults.fileContents,
-    );
+    const databaseSchema = await this.analyzeDatabaseSchema(files, analysisResults.fileContents);
 
     onProgress({
       current: 90,
@@ -235,16 +225,13 @@ export class CodebaseAnalysisWorker {
     });
 
     // Step 6: Build domain relationships
-    const domainRelationships = this.buildDomainRelationships(
-      analysisResults.dataModels,
-      analysisResults.apiEndpoints,
-    );
+    const domainRelationships = this.buildDomainRelationships(analysisResults.dataModels, analysisResults.apiEndpoints);
 
     // Step 7: Calculate complexity
     const complexity = this.calculateComplexity(
       files.length,
       analysisResults.totalLines,
-      Object.keys(dependencies).length,
+      Object.keys(dependencies).length
     );
 
     onProgress({ current: 100, total: 100, message: "Analysis complete!" });
@@ -281,11 +268,7 @@ export class CodebaseAnalysisWorker {
    */
   private async analyzeFileContents(
     files: string[],
-    onProgress: (progress: {
-      current: number;
-      total: number;
-      message: string;
-    }) => void,
+    onProgress: (progress: { current: number; total: number; message: string }) => void
   ): Promise<{
     fileContents: Map<string, string>;
     apiEndpoints: any[];
@@ -320,9 +303,14 @@ export class CodebaseAnalysisWorker {
         const ext = path.extname(file).toLowerCase();
         languageDistribution[ext] = (languageDistribution[ext] || 0) + 1;
 
-        // Collect endpoints and models
+        // Collect endpoints and models from legacy analysis
         apiEndpoints.push(...fileAnalysis.endpoints);
         dataModels.push(...fileAnalysis.models);
+
+        // Process structured analysis results
+        if (fileAnalysis.analysis) {
+          this.processStructuredAnalysis(fileAnalysis.analysis, file, dataModels);
+        }
 
         // Yield control to prevent blocking
         if (i % 10 === 0) {
@@ -350,37 +338,135 @@ export class CodebaseAnalysisWorker {
     lines: number;
     endpoints: any[];
     models: any[];
+    analysis?: FileAnalysisResult;
   }> {
-    const content = await fs.promises.readFile(filePath, "utf-8");
-    const lines = content.split("\n").length;
+    try {
+      const content = await fs.promises.readFile(filePath, "utf-8");
+      const lines = content.split("\n").length;
 
-    // Extract API endpoints and data models
-    const endpoints = this.extractApiEndpoints(filePath, content);
-    const models = this.extractDataModels(filePath, content);
+      // Use analyzer factory for structured analysis
+      let analysis: FileAnalysisResult | undefined;
+      try {
+        const analyzer = this.analyzerFactory.getAnalyzer(filePath);
+        if (analyzer) {
+          analysis = analyzer.analyze(content, filePath);
+        }
+      } catch (error) {
+        console.warn(`Failed to run structured analysis on ${filePath}:`, error);
+      }
 
-    return {
-      content,
-      lines,
-      endpoints,
-      models,
-    };
+      // Extract API endpoints and data models with error handling
+      let endpoints: any[] = [];
+      let models: any[] = [];
+
+      try {
+        endpoints = this.extractApiEndpoints(filePath, content);
+      } catch (error) {
+        console.warn(`Failed to extract API endpoints from ${filePath}:`, error);
+      }
+
+      try {
+        models = this.extractDataModels(filePath, content);
+      } catch (error) {
+        console.warn(`Failed to extract data models from ${filePath}:`, error);
+      }
+
+      return {
+        content,
+        lines,
+        endpoints,
+        models,
+        analysis,
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes("ENOENT")) {
+          throw new Error(`File not found: ${filePath}`);
+        } else if (error.message.includes("EACCES")) {
+          throw new Error(`Permission denied reading file: ${filePath}`);
+        } else if (error.message.includes("EISDIR")) {
+          throw new Error(`Expected file but found directory: ${filePath}`);
+        }
+      }
+      throw new Error(
+        `Failed to analyze file ${filePath}: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  }
+
+  /**
+   * Process structured analysis results from file analyzers
+   */
+  private processStructuredAnalysis(analysis: FileAnalysisResult, filePath: string, dataModels: any[]): void {
+    // Extract classes as data models if they have properties
+    if (analysis.classes) {
+      for (const classInfo of analysis.classes) {
+        dataModels.push({
+          name: classInfo.name,
+          type: "class",
+          file: filePath,
+          properties: classInfo.methods || [],
+          extends: classInfo.extends,
+          implements: classInfo.implements || [],
+        });
+      }
+    }
+
+    // Extract React components as models
+    if (analysis.components) {
+      for (const component of analysis.components) {
+        dataModels.push({
+          name: component.name,
+          type: "react_component",
+          file: filePath,
+          properties: [],
+        });
+      }
+    }
+
+    // Extract functions as potential API endpoints or utilities
+    if (analysis.functions) {
+      for (const func of analysis.functions) {
+        // Only include functions that might be API endpoints
+        if (this.isPotentialApiEndpoint(func.name, filePath)) {
+          dataModels.push({
+            name: func.name,
+            type: "function",
+            file: filePath,
+            properties: [],
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if a function might be an API endpoint
+   */
+  private isPotentialApiEndpoint(functionName: string, filePath: string): boolean {
+    const apiKeywords = ["get", "post", "put", "delete", "patch", "handler", "controller", "route", "api"];
+    const lowerName = functionName.toLowerCase();
+    const lowerPath = filePath.toLowerCase();
+
+    return apiKeywords.some(
+      (keyword) =>
+        lowerName.includes(keyword) ||
+        lowerPath.includes(keyword) ||
+        lowerPath.includes("api") ||
+        lowerPath.includes("route") ||
+        lowerPath.includes("controller")
+    );
   }
 
   /**
    * Find all relevant files in the workspace
    */
-  private async findRelevantFiles(
-    data: CodebaseAnalysisWorkerData,
-  ): Promise<string[]> {
+  private async findRelevantFiles(data: CodebaseAnalysisWorkerData): Promise<string[]> {
     const files: string[] = [];
 
     for (const pattern of data.filePatterns) {
       try {
-        const uris = await vscode.workspace.findFiles(
-          pattern,
-          `{${data.excludePatterns.join(",")}}`,
-          data.maxFiles,
-        );
+        const uris = await vscode.workspace.findFiles(pattern, `{${data.excludePatterns.join(",")}}`, data.maxFiles);
 
         files.push(...uris.map((uri) => uri.fsPath));
       } catch (error) {
@@ -395,18 +481,14 @@ export class CodebaseAnalysisWorker {
   /**
    * Analyze package.json and other dependency files
    */
-  private async analyzeDependencies(
-    workspacePath: string,
-  ): Promise<Record<string, string>> {
+  private async analyzeDependencies(workspacePath: string): Promise<Record<string, string>> {
     const dependencies: Record<string, string> = {};
 
     // Analyze package.json
     const packageJsonPath = path.join(workspacePath, "package.json");
     if (fs.existsSync(packageJsonPath)) {
       try {
-        const packageJson = JSON.parse(
-          await fs.promises.readFile(packageJsonPath, "utf-8"),
-        );
+        const packageJson = JSON.parse(await fs.promises.readFile(packageJsonPath, "utf-8"));
         Object.assign(dependencies, packageJson.dependencies || {});
         Object.assign(dependencies, packageJson.devDependencies || {});
       } catch (error) {
@@ -419,9 +501,7 @@ export class CodebaseAnalysisWorker {
     if (fs.existsSync(requirementsPath)) {
       try {
         const content = await fs.promises.readFile(requirementsPath, "utf-8");
-        const lines = content
-          .split("\n")
-          .filter((line) => line.trim() && !line.startsWith("#"));
+        const lines = content.split("\n").filter((line) => line.trim() && !line.startsWith("#"));
         for (const line of lines) {
           const [name, version] = line.split("==");
           if (name && version) {
@@ -439,10 +519,7 @@ export class CodebaseAnalysisWorker {
   /**
    * Detect frameworks based on files and dependencies
    */
-  private async detectFrameworks(
-    files: string[],
-    dependencies: Record<string, string>,
-  ): Promise<string[]> {
+  private async detectFrameworks(files: string[], dependencies: Record<string, string>): Promise<string[]> {
     const frameworks: Set<string> = new Set();
 
     // Framework detection based on dependencies
@@ -564,26 +641,37 @@ export class CodebaseAnalysisWorker {
     const properties: any[] = [];
     const lines = content.split("\n");
 
+    // Cache regex patterns to avoid recreation in loop
+    const propertyRegex = /(\w+)\s*\?\s*:\s*([^;,]+)/g;
+    const requiredRegex = /(\w+)\s*:\s*([^;,]+)/g;
+
     for (const line of lines) {
       const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith("//") && !trimmed.startsWith("/*")) {
-        const propMatch = /(\w+)\s*\?\s*:\s*([^;,]+)/g.exec(trimmed);
-        if (propMatch) {
-          properties.push({
-            name: propMatch[1],
-            type: propMatch[2].trim(),
-            optional: true,
-          });
-        } else {
-          const requiredMatch = /(\w+)\s*:\s*([^;,]+)/g.exec(trimmed);
-          if (requiredMatch) {
-            properties.push({
-              name: requiredMatch[1],
-              type: requiredMatch[2].trim(),
-              optional: false,
-            });
-          }
-        }
+      if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+        continue;
+      }
+
+      // Reset regex lastIndex for proper matching
+      propertyRegex.lastIndex = 0;
+      requiredRegex.lastIndex = 0;
+
+      let match = propertyRegex.exec(trimmed);
+      if (match) {
+        properties.push({
+          name: match[1],
+          type: match[2].trim(),
+          optional: true,
+        });
+        continue;
+      }
+
+      match = requiredRegex.exec(trimmed);
+      if (match) {
+        properties.push({
+          name: match[1],
+          type: match[2].trim(),
+          optional: false,
+        });
       }
     }
 
@@ -593,10 +681,7 @@ export class CodebaseAnalysisWorker {
   /**
    * Analyze database schema from files
    */
-  private async analyzeDatabaseSchema(
-    files: string[],
-    fileContents: Map<string, string>,
-  ): Promise<any> {
+  private async analyzeDatabaseSchema(files: string[], fileContents: Map<string, string>): Promise<any> {
     const schema = {
       tables: [] as any[],
       relationships: [] as any[],
@@ -653,10 +738,7 @@ export class CodebaseAnalysisWorker {
   /**
    * Build domain relationships between entities
    */
-  private buildDomainRelationships(
-    dataModels: any[],
-    apiEndpoints: any[],
-  ): any[] {
+  private buildDomainRelationships(dataModels: any[], apiEndpoints: any[]): any[] {
     const relationships: any[] = [];
 
     // Simple relationship detection based on naming patterns
@@ -668,8 +750,7 @@ export class CodebaseAnalysisWorker {
         for (const otherModel of dataModels) {
           if (
             otherModel.name !== model.name &&
-            (prop.type.includes(otherModel.name) ||
-              prop.name.toLowerCase().includes(otherModel.name.toLowerCase()))
+            (prop.type.includes(otherModel.name) || prop.name.toLowerCase().includes(otherModel.name.toLowerCase()))
           ) {
             relatedEntities.push(otherModel.name);
           }
@@ -693,10 +774,9 @@ export class CodebaseAnalysisWorker {
   private calculateComplexity(
     fileCount: number,
     lineCount: number,
-    dependencyCount: number,
+    dependencyCount: number
   ): "low" | "medium" | "high" {
-    const complexityScore =
-      fileCount * 0.3 + lineCount * 0.0001 + dependencyCount * 0.5;
+    const complexityScore = fileCount * 0.3 + lineCount * 0.0001 + dependencyCount * 0.5;
 
     if (complexityScore > 100) return "high";
     if (complexityScore > 50) return "medium";
