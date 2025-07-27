@@ -32,6 +32,28 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     this.client = this.deepseekLLM.getModel();
   }
 
+  /**
+   * Override to update Deepseek-specific chatHistory array
+   */
+  protected async updateProviderChatHistory(history: any[]): Promise<void> {
+    try {
+      // Convert to Deepseek's IMessageInput format
+      this.chatHistory = history.map((msg: any) =>
+        Message.of({
+          role: msg.role === "user" ? "user" : "assistant",
+          content: msg.content,
+        }),
+      );
+
+      this.logger.debug(
+        `Updated Deepseek chatHistory array with ${this.chatHistory.length} messages`,
+      );
+    } catch (error) {
+      this.logger.warn("Failed to update Deepseek chat history array:", error);
+      this.chatHistory = []; // Reset to empty on error
+    }
+  }
+
   public async sendResponse(
     response: string,
     currentChat: string,
