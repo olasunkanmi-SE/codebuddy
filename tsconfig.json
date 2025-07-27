@@ -5,11 +5,16 @@
     "outDir": "out",
     "lib": ["ESNext"],
     "skipLibCheck": true,
-    "sourceMap": true,
+    "sourceMap": false,
+    "inlineSourceMap": true,
+    "inlineSources": true,
     "rootDir": "src",
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "strict": true /* enable all strict type-checking options */
+    "strict": true /* enable all strict type-checking options */,
+    "declaration": false,
+    "removeComments": false,
+    "preserveConstEnums": true
     /* Additional Checks */
     // "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */
     // "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */

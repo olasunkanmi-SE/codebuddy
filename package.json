@@ -28,6 +28,7 @@
     "Snippets"
   ],
   "activationEvents": [
+    "*",
     "onLanguage:javascript",
     "onLanguage:typescript"
   ],
@@ -40,7 +41,7 @@
     "productivity"
   ],
   "homepage": "https://github.com/olasunkanmi-SE/codebuddy#readme",
-  "main": "./dist/extension.js",
+  "main": "./out/extension.js",
   "contributes": {
     "views": {
       "codeBuddy-view-container": [
@@ -309,7 +310,8 @@
     "dev:webview": "cd webviewUi && npm run dev",
     "build:webview": "cd webviewUi && npm run build",
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && npm run copy-wasm",
+    "copy-wasm": "mkdir -p out/services && cp dist/sql-wasm.wasm out/services/sql-wasm.wasm 2>/dev/null || echo 'WASM file copy skipped'",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",

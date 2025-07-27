@@ -1,20 +1,44 @@
 // See https://go.microsoft.com/fwlink/?LinkId=733558
 // for the documentation about the tasks.json format
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"type": "npm",
-			"script": "watch",
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			}
-		}
-	]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "compile",
+      "problemMatcher": "$tsc",
+      "group": "build",
+      "label": "npm: compile",
+      "detail": "Compile TypeScript for debugging"
+    },
+    {
+      "label": "compile-with-wasm",
+      "type": "shell",
+      "command": "npm run compile && mkdir -p out/services && cp dist/sql-wasm.wasm out/services/sql-wasm.wasm",
+      "group": "build",
+      "detail": "Compile TypeScript and copy WASM file",
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "clean-and-compile",
+      "type": "shell",
+      "command": "rm -rf out && npm run compile && mkdir -p out/services && cp dist/sql-wasm.wasm out/services/sql-wasm.wasm",
+      "group": "build",
+      "detail": "Clean output directory, recompile, and copy WASM file",
+      "problemMatcher": "$tsc"
+    },
+    {
+      "type": "npm",
+      "script": "watch",
+      "problemMatcher": "$tsc-watch",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
 }
