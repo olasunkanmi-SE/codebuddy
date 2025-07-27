@@ -1,7 +1,8 @@
 import { FileAnalyzer, AnalysisResult } from "./index";
 
 export class PythonAnalyzer implements FileAnalyzer {
-  private static readonly importRegex = /(?:from\s+([^\s]+)\s+import|import\s+([^\s,]+))/gi;
+  private static readonly importRegex =
+    /(?:from\s+([^\s]+)\s+import|import\s+([^\s,]+))/gi;
   private static readonly classRegex = /class\s+(\w+)(?:\([^)]*\))?\s*:/gi;
   private static readonly functionRegex = /def\s+(\w+)\s*\([^)]*\)\s*:/gi;
 

@@ -14,7 +14,8 @@ async function shouldRefreshAnalysis(summary: any): Promise<boolean> {
 
   if (summary.lastAnalysis) {
     const lastAnalysisDate = new Date(summary.lastAnalysis);
-    const hoursSinceAnalysis = (Date.now() - lastAnalysisDate.getTime()) / (1000 * 60 * 60);
+    const hoursSinceAnalysis =
+      (Date.now() - lastAnalysisDate.getTime()) / (1000 * 60 * 60);
     return hoursSinceAnalysis > 24;
   }
 
@@ -24,26 +25,29 @@ async function shouldRefreshAnalysis(summary: any): Promise<boolean> {
 /**
  * Prompts user for cache refresh decision when analysis is stale
  */
-async function getUserCacheDecision(summary: any): Promise<"use" | "refresh" | "cancel"> {
+async function getUserCacheDecision(
+  summary: any,
+): Promise<"use" | "refresh" | "cancel"> {
   if (!summary.hasCache) {
     const choice = await vscode.window.showInformationMessage(
       "No cached analysis found. This will take some time to analyze your codebase.",
       "Analyze Now",
-      "Cancel"
+      "Cancel",
     );
     return choice === "Analyze Now" ? "refresh" : "cancel";
   }
 
   if (summary.lastAnalysis) {
     const lastAnalysisDate = new Date(summary.lastAnalysis);
-    const hoursSinceAnalysis = (Date.now() - lastAnalysisDate.getTime()) / (1000 * 60 * 60);
+    const hoursSinceAnalysis =
+      (Date.now() - lastAnalysisDate.getTime()) / (1000 * 60 * 60);
 
     if (hoursSinceAnalysis > 24) {
       const choice = await vscode.window.showInformationMessage(
         `Cached analysis is ${Math.round(hoursSinceAnalysis)} hours old. Would you like to refresh it?`,
         "Use Cache",
         "Refresh Analysis",
-        "Cancel"
+        "Cancel",
       );
 
       if (choice === "Cancel") return "cancel";
@@ -55,14 +59,17 @@ async function getUserCacheDecision(summary: any): Promise<"use" | "refresh" | "
 }
 
 export async function architecturalRecommendationCommand(): Promise<void> {
-  const persistentCodebaseService = PersistentCodebaseUnderstandingService.getInstance();
+  const persistentCodebaseService =
+    PersistentCodebaseUnderstandingService.getInstance();
 
   // Initialize the service if not already done
   try {
     await persistentCodebaseService.initialize();
   } catch (error) {
     const errorMessage = "Failed to initialize codebase analysis service.";
-    vscode.window.showErrorMessage(`${errorMessage} ${error instanceof Error ? error.message : "Unknown error"}`);
+    vscode.window.showErrorMessage(
+      `${errorMessage} ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
     return;
   }
 
@@ -124,8 +131,12 @@ export async function architecturalRecommendationCommand(): Promise<void> {
 
         // Create context from persistent analysis with sanitization
         const context = createContextFromAnalysis(analysis);
-        const sanitizedContext = context.replace(/`/g, "\\`").replace(/\${/g, "\\${");
-        const sanitizedQuestion = question.replace(/`/g, "\\`").replace(/\${/g, "\\${");
+        const sanitizedContext = context
+          .replace(/`/g, "\\`")
+          .replace(/\${/g, "\\${");
+        const sanitizedQuestion = question
+          .replace(/`/g, "\\`")
+          .replace(/\${/g, "\\${");
 
         if (token.isCancellationRequested) {
           return;
@@ -179,14 +190,20 @@ ${sanitizedQuestion}
         progress.report({ increment: 90 });
 
         // Sanitize the LLM output before displaying in webview
-        const sanitizedContent = LLMOutputSanitizer.sanitizeLLMOutput(result, false);
+        const sanitizedContent = LLMOutputSanitizer.sanitizeLLMOutput(
+          result,
+          false,
+        );
 
         // Format the content to HTML with markdown rendering
         let formattedContent: string;
         try {
           formattedContent = formatText(sanitizedContent);
         } catch (error) {
-          console.warn("Markdown parsing failed, falling back to plain text:", error);
+          console.warn(
+            "Markdown parsing failed, falling back to plain text:",
+            error,
+          );
           // Fallback to plain text if markdown parsing fails
           formattedContent = `<pre>${LLMOutputSanitizer.sanitizeText(sanitizedContent)}</pre>`;
         }
@@ -200,7 +217,7 @@ ${sanitizedQuestion}
           {
             enableScripts: false, // Disable scripts for security
             localResourceRoots: [], // No local resources needed
-          }
+          },
         );
 
         // Create secure HTML wrapper with proper CSP
@@ -269,10 +286,10 @@ ${sanitizedQuestion}
       } catch (error) {
         console.error("Error in architectural recommendation:", error);
         vscode.window.showErrorMessage(
-          `Failed to analyze codebase: ${error instanceof Error ? error.message : "Unknown error"}`
+          `Failed to analyze codebase: ${error instanceof Error ? error.message : "Unknown error"}`,
         );
       }
-    }
+    },
   );
 }
 
@@ -305,7 +322,10 @@ function createContextFromAnalysis(analysis: any): string {
     analysis.apiEndpoints.length > 0
       ? analysis.apiEndpoints
           .slice(0, 15) // Limit endpoints
-          .map((endpoint: any) => `- ${endpoint.method} ${endpoint.path} (${endpoint.file})`)
+          .map(
+            (endpoint: any) =>
+              `- ${endpoint.method} ${endpoint.path} (${endpoint.file})`,
+          )
           .join("\n")
       : "No API endpoints detected",
     ``,
@@ -313,7 +333,9 @@ function createContextFromAnalysis(analysis: any): string {
     analysis.dataModels.length > 0
       ? analysis.dataModels
           .slice(0, 10) // Limit models
-          .map((model: any) => `- ${model.name} (${model.type}) - ${model.file}`)
+          .map(
+            (model: any) => `- ${model.name} (${model.type}) - ${model.file}`,
+          )
           .join("\n")
       : "No data models detected",
     ``,
@@ -321,7 +343,10 @@ function createContextFromAnalysis(analysis: any): string {
     analysis.files.length > 0
       ? analysis.files
           .slice(0, 30) // Limit files shown
-          .map((file: string, index: number) => `[[${index + 1}]](${file}) ${file}`)
+          .map(
+            (file: string, index: number) =>
+              `[[${index + 1}]](${file}) ${file}`,
+          )
           .join("\n")
       : "No files analyzed",
     ``,

@@ -1,11 +1,13 @@
 import { FileAnalyzer, AnalysisResult } from "./index";
 
 export class JavaScriptAnalyzer implements FileAnalyzer {
-  private static readonly importRegex = /(?:import|require)\s*\(?['"]([^'"]+)['"]\)?/gi;
+  private static readonly importRegex =
+    /(?:import|require)\s*\(?['"]([^'"]+)['"]\)?/gi;
   private static readonly exportRegex =
     /(?:export|module\.exports)\s*[=.]?\s*(?:default\s+)?(?:class|function|const)?\s*(\w+)?/gi;
   private static readonly functionRegex = /function\s+(\w+)\s*\([^)]*\)/gi;
-  private static readonly classRegex = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{/gi;
+  private static readonly classRegex =
+    /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{/gi;
 
   canAnalyze(filePath: string): boolean {
     return /\.(js|jsx|mjs|cjs)$/.test(filePath);
@@ -16,7 +18,9 @@ export class JavaScriptAnalyzer implements FileAnalyzer {
     const exports = this.extractExports(content);
     const functions = this.extractFunctions(content);
     const classes = this.extractClasses(content);
-    const components = filePath.includes(".jsx") ? this.extractReactComponents(content) : [];
+    const components = filePath.includes(".jsx")
+      ? this.extractReactComponents(content)
+      : [];
 
     return {
       imports,
