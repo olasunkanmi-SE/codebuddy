@@ -178,7 +178,6 @@ export class AgentService {
   }
 
   async clearAgentData(agentId: string): Promise<void> {
-    // Clear chat history using worker (primary storage)
     try {
       const requestId = `clear-agent-${agentId}-${Date.now()}`;
       await this.chatHistoryWorker.processRequest(
@@ -193,7 +192,6 @@ export class AgentService {
       );
     }
 
-    // Clear other agent data from file storage (not chat history - that's in SQLite now)
     await this.storage.delete(`${COMMON.AGENT_STATE_PREFIX}_${agentId}`);
     await this.storage.delete(`${COMMON.SNAPSHOT_PREFIX}_${agentId}`);
 
