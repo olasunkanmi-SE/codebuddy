@@ -5,14 +5,13 @@ import {
   IFileToolResponse,
 } from "../application/interfaces/agent.interface";
 import { Logger } from "../infrastructure/logger/logger";
-import { CodeRepository } from "../infrastructure/repository/code";
 import { getAPIKeyAndModel } from "./../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { LogLevel } from "./telemetry";
 import { WebSearchService } from "./web-search-service";
 
 export class ContextRetriever {
-  private readonly codeRepository: CodeRepository;
+  // private readonly codeRepository: CodeRepository;
   private readonly embeddingService: EmbeddingService;
   private static readonly SEARCH_RESULT_COUNT = 2;
   private readonly logger: Logger;
@@ -20,7 +19,7 @@ export class ContextRetriever {
   private readonly webSearchService: WebSearchService;
   protected readonly orchestrator: Orchestrator;
   constructor() {
-    this.codeRepository = CodeRepository.getInstance();
+    // this.codeRepository = CodeRepository.getInstance();
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     this.embeddingService = new EmbeddingService(apiKey);
     this.logger = Logger.initialize("ContextRetriever", {

@@ -27,6 +27,28 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     this.model = this.gemini.getModel();
   }
 
+  /**
+   * Override to update Gemini-specific chatHistory array
+   */
+  protected async updateProviderChatHistory(history: any[]): Promise<void> {
+    try {
+      // Convert to Gemini's IMessageInput format
+      this.chatHistory = history.map((msg: any) => ({
+        role: msg.role === "user" ? "user" : "model",
+        content: msg.content,
+        timestamp: msg.timestamp,
+        metadata: msg.metadata,
+      }));
+
+      this.logger.debug(
+        `Updated Gemini chatHistory array with ${this.chatHistory.length} messages`,
+      );
+    } catch (error) {
+      this.logger.warn("Failed to update Gemini chat history array:", error);
+      this.chatHistory = []; // Reset to empty on error
+    }
+  }
+
   async sendResponse(
     response: string,
     currentChat: string,

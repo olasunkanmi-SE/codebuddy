@@ -22,6 +22,28 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     });
   }
 
+  /**
+   * Override to update Groq-specific chatHistory array
+   */
+  protected async updateProviderChatHistory(history: any[]): Promise<void> {
+    try {
+      // Convert to Groq's IMessageInput format
+      this.chatHistory = history.map((msg: any) =>
+        Message.of({
+          role: msg.role === "user" ? "user" : "assistant",
+          content: msg.content,
+        }),
+      );
+
+      this.logger.debug(
+        `Updated Groq chatHistory array with ${this.chatHistory.length} messages`,
+      );
+    } catch (error) {
+      this.logger.warn("Failed to update Groq chat history array:", error);
+      this.chatHistory = []; // Reset to empty on error
+    }
+  }
+
   static initialize(
     extensionUri: vscode.Uri,
     apiKey: string,
