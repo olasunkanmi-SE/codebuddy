@@ -1,6 +1,7 @@
 import * as assert from "assert";
 import * as sinon from "sinon";
 import * as vscode from "vscode";
+import * as fs from "fs";
 import { CodebaseAnalysisCache } from "../../services/codebase-analysis-cache";
 
 suite("CodebaseAnalysisCache Tests", () => {

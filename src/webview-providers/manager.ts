@@ -223,13 +223,33 @@ export class WebViewProviderManager implements vscode.Disposable {
   }
 
   private async restoreChatHistory() {
-    const chatHistory = await this.getChatHistory();
-    setTimeout(async () => {
-      await this.webviewView?.webview.postMessage({
-        type: "chat-history",
-        message: JSON.stringify(chatHistory),
-      });
-    }, 10000);
+    try {
+      const chatHistory = await this.getChatHistory();
+
+      // Send chat history immediately - no artificial delay
+      if (this.webviewView?.webview) {
+        await this.webviewView.webview.postMessage({
+          type: "chat-history",
+          message: JSON.stringify(chatHistory),
+        });
+
+        this.logger.debug(
+          `Restored ${chatHistory.length} chat messages immediately`,
+        );
+      } else {
+        this.logger.warn("Webview not available for chat history restoration");
+      }
+    } catch (error) {
+      this.logger.error("Failed to restore chat history:", error);
+
+      // Send empty history to prevent UI hanging
+      if (this.webviewView?.webview) {
+        await this.webviewView.webview.postMessage({
+          type: "chat-history",
+          message: JSON.stringify([]),
+        });
+      }
+    }
   }
 
   // This update has to happen in the DB

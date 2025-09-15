@@ -1,16 +1,14 @@
-import { Database as DBInstance } from "better-sqlite3";
 import { ICodeRepository } from "../../application/interfaces/code.repository.interface";
 import { Logger, LogLevel } from "../logger/logger";
 
 export class CodeRepository implements ICodeRepository {
-  private readonly client: DBInstance | undefined;
+  private readonly client: any = undefined;
   private static instance: CodeRepository;
   private readonly logger: Logger;
   private constructor() {
     this.logger = Logger.initialize("CodeRepository", {
       minLevel: LogLevel.DEBUG,
     });
-    // this.client = dbManager.getDB();
   }
 
   public static getInstance(): CodeRepository {

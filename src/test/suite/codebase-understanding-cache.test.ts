@@ -1,6 +1,7 @@
 import * as assert from "assert";
 import * as sinon from "sinon";
 import * as vscode from "vscode";
+import * as fs from "fs";
 import { CodebaseUnderstandingService } from "../../services/codebase-understanding.service";
 import { CodebaseAnalysisCache } from "../../services/codebase-analysis-cache";
 
@@ -235,15 +236,15 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
       .stub(vscode.workspace, "workspaceFolders")
       .value([mockWorkspaceFolder]);
 
-    // Mock file system operations
+    // Mock file system operations for the native fs module
     const mockPackageJson = JSON.stringify({
       dependencies: { "@nestjs/core": "^8.0.0", react: "^17.0.0" },
       devDependencies: { typescript: "^4.0.0" },
     });
 
-    sandbox
-      .stub(vscode.workspace.fs, "readFile")
-      .resolves(new Uint8Array(Buffer.from(mockPackageJson)));
+    // Mock native fs module used by CodebaseAnalysisWorker
+    sandbox.stub(fs.promises, "readFile").resolves(mockPackageJson);
+    sandbox.stub(fs, "existsSync").returns(true);
 
     // Mock workspace service
     const mockFiles = [

@@ -119,8 +119,61 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     this.setWebviewHtml(this.currentWebView);
     this.setupMessageHandler(this.currentWebView);
+
+    // Synchronize provider chat history with database on startup
+    await this.synchronizeChatHistoryFromDatabase();
+
     // Get the current workspace files from DB.
     await this.getFiles();
+  }
+
+  /**
+   * Synchronize provider's chatHistory array with database on startup
+   * This ensures the provider has immediate access to persistent chat data
+   */
+  protected async synchronizeChatHistoryFromDatabase(): Promise<void> {
+    try {
+      // Get chat history from database via AgentService
+      const agentId = "agentId"; // Using the same hardcoded ID as WebViewProviderManager
+      const persistentHistory = await this.agentService.getChatHistory(agentId);
+
+      if (persistentHistory && persistentHistory.length > 0) {
+        // Convert database format to provider's IMessageInput format
+        const providerHistory = persistentHistory.map((msg: any) => ({
+          role: msg.type === "user" ? "user" : "model",
+          content: msg.content,
+          timestamp: msg.timestamp || Date.now(),
+          metadata: msg.metadata,
+        }));
+
+        // Update the provider's chatHistory array (this should be overridden in child classes)
+        await this.updateProviderChatHistory(providerHistory);
+
+        this.logger.debug(
+          `Synchronized ${persistentHistory.length} chat messages from database`,
+        );
+      } else {
+        this.logger.debug("No chat history found in database to synchronize");
+      }
+    } catch (error) {
+      this.logger.warn(
+        "Failed to synchronize chat history from database:",
+        error,
+      );
+      // Don't throw - this is not critical for provider initialization
+    }
+  }
+
+  /**
+   * Update the provider's specific chatHistory array
+   * Should be overridden by child classes to update their specific chatHistory type
+   */
+  protected async updateProviderChatHistory(history: any[]): Promise<void> {
+    // Base implementation - child classes should override this
+    // to update their specific chatHistory arrays
+    this.logger.debug(
+      "Base provider - no specific chat history array to update",
+    );
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {

@@ -5,7 +5,7 @@ import {
   generativeAiModels,
   GROQ_CONFIG,
 } from "../application/constant";
-import { IMessageInput } from "../llms/message";
+import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
 import {
   createAnthropicClient,
@@ -26,6 +26,28 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.model = createAnthropicClient(this.apiKey, this.baseUrl);
+  }
+
+  /**
+   * Override to update Anthropic-specific chatHistory array
+   */
+  protected async updateProviderChatHistory(history: any[]): Promise<void> {
+    try {
+      // Convert to Anthropic's IMessageInput format
+      this.chatHistory = history.map((msg: any) =>
+        Message.of({
+          role: msg.role === "user" ? "user" : "assistant",
+          content: msg.content,
+        }),
+      );
+
+      this.logger.debug(
+        `Updated Anthropic chatHistory array with ${this.chatHistory.length} messages`,
+      );
+    } catch (error) {
+      this.logger.warn("Failed to update Anthropic chat history array:", error);
+      this.chatHistory = []; // Reset to empty on error
+    }
   }
 
   public async sendResponse(

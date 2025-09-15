@@ -22,7 +22,6 @@ import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
 import { FileUploadService } from "./services/file-upload";
-import { FileWatcherService } from "./services/file-watcher";
 import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
@@ -31,6 +30,7 @@ import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
 import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
+import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
 import {
   generateDocumentationCommand,
   regenerateDocumentationCommand,
@@ -52,7 +52,6 @@ const {
 console.log(APP_CONFIG);
 
 const logger = Logger.initialize("extension", { minLevel: LogLevel.DEBUG });
-const fileWatcher = FileWatcherService.getInstance();
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
@@ -65,6 +64,16 @@ export async function activate(context: vscode.ExtensionContext) {
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     FileUploadService.initialize(apiKey);
     Memory.getInstance();
+
+    // Initialize persistent codebase understanding service
+    try {
+      const persistentCodebaseService =
+        PersistentCodebaseUnderstandingService.getInstance();
+      await persistentCodebaseService.initialize();
+      console.log("Persistent codebase understanding service initialized");
+    } catch (error) {
+      console.warn("Failed to initialize persistent codebase service:", error);
+    }
 
     // TODO for RAG codeIndexing incase user allows
     // const index = CodeIndexingService.createInstance();
@@ -198,6 +207,135 @@ export async function activate(context: vscode.ExtensionContext) {
       [openDocumentation]: async () => {
         await openDocumentationCommand();
       },
+      "CodeBuddy.showCacheStatus": async () => {
+        const persistentCodebaseService =
+          PersistentCodebaseUnderstandingService.getInstance();
+        const summary = await persistentCodebaseService.getAnalysisSummary();
+        const stats = summary.stats;
+
+        let message = `**Codebase Analysis Cache Status**\n\n`;
+        message += `• Has Cache: ${summary.hasCache ? "✅ Yes" : "❌ No"}\n`;
+
+        if (summary.lastAnalysis) {
+          const lastAnalysisDate = new Date(summary.lastAnalysis);
+          message += `• Last Analysis: ${lastAnalysisDate.toLocaleString()}\n`;
+        }
+
+        if (summary.gitState) {
+          message += `• Branch: ${summary.gitState.branch || "Unknown"}\n`;
+          message += `• Files: ${summary.gitState.fileCount || 0}\n`;
+        }
+
+        message += `• Total Snapshots: ${stats.totalSnapshots || 0}\n`;
+        message += `• Database Size: ${((stats.totalSize || 0) / 1024).toFixed(1)} KB\n`;
+
+        if (stats.oldestSnapshot) {
+          message += `• Oldest: ${new Date(stats.oldestSnapshot).toLocaleString()}\n`;
+        }
+        if (stats.newestSnapshot) {
+          message += `• Newest: ${new Date(stats.newestSnapshot).toLocaleString()}\n`;
+        }
+
+        const panel = vscode.window.createWebviewPanel(
+          "cacheStatus",
+          "CodeBuddy Cache Status",
+          vscode.ViewColumn.One,
+          {
+            enableScripts: false,
+          },
+        );
+
+        panel.webview.html = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="UTF-8">
+              <style>
+                  body { 
+                      font-family: var(--vscode-font-family);
+                      color: var(--vscode-foreground);
+                      background: var(--vscode-editor-background);
+                      padding: 20px;
+                      line-height: 1.6;
+                  }
+                  pre { 
+                      background: var(--vscode-textCodeBlock-background);
+                      padding: 15px;
+                      border-radius: 5px;
+                      white-space: pre-wrap;
+                  }
+              </style>
+          </head>
+          <body>
+              <pre>${message}</pre>
+          </body>
+          </html>
+        `;
+      },
+      "CodeBuddy.clearCache": async () => {
+        const choice = await vscode.window.showWarningMessage(
+          "Are you sure you want to clear the codebase analysis cache? This will require re-analysis next time.",
+          "Clear Cache",
+          "Cancel",
+        );
+
+        if (choice === "Clear Cache") {
+          try {
+            const persistentCodebaseService =
+              PersistentCodebaseUnderstandingService.getInstance();
+            await persistentCodebaseService.clearCache();
+            vscode.window.showInformationMessage(
+              "✅ Codebase analysis cache cleared successfully",
+            );
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `❌ Failed to clear cache: ${error instanceof Error ? error.message : "Unknown error"}`,
+            );
+          }
+        }
+      },
+      "CodeBuddy.refreshAnalysis": async () => {
+        const choice = await vscode.window.showInformationMessage(
+          "This will refresh the codebase analysis. It may take some time.",
+          "Refresh Now",
+          "Cancel",
+        );
+
+        if (choice === "Refresh Now") {
+          try {
+            const persistentCodebaseService =
+              PersistentCodebaseUnderstandingService.getInstance();
+
+            await vscode.window.withProgress(
+              {
+                location: vscode.ProgressLocation.Notification,
+                title: "Refreshing codebase analysis...",
+                cancellable: true,
+              },
+              async (progress, token) => {
+                const analysis =
+                  await persistentCodebaseService.forceRefreshAnalysis(token);
+
+                if (analysis && !token.isCancellationRequested) {
+                  vscode.window.showInformationMessage(
+                    `✅ Analysis refreshed successfully! Found ${analysis.summary.totalFiles} files. Analysis completed at ${new Date(analysis.analysisMetadata.createdAt).toLocaleString()}.`,
+                  );
+                }
+              },
+            );
+          } catch (error) {
+            if (error instanceof Error && error.message.includes("cancelled")) {
+              vscode.window.showInformationMessage(
+                "Analysis refresh cancelled",
+              );
+            } else {
+              vscode.window.showErrorMessage(
+                `❌ Failed to refresh analysis: ${error instanceof Error ? error.message : "Unknown error"}`,
+              );
+            }
+          }
+        }
+      },
     };
 
     let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
@@ -311,9 +449,6 @@ async function restartExtension(context: vscode.ExtensionContext) {
       if (orchestrator) {
         orchestrator.dispose();
       }
-      if (fileWatcher) {
-        fileWatcher.dispose();
-      }
 
       // Show progress and reload window
       await vscode.window.withProgress(
@@ -344,10 +479,19 @@ export function deactivate(context: vscode.ExtensionContext) {
   // Clear database history before deactivation
   clearFileStorageData();
 
+  // Shutdown persistent codebase service
+  try {
+    const persistentCodebaseService =
+      PersistentCodebaseUnderstandingService.getInstance();
+    persistentCodebaseService.shutdown();
+    console.log("Persistent codebase service shutdown");
+  } catch (error) {
+    console.warn("Error shutting down persistent codebase service:", error);
+  }
+
   quickFixCodeAction.dispose();
   agentEventEmmitter.dispose();
   orchestrator.dispose();
-  fileWatcher.dispose();
 
   // Dispose provider manager
   const providerManager = WebViewProviderManager.getInstance(context);
