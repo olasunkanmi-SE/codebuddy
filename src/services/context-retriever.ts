@@ -5,14 +5,14 @@ import {
   IFileToolResponse,
 } from "../application/interfaces/agent.interface";
 import { Logger } from "../infrastructure/logger/logger";
-import { getAPIKeyAndModel } from "./../utils/utils";
+import { getAPIKeyAndModel, getGenerativeAiModel } from "./../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { LogLevel } from "./telemetry";
 import { WebSearchService } from "./web-search-service";
 
 export class ContextRetriever {
   // private readonly codeRepository: CodeRepository;
-  private readonly embeddingService: EmbeddingService;
+  private readonly embeddingService: EmbeddingService; // Always uses Gemini for consistency
   private static readonly SEARCH_RESULT_COUNT = 2;
   private readonly logger: Logger;
   private static instance: ContextRetriever;
@@ -20,8 +20,11 @@ export class ContextRetriever {
   protected readonly orchestrator: Orchestrator;
   constructor() {
     // this.codeRepository = CodeRepository.getInstance();
-    const { apiKey, model } = getAPIKeyAndModel("gemini");
-    this.embeddingService = new EmbeddingService(apiKey);
+    // Always use Gemini for embeddings to ensure consistency
+    // regardless of the selected chat model (Groq, Anthropic, etc.)
+    const embeddingProvider = "Gemini";
+    const { apiKey: embeddingApiKey } = getAPIKeyAndModel(embeddingProvider);
+    this.embeddingService = new EmbeddingService(embeddingApiKey);
     this.logger = Logger.initialize("ContextRetriever", {
       minLevel: LogLevel.DEBUG,
     });
