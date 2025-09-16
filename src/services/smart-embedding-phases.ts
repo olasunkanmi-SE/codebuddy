@@ -1,10 +1,21 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { VectorDbWorkerManager, VECTOR_OPERATIONS } from "./vector-db-worker-manager";
+import {
+  VectorDbWorkerManager,
+  VECTOR_OPERATIONS,
+} from "./vector-db-worker-manager";
 import { CodeIndexingService } from "./code-indexing";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { IFunctionData } from "../application/interfaces";
-import { LanguageUtils, FileUtils, AsyncUtils, DisposableUtils } from "../utils/common-utils";
+import {
+  LanguageUtils,
+  FileUtils,
+  AsyncUtils,
+  DisposableUtils,
+} from "../utils/common-utils";
+import { EmbeddingService } from "./embedding-service";
+import { FileService } from "./file-service";
+import { VectorDatabaseService } from "./vector-database.service";
 
 export interface EmbeddingPhaseOptions {
   batchSize?: number;
@@ -24,11 +35,23 @@ export interface EmbeddingProgressCallback {
 export class ImmediateEmbeddingPhase implements vscode.Disposable {
   private logger: Logger;
   private disposables: vscode.Disposable[] = [];
+  private embeddingService: EmbeddingService | null = null;
+  private fileService: FileService;
 
-  constructor(private workerManager: VectorDbWorkerManager) {
+  constructor(
+    private workerManager: VectorDbWorkerManager,
+    private vectorDb?: VectorDatabaseService,
+  ) {
     this.logger = Logger.initialize("ImmediateEmbeddingPhase", {
       minLevel: LogLevel.INFO,
     });
+
+    this.fileService = new FileService();
+
+    // Initialize embedding service if vector DB is provided
+    if (vectorDb) {
+      this.embeddingService = new EmbeddingService(vectorDb, workerManager);
+    }
   }
 
   dispose(): void {
@@ -36,7 +59,10 @@ export class ImmediateEmbeddingPhase implements vscode.Disposable {
     this.disposables = [];
   }
 
-  async embedEssentials(context: vscode.ExtensionContext, progressCallback?: EmbeddingProgressCallback): Promise<void> {
+  async embedEssentials(
+    context: vscode.ExtensionContext,
+    progressCallback?: EmbeddingProgressCallback,
+  ): Promise<void> {
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -59,24 +85,29 @@ export class ImmediateEmbeddingPhase implements vscode.Disposable {
           async (file, index) => {
             try {
               await this.embedFile(file);
-              const currentProgress = ((index + 1) / essentialFiles.length) * 100;
+              const currentProgress =
+                ((index + 1) / essentialFiles.length) * 100;
               const increment = 100 / essentialFiles.length;
               progress.report({
                 increment,
                 message: `Indexed ${path.basename(file)} (${index + 1}/${essentialFiles.length})`,
               });
               if (progressCallback) {
-                progressCallback("immediate", currentProgress, `Indexed ${path.basename(file)}`);
+                progressCallback(
+                  "immediate",
+                  currentProgress,
+                  `Indexed ${path.basename(file)}`,
+                );
               }
             } catch (error) {
               this.logger.error(`Failed to embed file ${file}:`, error);
             }
           },
-          5 // Process 5 files at a time to avoid overwhelming the system
+          5, // Process 5 files at a time to avoid overwhelming the system
         );
 
         this.logger.info("Essential files embedding completed");
-      }
+      },
     );
   }
 
@@ -101,16 +132,19 @@ export class ImmediateEmbeddingPhase implements vscode.Disposable {
     indexFiles: string[];
   }> {
     // Gather files from different sources in parallel for better performance
-    const [entryPoints, recentFiles, mostImported, indexFiles] = await Promise.all([
-      this.findEntryPoints(),
-      this.getRecentlyModified(7),
-      this.getMostImportedFiles(10),
-      this.findIndexFiles(),
-    ]);
+    const [entryPoints, recentFiles, mostImported, indexFiles] =
+      await Promise.all([
+        this.findEntryPoints(),
+        this.getRecentlyModified(7),
+        this.getMostImportedFiles(10),
+        this.findIndexFiles(),
+      ]);
 
     // Currently open files (highest priority)
     const openFiles = vscode.workspace.textDocuments
-      .filter((doc) => LanguageUtils.isCodeFile(doc.languageId) && !doc.isUntitled)
+      .filter(
+        (doc) => LanguageUtils.isCodeFile(doc.languageId) && !doc.isUntitled,
+      )
       .map((doc) => doc.fileName);
 
     return {
@@ -153,7 +187,11 @@ export class ImmediateEmbeddingPhase implements vscode.Disposable {
         const packageJsonPath = path.join(folder.uri.fsPath, "package.json");
         const packageJsonUri = vscode.Uri.file(packageJsonPath);
 
-        const packageJson = JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(packageJsonUri)).toString());
+        const packageJson = JSON.parse(
+          Buffer.from(
+            await vscode.workspace.fs.readFile(packageJsonUri),
+          ).toString(),
+        );
 
         // Add main entry point
         if (packageJson.main) {
@@ -164,7 +202,12 @@ export class ImmediateEmbeddingPhase implements vscode.Disposable {
         }
 
         // Add TypeScript entry points
-        const commonEntries = ["src/index.ts", "src/main.ts", "index.ts", "main.ts"];
+        const commonEntries = [
+          "src/index.ts",
+          "src/main.ts",
+          "index.ts",
+          "main.ts",
+        ];
         for (const entry of commonEntries) {
           const entryPath = path.join(folder.uri.fsPath, entry);
           if (await this.fileExists(entryPath)) {
@@ -191,7 +234,10 @@ export class ImmediateEmbeddingPhase implements vscode.Disposable {
 
     for (const folder of workspaceFolders) {
       const pattern = "**/*.{ts,js,tsx,jsx,py,java,cpp,c,cs}";
-      const files = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, pattern), "**/node_modules/**");
+      const files = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, pattern),
+        "**/node_modules/**",
+      );
 
       for (const file of files) {
         try {
@@ -203,7 +249,10 @@ export class ImmediateEmbeddingPhase implements vscode.Disposable {
             }
           }
         } catch (error) {
-          this.logger.warn(`Could not get stats for file ${file.fsPath}:`, error);
+          this.logger.warn(
+            `Could not get stats for file ${file.fsPath}:`,
+            error,
+          );
           // Skip files that can't be read
         }
       }
@@ -238,7 +287,7 @@ export class ImmediateEmbeddingPhase implements vscode.Disposable {
       for (const pattern of importantPatterns) {
         const files = await vscode.workspace.findFiles(
           new vscode.RelativePattern(folder, pattern),
-          "**/node_modules/**"
+          "**/node_modules/**",
         );
 
         importantFiles.push(...files.map((f) => f.fsPath));
@@ -260,7 +309,7 @@ export class ImmediateEmbeddingPhase implements vscode.Disposable {
       for (const pattern of patterns) {
         const files = await vscode.workspace.findFiles(
           new vscode.RelativePattern(folder, pattern),
-          "**/node_modules/**"
+          "**/node_modules/**",
         );
 
         indexFiles.push(...files.map((f) => f.fsPath));
@@ -280,12 +329,29 @@ export class ImmediateEmbeddingPhase implements vscode.Disposable {
   }
 
   private async embedFile(filePath: string): Promise<void> {
-    // This would integrate with your existing embedding logic
-    // For now, we'll simulate the embedding process
-    this.logger.debug(`Embedding file: ${path.basename(filePath)}`);
+    if (this.embeddingService) {
+      // Use the dedicated embedding service for actual vector DB integration
+      const result = await this.embeddingService.embedFile(filePath, {
+        priority: "high",
+        retryCount: 2,
+        timeout: 30000,
+      });
 
-    // Add small delay to simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 100));
+      if (!result.success) {
+        this.logger.error(
+          `Failed to embed ${path.basename(filePath)}: ${result.error}`,
+        );
+        throw new Error(result.error);
+      }
+
+      this.logger.debug(
+        `Successfully embedded ${path.basename(filePath)} (${result.snippetsCreated} snippets)`,
+      );
+    } else {
+      // Fallback: use worker manager directly
+      this.logger.debug(`Embedding file: ${path.basename(filePath)}`);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
   }
 }
 
@@ -305,18 +371,25 @@ export class OnDemandEmbeddingPhase implements vscode.Disposable {
 
   setupTriggers(): void {
     // Trigger 2: File navigation
-    const activeEditorDisposable = vscode.window.onDidChangeActiveTextEditor(async (editor) => {
-      if (editor?.document.languageId && LanguageUtils.isCodeFile(editor.document.languageId)) {
-        await this.onFileOpened(editor.document.fileName);
-      }
-    });
+    const activeEditorDisposable = vscode.window.onDidChangeActiveTextEditor(
+      async (editor) => {
+        if (
+          editor?.document.languageId &&
+          LanguageUtils.isCodeFile(editor.document.languageId)
+        ) {
+          await this.onFileOpened(editor.document.fileName);
+        }
+      },
+    );
 
     // Trigger 3: File editing
-    const textDocumentDisposable = vscode.workspace.onDidChangeTextDocument(async (event) => {
-      if (LanguageUtils.isCodeFile(event.document.languageId)) {
-        await this.onFileEdited(event.document.fileName);
-      }
-    });
+    const textDocumentDisposable = vscode.workspace.onDidChangeTextDocument(
+      async (event) => {
+        if (LanguageUtils.isCodeFile(event.document.languageId)) {
+          await this.onFileEdited(event.document.fileName);
+        }
+      },
+    );
 
     this.disposables.push(activeEditorDisposable, textDocumentDisposable);
     this.logger.info("On-demand embedding triggers set up");
@@ -330,7 +403,7 @@ export class OnDemandEmbeddingPhase implements vscode.Disposable {
       if (unembedded.length > 0) {
         vscode.window.setStatusBarMessage(
           `🔍 Finding context for: "${question.substring(0, 30)}..."`,
-          this.embedFilesQuietly(unembedded)
+          this.embedFilesQuietly(unembedded),
         );
       }
     } catch (error) {
@@ -366,7 +439,9 @@ export class OnDemandEmbeddingPhase implements vscode.Disposable {
     return this.rankByRelevance(candidates, question);
   }
 
-  private async collectRelevantCandidates(keywords: string[]): Promise<string[]> {
+  private async collectRelevantCandidates(
+    keywords: string[],
+  ): Promise<string[]> {
     const candidates: string[] = [];
 
     // Collect files by filename patterns
@@ -382,7 +457,9 @@ export class OnDemandEmbeddingPhase implements vscode.Disposable {
   }
 
   private async findFilesByPatterns(keywords: string[]): Promise<string[]> {
-    const allMatches = await Promise.all(keywords.map((keyword) => this.findFilesByPattern(keyword)));
+    const allMatches = await Promise.all(
+      keywords.map((keyword) => this.findFilesByPattern(keyword)),
+    );
 
     return allMatches.flat();
   }
@@ -392,7 +469,18 @@ export class OnDemandEmbeddingPhase implements vscode.Disposable {
     const words = question.toLowerCase().split(/\s+/);
     const technicalWords = words.filter(
       (word) =>
-        word.length > 3 && !["the", "and", "that", "this", "with", "from", "they", "have", "been"].includes(word)
+        word.length > 3 &&
+        ![
+          "the",
+          "and",
+          "that",
+          "this",
+          "with",
+          "from",
+          "they",
+          "have",
+          "been",
+        ].includes(word),
     );
 
     return technicalWords.slice(0, 5); // Limit to top 5 keywords
@@ -406,7 +494,10 @@ export class OnDemandEmbeddingPhase implements vscode.Disposable {
 
     for (const folder of workspaceFolders) {
       const pattern = `**/*${keyword}*.{ts,js,tsx,jsx,py,java,cpp,c,cs}`;
-      const files = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, pattern), "**/node_modules/**");
+      const files = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, pattern),
+        "**/node_modules/**",
+      );
 
       matchingFiles.push(...files.map((f) => f.fsPath));
     }
@@ -414,7 +505,9 @@ export class OnDemandEmbeddingPhase implements vscode.Disposable {
     return matchingFiles;
   }
 
-  private async findFilesByContentKeywords(keywords: string[]): Promise<string[]> {
+  private async findFilesByContentKeywords(
+    keywords: string[],
+  ): Promise<string[]> {
     // This would require content analysis - simplified implementation
     return [];
   }
@@ -433,7 +526,10 @@ export class OnDemandEmbeddingPhase implements vscode.Disposable {
       .slice(0, 10); // Top 10 most relevant
   }
 
-  private calculateRelevanceScore(filePath: string, questionWords: string[]): number {
+  private calculateRelevanceScore(
+    filePath: string,
+    questionWords: string[],
+  ): number {
     const fileName = path.basename(filePath).toLowerCase();
     let score = 0;
 
@@ -470,7 +566,9 @@ export class OnDemandEmbeddingPhase implements vscode.Disposable {
     const pattern = "*.{ts,js,tsx,jsx}";
 
     try {
-      const files = await vscode.workspace.findFiles(new vscode.RelativePattern(directory, pattern));
+      const files = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(directory, pattern),
+      );
 
       return files.map((f) => f.fsPath).filter((f) => f !== filePath); // Exclude the original file
     } catch {
@@ -482,14 +580,22 @@ export class OnDemandEmbeddingPhase implements vscode.Disposable {
     const baseName = path.basename(filePath, path.extname(filePath));
     const directory = path.dirname(filePath);
 
-    const testPatterns = [`${baseName}.test.*`, `${baseName}.spec.*`, `**/${baseName}.test.*`, `**/${baseName}.spec.*`];
+    const testPatterns = [
+      `${baseName}.test.*`,
+      `${baseName}.spec.*`,
+      `**/${baseName}.test.*`,
+      `**/${baseName}.spec.*`,
+    ];
 
     const testFiles: string[] = [];
 
     for (const pattern of testPatterns) {
       try {
         const files = await vscode.workspace.findFiles(
-          new vscode.RelativePattern(vscode.workspace.workspaceFolders![0], pattern)
+          new vscode.RelativePattern(
+            vscode.workspace.workspaceFolders![0],
+            pattern,
+          ),
         );
 
         testFiles.push(...files.map((f) => f.fsPath));
@@ -602,12 +708,14 @@ export class BackgroundEmbeddingPhase implements vscode.Disposable {
         return;
       }
 
-      const batch = this.prioritizeBatch(unprocessedFiles.slice(0, this.BATCH_SIZE));
+      const batch = this.prioritizeBatch(
+        unprocessedFiles.slice(0, this.BATCH_SIZE),
+      );
 
       // Process silently in background
       vscode.window.setStatusBarMessage(
         `📚 Background indexing: ${batch.length} files...`,
-        this.processBatchSilently(batch)
+        this.processBatchSilently(batch),
       );
 
       // Schedule next batch if still idle
@@ -633,7 +741,10 @@ export class BackgroundEmbeddingPhase implements vscode.Disposable {
 
     for (const folder of workspaceFolders) {
       const pattern = "**/*.{ts,js,tsx,jsx,py,java,cpp,c,cs}";
-      const files = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, pattern), "**/node_modules/**");
+      const files = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, pattern),
+        "**/node_modules/**",
+      );
 
       allFiles.push(...files.map((f) => f.fsPath));
     }
@@ -678,7 +789,9 @@ export class BackgroundEmbeddingPhase implements vscode.Disposable {
 
   private onBackgroundProcessingComplete(): void {
     this.logger.info("Background processing completed - all files indexed");
-    vscode.window.showInformationMessage("✅ CodeBuddy has finished indexing your workspace in the background!");
+    vscode.window.showInformationMessage(
+      "✅ CodeBuddy has finished indexing your workspace in the background!",
+    );
   }
 
   private delay(ms: number): Promise<void> {
@@ -710,7 +823,10 @@ export class BulkEmbeddingPhase implements vscode.Disposable {
   }
 
   async registerBulkCommand(context: vscode.ExtensionContext): Promise<void> {
-    const command = vscode.commands.registerCommand("codebuddy.indexEntireCodebase", () => this.processBulkEmbedding());
+    const command = vscode.commands.registerCommand(
+      "codebuddy.indexEntireCodebase",
+      () => this.processBulkEmbedding(),
+    );
 
     context.subscriptions.push(command);
     this.logger.info("Bulk embedding command registered");
@@ -722,7 +838,9 @@ export class BulkEmbeddingPhase implements vscode.Disposable {
       const unprocessed = await this.filterUnprocessed(allFiles);
 
       if (unprocessed.length === 0) {
-        vscode.window.showInformationMessage("✅ Codebase is already fully indexed!");
+        vscode.window.showInformationMessage(
+          "✅ Codebase is already fully indexed!",
+        );
         return;
       }
 
@@ -732,7 +850,7 @@ export class BulkEmbeddingPhase implements vscode.Disposable {
         { modal: true },
         "Yes, Index All",
         "Index in Background",
-        "Cancel"
+        "Cancel",
       );
 
       if (proceed === "Cancel" || !proceed) return;
@@ -763,7 +881,9 @@ export class BulkEmbeddingPhase implements vscode.Disposable {
 
         for (let i = 0; i < files.length; i += batchSize) {
           if (token.isCancellationRequested) {
-            vscode.window.showWarningMessage(`Indexing cancelled. Processed ${processed}/${files.length} files.`);
+            vscode.window.showWarningMessage(
+              `Indexing cancelled. Processed ${processed}/${files.length} files.`,
+            );
             break;
           }
 
@@ -783,14 +903,16 @@ export class BulkEmbeddingPhase implements vscode.Disposable {
           }
         }
 
-        vscode.window.showInformationMessage(`✅ Indexing complete! Processed ${processed} files.`);
-      }
+        vscode.window.showInformationMessage(
+          `✅ Indexing complete! Processed ${processed} files.`,
+        );
+      },
     );
   }
 
   private async processBulkInBackground(files: string[]): Promise<void> {
     vscode.window.showInformationMessage(
-      `🔄 Started background indexing of ${files.length} files. Check status bar for progress.`
+      `🔄 Started background indexing of ${files.length} files. Check status bar for progress.`,
     );
 
     const batchSize = 8;
@@ -801,7 +923,7 @@ export class BulkEmbeddingPhase implements vscode.Disposable {
 
       vscode.window.setStatusBarMessage(
         `📚 Background indexing: ${processed + batch.length}/${files.length}`,
-        this.processBatch(batch)
+        this.processBatch(batch),
       );
 
       processed += batch.length;
@@ -810,7 +932,9 @@ export class BulkEmbeddingPhase implements vscode.Disposable {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
-    vscode.window.showInformationMessage(`✅ Background indexing complete! Indexed ${processed} files.`);
+    vscode.window.showInformationMessage(
+      `✅ Background indexing complete! Indexed ${processed} files.`,
+    );
   }
 
   private async processBatch(files: string[]): Promise<void> {
@@ -831,7 +955,10 @@ export class BulkEmbeddingPhase implements vscode.Disposable {
 
     for (const folder of workspaceFolders) {
       const pattern = "**/*.{ts,js,tsx,jsx,py,java,cpp,c,cs}";
-      const files = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, pattern), "**/node_modules/**");
+      const files = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, pattern),
+        "**/node_modules/**",
+      );
 
       allFiles.push(...files.map((f) => f.fsPath));
     }

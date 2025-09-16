@@ -190,12 +190,28 @@ export class FileUtils {
     const directory = path.dirname(filePath).toLowerCase();
 
     // Entry points and config files
-    if (["index.ts", "index.js", "main.ts", "main.js", "app.ts", "app.js"].includes(fileName)) {
+    if (
+      [
+        "index.ts",
+        "index.js",
+        "main.ts",
+        "main.js",
+        "app.ts",
+        "app.js",
+      ].includes(fileName)
+    ) {
       return 100;
     }
 
     // Config files
-    if (["package.json", "tsconfig.json", "webpack.config.js", "vite.config.ts"].includes(fileName)) {
+    if (
+      [
+        "package.json",
+        "tsconfig.json",
+        "webpack.config.js",
+        "vite.config.ts",
+      ].includes(fileName)
+    ) {
       return 90;
     }
 
@@ -210,7 +226,11 @@ export class FileUtils {
     }
 
     // Test files
-    if (fileName.includes("test") || fileName.includes("spec") || directory.includes("test")) {
+    if (
+      fileName.includes("test") ||
+      fileName.includes("spec") ||
+      directory.includes("test")
+    ) {
       return 60;
     }
 
@@ -237,7 +257,7 @@ export class AsyncUtils {
     items: T[],
     processor: (item: T) => Promise<void>,
     batchSize: number = 10,
-    delayMs: number = 0
+    delayMs: number = 0,
   ): Promise<void> {
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
@@ -256,7 +276,7 @@ export class AsyncUtils {
     items: T[],
     processor: (item: T, index: number) => Promise<void>,
     batchSize: number = 10,
-    progressCallback?: (current: number, total: number) => void
+    progressCallback?: (current: number, total: number) => void,
   ): Promise<void> {
     let processed = 0;
 
@@ -272,7 +292,7 @@ export class AsyncUtils {
           if (progressCallback) {
             progressCallback(processed, items.length);
           }
-        })
+        }),
       );
     }
   }
@@ -283,7 +303,7 @@ export class AsyncUtils {
   static async safeExecute<T>(
     operation: () => Promise<T>,
     fallback: T,
-    errorHandler?: (error: Error) => void
+    errorHandler?: (error: Error) => void,
   ): Promise<T> {
     try {
       return await operation();

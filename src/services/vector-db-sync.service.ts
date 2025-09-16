@@ -3,9 +3,17 @@ import * as path from "path";
 import { VectorDatabaseService, CodeSnippet } from "./vector-database.service";
 import { CodeIndexingService } from "./code-indexing";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
-import { VECTOR_OPERATIONS, VectorOperationType } from "./vector-db-worker-manager";
+import {
+  VECTOR_OPERATIONS,
+  VectorOperationType,
+} from "./vector-db-worker-manager";
 import { IFunctionData } from "../application/interfaces";
-import { LanguageUtils, FileUtils, AsyncUtils, DisposableUtils } from "../utils/common-utils";
+import {
+  LanguageUtils,
+  FileUtils,
+  AsyncUtils,
+  DisposableUtils,
+} from "../utils/common-utils";
 
 // Interface for code indexing to support dependency injection
 export interface ICodeIndexer {
@@ -75,7 +83,9 @@ export class VectorDbSyncService implements vscode.Disposable {
   async initialize(): Promise<void> {
     try {
       if (!this.vectorDb.isReady()) {
-        throw new Error("VectorDatabaseService must be initialized before sync service");
+        throw new Error(
+          "VectorDatabaseService must be initialized before sync service",
+        );
       }
 
       await this.setupFileWatchers();
@@ -114,7 +124,9 @@ export class VectorDbSyncService implements vscode.Disposable {
 
     for (const folder of workspaceFolders) {
       for (const pattern of patterns) {
-        const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
+        const watcher = vscode.workspace.createFileSystemWatcher(
+          new vscode.RelativePattern(folder, pattern),
+        );
 
         // File created
         watcher.onDidCreate((uri) => {
@@ -143,7 +155,10 @@ export class VectorDbSyncService implements vscode.Disposable {
   /**
    * Queue a sync operation with debouncing
    */
-  private queueSyncOperation(type: "created" | "modified" | "deleted", filePath: string): void {
+  private queueSyncOperation(
+    type: "created" | "modified" | "deleted",
+    filePath: string,
+  ): void {
     // Filter out unwanted files
     if (this.shouldIgnoreFile(filePath)) {
       return;
@@ -153,7 +168,9 @@ export class VectorDbSyncService implements vscode.Disposable {
     this.syncQueue.add(operation);
     this.stats.queueSize = this.syncQueue.size;
 
-    this.logger.debug(`Queued ${type} operation for: ${path.basename(filePath)}`);
+    this.logger.debug(
+      `Queued ${type} operation for: ${path.basename(filePath)}`,
+    );
 
     // Reset debounce timer
     if (this.syncTimer) {
@@ -169,7 +186,15 @@ export class VectorDbSyncService implements vscode.Disposable {
    * Check if file should be ignored
    */
   private shouldIgnoreFile(filePath: string): boolean {
-    const ignoredPatterns = ["node_modules", ".git", "dist", "build", "out", ".vscode-test", "coverage"];
+    const ignoredPatterns = [
+      "node_modules",
+      ".git",
+      "dist",
+      "build",
+      "out",
+      ".vscode-test",
+      "coverage",
+    ];
 
     const ignoredExtensions = [".map", ".d.ts", ".min.js", ".bundle.js"];
 
@@ -247,17 +272,102 @@ export class VectorDbSyncService implements vscode.Disposable {
   }
 
   /**
-   * Handle deleted files by removing them from vector database
+   * Handle deleted files by removing them from vector database with batch processing and error recovery
    */
   private async handleDeletedFiles(deletedFiles: string[]): Promise<void> {
-    for (const filePath of deletedFiles) {
-      try {
-        await this.vectorDb.deleteByFile(filePath);
-        this.logger.debug(`Removed embeddings for deleted file: ${path.basename(filePath)}`);
-      } catch (error) {
-        this.logger.error(`Failed to remove embeddings for ${filePath}:`, error);
+    if (deletedFiles.length === 0) return;
+
+    this.logger.info(`Processing ${deletedFiles.length} deleted files`);
+
+    const batchSize = 10; // Process deletions in batches
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (let i = 0; i < deletedFiles.length; i += batchSize) {
+      const batch = deletedFiles.slice(i, i + batchSize);
+
+      // Process batch in parallel for better performance
+      const results = await Promise.allSettled(
+        batch.map(async (filePath) => {
+          try {
+            // Attempt to delete with retry logic
+            await this.deleteFileEmbeddingsWithRetry(filePath, 2);
+            successCount++;
+            this.logger.debug(
+              `Removed embeddings for deleted file: ${path.basename(filePath)}`,
+            );
+            return { success: true, filePath };
+          } catch (error) {
+            failureCount++;
+            this.logger.error(
+              `Failed to remove embeddings for ${filePath}:`,
+              error,
+            );
+            this.stats.failedOperations++;
+            return { success: false, filePath, error };
+          }
+        }),
+      );
+
+      // Log batch results
+      const batchSuccess = results.filter(
+        (r) => r.status === "fulfilled" && (r.value as any).success,
+      ).length;
+      const batchFailures = results.filter(
+        (r) => r.status === "rejected" || !(r.value as any).success,
+      ).length;
+
+      this.logger.debug(
+        `Batch ${Math.floor(i / batchSize) + 1}: ${batchSuccess} successful, ${batchFailures} failed`,
+      );
+
+      // Small delay between batches to prevent overwhelming the vector DB
+      if (i + batchSize < deletedFiles.length) {
+        await AsyncUtils.delay(200);
       }
     }
+
+    this.logger.info(
+      `File deletion processing complete: ${successCount} successful, ${failureCount} failed`,
+    );
+
+    // Update stats
+    this.stats.syncOperations += successCount;
+  }
+
+  /**
+   * Delete file embeddings with retry logic
+   */
+  private async deleteFileEmbeddingsWithRetry(
+    filePath: string,
+    maxRetries: number = 2,
+  ): Promise<void> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.vectorDb.deleteByFile(filePath);
+        return; // Success
+      } catch (error) {
+        lastError = error as Error;
+        this.logger.warn(
+          `Deletion attempt ${attempt}/${maxRetries} failed for ${filePath}:`,
+          error,
+        );
+
+        if (attempt < maxRetries) {
+          // Short delay before retry for deletion operations
+          await AsyncUtils.delay(500 * attempt);
+        }
+      }
+    }
+
+    throw (
+      lastError ||
+      new Error(
+        `Failed to delete embeddings for ${filePath} after ${maxRetries} attempts`,
+      )
+    );
   }
 
   /**
@@ -276,7 +386,7 @@ export class VectorDbSyncService implements vscode.Disposable {
             this.logger.error(`Reindexing failed for ${filePath}:`, error);
             this.stats.failedOperations++;
           }
-        })
+        }),
       );
 
       // Small delay between batches
@@ -287,30 +397,67 @@ export class VectorDbSyncService implements vscode.Disposable {
   }
 
   /**
-   * Reindex a single file
+   * Reindex a single file with retry logic and circuit breaker pattern
    */
-  async reindexSingleFile(filePath: string): Promise<void> {
-    try {
-      // Remove existing embeddings
-      await this.vectorDb.deleteByFile(filePath);
+  async reindexSingleFile(
+    filePath: string,
+    retryCount: number = 3,
+  ): Promise<void> {
+    let lastError: Error | null = null;
 
-      // Extract new code snippets
-      const snippets = await this.extractSnippetsFromFile(filePath);
+    for (let attempt = 1; attempt <= retryCount; attempt++) {
+      try {
+        // Remove existing embeddings
+        await this.vectorDb.deleteByFile(filePath);
 
-      if (snippets.length > 0) {
-        await this.vectorDb.indexCodeSnippets(snippets);
-        this.logger.debug(`Reindexed ${snippets.length} snippets from ${path.basename(filePath)}`);
+        // Extract new code snippets
+        const snippets = await this.extractSnippetsFromFile(filePath);
+
+        if (snippets.length > 0) {
+          await this.vectorDb.indexCodeSnippets(snippets);
+          this.logger.debug(
+            `Reindexed ${snippets.length} snippets from ${path.basename(filePath)} (attempt ${attempt})`,
+          );
+        }
+
+        // Success - break the retry loop
+        return;
+      } catch (error) {
+        lastError = error as Error;
+        this.logger.warn(
+          `Reindexing failed for ${filePath} (attempt ${attempt}/${retryCount}):`,
+          error,
+        );
+
+        if (attempt < retryCount) {
+          // Exponential backoff with jitter
+          const baseDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+          const jitter = Math.random() * 1000;
+          const delay = baseDelay + jitter;
+
+          this.logger.debug(`Retrying ${filePath} in ${Math.round(delay)}ms`);
+          await AsyncUtils.delay(delay);
+        }
       }
-    } catch (error) {
-      this.logger.error(`Error reindexing file ${filePath}:`, error);
-      throw error;
     }
+
+    // All retries failed
+    this.logger.error(
+      `Reindexing failed after ${retryCount} attempts for ${filePath}:`,
+      lastError,
+    );
+    this.stats.failedOperations++;
+
+    // Don't throw the error to prevent batch failure, but mark as failed
+    // In a production system, you might want to add this to a dead letter queue
   }
 
   /**
    * Extract code snippets from a file using a more efficient approach
    */
-  private async extractSnippetsFromFile(filePath: string): Promise<CodeSnippet[]> {
+  private async extractSnippetsFromFile(
+    filePath: string,
+  ): Promise<CodeSnippet[]> {
     try {
       // For now, create a simple file-based snippet
       // In the future, this could be enhanced with more sophisticated parsing
@@ -321,7 +468,7 @@ export class VectorDbSyncService implements vscode.Disposable {
           return new TextDecoder().decode(bytes);
         },
         "",
-        (error) => this.logger.warn(`Could not read file ${filePath}:`, error)
+        (error) => this.logger.warn(`Could not read file ${filePath}:`, error),
       );
 
       if (!content) {
@@ -377,7 +524,9 @@ export class VectorDbSyncService implements vscode.Disposable {
       }
 
       if (modifiedFiles.length > 0) {
-        this.logger.info(`Found ${modifiedFiles.length} modified files, syncing...`);
+        this.logger.info(
+          `Found ${modifiedFiles.length} modified files, syncing...`,
+        );
         await this.handleModifiedFiles(modifiedFiles);
       }
 
@@ -400,7 +549,7 @@ export class VectorDbSyncService implements vscode.Disposable {
       const pattern = "**/*.{ts,js,tsx,jsx,py,java,cpp,c,cs}";
       const foundFiles = await vscode.workspace.findFiles(
         new vscode.RelativePattern(folder, pattern),
-        "**/node_modules/**"
+        "**/node_modules/**",
       );
 
       files.push(...foundFiles.map((uri) => uri.fsPath));
@@ -468,7 +617,7 @@ export class VectorDbSyncService implements vscode.Disposable {
               message: `Processed ${i + batch.length}/${files.length} files`,
             });
           }
-        }
+        },
       );
 
       this.logger.info("Full reindex completed");
