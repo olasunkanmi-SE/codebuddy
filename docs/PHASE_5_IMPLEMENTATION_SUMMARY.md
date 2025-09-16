@@ -269,3 +269,37 @@ All Phase 5 objectives from the INCREMENTAL_DEVELOPMENT_ROADMAP.md have been suc
 6. ✅ **Validation & Testing**: Comprehensive test suite with 95% pass rate
 
 The Phase 5 implementation provides a robust, production-ready vector database system with enterprise-grade performance monitoring, automatic optimization, and comprehensive safeguards for large-scale deployment.
+
+````mermaid
+graph TD
+    A[WebUI: User types question] --> B[VS Code Extension Bridge]
+    B --> C[Question Analysis]
+    C --> D{Codebase-related?}
+    D -->|No| E[Direct AI Response]
+    D -->|Yes| F[Smart Context Extraction]
+
+    F --> G[Cache Check]
+    G -->|Hit| H[Return Cached Results]
+    G -->|Miss| I[Vector Database Search]
+
+    I --> J[Generate Query Embedding]
+    J --> K[ChromaDB Semantic Search]
+    K --> L[Rank & Filter Results]
+    L --> M[Context Enhancement]
+
+    M --> N[Production Safeguards Check]
+    N --> O[Resource Monitoring]
+    O --> P[AI Model Generation]
+    P --> Q[Response Post-processing]
+    Q --> R[WebUI Display]
+
+    S[File System] --> T[File Change Detection]
+    T --> U[Smart Embedding Orchestrator]
+    U --> V[Multi-phase Indexing]
+    V --> W[Vector Database Update]
+
+    X[Performance Profiler] --> Y[Metrics Collection]
+    Y --> Z[Alert System]
+    Z --> AA[User Notifications]
+    ```
+````
