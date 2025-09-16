@@ -1,0 +1,466 @@
+import * as vscode from "vscode";
+import * as path from "path";
+import { VectorDatabaseService, CodeSnippet } from "./vector-database.service";
+import { CodeIndexingService } from "./code-indexing";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { VECTOR_OPERATIONS, VectorOperationType } from "./vector-db-worker-manager";
+import { IFunctionData } from "../application/interfaces";
+
+export interface SyncOperation {
+  type: "created" | "modified" | "deleted";
+  filePath: string;
+  timestamp: number;
+}
+
+export interface VectorDbSyncStats {
+  filesMonitored: number;
+  syncOperations: number;
+  lastSync: string | null;
+  failedOperations: number;
+  queueSize: number;
+}
+
+/**
+ * VectorDbSyncService handles file monitoring and real-time synchronization
+ * with the vector database. It uses debounced batch processing for efficiency.
+ */
+export class VectorDbSyncService implements vscode.Disposable {
+  private vectorDb: VectorDatabaseService;
+  private codeIndexing: CodeIndexingService;
+  private logger: Logger;
+
+  private syncQueue = new Set<string>();
+  private syncTimer: NodeJS.Timeout | null = null;
+  private readonly SYNC_DELAY = 1000; // 1 second debounce
+  private readonly BATCH_SIZE = 10;
+
+  private fileWatchers: vscode.FileSystemWatcher[] = [];
+  private disposables: vscode.Disposable[] = [];
+  private isInitialized = false;
+
+  private stats: VectorDbSyncStats = {
+    filesMonitored: 0,
+    syncOperations: 0,
+    lastSync: null,
+    failedOperations: 0,
+    queueSize: 0,
+  };
+
+  constructor(vectorDb: VectorDatabaseService, codeIndexing: CodeIndexingService) {
+    this.vectorDb = vectorDb;
+    this.codeIndexing = codeIndexing;
+    this.logger = Logger.initialize("VectorDbSyncService", {
+      minLevel: LogLevel.INFO,
+    });
+  }
+
+  /**
+   * Initialize the sync service and set up file monitoring
+   */
+  async initialize(): Promise<void> {
+    try {
+      if (!this.vectorDb.isReady()) {
+        throw new Error("VectorDatabaseService must be initialized before sync service");
+      }
+
+      await this.setupFileWatchers();
+      await this.performInitialSync();
+
+      this.isInitialized = true;
+      this.logger.info("VectorDbSyncService initialized successfully");
+    } catch (error) {
+      this.logger.error("Failed to initialize VectorDbSyncService:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set up file system watchers for different file types
+   */
+  private async setupFileWatchers(): Promise<void> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+      this.logger.warn("No workspace folders found");
+      return;
+    }
+
+    // File patterns to monitor
+    const patterns = [
+      "**/*.ts",
+      "**/*.js",
+      "**/*.tsx",
+      "**/*.jsx",
+      "**/*.py",
+      "**/*.java",
+      "**/*.cpp",
+      "**/*.c",
+      "**/*.cs",
+    ];
+
+    for (const folder of workspaceFolders) {
+      for (const pattern of patterns) {
+        const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
+
+        // File created
+        watcher.onDidCreate((uri) => {
+          this.queueSyncOperation("created", uri.fsPath);
+        });
+
+        // File modified
+        watcher.onDidChange((uri) => {
+          this.queueSyncOperation("modified", uri.fsPath);
+        });
+
+        // File deleted
+        watcher.onDidDelete((uri) => {
+          this.queueSyncOperation("deleted", uri.fsPath);
+        });
+
+        this.fileWatchers.push(watcher);
+        this.disposables.push(watcher);
+      }
+    }
+
+    this.stats.filesMonitored = this.fileWatchers.length;
+    this.logger.info(`Set up ${this.fileWatchers.length} file watchers`);
+  }
+
+  /**
+   * Queue a sync operation with debouncing
+   */
+  private queueSyncOperation(type: "created" | "modified" | "deleted", filePath: string): void {
+    // Filter out unwanted files
+    if (this.shouldIgnoreFile(filePath)) {
+      return;
+    }
+
+    const operation = `${type}:${filePath}`;
+    this.syncQueue.add(operation);
+    this.stats.queueSize = this.syncQueue.size;
+
+    this.logger.debug(`Queued ${type} operation for: ${path.basename(filePath)}`);
+
+    // Reset debounce timer
+    if (this.syncTimer) {
+      clearTimeout(this.syncTimer);
+    }
+
+    this.syncTimer = setTimeout(() => {
+      this.processSyncQueue();
+    }, this.SYNC_DELAY);
+  }
+
+  /**
+   * Check if file should be ignored
+   */
+  private shouldIgnoreFile(filePath: string): boolean {
+    const ignoredPatterns = ["node_modules", ".git", "dist", "build", "out", ".vscode-test", "coverage"];
+
+    const ignoredExtensions = [".map", ".d.ts", ".min.js", ".bundle.js"];
+
+    // Check ignored directories
+    for (const pattern of ignoredPatterns) {
+      if (filePath.includes(pattern)) {
+        return true;
+      }
+    }
+
+    // Check ignored file extensions
+    for (const ext of ignoredExtensions) {
+      if (filePath.endsWith(ext)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Process the sync queue in batches
+   */
+  private async processSyncQueue(): Promise<void> {
+    if (this.syncQueue.size === 0) return;
+
+    const operations = Array.from(this.syncQueue);
+    this.syncQueue.clear();
+    this.stats.queueSize = 0;
+
+    const created: string[] = [];
+    const modified: string[] = [];
+    const deleted: string[] = [];
+
+    // Categorize operations
+    for (const op of operations) {
+      const [operation, filePath] = op.split(":");
+      switch (operation) {
+        case "created":
+          created.push(filePath);
+          break;
+        case "modified":
+          modified.push(filePath);
+          break;
+        case "deleted":
+          deleted.push(filePath);
+          break;
+      }
+    }
+
+    try {
+      // Process deletions first
+      if (deleted.length > 0) {
+        await this.handleDeletedFiles(deleted);
+      }
+
+      // Process modifications and creations
+      const filesToProcess = [...created, ...modified];
+      if (filesToProcess.length > 0) {
+        await this.handleModifiedFiles(filesToProcess);
+      }
+
+      this.stats.syncOperations += operations.length;
+      this.stats.lastSync = new Date().toISOString();
+
+      this.logger.info(`Processed ${operations.length} file operations`, {
+        created: created.length,
+        modified: modified.length,
+        deleted: deleted.length,
+      });
+    } catch (error) {
+      this.stats.failedOperations += operations.length;
+      this.logger.error("Error processing sync queue:", error);
+    }
+  }
+
+  /**
+   * Handle deleted files by removing them from vector database
+   */
+  private async handleDeletedFiles(deletedFiles: string[]): Promise<void> {
+    for (const filePath of deletedFiles) {
+      try {
+        await this.vectorDb.deleteByFile(filePath);
+        this.logger.debug(`Removed embeddings for deleted file: ${path.basename(filePath)}`);
+      } catch (error) {
+        this.logger.error(`Failed to remove embeddings for ${filePath}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Handle modified/created files by reindexing them
+   */
+  private async handleModifiedFiles(modifiedFiles: string[]): Promise<void> {
+    // Process files in batches to avoid overwhelming the system
+    for (let i = 0; i < modifiedFiles.length; i += this.BATCH_SIZE) {
+      const batch = modifiedFiles.slice(i, i + this.BATCH_SIZE);
+
+      await Promise.all(batch.map((filePath) => this.reindexSingleFile(filePath)));
+
+      // Small delay between batches
+      if (i + this.BATCH_SIZE < modifiedFiles.length) {
+        await this.delay(100);
+      }
+    }
+  }
+
+  /**
+   * Reindex a single file
+   */
+  async reindexSingleFile(filePath: string): Promise<void> {
+    try {
+      // Remove existing embeddings
+      await this.vectorDb.deleteByFile(filePath);
+
+      // Extract new code snippets
+      const snippets = await this.extractSnippetsFromFile(filePath);
+
+      if (snippets.length > 0) {
+        await this.vectorDb.indexCodeSnippets(snippets);
+        this.logger.debug(`Reindexed ${snippets.length} snippets from ${path.basename(filePath)}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error reindexing file ${filePath}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Extract code snippets from a file
+   */
+  private async extractSnippetsFromFile(filePath: string): Promise<CodeSnippet[]> {
+    try {
+      // Use the existing code indexing service to analyze the file
+      const functionData = await this.codeIndexing.generateEmbeddings();
+
+      return functionData
+        .filter((f) => f.path === filePath)
+        .map((f) => ({
+          id: `${f.path}::${f.className || "global"}::${f.name}`,
+          filePath: f.path || "",
+          type: "function" as const,
+          name: f.name || "",
+          content: f.compositeText || f.description || "",
+          metadata: {
+            className: f.className,
+            returnType: f.returnType,
+            dependencies: f.dependencies,
+          },
+        }));
+    } catch (error) {
+      this.logger.error(`Error extracting snippets from ${filePath}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Perform initial sync when service starts
+   */
+  private async performInitialSync(): Promise<void> {
+    try {
+      this.logger.info("Starting initial sync...");
+
+      // Get all existing embeddings
+      const stats = this.vectorDb.getStats();
+
+      if (stats.documentCount === 0) {
+        this.logger.info("No existing embeddings found, skipping initial sync");
+        return;
+      }
+
+      // Check if any files have been modified since last sync
+      const workspaceFiles = await this.getAllWorkspaceFiles();
+      const modifiedFiles: string[] = [];
+
+      for (const filePath of workspaceFiles) {
+        if (await this.hasFileChanged(filePath)) {
+          modifiedFiles.push(filePath);
+        }
+      }
+
+      if (modifiedFiles.length > 0) {
+        this.logger.info(`Found ${modifiedFiles.length} modified files, syncing...`);
+        await this.handleModifiedFiles(modifiedFiles);
+      }
+
+      this.logger.info("Initial sync completed");
+    } catch (error) {
+      this.logger.error("Error during initial sync:", error);
+    }
+  }
+
+  /**
+   * Get all workspace files that should be indexed
+   */
+  private async getAllWorkspaceFiles(): Promise<string[]> {
+    const files: string[] = [];
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+
+    if (!workspaceFolders) return files;
+
+    for (const folder of workspaceFolders) {
+      const pattern = "**/*.{ts,js,tsx,jsx,py,java,cpp,c,cs}";
+      const foundFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, pattern),
+        "**/node_modules/**"
+      );
+
+      files.push(...foundFiles.map((uri) => uri.fsPath));
+    }
+
+    return files.filter((file) => !this.shouldIgnoreFile(file));
+  }
+
+  /**
+   * Check if file has changed since last sync
+   */
+  private async hasFileChanged(filePath: string): Promise<boolean> {
+    try {
+      const stat = await vscode.workspace.fs.stat(vscode.Uri.file(filePath));
+      const lastModified = new Date(stat.mtime);
+
+      // Compare with last sync time
+      if (this.stats.lastSync) {
+        const lastSyncTime = new Date(this.stats.lastSync);
+        return lastModified > lastSyncTime;
+      }
+
+      return true; // No previous sync, consider as changed
+    } catch (error) {
+      return false; // File might not exist
+    }
+  }
+
+  /**
+   * Get sync service statistics
+   */
+  getStats(): VectorDbSyncStats {
+    return { ...this.stats };
+  }
+
+  /**
+   * Check if service is initialized
+   */
+  isReady(): boolean {
+    return this.isInitialized && this.vectorDb.isReady();
+  }
+
+  /**
+   * Force sync of all workspace files
+   */
+  async performFullReindex(): Promise<void> {
+    try {
+      const files = await this.getAllWorkspaceFiles();
+      this.logger.info(`Starting full reindex of ${files.length} files...`);
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Reindexing workspace files",
+          cancellable: false,
+        },
+        async (progress) => {
+          for (let i = 0; i < files.length; i += this.BATCH_SIZE) {
+            const batch = files.slice(i, i + this.BATCH_SIZE);
+
+            await this.handleModifiedFiles(batch);
+
+            progress.report({
+              increment: (batch.length / files.length) * 100,
+              message: `Processed ${i + batch.length}/${files.length} files`,
+            });
+          }
+        }
+      );
+
+      this.logger.info("Full reindex completed");
+    } catch (error) {
+      this.logger.error("Error during full reindex:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Utility delay function
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Dispose of all resources
+   */
+  dispose(): void {
+    // Clear sync timer
+    if (this.syncTimer) {
+      clearTimeout(this.syncTimer);
+      this.syncTimer = null;
+    }
+
+    // Dispose of all watchers and disposables
+    this.disposables.forEach((disposable) => disposable.dispose());
+    this.fileWatchers = [];
+    this.disposables = [];
+
+    this.isInitialized = false;
+    this.logger.info("VectorDbSyncService disposed");
+  }
+}
