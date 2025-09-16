@@ -49,7 +49,7 @@ export class VectorDatabaseService {
 
   constructor(
     private context: vscode.ExtensionContext,
-    private geminiApiKey?: string
+    private geminiApiKey?: string,
   ) {
     this.logger = Logger.initialize("VectorDatabaseService", {
       minLevel: LogLevel.INFO,
@@ -59,13 +59,16 @@ export class VectorDatabaseService {
     this.simpleStore = new SimpleVectorStore();
 
     // Set LanceDB database path - use workspace root for project-specific storage
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+    const workspaceRoot =
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
     if (workspaceRoot) {
       this.dbPath = path.join(workspaceRoot, ".codebuddy", "lancedb");
     } else {
       // Fallback to extension path if no workspace is open
       this.dbPath = path.join(this.context.extensionPath, "lancedb");
-      this.logger.warn("No workspace found, using extension directory for LanceDB storage");
+      this.logger.warn(
+        "No workspace found, using extension directory for LanceDB storage",
+      );
     }
 
     // Always use Gemini for embeddings to maintain consistency
@@ -75,7 +78,9 @@ export class VectorDatabaseService {
     }
 
     if (!this.geminiApiKey) {
-      this.logger.warn("Gemini API key not found. Vector database will be disabled.");
+      this.logger.warn(
+        "Gemini API key not found. Vector database will be disabled.",
+      );
     } else {
       this.embeddingService = new EmbeddingService(this.geminiApiKey);
     }
@@ -95,7 +100,9 @@ export class VectorDatabaseService {
   async initialize(): Promise<void> {
     try {
       if (!this.geminiApiKey) {
-        this.logger.warn("Gemini API key not found. Using SimpleVectorStore fallback.");
+        this.logger.warn(
+          "Gemini API key not found. Using SimpleVectorStore fallback.",
+        );
         this.useSimpleStore = true;
         this.isInitialized = true;
         this.stats.isInitialized = true;
@@ -106,7 +113,9 @@ export class VectorDatabaseService {
       const fs = await import("fs");
       if (!fs.existsSync(path.dirname(this.dbPath))) {
         fs.mkdirSync(path.dirname(this.dbPath), { recursive: true });
-        this.logger.info(`Created LanceDB storage directory: ${path.dirname(this.dbPath)}`);
+        this.logger.info(
+          `Created LanceDB storage directory: ${path.dirname(this.dbPath)}`,
+        );
       }
 
       // Connect to LanceDB
@@ -118,7 +127,9 @@ export class VectorDatabaseService {
         this.logger.info("Opened existing LanceDB table");
       } catch (error) {
         // Table doesn't exist, we'll create it when first documents are added
-        this.logger.info("LanceDB table doesn't exist yet, will create on first document");
+        this.logger.info(
+          "LanceDB table doesn't exist yet, will create on first document",
+        );
       }
 
       this.useSimpleStore = false; // Use LanceDB as primary
@@ -137,7 +148,10 @@ export class VectorDatabaseService {
         documentCount: count,
       });
     } catch (error) {
-      this.logger.error("Failed to initialize LanceDB, falling back to SimpleVectorStore:", error);
+      this.logger.error(
+        "Failed to initialize LanceDB, falling back to SimpleVectorStore:",
+        error,
+      );
 
       // Fallback to SimpleVectorStore
       this.useSimpleStore = true;
@@ -207,7 +221,9 @@ export class VectorDatabaseService {
       for (const snippet of snippets) {
         try {
           // Generate embedding using Gemini
-          const embedding = await embeddingService.generateEmbedding(snippet.content);
+          const embedding = await embeddingService.generateEmbedding(
+            snippet.content,
+          );
 
           documents.push({
             id: snippet.id,
@@ -219,7 +235,10 @@ export class VectorDatabaseService {
             metadata: JSON.stringify(snippet.metadata || {}),
           });
         } catch (error) {
-          this.logger.error(`Failed to generate embedding for snippet ${snippet.id}:`, error);
+          this.logger.error(
+            `Failed to generate embedding for snippet ${snippet.id}:`,
+            error,
+          );
           // Continue with other snippets
         }
       }
@@ -241,9 +260,12 @@ export class VectorDatabaseService {
       this.stats.documentCount = await this.getDocumentCount();
       this.stats.lastSync = new Date().toISOString();
 
-      this.logger.info(`Successfully indexed ${documents.length} code snippets with LanceDB`, {
-        totalDocuments: this.stats.documentCount,
-      });
+      this.logger.info(
+        `Successfully indexed ${documents.length} code snippets with LanceDB`,
+        {
+          totalDocuments: this.stats.documentCount,
+        },
+      );
     } catch (error) {
       this.logger.error("Failed to index code snippets:", error);
       throw error;
@@ -265,7 +287,9 @@ export class VectorDatabaseService {
 
     for (const snippet of snippets) {
       try {
-        const embedding = await this.embeddingService.generateEmbedding(snippet.content);
+        const embedding = await this.embeddingService.generateEmbedding(
+          snippet.content,
+        );
 
         embeddings.push(embedding);
         ids.push(snippet.id);
@@ -277,7 +301,10 @@ export class VectorDatabaseService {
           ...snippet.metadata,
         });
       } catch (error) {
-        this.logger.error(`Failed to generate embedding for snippet ${snippet.id}:`, error);
+        this.logger.error(
+          `Failed to generate embedding for snippet ${snippet.id}:`,
+          error,
+        );
       }
     }
 
@@ -296,9 +323,12 @@ export class VectorDatabaseService {
     this.stats.documentCount = await this.simpleStore.count();
     this.stats.lastSync = new Date().toISOString();
 
-    this.logger.info(`Successfully indexed ${embeddings.length} code snippets with SimpleVectorStore`, {
-      totalDocuments: this.stats.documentCount,
-    });
+    this.logger.info(
+      `Successfully indexed ${embeddings.length} code snippets with SimpleVectorStore`,
+      {
+        totalDocuments: this.stats.documentCount,
+      },
+    );
   }
 
   /**
@@ -306,7 +336,9 @@ export class VectorDatabaseService {
    */
   async semanticSearch(query: string, limit = 5): Promise<SearchResult[]> {
     if (!this.isReady()) {
-      this.logger.warn("Vector database not initialized, returning empty results");
+      this.logger.warn(
+        "Vector database not initialized, returning empty results",
+      );
       return [];
     }
 
@@ -323,11 +355,16 @@ export class VectorDatabaseService {
 
       // Use LanceDB
       if (!this.table) {
-        this.logger.warn("LanceDB table not available, returning empty results");
+        this.logger.warn(
+          "LanceDB table not available, returning empty results",
+        );
         return [];
       }
 
-      const results = await this.table.search(queryEmbedding).limit(limit).toArray();
+      const results = await this.table
+        .search(queryEmbedding)
+        .limit(limit)
+        .toArray();
 
       // Transform LanceDB results to SearchResult format
       const searchResults: SearchResult[] = results.map((result: any) => {
@@ -347,7 +384,9 @@ export class VectorDatabaseService {
         };
       });
 
-      this.logger.debug(`LanceDB search returned ${searchResults.length} results for query: "${query}"`);
+      this.logger.debug(
+        `LanceDB search returned ${searchResults.length} results for query: "${query}"`,
+      );
       return searchResults;
     } catch (error) {
       this.logger.error("Semantic search failed:", error);
@@ -358,7 +397,11 @@ export class VectorDatabaseService {
   /**
    * Search using SimpleVectorStore fallback
    */
-  private async searchWithSimpleStore(queryEmbedding: number[], limit: number, query: string): Promise<SearchResult[]> {
+  private async searchWithSimpleStore(
+    queryEmbedding: number[],
+    limit: number,
+    query: string,
+  ): Promise<SearchResult[]> {
     const results = await this.simpleStore.query({
       queryEmbeddings: [queryEmbedding],
       nResults: limit,
@@ -385,7 +428,9 @@ export class VectorDatabaseService {
       }
     }
 
-    this.logger.debug(`SimpleVectorStore search returned ${searchResults.length} results for query: "${query}"`);
+    this.logger.debug(
+      `SimpleVectorStore search returned ${searchResults.length} results for query: "${query}"`,
+    );
     return searchResults;
   }
 
@@ -407,7 +452,9 @@ export class VectorDatabaseService {
         if (results.ids && results.ids.length > 0) {
           await this.simpleStore.delete(results.ids);
           this.stats.documentCount = await this.simpleStore.count();
-          this.logger.info(`Deleted ${results.ids.length} documents for file: ${filePath}`);
+          this.logger.info(
+            `Deleted ${results.ids.length} documents for file: ${filePath}`,
+          );
         }
         return;
       }
@@ -424,7 +471,10 @@ export class VectorDatabaseService {
       this.stats.documentCount = await this.getDocumentCount();
       this.logger.info(`Deleted documents for file: ${filePath}`);
     } catch (error) {
-      this.logger.error(`Failed to delete documents for file ${filePath}:`, error);
+      this.logger.error(
+        `Failed to delete documents for file ${filePath}:`,
+        error,
+      );
     }
   }
 
@@ -500,7 +550,9 @@ export class VectorDatabaseService {
     embeddingService: EmbeddingService;
   } {
     if (!this.isReady()) {
-      throw new Error("Vector database not initialized or Gemini API key missing");
+      throw new Error(
+        "Vector database not initialized or Gemini API key missing",
+      );
     }
     return {
       embeddingService: this.embeddingService!,

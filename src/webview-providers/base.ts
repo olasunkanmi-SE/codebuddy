@@ -189,6 +189,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       await this.vectorDbSyncService?.initialize();
       this.logger.info("✓ Vector database sync service initialized");
 
+      // Phase 4.4.1: Connect service status checker to production safeguards
+      if (this.vectorDbSyncService && this.productionSafeguards) {
+        this.productionSafeguards.setServiceStatusChecker(
+          this.vectorDbSyncService,
+        );
+        this.logger.info(
+          "✓ Production safeguards connected to sync service status",
+        );
+      }
+
       // Phase 4.5: Trigger immediate embedding phase for essential files
       await this.executeImmediateEmbeddingPhase();
       this.logger.info("✓ Immediate embedding phase completed");

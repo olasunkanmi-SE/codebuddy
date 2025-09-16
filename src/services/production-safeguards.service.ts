@@ -52,6 +52,14 @@ export interface RecoveryStrategy {
 }
 
 /**
+ * Service status checker interface for smarter recovery decisions
+ */
+export interface ServiceStatusChecker {
+  isIndexingInProgress(): boolean;
+  getIndexingStats?(): { isIndexing: boolean; indexingPhase: string };
+}
+
+/**
  * Production safeguards for vector database operations
  */
 export class ProductionSafeguards implements vscode.Disposable {
@@ -63,6 +71,7 @@ export class ProductionSafeguards implements vscode.Disposable {
   private monitoringInterval?: NodeJS.Timeout;
   private emergencyStopActive: boolean = false;
   private readonly disposables: vscode.Disposable[] = [];
+  private serviceStatusChecker?: ServiceStatusChecker;
 
   // Circuit breaker state
   private circuitBreaker: {
@@ -77,10 +86,15 @@ export class ProductionSafeguards implements vscode.Disposable {
     openUntil: 0,
   };
 
-  constructor(customLimits?: Partial<ResourceLimits>) {
+  constructor(
+    customLimits?: Partial<ResourceLimits>,
+    serviceStatusChecker?: ServiceStatusChecker,
+  ) {
     this.logger = Logger.initialize("ProductionSafeguards", {
       minLevel: LogLevel.INFO,
     });
+
+    this.serviceStatusChecker = serviceStatusChecker;
 
     this.resourceLimits = {
       maxMemoryMB: 1024,
@@ -102,8 +116,14 @@ export class ProductionSafeguards implements vscode.Disposable {
     return [
       {
         action: "CLEAR_CACHE",
-        condition: (usage, limits) =>
-          usage.memoryUsage.heapUsed / 1024 / 1024 > limits.alertThresholdMB,
+        condition: (usage, limits) => {
+          const highMemory =
+            usage.memoryUsage.heapUsed / 1024 / 1024 > limits.alertThresholdMB;
+
+          // Clear cache when memory is high regardless of indexing status
+          // Cache clearing is always beneficial and safe
+          return highMemory;
+        },
         cooldownMs: 30000, // 30 seconds
         maxRetries: 3,
         priority: 1,
@@ -118,25 +138,47 @@ export class ProductionSafeguards implements vscode.Disposable {
       },
       {
         action: "REDUCE_BATCH_SIZE",
-        condition: (usage, limits) =>
-          usage.memoryUsage.heapUsed / 1024 / 1024 >
-          limits.alertThresholdMB * 0.8,
+        condition: (usage, limits) => {
+          const moderateMemory =
+            usage.memoryUsage.heapUsed / 1024 / 1024 >
+            limits.alertThresholdMB * 0.8;
+          const isIndexing =
+            this.serviceStatusChecker?.isIndexingInProgress() ?? false;
+
+          // Only reduce batch size if indexing is running and memory is moderately high
+          return moderateMemory && isIndexing;
+        },
         cooldownMs: 60000, // 1 minute
         maxRetries: 2,
         priority: 3,
       },
       {
         action: "PAUSE_INDEXING",
-        condition: (usage, limits) =>
-          usage.memoryUsage.heapUsed / 1024 / 1024 > limits.maxHeapMB * 0.9,
+        condition: (usage, limits) => {
+          const highMemory =
+            usage.memoryUsage.heapUsed / 1024 / 1024 > limits.maxHeapMB * 0.9;
+          const isIndexing =
+            this.serviceStatusChecker?.isIndexingInProgress() ?? false;
+
+          // Only trigger if memory is high AND indexing is actually running
+          return highMemory && isIndexing;
+        },
         cooldownMs: 120000, // 2 minutes
         maxRetries: 1,
         priority: 4,
       },
       {
         action: "RESTART_WORKER",
-        condition: (usage, limits) =>
-          usage.memoryUsage.heapUsed / 1024 / 1024 > limits.maxHeapMB,
+        condition: (usage, limits) => {
+          const veryHighMemory =
+            usage.memoryUsage.heapUsed / 1024 / 1024 > limits.maxHeapMB;
+          const isIndexing =
+            this.serviceStatusChecker?.isIndexingInProgress() ?? false;
+
+          // Only restart worker if memory is very high AND vector operations are running
+          // Worker restart is disruptive, so be conservative
+          return veryHighMemory && isIndexing;
+        },
         cooldownMs: 300000, // 5 minutes
         maxRetries: 1,
         priority: 5,
@@ -426,6 +468,13 @@ export class ProductionSafeguards implements vscode.Disposable {
         break;
 
       case "PAUSE_INDEXING":
+        // Log current indexing status for debugging
+        const indexingStats = this.serviceStatusChecker?.getIndexingStats?.();
+        this.logger.info("PAUSE_INDEXING recovery action triggered", {
+          isIndexing: indexingStats?.isIndexing ?? "unknown",
+          indexingPhase: indexingStats?.indexingPhase ?? "unknown",
+        });
+
         // Signal indexing pause
         vscode.commands.executeCommand("codebuddy.pauseIndexing");
         vscode.window
@@ -560,6 +609,14 @@ export class ProductionSafeguards implements vscode.Disposable {
   updateResourceLimits(limits: Partial<ResourceLimits>): void {
     this.resourceLimits = { ...this.resourceLimits, ...limits };
     this.logger.info("Resource limits updated:", this.resourceLimits);
+  }
+
+  /**
+   * Set or update the service status checker
+   */
+  setServiceStatusChecker(checker: ServiceStatusChecker): void {
+    this.serviceStatusChecker = checker;
+    this.logger.info("Service status checker updated");
   }
 
   /**

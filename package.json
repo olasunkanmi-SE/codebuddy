@@ -151,6 +151,58 @@
       {
         "command": "CodeBuddy.reviewPR",
         "title": "CodeBuddy. Review Pull Request"
+      },
+      {
+        "command": "codebuddy.vectorDb.showStats",
+        "title": "CodeBuddy: Show Vector Database Statistics"
+      },
+      {
+        "command": "codebuddy.vectorDb.forceReindex",
+        "title": "CodeBuddy: Force Full Reindex"
+      },
+      {
+        "command": "codebuddy.showIndexingStatus",
+        "title": "CodeBuddy: Show Indexing Status"
+      },
+      {
+        "command": "codebuddy.vectorDb.diagnostic",
+        "title": "CodeBuddy: Vector Database Diagnostic"
+      },
+      {
+        "command": "codebuddy.showPerformanceReport",
+        "title": "CodeBuddy: Show Performance Report"
+      },
+      {
+        "command": "codebuddy.clearVectorCache",
+        "title": "CodeBuddy: Clear Vector Cache"
+      },
+      {
+        "command": "codebuddy.reduceBatchSize",
+        "title": "CodeBuddy: Reduce Batch Size"
+      },
+      {
+        "command": "codebuddy.pauseIndexing",
+        "title": "CodeBuddy: Pause Indexing"
+      },
+      {
+        "command": "codebuddy.resumeIndexing",
+        "title": "CodeBuddy: Resume Indexing"
+      },
+      {
+        "command": "codebuddy.restartVectorWorker",
+        "title": "CodeBuddy: Restart Vector Worker"
+      },
+      {
+        "command": "codebuddy.emergencyStop",
+        "title": "CodeBuddy: Emergency Stop"
+      },
+      {
+        "command": "codebuddy.resumeFromEmergencyStop",
+        "title": "CodeBuddy: Resume From Emergency Stop"
+      },
+      {
+        "command": "codebuddy.optimizePerformance",
+        "title": "CodeBuddy: Optimize Performance"
       }
     ],
     "viewsContainers": {

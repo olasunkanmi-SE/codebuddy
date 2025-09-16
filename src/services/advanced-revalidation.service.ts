@@ -44,7 +44,7 @@ export class AdvancedRevalidationManager {
 
   constructor(
     private vectorDb: VectorDatabaseService,
-    private config: RevalidationConfig
+    private config: RevalidationConfig,
   ) {
     this.logger = Logger.initialize("AdvancedRevalidationManager", {
       minLevel: LogLevel.INFO,
@@ -58,7 +58,9 @@ export class AdvancedRevalidationManager {
   async contentBasedRevalidation(filePaths: string[]): Promise<void> {
     if (!this.config.enableContentHashing) return;
 
-    this.logger.info(`Content-based revalidation for ${filePaths.length} files`);
+    this.logger.info(
+      `Content-based revalidation for ${filePaths.length} files`,
+    );
     const changedFiles: string[] = [];
 
     for (const filePath of filePaths) {
@@ -66,7 +68,10 @@ export class AdvancedRevalidationManager {
         const currentChecksum = await this.calculateFileChecksum(filePath);
         const cachedChecksum = this.checksumCache.get(filePath);
 
-        if (!cachedChecksum || cachedChecksum.checksum !== currentChecksum.checksum) {
+        if (
+          !cachedChecksum ||
+          cachedChecksum.checksum !== currentChecksum.checksum
+        ) {
           changedFiles.push(filePath);
           this.checksumCache.set(filePath, currentChecksum);
           this.logger.debug(`Content changed: ${filePath}`);
@@ -94,7 +99,9 @@ export class AdvancedRevalidationManager {
     const dependentFiles = this.findDependentFiles(changedFile);
 
     if (dependentFiles.size > 0) {
-      this.logger.info(`Found ${dependentFiles.size} dependent files to revalidate`);
+      this.logger.info(
+        `Found ${dependentFiles.size} dependent files to revalidate`,
+      );
       await this.reindexFiles(Array.from(dependentFiles), "dependency-aware");
     }
 
@@ -119,14 +126,19 @@ export class AdvancedRevalidationManager {
       }
     }, intervalMs);
 
-    this.logger.info(`Scheduled revalidation every ${this.config.scheduledInterval} hours`);
+    this.logger.info(
+      `Scheduled revalidation every ${this.config.scheduledInterval} hours`,
+    );
   }
 
   /**
    * STRATEGY 4: Git Hook-Based Revalidation
    * Triggers revalidation on git events (commit, merge, branch switch)
    */
-  async gitHookRevalidation(gitEvent: "commit" | "merge" | "branch-switch", affectedFiles?: string[]): Promise<void> {
+  async gitHookRevalidation(
+    gitEvent: "commit" | "merge" | "branch-switch",
+    affectedFiles?: string[],
+  ): Promise<void> {
     if (!this.config.enableGitHookRevalidation) return;
 
     this.logger.info(`Git-based revalidation triggered by: ${gitEvent}`);
@@ -173,7 +185,9 @@ export class AdvancedRevalidationManager {
       // For now, this is a conceptual framework
 
       if (invalidEmbeddings.length > 0) {
-        this.logger.warn(`Found ${invalidEmbeddings.length} potentially invalid embeddings`);
+        this.logger.warn(
+          `Found ${invalidEmbeddings.length} potentially invalid embeddings`,
+        );
         // Trigger revalidation of these specific documents
       }
     } catch (error) {
@@ -197,7 +211,10 @@ export class AdvancedRevalidationManager {
       searchMetrics.errorRate > 0.1; // > 10% errors
 
     if (shouldRevalidate) {
-      this.logger.warn("Performance degradation detected, triggering revalidation", searchMetrics);
+      this.logger.warn(
+        "Performance degradation detected, triggering revalidation",
+        searchMetrics,
+      );
       await this.performFullRevalidation("performance-degradation");
     }
   }
@@ -256,7 +273,7 @@ export class AdvancedRevalidationManager {
 
         // This would need integration with the sync service
         progress.report({ increment: 100, message: "Revalidation complete" });
-      }
+      },
     );
   }
 
@@ -265,7 +282,10 @@ export class AdvancedRevalidationManager {
     // This might involve comparing file hashes with what's in the embeddings
   }
 
-  private async reindexFiles(filePaths: string[], reason: string): Promise<void> {
+  private async reindexFiles(
+    filePaths: string[],
+    reason: string,
+  ): Promise<void> {
     this.logger.info(`Reindexing ${filePaths.length} files (${reason})`);
 
     // Process in batches
@@ -280,7 +300,7 @@ export class AdvancedRevalidationManager {
           } catch (error) {
             this.logger.error(`Failed to reindex ${filePath}:`, error);
           }
-        })
+        }),
       );
     }
   }
@@ -294,7 +314,7 @@ export class AdvancedRevalidationManager {
       const pattern = "**/*.{ts,js,tsx,jsx,py,java,cpp,c,cs}";
       const foundFiles = await vscode.workspace.findFiles(
         new vscode.RelativePattern(folder, pattern),
-        "**/node_modules/**"
+        "**/node_modules/**",
       );
       files.push(...foundFiles.map((uri) => uri.fsPath));
     }
@@ -322,7 +342,8 @@ export class AdvancedRevalidationManager {
 export const REVALIDATION_STRATEGIES: RevalidationStrategy[] = [
   {
     name: "Real-time File Monitoring",
-    description: "Watches file system changes and updates embeddings immediately",
+    description:
+      "Watches file system changes and updates embeddings immediately",
     trigger: "automatic",
     cost: "low",
   },
