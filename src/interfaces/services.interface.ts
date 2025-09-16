@@ -20,7 +20,7 @@ export interface IVectorDatabaseService {
       content: string;
       language: string;
       chunkIndex?: number;
-    }
+    },
   ): Promise<void>;
 
   /**
@@ -32,7 +32,7 @@ export interface IVectorDatabaseService {
       limit?: number;
       threshold?: number;
       filters?: Record<string, any>;
-    }
+    },
   ): Promise<SearchResult[]>;
 
   /**
@@ -102,7 +102,10 @@ export interface IVectorDbWorkerManager {
   /**
    * Queue a file for processing
    */
-  queueFile(filePath: string, priority?: "high" | "normal" | "low"): Promise<void>;
+  queueFile(
+    filePath: string,
+    priority?: "high" | "normal" | "low",
+  ): Promise<void>;
 
   /**
    * Cancel processing for a specific file
@@ -146,12 +149,18 @@ export interface ISmartContextExtractor {
   /**
    * Extract relevant context using vector search
    */
-  extractRelevantContextWithVector(query: string, currentFilePath?: string): Promise<ContextResult>;
+  extractRelevantContextWithVector(
+    query: string,
+    currentFilePath?: string,
+  ): Promise<ContextResult>;
 
   /**
    * Extract traditional context as fallback
    */
-  extractTraditionalContext(query: string, currentFilePath?: string): Promise<ContextResult>;
+  extractTraditionalContext(
+    query: string,
+    currentFilePath?: string,
+  ): Promise<ContextResult>;
 
   /**
    * Configure extraction parameters
@@ -206,12 +215,18 @@ export interface IUserFeedbackService {
   /**
    * Show success message
    */
-  showSuccess(message: string, actions?: string[]): Thenable<string | undefined>;
+  showSuccess(
+    message: string,
+    actions?: string[],
+  ): Thenable<string | undefined>;
 
   /**
    * Show warning message
    */
-  showWarning(message: string, actions?: string[]): Thenable<string | undefined>;
+  showWarning(
+    message: string,
+    actions?: string[],
+  ): Thenable<string | undefined>;
 
   /**
    * Show error message
@@ -256,7 +271,11 @@ export interface IConfigurationManager<T> {
   /**
    * Update a configuration value
    */
-  updateConfig<K extends keyof T>(key: K, value: T[K], target?: vscode.ConfigurationTarget): Promise<void>;
+  updateConfig<K extends keyof T>(
+    key: K,
+    value: T[K],
+    target?: vscode.ConfigurationTarget,
+  ): Promise<void>;
 
   /**
    * Validate current configuration
@@ -276,7 +295,10 @@ export interface IConfigurationManager<T> {
   /**
    * Import configuration from JSON
    */
-  importConfiguration(configJson: string, target?: vscode.ConfigurationTarget): Promise<void>;
+  importConfiguration(
+    configJson: string,
+    target?: vscode.ConfigurationTarget,
+  ): Promise<void>;
 
   /**
    * Listen for configuration changes

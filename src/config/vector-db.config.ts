@@ -60,7 +60,10 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
     logLevel: "info",
   };
 
-  private readonly PERFORMANCE_THRESHOLDS: Record<string, PerformanceThresholds> = {
+  private readonly PERFORMANCE_THRESHOLDS: Record<
+    string,
+    PerformanceThresholds
+  > = {
     balanced: {
       maxEmbeddingTime: 5000,
       maxSearchTime: 2000,
@@ -101,30 +104,55 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       return { ...this.cachedConfig };
     }
 
-    const workspaceConfig = vscode.workspace.getConfiguration("codebuddy.vectorDb");
+    const workspaceConfig =
+      vscode.workspace.getConfiguration("codebuddy.vectorDb");
 
     this.cachedConfig = {
       enabled: workspaceConfig.get("enabled", this.DEFAULT_CONFIG.enabled),
-      embeddingModel: workspaceConfig.get("embeddingModel", this.DEFAULT_CONFIG.embeddingModel),
-      maxTokens: workspaceConfig.get("maxTokens", this.DEFAULT_CONFIG.maxTokens),
-      batchSize: workspaceConfig.get("batchSize", this.DEFAULT_CONFIG.batchSize),
-      searchResultLimit: workspaceConfig.get("searchResultLimit", this.DEFAULT_CONFIG.searchResultLimit),
+      embeddingModel: workspaceConfig.get(
+        "embeddingModel",
+        this.DEFAULT_CONFIG.embeddingModel,
+      ),
+      maxTokens: workspaceConfig.get(
+        "maxTokens",
+        this.DEFAULT_CONFIG.maxTokens,
+      ),
+      batchSize: workspaceConfig.get(
+        "batchSize",
+        this.DEFAULT_CONFIG.batchSize,
+      ),
+      searchResultLimit: workspaceConfig.get(
+        "searchResultLimit",
+        this.DEFAULT_CONFIG.searchResultLimit,
+      ),
       enableBackgroundProcessing: workspaceConfig.get(
         "enableBackgroundProcessing",
-        this.DEFAULT_CONFIG.enableBackgroundProcessing
+        this.DEFAULT_CONFIG.enableBackgroundProcessing,
       ),
       enableProgressNotifications: workspaceConfig.get(
         "enableProgressNotifications",
-        this.DEFAULT_CONFIG.enableProgressNotifications
+        this.DEFAULT_CONFIG.enableProgressNotifications,
       ),
-      progressLocation: workspaceConfig.get("progressLocation", this.DEFAULT_CONFIG.progressLocation),
-      debounceDelay: workspaceConfig.get("debounceDelay", this.DEFAULT_CONFIG.debounceDelay),
-      performanceMode: workspaceConfig.get("performanceMode", this.DEFAULT_CONFIG.performanceMode),
+      progressLocation: workspaceConfig.get(
+        "progressLocation",
+        this.DEFAULT_CONFIG.progressLocation,
+      ),
+      debounceDelay: workspaceConfig.get(
+        "debounceDelay",
+        this.DEFAULT_CONFIG.debounceDelay,
+      ),
+      performanceMode: workspaceConfig.get(
+        "performanceMode",
+        this.DEFAULT_CONFIG.performanceMode,
+      ),
       fallbackToKeywordSearch: workspaceConfig.get(
         "fallbackToKeywordSearch",
-        this.DEFAULT_CONFIG.fallbackToKeywordSearch
+        this.DEFAULT_CONFIG.fallbackToKeywordSearch,
       ),
-      cacheEnabled: workspaceConfig.get("cacheEnabled", this.DEFAULT_CONFIG.cacheEnabled),
+      cacheEnabled: workspaceConfig.get(
+        "cacheEnabled",
+        this.DEFAULT_CONFIG.cacheEnabled,
+      ),
       logLevel: workspaceConfig.get("logLevel", this.DEFAULT_CONFIG.logLevel),
     };
 
@@ -144,14 +172,21 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
    */
   getFeatureFlags(): FeatureFlags {
     const config = this.getConfig();
-    const workspaceConfig = vscode.workspace.getConfiguration("codebuddy.vectorDb.features");
+    const workspaceConfig = vscode.workspace.getConfiguration(
+      "codebuddy.vectorDb.features",
+    );
 
     return {
-      enableVectorSearch: config.enabled && workspaceConfig.get("enableVectorSearch", true),
-      enableSemanticSimilarity: config.enabled && workspaceConfig.get("enableSemanticSimilarity", true),
-      enableSmartRanking: config.enabled && workspaceConfig.get("enableSmartRanking", true),
-      enableRealtimeSync: config.enabled && workspaceConfig.get("enableRealtimeSync", true),
-      enableBulkOperations: config.enabled && workspaceConfig.get("enableBulkOperations", true),
+      enableVectorSearch:
+        config.enabled && workspaceConfig.get("enableVectorSearch", true),
+      enableSemanticSimilarity:
+        config.enabled && workspaceConfig.get("enableSemanticSimilarity", true),
+      enableSmartRanking:
+        config.enabled && workspaceConfig.get("enableSmartRanking", true),
+      enableRealtimeSync:
+        config.enabled && workspaceConfig.get("enableRealtimeSync", true),
+      enableBulkOperations:
+        config.enabled && workspaceConfig.get("enableBulkOperations", true),
       enableAnalytics: workspaceConfig.get("enableAnalytics", false),
     };
   }
@@ -162,10 +197,11 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
   async updateConfig<K extends keyof VectorDbConfig>(
     key: K,
     value: VectorDbConfig[K],
-    target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Workspace
+    target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Workspace,
   ): Promise<void> {
     try {
-      const workspaceConfig = vscode.workspace.getConfiguration("codebuddy.vectorDb");
+      const workspaceConfig =
+        vscode.workspace.getConfiguration("codebuddy.vectorDb");
       await workspaceConfig.update(key, value, target);
 
       this.logger.info(`Configuration updated: ${key} = ${value}`);
@@ -185,9 +221,12 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
   /**
    * Reset configuration to defaults
    */
-  async resetToDefaults(target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Workspace): Promise<void> {
+  async resetToDefaults(
+    target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Workspace,
+  ): Promise<void> {
     try {
-      const workspaceConfig = vscode.workspace.getConfiguration("codebuddy.vectorDb");
+      const workspaceConfig =
+        vscode.workspace.getConfiguration("codebuddy.vectorDb");
 
       for (const [key, value] of Object.entries(this.DEFAULT_CONFIG)) {
         await workspaceConfig.update(key, value, target);
@@ -200,7 +239,9 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       const newConfig = this.getConfig();
       this.notifyConfigChange(newConfig);
 
-      vscode.window.showInformationMessage("Vector database configuration reset to defaults");
+      vscode.window.showInformationMessage(
+        "Vector database configuration reset to defaults",
+      );
     } catch (error) {
       this.logger.error("Failed to reset configuration:", error);
       vscode.window.showErrorMessage("Failed to reset configuration");
@@ -217,33 +258,43 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
 
     // Validate batch size
     if (config.batchSize < 1 || config.batchSize > 50) {
-      issues.push(`Batch size ${config.batchSize} is outside recommended range (1-50)`);
+      issues.push(
+        `Batch size ${config.batchSize} is outside recommended range (1-50)`,
+      );
     }
 
     // Validate max tokens
     if (config.maxTokens < 1000 || config.maxTokens > 32000) {
-      issues.push(`Max tokens ${config.maxTokens} is outside recommended range (1000-32000)`);
+      issues.push(
+        `Max tokens ${config.maxTokens} is outside recommended range (1000-32000)`,
+      );
     }
 
     // Validate debounce delay
     if (config.debounceDelay < 100 || config.debounceDelay > 10000) {
-      issues.push(`Debounce delay ${config.debounceDelay}ms is outside recommended range (100-10000ms)`);
+      issues.push(
+        `Debounce delay ${config.debounceDelay}ms is outside recommended range (100-10000ms)`,
+      );
     }
 
     // Validate search result limit
     if (config.searchResultLimit < 1 || config.searchResultLimit > 20) {
-      issues.push(`Search result limit ${config.searchResultLimit} is outside recommended range (1-20)`);
+      issues.push(
+        `Search result limit ${config.searchResultLimit} is outside recommended range (1-20)`,
+      );
     }
 
     if (issues.length > 0) {
       this.logger.warn("Configuration validation issues found:", issues);
 
       const message = `Vector database configuration issues detected:\\n${issues.join("\\n")}`;
-      vscode.window.showWarningMessage(message, "Fix Configuration", "Ignore").then((action) => {
-        if (action === "Fix Configuration") {
-          this.showConfigurationWizard();
-        }
-      });
+      vscode.window
+        .showWarningMessage(message, "Fix Configuration", "Ignore")
+        .then((action) => {
+          if (action === "Fix Configuration") {
+            this.showConfigurationWizard();
+          }
+        });
 
       return false;
     }
@@ -279,7 +330,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       {
         placeHolder: "Select performance mode",
         title: "Vector Database Configuration (1/4)",
-      }
+      },
     );
 
     if (!performanceMode) return;
@@ -301,7 +352,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       {
         placeHolder: "Enable background processing?",
         title: "Vector Database Configuration (2/4)",
-      }
+      },
     );
 
     if (!backgroundProcessing) return;
@@ -328,7 +379,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       {
         placeHolder: "How should progress be displayed?",
         title: "Vector Database Configuration (3/4)",
-      }
+      },
     );
 
     if (!progressNotifications) return;
@@ -351,8 +402,14 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
 
     // Apply configuration
     try {
-      await this.updateConfig("performanceMode", performanceMode.label.toLowerCase() as any);
-      await this.updateConfig("enableBackgroundProcessing", backgroundProcessing.label === "Enable");
+      await this.updateConfig(
+        "performanceMode",
+        performanceMode.label.toLowerCase() as any,
+      );
+      await this.updateConfig(
+        "enableBackgroundProcessing",
+        backgroundProcessing.label === "Enable",
+      );
 
       if (progressNotifications.label === "Disabled") {
         await this.updateConfig("enableProgressNotifications", false);
@@ -360,13 +417,17 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
         await this.updateConfig("enableProgressNotifications", true);
         await this.updateConfig(
           "progressLocation",
-          progressNotifications.label === "Notification Panel" ? "notification" : "statusBar"
+          progressNotifications.label === "Notification Panel"
+            ? "notification"
+            : "statusBar",
         );
       }
 
       await this.updateConfig("batchSize", parseInt(batchSizeInput));
 
-      vscode.window.showInformationMessage("Vector database configuration updated successfully!");
+      vscode.window.showInformationMessage(
+        "Vector database configuration updated successfully!",
+      );
     } catch (error) {
       vscode.window.showErrorMessage("Failed to update configuration");
     }
@@ -391,7 +452,9 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       }
 
       this.logger.info("Auto-tune configuration completed");
-      vscode.window.showInformationMessage(`Configuration auto-tuned for ${workspaceStats.totalFiles} files`);
+      vscode.window.showInformationMessage(
+        `Configuration auto-tuned for ${workspaceStats.totalFiles} files`,
+      );
     } catch (error) {
       this.logger.error("Auto-tune failed:", error);
       vscode.window.showErrorMessage("Failed to auto-tune configuration");
@@ -409,7 +472,12 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
   }> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
-      return { totalFiles: 0, averageFileSize: 0, codeFileTypes: [], estimatedMemoryUsage: 0 };
+      return {
+        totalFiles: 0,
+        averageFileSize: 0,
+        codeFileTypes: [],
+        estimatedMemoryUsage: 0,
+      };
     }
 
     let totalFiles = 0;
@@ -417,8 +485,14 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
     const fileTypes = new Set<string>();
 
     for (const folder of workspaceFolders) {
-      const pattern = new vscode.RelativePattern(folder, "**/*.{ts,tsx,js,jsx,py,java,cpp,c,cs,go,rs,php,rb}");
-      const files = await vscode.workspace.findFiles(pattern, "**/node_modules/**");
+      const pattern = new vscode.RelativePattern(
+        folder,
+        "**/*.{ts,tsx,js,jsx,py,java,cpp,c,cs,go,rs,php,rb}",
+      );
+      const files = await vscode.workspace.findFiles(
+        pattern,
+        "**/node_modules/**",
+      );
 
       totalFiles += files.length;
 
@@ -436,8 +510,10 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       }
     }
 
-    const averageFileSize = totalFiles > 0 ? totalSize / Math.min(totalFiles, 100) : 0;
-    const estimatedMemoryUsage = (totalFiles * averageFileSize * 2) / (1024 * 1024); // Rough estimate in MB
+    const averageFileSize =
+      totalFiles > 0 ? totalSize / Math.min(totalFiles, 100) : 0;
+    const estimatedMemoryUsage =
+      (totalFiles * averageFileSize * 2) / (1024 * 1024); // Rough estimate in MB
 
     return {
       totalFiles,
@@ -512,7 +588,9 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
   /**
    * Add configuration change listener
    */
-  onConfigChange(listener: (config: VectorDbConfig) => void): vscode.Disposable {
+  onConfigChange(
+    listener: (config: VectorDbConfig) => void,
+  ): vscode.Disposable {
     this.configChangeListeners.push(listener);
 
     return {
@@ -551,7 +629,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
    */
   async importConfiguration(
     configJson: string,
-    target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Workspace
+    target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Workspace,
   ): Promise<void> {
     try {
       const config = JSON.parse(configJson) as Partial<VectorDbConfig>;
@@ -563,10 +641,14 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
         }
       }
 
-      vscode.window.showInformationMessage("Configuration imported successfully");
+      vscode.window.showInformationMessage(
+        "Configuration imported successfully",
+      );
     } catch (error) {
       this.logger.error("Failed to import configuration:", error);
-      vscode.window.showErrorMessage("Failed to import configuration: Invalid JSON");
+      vscode.window.showErrorMessage(
+        "Failed to import configuration: Invalid JSON",
+      );
       throw error;
     }
   }

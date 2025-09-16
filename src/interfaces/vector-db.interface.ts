@@ -30,7 +30,10 @@ export interface ICodeIndexer {
   /**
    * Search for similar code based on query
    */
-  searchSimilar(query: string, options?: SearchOptions): Promise<SearchResult[]>;
+  searchSimilar(
+    query: string,
+    options?: SearchOptions,
+  ): Promise<SearchResult[]>;
 
   /**
    * Get indexing statistics
@@ -109,12 +112,18 @@ export interface ISmartContextExtractor {
   /**
    * Extract relevant context using vector search
    */
-  extractRelevantContextWithVector(query: string, currentFilePath?: string): Promise<SmartContextResult>;
+  extractRelevantContextWithVector(
+    query: string,
+    currentFilePath?: string,
+  ): Promise<SmartContextResult>;
 
   /**
    * Extract context using traditional methods as fallback
    */
-  extractTraditionalContext(query: string, currentFilePath?: string): Promise<SmartContextResult>;
+  extractTraditionalContext(
+    query: string,
+    currentFilePath?: string,
+  ): Promise<SmartContextResult>;
 
   /**
    * Configure extraction options

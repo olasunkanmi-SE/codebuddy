@@ -53,7 +53,7 @@ export class SmartContextExtractor {
     private codebaseUnderstanding?: CodebaseUnderstandingService,
     private questionClassifier?: QuestionClassifierService,
     options: SmartContextOptions = {},
-    performanceProfiler?: any
+    performanceProfiler?: any,
   ) {
     this.performanceProfiler = performanceProfiler;
     this.logger = Logger.initialize("SmartContextExtractor", {
@@ -80,7 +80,10 @@ export class SmartContextExtractor {
   /**
    * Main method for extracting relevant context with vector search capabilities
    */
-  async extractRelevantContextWithVector(userQuestion: string, activeFile?: string): Promise<ContextExtractionResult> {
+  async extractRelevantContextWithVector(
+    userQuestion: string,
+    activeFile?: string,
+  ): Promise<ContextExtractionResult> {
     const startTime = Date.now();
 
     try {
@@ -109,11 +112,16 @@ export class SmartContextExtractor {
   /**
    * Core context extraction logic
    */
-  private async performContextExtraction(userQuestion: string, activeFile?: string): Promise<ContextExtractionResult> {
+  private async performContextExtraction(
+    userQuestion: string,
+    activeFile?: string,
+  ): Promise<ContextExtractionResult> {
     const startTime = Date.now();
 
     try {
-      this.logger.debug(`Extracting context for question: "${userQuestion.substring(0, 50)}..."`);
+      this.logger.debug(
+        `Extracting context for question: "${userQuestion.substring(0, 50)}..."`,
+      );
 
       // Analyze question to determine search strategy
       const questionAnalysis = await this.analyzeQuestion(userQuestion);
@@ -121,11 +129,15 @@ export class SmartContextExtractor {
       // Try vector search first if available and enabled
       let vectorResult: ContextExtractionResult | null = null;
       if (this.options.enableVectorSearch && this.vectorDb) {
-        vectorResult = await this.tryVectorSearch(userQuestion, activeFile, questionAnalysis);
+        vectorResult = await this.tryVectorSearch(
+          userQuestion,
+          activeFile,
+          questionAnalysis,
+        );
 
         if (vectorResult && vectorResult.sources.length > 0) {
           this.logger.info(
-            `Vector search found ${vectorResult.sources.length} relevant results in ${Date.now() - startTime}ms`
+            `Vector search found ${vectorResult.sources.length} relevant results in ${Date.now() - startTime}ms`,
           );
           return vectorResult;
         }
@@ -133,16 +145,23 @@ export class SmartContextExtractor {
 
       // Fallback to keyword-based search if enabled and needed
       if (this.options.enableFallback) {
-        const isVectorDbAvailable = this.vectorDb && (await this.isVectorDbReady());
-        const hasVectorResults = vectorResult && vectorResult.sources.length > 0;
+        const isVectorDbAvailable =
+          this.vectorDb && (await this.isVectorDbReady());
+        const hasVectorResults =
+          vectorResult && vectorResult.sources.length > 0;
 
         if (!isVectorDbAvailable || !hasVectorResults) {
-          this.logger.debug("Vector search unavailable or returned no results, using fallback method");
-          const fallbackResult = await this.tryKeywordSearch(userQuestion, activeFile);
+          this.logger.debug(
+            "Vector search unavailable or returned no results, using fallback method",
+          );
+          const fallbackResult = await this.tryKeywordSearch(
+            userQuestion,
+            activeFile,
+          );
 
           if (fallbackResult) {
             this.logger.info(
-              `Fallback search found ${fallbackResult.sources.length} relevant results in ${Date.now() - startTime}ms`
+              `Fallback search found ${fallbackResult.sources.length} relevant results in ${Date.now() - startTime}ms`,
             );
             return fallbackResult;
           }
@@ -150,7 +169,8 @@ export class SmartContextExtractor {
       }
 
       // Return empty result if no context found
-      const actualSearchMethod = this.vectorDb && (await this.isVectorDbReady()) ? "vector" : "keyword";
+      const actualSearchMethod =
+        this.vectorDb && (await this.isVectorDbReady()) ? "vector" : "keyword";
       this.logger.warn("No relevant context found for question");
       return {
         content: "",
@@ -216,7 +236,7 @@ export class SmartContextExtractor {
   private async tryVectorSearch(
     question: string,
     activeFile?: string,
-    questionAnalysis?: any
+    questionAnalysis?: any,
   ): Promise<ContextExtractionResult | null> {
     if (!this.vectorDb) return null;
 
@@ -224,7 +244,7 @@ export class SmartContextExtractor {
       // Perform semantic search
       const searchResults = await this.vectorDb.semanticSearch(
         question,
-        this.options.maxResults * 2 // Get more results to filter and rank
+        this.options.maxResults * 2, // Get more results to filter and rank
       );
 
       if (searchResults.length === 0) {
@@ -232,11 +252,18 @@ export class SmartContextExtractor {
       }
 
       // Rank and filter results
-      const rankedResults = await this.rankSearchResults(searchResults, question, activeFile);
+      const rankedResults = await this.rankSearchResults(
+        searchResults,
+        question,
+        activeFile,
+      );
       const topResults = rankedResults.slice(0, this.options.maxResults);
 
       // Build context from results
-      const contextResult = this.buildContextFromVectorResults(topResults, question);
+      const contextResult = this.buildContextFromVectorResults(
+        topResults,
+        question,
+      );
 
       return {
         ...contextResult,
@@ -251,13 +278,20 @@ export class SmartContextExtractor {
   /**
    * Attempt keyword-based fallback search
    */
-  private async tryKeywordSearch(question: string, activeFile?: string): Promise<ContextExtractionResult | null> {
+  private async tryKeywordSearch(
+    question: string,
+    activeFile?: string,
+  ): Promise<ContextExtractionResult | null> {
     if (!this.codebaseUnderstanding) return null;
 
     try {
       // Use existing codebase understanding service
       const fullContext = await this.codebaseUnderstanding.getCodebaseContext();
-      const extractedContext = this.extractRelevantKeywordContext(fullContext, question, activeFile);
+      const extractedContext = this.extractRelevantKeywordContext(
+        fullContext,
+        question,
+        activeFile,
+      );
 
       if (!extractedContext) return null;
 
@@ -280,14 +314,18 @@ export class SmartContextExtractor {
   private async rankSearchResults(
     results: SearchResult[],
     question: string,
-    activeFile?: string
+    activeFile?: string,
   ): Promise<SearchResult[]> {
     const questionKeywords = this.extractTechnicalKeywords(question);
 
     return results
       .map((result) => ({
         ...result,
-        compositeScore: this.calculateCompositeScore(result, questionKeywords, activeFile),
+        compositeScore: this.calculateCompositeScore(
+          result,
+          questionKeywords,
+          activeFile,
+        ),
       }))
       .sort((a, b) => (b as any).compositeScore - (a as any).compositeScore);
   }
@@ -295,7 +333,11 @@ export class SmartContextExtractor {
   /**
    * Calculate composite relevance score
    */
-  private calculateCompositeScore(result: SearchResult, questionKeywords: string[], activeFile?: string): number {
+  private calculateCompositeScore(
+    result: SearchResult,
+    questionKeywords: string[],
+    activeFile?: string,
+  ): number {
     let score = 0;
 
     // 1. Vector similarity score (primary) - weight: 40%
@@ -303,12 +345,16 @@ export class SmartContextExtractor {
 
     // 2. File proximity to active file (secondary) - weight: 25%
     if (activeFile && result.metadata.filePath) {
-      score += this.calculateFileProximityScore(result.metadata.filePath, activeFile) * 0.25;
+      score +=
+        this.calculateFileProximityScore(result.metadata.filePath, activeFile) *
+        0.25;
     }
 
     // 3. Keyword overlap - weight: 20%
     if (questionKeywords.length > 0) {
-      score += this.calculateKeywordOverlapScore(result.content, questionKeywords) * 0.2;
+      score +=
+        this.calculateKeywordOverlapScore(result.content, questionKeywords) *
+        0.2;
     }
 
     // 4. Code importance/complexity (metadata-based) - weight: 15%
@@ -327,7 +373,10 @@ export class SmartContextExtractor {
   /**
    * Calculate file proximity score component
    */
-  private calculateFileProximityScore(resultPath: string, activeFile: string): number {
+  private calculateFileProximityScore(
+    resultPath: string,
+    activeFile: string,
+  ): number {
     if (resultPath === activeFile) return 1.0;
 
     const resultDir = path.dirname(resultPath);
@@ -355,11 +404,16 @@ export class SmartContextExtractor {
   /**
    * Calculate keyword overlap score component
    */
-  private calculateKeywordOverlapScore(content: string, keywords: string[]): number {
+  private calculateKeywordOverlapScore(
+    content: string,
+    keywords: string[],
+  ): number {
     if (keywords.length === 0) return 0;
 
     const contentLower = content.toLowerCase();
-    const matchedKeywords = keywords.filter((keyword) => contentLower.includes(keyword.toLowerCase()));
+    const matchedKeywords = keywords.filter((keyword) =>
+      contentLower.includes(keyword.toLowerCase()),
+    );
 
     return matchedKeywords.length / keywords.length;
   }
@@ -383,7 +437,9 @@ export class SmartContextExtractor {
 
     // Higher importance for recently modified files
     if (metadata.lastModified) {
-      const daysSinceModified = (Date.now() - new Date(metadata.lastModified).getTime()) / (1000 * 60 * 60 * 24);
+      const daysSinceModified =
+        (Date.now() - new Date(metadata.lastModified).getTime()) /
+        (1000 * 60 * 60 * 24);
       if (daysSinceModified < 7) importance += 0.1;
     }
 
@@ -395,7 +451,7 @@ export class SmartContextExtractor {
    */
   private buildContextFromVectorResults(
     results: SearchResult[],
-    question: string
+    question: string,
   ): {
     content: string;
     sources: ContextSource[];
@@ -423,7 +479,10 @@ export class SmartContextExtractor {
 
       // Check token budget
       const sectionTokens = this.estimateTokenCount(result.content);
-      if (totalTokens + sectionTokens > this.options.maxContextTokens - this.options.tokenBudgetBuffer) {
+      if (
+        totalTokens + sectionTokens >
+        this.options.maxContextTokens - this.options.tokenBudgetBuffer
+      ) {
         this.logger.debug(`Token budget reached, stopping at ${i} results`);
         break;
       }
@@ -460,7 +519,8 @@ export class SmartContextExtractor {
       averageRelevance += result.relevanceScore;
     }
 
-    averageRelevance = sources.length > 0 ? averageRelevance / sources.length : 0;
+    averageRelevance =
+      sources.length > 0 ? averageRelevance / sources.length : 0;
 
     // Add context instructions
     if (sources.length > 0) {
@@ -480,7 +540,11 @@ export class SmartContextExtractor {
   /**
    * Extract relevant context using keyword-based search (fallback)
    */
-  private extractRelevantKeywordContext(fullContext: string, question: string, activeFile?: string): string | null {
+  private extractRelevantKeywordContext(
+    fullContext: string,
+    question: string,
+    activeFile?: string,
+  ): string | null {
     const keywords = this.extractTechnicalKeywords(question);
     if (keywords.length === 0) return null;
 
@@ -524,7 +588,8 @@ export class SmartContextExtractor {
     }
 
     // Also extract camelCase and PascalCase identifiers
-    const identifierPattern = /\b[a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*\b|\b[A-Z][a-zA-Z0-9]*\b/g;
+    const identifierPattern =
+      /\b[a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*\b|\b[A-Z][a-zA-Z0-9]*\b/g;
     const identifiers = question.match(identifierPattern);
     if (identifiers) {
       identifiers.forEach((id) => keywords.add(id));
@@ -543,7 +608,11 @@ export class SmartContextExtractor {
   /**
    * Rank contexts by relevance using multiple factors - advanced ranking algorithm
    */
-  private rankContextsByRelevance(contexts: any[], question: string, activeFile?: string): any[] {
+  private rankContextsByRelevance(
+    contexts: any[],
+    question: string,
+    activeFile?: string,
+  ): any[] {
     return contexts
       .map((context) => {
         let score = context.score || 0;
@@ -556,7 +625,9 @@ export class SmartContextExtractor {
         // Boost score based on question keywords
         const questionKeywords = this.extractTechnicalKeywords(question);
         const contextText = context.content || context.text || "";
-        const matchingKeywords = questionKeywords.filter((keyword) => contextText.toLowerCase().includes(keyword));
+        const matchingKeywords = questionKeywords.filter((keyword) =>
+          contextText.toLowerCase().includes(keyword),
+        );
         score += matchingKeywords.length * 0.1;
 
         return { ...context, score };
@@ -569,7 +640,7 @@ export class SmartContextExtractor {
    */
   private async fallbackToKeywordSearch(
     question: string,
-    activeFile?: string
+    activeFile?: string,
   ): Promise<ContextExtractionResult | null> {
     try {
       const keywords = this.extractTechnicalKeywords(question);
@@ -577,13 +648,16 @@ export class SmartContextExtractor {
 
       // Fallback to codebase understanding service if available
       if (this.codebaseUnderstanding) {
-        const contextData = await this.codebaseUnderstanding.getCodebaseContext();
+        const contextData =
+          await this.codebaseUnderstanding.getCodebaseContext();
 
         if (contextData) {
           // Simple keyword matching in the context
           const contextLines = contextData.split("\n");
           const relevantLines = contextLines.filter((line) =>
-            keywords.some((keyword) => line.toLowerCase().includes(keyword.toLowerCase()))
+            keywords.some((keyword) =>
+              line.toLowerCase().includes(keyword.toLowerCase()),
+            ),
           );
 
           if (relevantLines.length > 0) {
@@ -662,7 +736,9 @@ export class SmartContextExtractor {
       }
 
       // Find the most similar existing content and use its relevance as a baseline
-      const maxSimilarity = Math.max(...existingResults.map((r) => r.relevanceScore));
+      const maxSimilarity = Math.max(
+        ...existingResults.map((r) => r.relevanceScore),
+      );
 
       // Apply text similarity to adjust the score based on actual content match
       const textSimilarity = this.calculateBasicTextSimilarity(query, content);
@@ -684,7 +760,10 @@ export class SmartContextExtractor {
     const contentWords = content.toLowerCase().split(/\s+/);
 
     const matchingWords = queryWords.filter((word) =>
-      contentWords.some((contentWord) => contentWord.includes(word) || word.includes(contentWord))
+      contentWords.some(
+        (contentWord) =>
+          contentWord.includes(word) || word.includes(contentWord),
+      ),
     );
 
     return queryWords.length > 0 ? matchingWords.length / queryWords.length : 0;

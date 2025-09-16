@@ -92,11 +92,12 @@ export class VectorDatabaseService {
         path: dbPath,
       });
 
-      // Create or get collection without embedding function (we'll handle embeddings manually)
+      // Create or get collection with default embedding function
+      // (we'll still provide embeddings manually for consistency with Gemini)
       this.collection = await this.client.getOrCreateCollection({
         name: "codebase_embeddings",
-        // Note: We don't use ChromaDB's embedding function because we want
-        // to use our consistent Gemini embedding service
+        // ChromaDB will use the default embedding function, but we'll override
+        // by providing embeddings manually in add() and query() calls
       });
 
       this.isInitialized = true;

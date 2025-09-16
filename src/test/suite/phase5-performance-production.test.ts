@@ -112,9 +112,12 @@ suite("Phase 5: Performance & Production Tests", () => {
         alertThresholdMB: 800,
       });
 
-      const result = await productionSafeguards.executeWithSafeguards("test-operation", async () => {
-        return "success";
-      });
+      const result = await productionSafeguards.executeWithSafeguards(
+        "test-operation",
+        async () => {
+          return "success";
+        },
+      );
 
       assert.strictEqual(result, "success");
     });
@@ -130,7 +133,7 @@ suite("Phase 5: Performance & Production Tests", () => {
             await new Promise((resolve) => setTimeout(resolve, 100));
             return "should not reach here";
           },
-          { timeoutMs: 20 }
+          { timeoutMs: 20 },
         );
         assert.fail("Should have thrown timeout error");
       } catch (error) {
@@ -182,7 +185,8 @@ suite("Phase 5: Performance & Production Tests", () => {
     test("should handle cache miss", async () => {
       enhancedCacheManager = new EnhancedCacheManager();
 
-      const result = await enhancedCacheManager.getEmbedding("non-existent-key");
+      const result =
+        await enhancedCacheManager.getEmbedding("non-existent-key");
       assert.strictEqual(result, null);
 
       const stats = enhancedCacheManager.getStats();
@@ -196,7 +200,8 @@ suite("Phase 5: Performance & Production Tests", () => {
       const searchResults = { results: ["result1", "result2"], score: 0.95 };
       await enhancedCacheManager.setSearchResults("search-key", searchResults);
 
-      const retrieved = await enhancedCacheManager.getSearchResults("search-key");
+      const retrieved =
+        await enhancedCacheManager.getSearchResults("search-key");
       assert.deepStrictEqual(retrieved, searchResults);
     });
 
@@ -217,12 +222,15 @@ suite("Phase 5: Performance & Production Tests", () => {
       enhancedCacheManager = new EnhancedCacheManager();
 
       await enhancedCacheManager.setEmbedding("emb-key", [1, 2, 3]);
-      await enhancedCacheManager.setSearchResults("search-key", { results: [] });
+      await enhancedCacheManager.setSearchResults("search-key", {
+        results: [],
+      });
 
       await enhancedCacheManager.clearCache("embedding");
 
       const embResult = await enhancedCacheManager.getEmbedding("emb-key");
-      const searchResult = await enhancedCacheManager.getSearchResults("search-key");
+      const searchResult =
+        await enhancedCacheManager.getSearchResults("search-key");
 
       assert.strictEqual(embResult, null);
       assert.ok(searchResult !== null); // Search cache should still exist
@@ -278,16 +286,23 @@ suite("Phase 5: Performance & Production Tests", () => {
 
       // Simulate production workload
       const operations = Array.from({ length: 10 }, (_, i) =>
-        productionSafeguards.executeWithSafeguards(`operation-${i}`, async () => {
-          // Simulate search with caching
-          const cached = await enhancedCacheManager.getEmbedding(`key-${i}`);
-          if (!cached) {
-            const embedding = Array.from({ length: 384 }, () => Math.random());
-            await enhancedCacheManager.setEmbedding(`key-${i}`, embedding);
-            performanceProfiler.recordSearchLatency(100 + Math.random() * 200);
-          }
-          return `result-${i}`;
-        })
+        productionSafeguards.executeWithSafeguards(
+          `operation-${i}`,
+          async () => {
+            // Simulate search with caching
+            const cached = await enhancedCacheManager.getEmbedding(`key-${i}`);
+            if (!cached) {
+              const embedding = Array.from({ length: 384 }, () =>
+                Math.random(),
+              );
+              await enhancedCacheManager.setEmbedding(`key-${i}`, embedding);
+              performanceProfiler.recordSearchLatency(
+                100 + Math.random() * 200,
+              );
+            }
+            return `result-${i}`;
+          },
+        ),
       );
 
       const results = await Promise.all(operations);

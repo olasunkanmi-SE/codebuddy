@@ -29,7 +29,8 @@ export interface StatusInfo {
 export class UserFeedbackService implements vscode.Disposable {
   private logger: Logger;
   private statusBarItem: vscode.StatusBarItem;
-  private progressTokens: Map<string, vscode.CancellationTokenSource> = new Map();
+  private progressTokens: Map<string, vscode.CancellationTokenSource> =
+    new Map();
   private disposables: vscode.Disposable[] = [];
   private readonly options: Required<UserFeedbackOptions>;
 
@@ -42,11 +43,15 @@ export class UserFeedbackService implements vscode.Disposable {
       enableStatusBar: options.enableStatusBar ?? true,
       enableProgressNotifications: options.enableProgressNotifications ?? true,
       enableToastNotifications: options.enableToastNotifications ?? true,
-      progressLocation: options.progressLocation ?? vscode.ProgressLocation.Notification,
+      progressLocation:
+        options.progressLocation ?? vscode.ProgressLocation.Notification,
     };
 
     // Create status bar item
-    this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    this.statusBarItem = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      100,
+    );
     this.statusBarItem.command = "codebuddy.vectorDb.showStats";
     this.disposables.push(this.statusBarItem);
 
@@ -89,13 +94,17 @@ export class UserFeedbackService implements vscode.Disposable {
   /**
    * Show initialization progress
    */
-  async showInitializationProgress(phases: Array<{ name: string; action: () => Promise<void> }>): Promise<void> {
+  async showInitializationProgress(
+    phases: Array<{ name: string; action: () => Promise<void> }>,
+  ): Promise<void> {
     if (!this.options.enableProgressNotifications) {
       // Still update status bar
       this.updateStatus({
         text: "$(loading~spin) CodeBuddy: Initializing...",
         tooltip: "Vector database is initializing",
-        backgroundColor: new vscode.ThemeColor("statusBarItem.warningBackground"),
+        backgroundColor: new vscode.ThemeColor(
+          "statusBarItem.warningBackground",
+        ),
       });
 
       // Execute phases without progress UI
@@ -126,7 +135,9 @@ export class UserFeedbackService implements vscode.Disposable {
           this.updateStatus({
             text: `$(loading~spin) CodeBuddy: ${phase.name}`,
             tooltip: `Initializing: ${phase.name}`,
-            backgroundColor: new vscode.ThemeColor("statusBarItem.warningBackground"),
+            backgroundColor: new vscode.ThemeColor(
+              "statusBarItem.warningBackground",
+            ),
           });
 
           try {
@@ -141,7 +152,7 @@ export class UserFeedbackService implements vscode.Disposable {
           increment: increment,
           message: "Complete!",
         });
-      }
+      },
     );
   }
 
@@ -151,7 +162,7 @@ export class UserFeedbackService implements vscode.Disposable {
   async showEmbeddingProgress(
     operationId: string,
     totalFiles: number,
-    onProgress: (progress: ProgressInfo) => Promise<void>
+    onProgress: (progress: ProgressInfo) => Promise<void>,
   ): Promise<void> {
     if (!this.options.enableProgressNotifications) {
       return;
@@ -191,12 +202,14 @@ export class UserFeedbackService implements vscode.Disposable {
             this.updateStatus({
               text: `$(sync~spin) CodeBuddy: ${percentage}%`,
               tooltip: `Embedding progress: ${processedFiles}/${totalFiles} files`,
-              backgroundColor: new vscode.ThemeColor("statusBarItem.warningBackground"),
+              backgroundColor: new vscode.ThemeColor(
+                "statusBarItem.warningBackground",
+              ),
             });
           };
 
           await onProgress({ operation: "embedding", progress: 0 });
-        }
+        },
       );
     } finally {
       this.progressTokens.delete(operationId);
@@ -229,7 +242,10 @@ export class UserFeedbackService implements vscode.Disposable {
   /**
    * Show success notification
    */
-  showSuccess(message: string, actions?: string[]): Thenable<string | undefined> {
+  showSuccess(
+    message: string,
+    actions?: string[],
+  ): Thenable<string | undefined> {
     if (!this.options.enableToastNotifications) {
       this.logger.info(`Success: ${message}`);
       return Promise.resolve(undefined);
@@ -247,7 +263,10 @@ export class UserFeedbackService implements vscode.Disposable {
   /**
    * Show warning notification
    */
-  showWarning(message: string, actions?: string[]): Thenable<string | undefined> {
+  showWarning(
+    message: string,
+    actions?: string[],
+  ): Thenable<string | undefined> {
     if (!this.options.enableToastNotifications) {
       this.logger.warn(message);
       return Promise.resolve(undefined);
@@ -292,13 +311,17 @@ export class UserFeedbackService implements vscode.Disposable {
       this.updateStatus({
         text: `$(sync~spin) CodeBuddy: Processing ${filesQueued} files`,
         tooltip: `Vector database sync in progress: ${filesQueued} files queued`,
-        backgroundColor: new vscode.ThemeColor("statusBarItem.warningBackground"),
+        backgroundColor: new vscode.ThemeColor(
+          "statusBarItem.warningBackground",
+        ),
       });
     } else if (filesQueued > 0) {
       this.updateStatus({
         text: `$(sync) CodeBuddy: ${filesQueued} queued`,
         tooltip: `${filesQueued} files queued for vector database sync`,
-        backgroundColor: new vscode.ThemeColor("statusBarItem.warningBackground"),
+        backgroundColor: new vscode.ThemeColor(
+          "statusBarItem.warningBackground",
+        ),
       });
     } else {
       this.updateStatus({
@@ -322,8 +345,13 @@ export class UserFeedbackService implements vscode.Disposable {
       .getConfiguration("codebuddy.vectorDb")
       .get("slowSearchThreshold", 2000); // Default 2 seconds
 
-    if (this.options.enableToastNotifications && searchTime > slowSearchThreshold) {
-      this.showWarning(`Search took ${searchTime}ms - consider reindexing for better performance`);
+    if (
+      this.options.enableToastNotifications &&
+      searchTime > slowSearchThreshold
+    ) {
+      this.showWarning(
+        `Search took ${searchTime}ms - consider reindexing for better performance`,
+      );
     }
   }
 
@@ -352,7 +380,9 @@ export class UserFeedbackService implements vscode.Disposable {
    * Check if user has enabled vector database features in settings
    */
   isVectorDbEnabled(): boolean {
-    return vscode.workspace.getConfiguration("codebuddy").get("vectorDb.enabled", true);
+    return vscode.workspace
+      .getConfiguration("codebuddy")
+      .get("vectorDb.enabled", true);
   }
 
   /**
@@ -376,14 +406,18 @@ export class UserFeedbackService implements vscode.Disposable {
    * Get user preference for embedding batch size
    */
   getEmbeddingBatchSize(): number {
-    return vscode.workspace.getConfiguration("codebuddy").get("vectorDb.batchSize", 10);
+    return vscode.workspace
+      .getConfiguration("codebuddy")
+      .get("vectorDb.batchSize", 10);
   }
 
   /**
    * Check if background processing is enabled
    */
   isBackgroundProcessingEnabled(): boolean {
-    return vscode.workspace.getConfiguration("codebuddy").get("vectorDb.backgroundProcessing", true);
+    return vscode.workspace
+      .getConfiguration("codebuddy")
+      .get("vectorDb.backgroundProcessing", true);
   }
 
   /**
@@ -399,7 +433,8 @@ export class UserFeedbackService implements vscode.Disposable {
           .getConfiguration("codebuddy")
           .get("vectorDb.showProgress", true);
 
-        this.options.progressLocation = this.getProgressNotificationPreference();
+        this.options.progressLocation =
+          this.getProgressNotificationPreference();
 
         // Show notification about configuration change
         if (this.options.enableToastNotifications) {
@@ -428,18 +463,27 @@ export class UserFeedbackService implements vscode.Disposable {
 
     switch (choice) {
       case "Enable Vector Database":
-        await vscode.commands.executeCommand("workbench.action.openSettings", "codebuddy.vectorDb.enabled");
+        await vscode.commands.executeCommand(
+          "workbench.action.openSettings",
+          "codebuddy.vectorDb.enabled",
+        );
         break;
       case "Configure Progress Notifications":
-        await vscode.commands.executeCommand("workbench.action.openSettings", "codebuddy.vectorDb.progressLocation");
+        await vscode.commands.executeCommand(
+          "workbench.action.openSettings",
+          "codebuddy.vectorDb.progressLocation",
+        );
         break;
       case "Set Batch Size":
-        await vscode.commands.executeCommand("workbench.action.openSettings", "codebuddy.vectorDb.batchSize");
+        await vscode.commands.executeCommand(
+          "workbench.action.openSettings",
+          "codebuddy.vectorDb.batchSize",
+        );
         break;
       case "Toggle Background Processing":
         await vscode.commands.executeCommand(
           "workbench.action.openSettings",
-          "codebuddy.vectorDb.backgroundProcessing"
+          "codebuddy.vectorDb.backgroundProcessing",
         );
         break;
       case "View Statistics":

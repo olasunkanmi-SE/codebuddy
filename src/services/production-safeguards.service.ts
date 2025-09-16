@@ -102,42 +102,49 @@ export class ProductionSafeguards implements vscode.Disposable {
     return [
       {
         action: "CLEAR_CACHE",
-        condition: (usage, limits) => usage.memoryUsage.heapUsed / 1024 / 1024 > limits.alertThresholdMB,
+        condition: (usage, limits) =>
+          usage.memoryUsage.heapUsed / 1024 / 1024 > limits.alertThresholdMB,
         cooldownMs: 30000, // 30 seconds
         maxRetries: 3,
         priority: 1,
       },
       {
         action: "FORCE_GC",
-        condition: (usage, limits) => usage.memoryUsage.heapUsed / 1024 / 1024 > limits.gcThresholdMB,
+        condition: (usage, limits) =>
+          usage.memoryUsage.heapUsed / 1024 / 1024 > limits.gcThresholdMB,
         cooldownMs: 15000, // 15 seconds
         maxRetries: 5,
         priority: 2,
       },
       {
         action: "REDUCE_BATCH_SIZE",
-        condition: (usage, limits) => usage.memoryUsage.heapUsed / 1024 / 1024 > limits.alertThresholdMB * 0.8,
+        condition: (usage, limits) =>
+          usage.memoryUsage.heapUsed / 1024 / 1024 >
+          limits.alertThresholdMB * 0.8,
         cooldownMs: 60000, // 1 minute
         maxRetries: 2,
         priority: 3,
       },
       {
         action: "PAUSE_INDEXING",
-        condition: (usage, limits) => usage.memoryUsage.heapUsed / 1024 / 1024 > limits.maxHeapMB * 0.9,
+        condition: (usage, limits) =>
+          usage.memoryUsage.heapUsed / 1024 / 1024 > limits.maxHeapMB * 0.9,
         cooldownMs: 120000, // 2 minutes
         maxRetries: 1,
         priority: 4,
       },
       {
         action: "RESTART_WORKER",
-        condition: (usage, limits) => usage.memoryUsage.heapUsed / 1024 / 1024 > limits.maxHeapMB,
+        condition: (usage, limits) =>
+          usage.memoryUsage.heapUsed / 1024 / 1024 > limits.maxHeapMB,
         cooldownMs: 300000, // 5 minutes
         maxRetries: 1,
         priority: 5,
       },
       {
         action: "EMERGENCY_STOP",
-        condition: (usage, limits) => usage.memoryUsage.rss / 1024 / 1024 > limits.maxMemoryMB,
+        condition: (usage, limits) =>
+          usage.memoryUsage.rss / 1024 / 1024 > limits.maxMemoryMB,
         cooldownMs: 0,
         maxRetries: 1,
         priority: 6,
@@ -155,9 +162,13 @@ export class ProductionSafeguards implements vscode.Disposable {
       timeoutMs?: number;
       retries?: number;
       skipCircuitBreaker?: boolean;
-    }
+    },
   ): Promise<T> {
-    const { timeoutMs = 30000, retries = 2, skipCircuitBreaker = false } = options || {};
+    const {
+      timeoutMs = 30000,
+      retries = 2,
+      skipCircuitBreaker = false,
+    } = options || {};
 
     // Check if emergency stop is active
     if (this.emergencyStopActive) {
@@ -166,7 +177,9 @@ export class ProductionSafeguards implements vscode.Disposable {
 
     // Check circuit breaker
     if (!skipCircuitBreaker && !this.isCircuitBreakerClosed()) {
-      throw new Error(`Circuit breaker is ${this.circuitBreaker.state} - operation blocked`);
+      throw new Error(
+        `Circuit breaker is ${this.circuitBreaker.state} - operation blocked`,
+      );
     }
 
     // Check resource limits before operation
@@ -195,7 +208,10 @@ export class ProductionSafeguards implements vscode.Disposable {
       } catch (error) {
         lastError = error as Error;
 
-        this.logger.error(`Operation ${operation} failed (attempt ${attempt + 1}/${retries + 1}):`, error);
+        this.logger.error(
+          `Operation ${operation} failed (attempt ${attempt + 1}/${retries + 1}):`,
+          error,
+        );
 
         // Update circuit breaker
         this.recordCircuitBreakerFailure();
@@ -211,7 +227,10 @@ export class ProductionSafeguards implements vscode.Disposable {
       }
     }
 
-    throw lastError || new Error(`Operation ${operation} failed after ${retries + 1} attempts`);
+    throw (
+      lastError ||
+      new Error(`Operation ${operation} failed after ${retries + 1} attempts`)
+    );
   }
 
   /**
@@ -251,12 +270,14 @@ export class ProductionSafeguards implements vscode.Disposable {
       this.circuitBreaker.state = "OPEN";
       this.circuitBreaker.openUntil = Date.now() + 60000; // Open for 1 minute
 
-      this.logger.warn(`Circuit breaker opened due to ${this.circuitBreaker.failures} failures`);
+      this.logger.warn(
+        `Circuit breaker opened due to ${this.circuitBreaker.failures} failures`,
+      );
 
       vscode.window
         .showWarningMessage(
           "CodeBuddy Vector Database temporarily disabled due to repeated failures. Will retry automatically.",
-          "View Logs"
+          "View Logs",
         )
         .then((action) => {
           if (action === "View Logs") {
@@ -269,7 +290,10 @@ export class ProductionSafeguards implements vscode.Disposable {
   /**
    * Execute operation with timeout
    */
-  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  private async withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+  ): Promise<T> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error(`Operation timed out after ${timeoutMs}ms`));
@@ -308,7 +332,10 @@ export class ProductionSafeguards implements vscode.Disposable {
     const heapUsedMB = usage.memoryUsage.heapUsed / 1024 / 1024;
     const rssMB = usage.memoryUsage.rss / 1024 / 1024;
 
-    return heapUsedMB > this.resourceLimits.maxHeapMB || rssMB > this.resourceLimits.maxMemoryMB;
+    return (
+      heapUsedMB > this.resourceLimits.maxHeapMB ||
+      rssMB > this.resourceLimits.maxMemoryMB
+    );
   }
 
   /**
@@ -340,7 +367,9 @@ export class ProductionSafeguards implements vscode.Disposable {
       .sort((a, b) => a.priority - b.priority);
 
     if (applicableStrategies.length === 0) {
-      this.logger.warn("No applicable recovery strategies for current resource usage");
+      this.logger.warn(
+        "No applicable recovery strategies for current resource usage",
+      );
       return;
     }
 
@@ -363,7 +392,10 @@ export class ProductionSafeguards implements vscode.Disposable {
           break;
         }
       } catch (error) {
-        this.logger.error(`Recovery strategy ${strategy.action} failed:`, error);
+        this.logger.error(
+          `Recovery strategy ${strategy.action} failed:`,
+          error,
+        );
       }
     }
   }
@@ -382,7 +414,9 @@ export class ProductionSafeguards implements vscode.Disposable {
         if (global.gc) {
           global.gc();
         } else {
-          this.logger.warn("Garbage collection not available (start with --expose-gc)");
+          this.logger.warn(
+            "Garbage collection not available (start with --expose-gc)",
+          );
         }
         break;
 
@@ -397,7 +431,7 @@ export class ProductionSafeguards implements vscode.Disposable {
         vscode.window
           .showWarningMessage(
             "CodeBuddy indexing paused due to high memory usage. Will resume automatically.",
-            "Resume Now"
+            "Resume Now",
           )
           .then((action) => {
             if (action === "Resume Now") {
@@ -419,7 +453,7 @@ export class ProductionSafeguards implements vscode.Disposable {
           .showErrorMessage(
             "CodeBuddy Emergency Stop: Critical resource usage detected. All vector operations stopped.",
             "View Status",
-            "Force Resume"
+            "Force Resume",
           )
           .then((action) => {
             if (action === "View Status") {
@@ -504,7 +538,7 @@ export class ProductionSafeguards implements vscode.Disposable {
 
     if (this.isResourceLimitExceeded(usage)) {
       vscode.window.showWarningMessage(
-        "Cannot resume - resource usage still too high. Please close other applications or restart VS Code."
+        "Cannot resume - resource usage still too high. Please close other applications or restart VS Code.",
       );
       return;
     }
@@ -515,7 +549,9 @@ export class ProductionSafeguards implements vscode.Disposable {
     this.retryCounters.clear();
 
     vscode.commands.executeCommand("codebuddy.resumeFromEmergencyStop");
-    vscode.window.showInformationMessage("CodeBuddy resumed from emergency stop");
+    vscode.window.showInformationMessage(
+      "CodeBuddy resumed from emergency stop",
+    );
   }
 
   /**
@@ -551,10 +587,33 @@ export class ProductionSafeguards implements vscode.Disposable {
   async triggerRecoveryAction(action: RecoveryAction): Promise<void> {
     try {
       await this.executeRecoveryAction(action);
-      vscode.window.showInformationMessage(`Recovery action ${action} executed successfully`);
+      vscode.window.showInformationMessage(
+        `Recovery action ${action} executed successfully`,
+      );
     } catch (error) {
       this.logger.error(`Manual recovery action ${action} failed:`, error);
-      vscode.window.showErrorMessage(`Recovery action failed: ${error}`);
+
+      // Provide specific guidance for common vector database issues
+      if (
+        error instanceof Error &&
+        error.message.includes("DefaultEmbeddingFunction")
+      ) {
+        vscode.window
+          .showErrorMessage(
+            "Vector database initialization failed. Try restarting VS Code after ensuring ChromaDB dependencies are installed.",
+            "Restart VS Code",
+            "View Logs",
+          )
+          .then((action) => {
+            if (action === "Restart VS Code") {
+              vscode.commands.executeCommand("workbench.action.reloadWindow");
+            } else if (action === "View Logs") {
+              vscode.commands.executeCommand("workbench.action.toggleDevTools");
+            }
+          });
+      } else {
+        vscode.window.showErrorMessage(`Recovery action failed: ${error}`);
+      }
     }
   }
 

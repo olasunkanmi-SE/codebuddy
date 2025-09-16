@@ -1,9 +1,15 @@
 import * as assert from "assert";
 import * as sinon from "sinon";
 import * as vscode from "vscode";
-import { VectorDbSyncService, ICodeIndexer } from "../../services/vector-db-sync.service";
+import {
+  VectorDbSyncService,
+  ICodeIndexer,
+} from "../../services/vector-db-sync.service";
 import { VectorDatabaseService } from "../../services/vector-database.service";
-import { ImmediateEmbeddingPhase, OnDemandEmbeddingPhase } from "../../services/smart-embedding-phases";
+import {
+  ImmediateEmbeddingPhase,
+  OnDemandEmbeddingPhase,
+} from "../../services/smart-embedding-phases";
 import { VectorDbWorkerManager } from "../../services/vector-db-worker-manager";
 import { LanguageUtils, FileUtils, AsyncUtils } from "../../utils/common-utils";
 import { IFunctionData } from "../../application/interfaces";
@@ -29,10 +35,22 @@ describe("Phase 2 Implementation Tests", () => {
     });
 
     it("should get correct language from file path", () => {
-      assert.strictEqual(LanguageUtils.getLanguageFromPath("test.ts"), "typescript");
-      assert.strictEqual(LanguageUtils.getLanguageFromPath("test.js"), "javascript");
-      assert.strictEqual(LanguageUtils.getLanguageFromPath("test.py"), "python");
-      assert.strictEqual(LanguageUtils.getLanguageFromPath("test.unknown"), "plaintext");
+      assert.strictEqual(
+        LanguageUtils.getLanguageFromPath("test.ts"),
+        "typescript",
+      );
+      assert.strictEqual(
+        LanguageUtils.getLanguageFromPath("test.js"),
+        "javascript",
+      );
+      assert.strictEqual(
+        LanguageUtils.getLanguageFromPath("test.py"),
+        "python",
+      );
+      assert.strictEqual(
+        LanguageUtils.getLanguageFromPath("test.unknown"),
+        "plaintext",
+      );
     });
 
     it("should identify code files by path", () => {
@@ -50,9 +68,15 @@ describe("Phase 2 Implementation Tests", () => {
 
   describe("FileUtils", () => {
     it("should correctly identify files to ignore", () => {
-      assert.strictEqual(FileUtils.shouldIgnoreFile("/path/node_modules/test.js"), true);
+      assert.strictEqual(
+        FileUtils.shouldIgnoreFile("/path/node_modules/test.js"),
+        true,
+      );
       assert.strictEqual(FileUtils.shouldIgnoreFile("/path/.git/config"), true);
-      assert.strictEqual(FileUtils.shouldIgnoreFile("/path/src/test.ts"), false);
+      assert.strictEqual(
+        FileUtils.shouldIgnoreFile("/path/src/test.ts"),
+        false,
+      );
     });
 
     it("should assign correct file priorities", () => {
@@ -60,7 +84,10 @@ describe("Phase 2 Implementation Tests", () => {
       assert.strictEqual(FileUtils.getFilePriority("/path/package.json"), 90);
       assert.strictEqual(FileUtils.getFilePriority("/path/README.md"), 80);
       assert.strictEqual(FileUtils.getFilePriority("/path/src/utils.ts"), 70);
-      assert.strictEqual(FileUtils.getFilePriority("/path/test/unit.spec.ts"), 60);
+      assert.strictEqual(
+        FileUtils.getFilePriority("/path/test/unit.spec.ts"),
+        60,
+      );
       assert.strictEqual(FileUtils.getFilePriority("/path/other.ts"), 50);
     });
   });
@@ -75,7 +102,7 @@ describe("Phase 2 Implementation Tests", () => {
         async (item) => {
           processed.push(item);
         },
-        2
+        2,
       );
 
       assert.deepStrictEqual(processed.sort(), [1, 2, 3, 4, 5]);
@@ -89,7 +116,7 @@ describe("Phase 2 Implementation Tests", () => {
         "fallback",
         (error) => {
           assert.strictEqual(error.message, "Test error");
-        }
+        },
       );
 
       assert.strictEqual(result, "fallback");
@@ -107,11 +134,14 @@ describe("Phase 2 Implementation Tests", () => {
         2,
         (current, total) => {
           progressReports.push({ current, total });
-        }
+        },
       );
 
       assert.strictEqual(progressReports.length, 5);
-      assert.strictEqual(progressReports[progressReports.length - 1].current, 5);
+      assert.strictEqual(
+        progressReports[progressReports.length - 1].current,
+        5,
+      );
       assert.strictEqual(progressReports[progressReports.length - 1].total, 5);
     });
   });
@@ -124,7 +154,9 @@ describe("Phase 2 Implementation Tests", () => {
     beforeEach(() => {
       vectorDbService = sandbox.createStubInstance(VectorDatabaseService);
       codeIndexer = {
-        generateEmbeddings: sandbox.stub<[], Promise<IFunctionData[]>>().resolves([]),
+        generateEmbeddings: sandbox
+          .stub<[], Promise<IFunctionData[]>>()
+          .resolves([]),
       };
 
       vectorDbService.isReady.returns(true);
@@ -136,10 +168,15 @@ describe("Phase 2 Implementation Tests", () => {
         memoryUsage: 0,
       });
 
-      syncService = new VectorDbSyncService(vectorDbService as any, codeIndexer);
+      syncService = new VectorDbSyncService(
+        vectorDbService as any,
+        codeIndexer,
+      );
 
       // Mock VS Code workspace
-      sandbox.stub(vscode.workspace, "workspaceFolders").value([{ uri: { fsPath: "/test/workspace" } }]);
+      sandbox
+        .stub(vscode.workspace, "workspaceFolders")
+        .value([{ uri: { fsPath: "/test/workspace" } }]);
     });
 
     it("should initialize successfully when vector db is ready", async () => {
@@ -191,7 +228,9 @@ describe("Phase 2 Implementation Tests", () => {
       immediatePhase = new ImmediateEmbeddingPhase(workerManager as any);
 
       // Mock VS Code workspace
-      sandbox.stub(vscode.workspace, "workspaceFolders").value([{ uri: { fsPath: "/test/workspace" } }]);
+      sandbox
+        .stub(vscode.workspace, "workspaceFolders")
+        .value([{ uri: { fsPath: "/test/workspace" } }]);
 
       sandbox.stub(vscode.workspace, "textDocuments").value([]);
     });
@@ -200,12 +239,14 @@ describe("Phase 2 Implementation Tests", () => {
       sandbox.stub(vscode.workspace, "workspaceFolders").value(undefined);
 
       // Mock progress dialog
-      sandbox.stub(vscode.window, "withProgress").callsFake(async (options, task) => {
-        const progress = {
-          report: sandbox.stub(),
-        };
-        return await task(progress, {} as any);
-      });
+      sandbox
+        .stub(vscode.window, "withProgress")
+        .callsFake(async (options, task) => {
+          const progress = {
+            report: sandbox.stub(),
+          };
+          return await task(progress, {} as any);
+        });
 
       // This should not throw
       await immediatePhase.embedEssentials({} as any);
@@ -246,7 +287,9 @@ describe("Phase 2 Implementation Tests", () => {
     });
 
     it("should handle questions correctly", async () => {
-      sandbox.stub(vscode.workspace, "workspaceFolders").value([{ uri: { fsPath: "/test/workspace" } }]);
+      sandbox
+        .stub(vscode.workspace, "workspaceFolders")
+        .value([{ uri: { fsPath: "/test/workspace" } }]);
 
       sandbox.stub(vscode.workspace, "findFiles").resolves([]);
 
@@ -264,7 +307,9 @@ describe("Phase 2 Implementation Tests", () => {
     it("should integrate VectorDbSyncService with real dependencies", async () => {
       const vectorDbService = sandbox.createStubInstance(VectorDatabaseService);
       const codeIndexer = {
-        generateEmbeddings: sandbox.stub<[], Promise<IFunctionData[]>>().resolves([]),
+        generateEmbeddings: sandbox
+          .stub<[], Promise<IFunctionData[]>>()
+          .resolves([]),
       };
 
       vectorDbService.isReady.returns(true);
@@ -276,10 +321,15 @@ describe("Phase 2 Implementation Tests", () => {
         memoryUsage: 0,
       });
 
-      const syncService = new VectorDbSyncService(vectorDbService as any, codeIndexer);
+      const syncService = new VectorDbSyncService(
+        vectorDbService as any,
+        codeIndexer,
+      );
 
       // Mock VS Code environment
-      sandbox.stub(vscode.workspace, "workspaceFolders").value([{ uri: { fsPath: "/test/workspace" } }]);
+      sandbox
+        .stub(vscode.workspace, "workspaceFolders")
+        .value([{ uri: { fsPath: "/test/workspace" } }]);
 
       sandbox.stub(vscode.workspace, "createFileSystemWatcher").returns({
         onDidCreate: sandbox.stub(),
@@ -304,7 +354,9 @@ describe("Phase 2 Implementation Tests", () => {
 
       const vectorDbService = sandbox.createStubInstance(VectorDatabaseService);
       const codeIndexer = {
-        generateEmbeddings: sandbox.stub<[], Promise<IFunctionData[]>>().resolves([]),
+        generateEmbeddings: sandbox
+          .stub<[], Promise<IFunctionData[]>>()
+          .resolves([]),
       };
 
       vectorDbService.isReady.returns(true);
@@ -316,7 +368,10 @@ describe("Phase 2 Implementation Tests", () => {
         memoryUsage: 0,
       });
 
-      const syncService = new VectorDbSyncService(vectorDbService as any, codeIndexer);
+      const syncService = new VectorDbSyncService(
+        vectorDbService as any,
+        codeIndexer,
+      );
 
       // Should not throw
       await syncService.initialize();
@@ -328,7 +383,9 @@ describe("Phase 2 Implementation Tests", () => {
     it("should handle file system errors gracefully", async () => {
       const vectorDbService = sandbox.createStubInstance(VectorDatabaseService);
       const codeIndexer = {
-        generateEmbeddings: sandbox.stub<[], Promise<IFunctionData[]>>().resolves([]),
+        generateEmbeddings: sandbox
+          .stub<[], Promise<IFunctionData[]>>()
+          .resolves([]),
       };
 
       vectorDbService.isReady.returns(true);
@@ -340,12 +397,19 @@ describe("Phase 2 Implementation Tests", () => {
         memoryUsage: 0,
       });
 
-      const syncService = new VectorDbSyncService(vectorDbService as any, codeIndexer);
+      const syncService = new VectorDbSyncService(
+        vectorDbService as any,
+        codeIndexer,
+      );
 
       // Mock workspace with error
-      sandbox.stub(vscode.workspace, "workspaceFolders").value([{ uri: { fsPath: "/test/workspace" } }]);
+      sandbox
+        .stub(vscode.workspace, "workspaceFolders")
+        .value([{ uri: { fsPath: "/test/workspace" } }]);
 
-      sandbox.stub(vscode.workspace, "createFileSystemWatcher").throws(new Error("Test error"));
+      sandbox
+        .stub(vscode.workspace, "createFileSystemWatcher")
+        .throws(new Error("Test error"));
 
       try {
         await syncService.initialize();
@@ -360,19 +424,25 @@ describe("Phase 2 Implementation Tests", () => {
       const immediatePhase = new ImmediateEmbeddingPhase(workerManager as any);
 
       // Mock VS Code workspace
-      sandbox.stub(vscode.workspace, "workspaceFolders").value([{ uri: { fsPath: "/test/workspace" } }]);
+      sandbox
+        .stub(vscode.workspace, "workspaceFolders")
+        .value([{ uri: { fsPath: "/test/workspace" } }]);
 
       sandbox.stub(vscode.workspace, "textDocuments").value([]);
       sandbox.stub(vscode.workspace, "findFiles").resolves([]);
-      sandbox.stub(vscode.workspace.fs, "readFile").throws(new Error("File read error"));
+      sandbox
+        .stub(vscode.workspace.fs, "readFile")
+        .throws(new Error("File read error"));
 
       // Mock progress dialog
-      sandbox.stub(vscode.window, "withProgress").callsFake(async (options, task) => {
-        const progress = {
-          report: sandbox.stub(),
-        };
-        return await task(progress, {} as any);
-      });
+      sandbox
+        .stub(vscode.window, "withProgress")
+        .callsFake(async (options, task) => {
+          const progress = {
+            report: sandbox.stub(),
+          };
+          return await task(progress, {} as any);
+        });
 
       // Should not throw - errors should be handled gracefully
       await immediatePhase.embedEssentials({} as any);

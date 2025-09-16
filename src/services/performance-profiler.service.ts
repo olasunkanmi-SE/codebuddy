@@ -31,7 +31,11 @@ export interface PerformanceReport {
  * Performance alert types
  */
 export interface PerformanceAlert {
-  type: "HIGH_SEARCH_LATENCY" | "HIGH_MEMORY_USAGE" | "HIGH_ERROR_RATE" | "LOW_THROUGHPUT";
+  type:
+    | "HIGH_SEARCH_LATENCY"
+    | "HIGH_MEMORY_USAGE"
+    | "HIGH_ERROR_RATE"
+    | "LOW_THROUGHPUT";
   severity: "info" | "warning" | "critical";
   message: string;
   timestamp: Date;
@@ -170,7 +174,10 @@ export class PerformanceProfiler implements vscode.Disposable {
         success: false,
       });
 
-      this.logger.error(`Performance measurement failed for ${operation}:`, error);
+      this.logger.error(
+        `Performance measurement failed for ${operation}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -180,7 +187,7 @@ export class PerformanceProfiler implements vscode.Disposable {
    */
   private recordMeasurement(
     operation: string,
-    measurement: { duration: number; memoryDelta: number; success: boolean }
+    measurement: { duration: number; memoryDelta: number; success: boolean },
   ): void {
     // Record operation-specific metrics
     switch (operation) {
@@ -263,7 +270,10 @@ export class PerformanceProfiler implements vscode.Disposable {
         severity: report.avgSearchLatency > 1000 ? "critical" : "warning",
         message: `Average search latency is ${report.avgSearchLatency.toFixed(0)}ms (target: <500ms)`,
         timestamp: new Date(),
-        metrics: { avgLatency: report.avgSearchLatency, p95Latency: report.p95SearchLatency },
+        metrics: {
+          avgLatency: report.avgSearchLatency,
+          p95Latency: report.p95SearchLatency,
+        },
       });
     }
 
@@ -390,12 +400,19 @@ export class PerformanceProfiler implements vscode.Disposable {
    */
   private handlePerformanceAlerts(alerts: PerformanceAlert[]): void {
     for (const alert of alerts) {
-      this.logger.warn(`Performance Alert [${alert.severity.toUpperCase()}]:`, alert.message);
+      this.logger.warn(
+        `Performance Alert [${alert.severity.toUpperCase()}]:`,
+        alert.message,
+      );
 
       // Show user notification for critical alerts
       if (alert.severity === "critical") {
         vscode.window
-          .showWarningMessage(`CodeBuddy Performance Alert: ${alert.message}`, "View Details", "Optimize Settings")
+          .showWarningMessage(
+            `CodeBuddy Performance Alert: ${alert.message}`,
+            "View Details",
+            "Optimize Settings",
+          )
           .then((action) => {
             if (action === "View Details") {
               this.showPerformanceReport();
@@ -459,7 +476,9 @@ export class PerformanceProfiler implements vscode.Disposable {
         await this.configManager.updateConfig("performanceMode", "performance");
       }
 
-      vscode.window.showInformationMessage(`Configuration optimized: Batch size set to ${newBatchSize}`);
+      vscode.window.showInformationMessage(
+        `Configuration optimized: Batch size set to ${newBatchSize}`,
+      );
     } catch (error) {
       this.logger.error("Failed to optimize configuration:", error);
       vscode.window.showErrorMessage("Failed to optimize configuration");

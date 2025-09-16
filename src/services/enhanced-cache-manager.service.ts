@@ -101,8 +101,18 @@ export class EnhancedCacheManager implements vscode.Disposable {
   /**
    * Set embedding in cache
    */
-  async setEmbedding(key: string, embedding: number[], ttl?: number): Promise<void> {
-    await this.setCacheEntry(this.embeddingCache, key, embedding, ttl, "embedding");
+  async setEmbedding(
+    key: string,
+    embedding: number[],
+    ttl?: number,
+  ): Promise<void> {
+    await this.setCacheEntry(
+      this.embeddingCache,
+      key,
+      embedding,
+      ttl,
+      "embedding",
+    );
   }
 
   /**
@@ -115,7 +125,11 @@ export class EnhancedCacheManager implements vscode.Disposable {
   /**
    * Set search results in cache
    */
-  async setSearchResults(key: string, results: any, ttl?: number): Promise<void> {
+  async setSearchResults(
+    key: string,
+    results: any,
+    ttl?: number,
+  ): Promise<void> {
     await this.setCacheEntry(this.searchCache, key, results, ttl, "search");
   }
 
@@ -130,7 +144,13 @@ export class EnhancedCacheManager implements vscode.Disposable {
    * Set metadata in cache
    */
   async setMetadata(key: string, metadata: any, ttl?: number): Promise<void> {
-    await this.setCacheEntry(this.metadataCache, key, metadata, ttl, "metadata");
+    await this.setCacheEntry(
+      this.metadataCache,
+      key,
+      metadata,
+      ttl,
+      "metadata",
+    );
   }
 
   /**
@@ -143,14 +163,28 @@ export class EnhancedCacheManager implements vscode.Disposable {
   /**
    * Set response in cache
    */
-  async setResponse(key: string, response: string, ttl?: number): Promise<void> {
-    await this.setCacheEntry(this.responseCache, key, response, ttl, "response");
+  async setResponse(
+    key: string,
+    response: string,
+    ttl?: number,
+  ): Promise<void> {
+    await this.setCacheEntry(
+      this.responseCache,
+      key,
+      response,
+      ttl,
+      "response",
+    );
   }
 
   /**
    * Generic cache get operation
    */
-  private async getCacheEntry<T>(cache: Map<string, CacheEntry<T>>, key: string, type: string): Promise<T | null> {
+  private async getCacheEntry<T>(
+    cache: Map<string, CacheEntry<T>>,
+    key: string,
+    type: string,
+  ): Promise<T | null> {
     const start = performance.now();
 
     try {
@@ -210,7 +244,7 @@ export class EnhancedCacheManager implements vscode.Disposable {
     key: string,
     data: T,
     ttl?: number,
-    type?: string
+    type?: string,
   ): Promise<void> {
     try {
       const size = this.estimateSize(data);
@@ -246,17 +280,26 @@ export class EnhancedCacheManager implements vscode.Disposable {
   /**
    * Check if eviction is needed
    */
-  private shouldEvict<T>(cache: Map<string, CacheEntry<T>>, newEntrySize: number): boolean {
+  private shouldEvict<T>(
+    cache: Map<string, CacheEntry<T>>,
+    newEntrySize: number,
+  ): boolean {
     const totalEntries = this.getTotalCacheSize();
     const totalMemory = this.getTotalMemoryUsage();
 
-    return totalEntries >= this.config.maxSize || totalMemory + newEntrySize > this.config.maxMemoryMB * 1024 * 1024;
+    return (
+      totalEntries >= this.config.maxSize ||
+      totalMemory + newEntrySize > this.config.maxMemoryMB * 1024 * 1024
+    );
   }
 
   /**
    * Evict entries based on configured policy
    */
-  private async evictEntries<T>(cache: Map<string, CacheEntry<T>>, requiredSpace: number): Promise<void> {
+  private async evictEntries<T>(
+    cache: Map<string, CacheEntry<T>>,
+    requiredSpace: number,
+  ): Promise<void> {
     const entries = Array.from(cache.entries());
     let evicted = 0;
     let freedSpace = 0;
@@ -271,7 +314,9 @@ export class EnhancedCacheManager implements vscode.Disposable {
         break;
 
       case "TTL":
-        entries.sort((a, b) => a[1].timestamp + a[1].ttl - (b[1].timestamp + b[1].ttl));
+        entries.sort(
+          (a, b) => a[1].timestamp + a[1].ttl - (b[1].timestamp + b[1].ttl),
+        );
         break;
     }
 
@@ -320,7 +365,12 @@ export class EnhancedCacheManager implements vscode.Disposable {
    * Get total cache size across all caches
    */
   private getTotalCacheSize(): number {
-    return this.embeddingCache.size + this.searchCache.size + this.metadataCache.size + this.responseCache.size;
+    return (
+      this.embeddingCache.size +
+      this.searchCache.size +
+      this.metadataCache.size +
+      this.responseCache.size
+    );
   }
 
   /**
@@ -353,7 +403,9 @@ export class EnhancedCacheManager implements vscode.Disposable {
     this.stats.memoryUsage = this.getTotalMemoryUsage();
 
     if (this.accessTimes.length > 0) {
-      this.stats.avgAccessTime = this.accessTimes.reduce((sum, time) => sum + time, 0) / this.accessTimes.length;
+      this.stats.avgAccessTime =
+        this.accessTimes.reduce((sum, time) => sum + time, 0) /
+        this.accessTimes.length;
     }
   }
 
@@ -412,7 +464,9 @@ export class EnhancedCacheManager implements vscode.Disposable {
       this.updateCacheStats();
 
       if (expiredCount > 0) {
-        this.logger.debug(`Cleanup removed ${expiredCount} expired cache entries`);
+        this.logger.debug(
+          `Cleanup removed ${expiredCount} expired cache entries`,
+        );
       }
 
       // Check memory usage and evict if necessary
@@ -420,11 +474,18 @@ export class EnhancedCacheManager implements vscode.Disposable {
       const memoryLimitBytes = this.config.maxMemoryMB * 1024 * 1024;
 
       if (memoryUsage > memoryLimitBytes * 0.8) {
-        this.logger.warn(`Cache memory usage high: ${(memoryUsage / 1024 / 1024).toFixed(1)}MB`);
+        this.logger.warn(
+          `Cache memory usage high: ${(memoryUsage / 1024 / 1024).toFixed(1)}MB`,
+        );
 
         // Evict 10% of entries from largest cache
-        const largestCache = [this.embeddingCache, this.searchCache, this.metadataCache, this.responseCache].reduce(
-          (largest, cache) => (cache.size > largest.size ? cache : largest)
+        const largestCache = [
+          this.embeddingCache,
+          this.searchCache,
+          this.metadataCache,
+          this.responseCache,
+        ].reduce((largest, cache) =>
+          cache.size > largest.size ? cache : largest,
         );
 
         const entriesToEvict = Math.ceil(largestCache.size * 0.1);
@@ -492,7 +553,9 @@ export class EnhancedCacheManager implements vscode.Disposable {
   /**
    * Clear specific cache type
    */
-  async clearCache(type: "embedding" | "search" | "metadata" | "response" | "all"): Promise<void> {
+  async clearCache(
+    type: "embedding" | "search" | "metadata" | "response" | "all",
+  ): Promise<void> {
     try {
       switch (type) {
         case "embedding":
@@ -527,22 +590,29 @@ export class EnhancedCacheManager implements vscode.Disposable {
    */
   async optimizeConfiguration(): Promise<void> {
     try {
-      const hitRate = this.stats.hitCount / (this.stats.hitCount + this.stats.missCount) || 0;
+      const hitRate =
+        this.stats.hitCount / (this.stats.hitCount + this.stats.missCount) || 0;
       const memoryUsage = this.getTotalMemoryUsage() / 1024 / 1024; // MB
 
       // Adjust cache size based on hit rate
       if (hitRate < 0.5 && this.config.maxSize > 1000) {
         this.config.maxSize = Math.floor(this.config.maxSize * 0.8);
-        this.logger.info(`Reduced cache size to ${this.config.maxSize} due to low hit rate`);
+        this.logger.info(
+          `Reduced cache size to ${this.config.maxSize} due to low hit rate`,
+        );
       } else if (hitRate > 0.8 && memoryUsage < this.config.maxMemoryMB * 0.6) {
         this.config.maxSize = Math.floor(this.config.maxSize * 1.2);
-        this.logger.info(`Increased cache size to ${this.config.maxSize} due to high hit rate`);
+        this.logger.info(
+          `Increased cache size to ${this.config.maxSize} due to high hit rate`,
+        );
       }
 
       // Adjust TTL based on access patterns
       if (this.stats.avgAccessTime > 10) {
         this.config.defaultTtl = Math.floor(this.config.defaultTtl * 1.2);
-        this.logger.info(`Increased default TTL to ${this.config.defaultTtl}ms`);
+        this.logger.info(
+          `Increased default TTL to ${this.config.defaultTtl}ms`,
+        );
       }
 
       this.stats.maxSize = this.config.maxSize;
@@ -560,7 +630,10 @@ export class EnhancedCacheManager implements vscode.Disposable {
     cacheInfo: any;
     sampleEntries: any;
   } {
-    const getSampleEntries = (cache: Map<string, CacheEntry<any>>, name: string) => {
+    const getSampleEntries = (
+      cache: Map<string, CacheEntry<any>>,
+      name: string,
+    ) => {
       const entries = Array.from(cache.entries()).slice(0, 3);
       return entries.map(([key, entry]) => ({
         key: key.substring(0, 50),

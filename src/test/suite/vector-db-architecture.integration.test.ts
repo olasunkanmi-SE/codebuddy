@@ -199,9 +199,13 @@ suite("Vector Database Architecture Integration Tests", () => {
       assert.ok(["gemini", "openai", "local"].includes(config.embeddingModel));
       assert.ok(config.maxTokens >= 1000 && config.maxTokens <= 32000);
       assert.ok(config.batchSize >= 1 && config.batchSize <= 50);
-      assert.ok(config.searchResultLimit >= 1 && config.searchResultLimit <= 20);
+      assert.ok(
+        config.searchResultLimit >= 1 && config.searchResultLimit <= 20,
+      );
       assert.ok(config.debounceDelay >= 100 && config.debounceDelay <= 10000);
-      assert.ok(["balanced", "performance", "memory"].includes(config.performanceMode));
+      assert.ok(
+        ["balanced", "performance", "memory"].includes(config.performanceMode),
+      );
     });
 
     test("should provide performance thresholds based on mode", () => {
@@ -270,7 +274,10 @@ suite("Vector Database Architecture Integration Tests", () => {
       } catch (error) {
         // Expected in test environment where workspace analysis might fail
         assert.ok(error instanceof Error);
-        assert.ok(error.message.includes("auto-tune") || error.message.includes("configuration"));
+        assert.ok(
+          error.message.includes("auto-tune") ||
+            error.message.includes("configuration"),
+        );
       }
     });
   });

@@ -3,7 +3,10 @@ import * as path from "path";
 import { VectorDatabaseService } from "./vector-database.service";
 import { VectorDbWorkerManager } from "./vector-db-worker-manager";
 import { VectorDbSyncService } from "./vector-db-sync.service";
-import { EmbeddingPhaseFactory, CreatedPhases } from "./embedding-phase-factory";
+import {
+  EmbeddingPhaseFactory,
+  CreatedPhases,
+} from "./embedding-phase-factory";
 import { EmbeddingConfigurationManager } from "./embedding-configuration";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { FileUtils, AsyncUtils } from "../utils/common-utils";
@@ -31,7 +34,13 @@ export interface OrchestrationStats {
 }
 
 export interface UserActivity {
-  type: "file_opened" | "file_edited" | "file_deleted" | "file_renamed" | "question_asked" | "search_performed";
+  type:
+    | "file_opened"
+    | "file_edited"
+    | "file_deleted"
+    | "file_renamed"
+    | "question_asked"
+    | "search_performed";
   filePath?: string;
   oldFilePath?: string; // For renames
   content?: string;
@@ -80,7 +89,7 @@ export class SmartEmbeddingOrchestrator {
   constructor(
     private context: vscode.ExtensionContext,
     private vectorDb: VectorDatabaseService,
-    private workerManager: VectorDbWorkerManager
+    private workerManager: VectorDbWorkerManager,
   ) {
     this.logger = Logger.initialize("SmartEmbeddingOrchestrator", {
       minLevel: LogLevel.INFO,
@@ -90,7 +99,10 @@ export class SmartEmbeddingOrchestrator {
     this.phaseFactory = EmbeddingPhaseFactory.getInstance();
 
     // Create status bar item
-    this.progressStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    this.progressStatusBar = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      100,
+    );
     this.progressStatusBar.command = "codebuddy.showEmbeddingStatus";
 
     // Register commands
@@ -153,13 +165,15 @@ export class SmartEmbeddingOrchestrator {
       this.logger.info("Smart Embedding Orchestrator initialized successfully");
 
       // Show completion notification
-      vscode.window.showInformationMessage("🚀 CodeBuddy AI is ready with enhanced context understanding!");
+      vscode.window.showInformationMessage(
+        "🚀 CodeBuddy AI is ready with enhanced context understanding!",
+      );
     } catch (error) {
       this.logger.error("Failed to initialize orchestrator:", error);
       this.updateStatusBar("CodeBuddy AI Error", false);
 
       vscode.window.showErrorMessage(
-        `Failed to initialize CodeBuddy AI: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to initialize CodeBuddy AI: ${error instanceof Error ? error.message : String(error)}`,
       );
 
       throw error;
@@ -176,10 +190,13 @@ export class SmartEmbeddingOrchestrator {
       this.stats.phasesActive.immediate = true;
       this.updateStatusBar("Indexing essential files...", true);
 
-      await this.phases.immediate.embedEssentials(this.context, (phase, progress, details) => {
-        this.updateStatusBar(`${details} (${Math.round(progress)}%)`, true);
-        this.updateEmbeddingProgress(1, 0);
-      });
+      await this.phases.immediate.embedEssentials(
+        this.context,
+        (phase, progress, details) => {
+          this.updateStatusBar(`${details} (${Math.round(progress)}%)`, true);
+          this.updateEmbeddingProgress(1, 0);
+        },
+      );
 
       this.stats.phasesActive.immediate = false;
       this.logger.info("Phase 1 (Immediate) completed successfully");
@@ -285,7 +302,9 @@ export class SmartEmbeddingOrchestrator {
     fileWatcher.onDidDelete((uri) => {
       recentDeletes.push({ path: uri.fsPath, timestamp: Date.now() });
       // Clean up old entries (older than 1 second)
-      recentDeletes = recentDeletes.filter((d) => Date.now() - d.timestamp < 1000);
+      recentDeletes = recentDeletes.filter(
+        (d) => Date.now() - d.timestamp < 1000,
+      );
     });
 
     fileWatcher.onDidCreate((uri) => {
@@ -293,13 +312,15 @@ export class SmartEmbeddingOrchestrator {
       const possibleRename = recentDeletes.find(
         (d) =>
           Date.now() - d.timestamp < 500 && // Within 500ms
-          path.basename(d.path) === path.basename(uri.fsPath) // Same filename
+          path.basename(d.path) === path.basename(uri.fsPath), // Same filename
       );
 
       if (possibleRename) {
         this.handleFileRenamed(possibleRename.path, uri.fsPath);
         // Remove from recent deletes
-        recentDeletes = recentDeletes.filter((d) => d.path !== possibleRename.path);
+        recentDeletes = recentDeletes.filter(
+          (d) => d.path !== possibleRename.path,
+        );
       }
     });
 
@@ -393,11 +414,19 @@ export class SmartEmbeddingOrchestrator {
   } {
     const recentActivities = this.userActivityQueue.slice(-20);
 
-    const recentFiles = [...new Set(recentActivities.filter((a) => a.filePath).map((a) => a.filePath!))];
+    const recentFiles = [
+      ...new Set(
+        recentActivities.filter((a) => a.filePath).map((a) => a.filePath!),
+      ),
+    ];
 
-    const activeDirectories = [...new Set(recentFiles.map((f) => path.dirname(f)))];
+    const activeDirectories = [
+      ...new Set(recentFiles.map((f) => path.dirname(f))),
+    ];
 
-    const questionFrequency = recentActivities.filter((a) => a.type === "question_asked").length;
+    const questionFrequency = recentActivities.filter(
+      (a) => a.type === "question_asked",
+    ).length;
 
     return {
       recentFiles,
@@ -461,19 +490,29 @@ export class SmartEmbeddingOrchestrator {
    */
   private registerCommands(): void {
     // Show embedding status command
-    const statusCommand = vscode.commands.registerCommand("codebuddy.showEmbeddingStatus", () =>
-      this.showEmbeddingStatus()
+    const statusCommand = vscode.commands.registerCommand(
+      "codebuddy.showEmbeddingStatus",
+      () => this.showEmbeddingStatus(),
     );
 
     // Force reindex command
-    const reindexCommand = vscode.commands.registerCommand("codebuddy.forceReindex", () => this.forceReindex());
-
-    // Toggle background processing
-    const toggleBackgroundCommand = vscode.commands.registerCommand("codebuddy.toggleBackgroundProcessing", () =>
-      this.toggleBackgroundProcessing()
+    const reindexCommand = vscode.commands.registerCommand(
+      "codebuddy.forceReindex",
+      () => this.forceReindex(),
     );
 
-    this.context.subscriptions.push(statusCommand, reindexCommand, toggleBackgroundCommand, this.progressStatusBar);
+    // Toggle background processing
+    const toggleBackgroundCommand = vscode.commands.registerCommand(
+      "codebuddy.toggleBackgroundProcessing",
+      () => this.toggleBackgroundProcessing(),
+    );
+
+    this.context.subscriptions.push(
+      statusCommand,
+      reindexCommand,
+      toggleBackgroundCommand,
+      this.progressStatusBar,
+    );
   }
 
   /**
@@ -512,17 +551,27 @@ export class SmartEmbeddingOrchestrator {
     `.trim();
 
     vscode.window
-      .showInformationMessage(statusMessage, "View Logs", "Force Reindex", "Settings")
+      .showInformationMessage(
+        statusMessage,
+        "View Logs",
+        "Force Reindex",
+        "Settings",
+      )
       .then(async (selection) => {
         switch (selection) {
           case "View Logs":
-            vscode.commands.executeCommand("workbench.action.showOutputChannels");
+            vscode.commands.executeCommand(
+              "workbench.action.showOutputChannels",
+            );
             break;
           case "Force Reindex":
             await this.forceReindex();
             break;
           case "Settings":
-            vscode.commands.executeCommand("workbench.action.openSettings", "codebuddy.smartEmbedding");
+            vscode.commands.executeCommand(
+              "workbench.action.openSettings",
+              "codebuddy.smartEmbedding",
+            );
             break;
         }
       });
@@ -540,7 +589,7 @@ export class SmartEmbeddingOrchestrator {
     const confirmation = await vscode.window.showWarningMessage(
       "This will reindex your entire codebase. Continue?",
       { modal: true },
-      "Yes, Reindex All"
+      "Yes, Reindex All",
     );
 
     if (confirmation) {
@@ -651,16 +700,24 @@ export class SmartEmbeddingOrchestrator {
   private async handleFileDeleted(filePath: string): Promise<void> {
     try {
       await this.vectorDb.deleteByFile(filePath);
-      this.logger.info(`Cleaned up vector DB entries for deleted file: ${filePath}`);
+      this.logger.info(
+        `Cleaned up vector DB entries for deleted file: ${filePath}`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to clean up vector DB for deleted file ${filePath}:`, error);
+      this.logger.error(
+        `Failed to clean up vector DB for deleted file ${filePath}:`,
+        error,
+      );
     }
   }
 
   /**
    * Handle file rename by updating vector database entries
    */
-  private async handleFileRenamed(oldPath: string, newPath: string): Promise<void> {
+  private async handleFileRenamed(
+    oldPath: string,
+    newPath: string,
+  ): Promise<void> {
     try {
       // Record the rename activity
       this.recordActivity({
@@ -679,9 +736,14 @@ export class SmartEmbeddingOrchestrator {
         await this.processEmbeddingForFile(newPath);
       }
 
-      this.logger.info(`Updated vector DB for renamed file: ${oldPath} -> ${newPath}`);
+      this.logger.info(
+        `Updated vector DB for renamed file: ${oldPath} -> ${newPath}`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to handle file rename ${oldPath} -> ${newPath}:`, error);
+      this.logger.error(
+        `Failed to handle file rename ${oldPath} -> ${newPath}:`,
+        error,
+      );
     }
   }
 
@@ -724,15 +786,20 @@ export class SmartEmbeddingOrchestrator {
     // Process in batches
     for (let i = 0; i < files.length; i += this.BATCH_SIZE) {
       const batch = files.slice(i, i + this.BATCH_SIZE);
-      const batchPromises = batch.map((file) => this.processEmbeddingForFile(file));
+      const batchPromises = batch.map((file) =>
+        this.processEmbeddingForFile(file),
+      );
 
       try {
         await Promise.all(batchPromises);
         this.logger.info(
-          `Processed batch ${Math.floor(i / this.BATCH_SIZE) + 1} of ${Math.ceil(files.length / this.BATCH_SIZE)}`
+          `Processed batch ${Math.floor(i / this.BATCH_SIZE) + 1} of ${Math.ceil(files.length / this.BATCH_SIZE)}`,
         );
       } catch (error) {
-        this.logger.error(`Batch processing failed for files ${i}-${i + batch.length}:`, error);
+        this.logger.error(
+          `Batch processing failed for files ${i}-${i + batch.length}:`,
+          error,
+        );
       }
     }
   }
