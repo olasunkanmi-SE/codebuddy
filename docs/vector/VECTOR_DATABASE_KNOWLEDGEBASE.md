@@ -44,7 +44,7 @@ The Vector Database & Smart Context Extraction system enhances CodeBuddy's abili
 
 ### 🔧 Technology Stack
 
-- **Vector Database**: ChromaDB (local, embedded)
+- **Vector Database**: LanceDB (local, serverless, TypeScript-native)
 - **Embeddings**: Currently selected model from CodeBuddy configuration (Gemini, Groq, Anthropic, DeepSeek, etc.)
 - **Code Analysis**: TypeScript AST (existing `typescript-ats.service.ts`)
 - **Caching**: SQLite (existing infrastructure)
@@ -58,7 +58,7 @@ graph TB
     B --> C[Code Indexing Service]
     C --> D[TypeScript ATS Mapper]
     C --> E[Embedding Service]
-    E --> F[ChromaDB]
+    E --> F[LanceDB]
     G[Smart Context Extractor] --> F
     G --> H[Question Classifier]
     G --> I[BaseWebViewProvider]
@@ -85,7 +85,7 @@ graph TB
 2. **Incremental Processing**: Modified files are queued for reprocessing
 3. **Code Analysis**: TypeScript AST extracts functions, classes, interfaces
 4. **Embedding Generation**: Create vector embeddings for code snippets
-5. **Vector Storage**: Store embeddings in ChromaDB with metadata
+5. **Vector Storage**: Store embeddings in LanceDB with metadata
 6. **Semantic Search**: Query vector DB for relevant context
 7. **Context Enhancement**: Inject relevant context into AI prompts
 
@@ -161,7 +161,7 @@ Instead of embedding everything at once (which blocks the UI), CodeBuddy uses a 
 
 ```typescript
 // Install dependencies
-npm install chromadb @types/chromadb worker_threads
+npm install @lancedb/lancedb apache-arrow
 
 // ✅ Smart orchestrated approach (non-blocking)
 const embeddingOrchestrator = new SmartEmbeddingOrchestrator(context, workerManager);
@@ -303,7 +303,7 @@ interface VectorDbSyncService {
 1. **Dependencies**
 
    ```bash
-   npm install chromadb @tensorflow/tfjs-node
+   npm install @lancedb/lancedb apache-arrow
    ```
 
 2. **Configuration**
