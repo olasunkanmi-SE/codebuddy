@@ -70,7 +70,7 @@ const nodeModulesPlugin = {
     const filteredBuiltins = nodeBuiltins.filter((m) => m !== "punycode");
     build.onResolve({ filter: new RegExp(`^(${filteredBuiltins.join("|")})$`) }, () => ({ external: true }));
     build.onResolve({ filter: new RegExp(`^(${filteredBuiltins.join("|")})/`) }, () => ({ external: true }));
-    build.onResolve({ filter: /better-sqlite3|electron/ }, () => ({ external: true })); // jsdom removed
+    build.onResolve({ filter: /better-sqlite3|electron|@lancedb\/lancedb|apache-arrow/ }, () => ({ external: true })); // jsdom removed
   },
 };
 
@@ -107,6 +107,8 @@ async function main() {
       "vscode",
       "better-sqlite3",
       "electron",
+      "@lancedb/lancedb",
+      "apache-arrow",
       "./node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js",
       // 'punycode' intentionally NOT external, so it is bundled
     ],

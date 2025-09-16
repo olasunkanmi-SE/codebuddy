@@ -44,25 +44,51 @@ suite("Vector Database Initialization Fix", () => {
       await vectorDb.initialize();
 
       // Verify initialization was successful
-      assert.strictEqual(vectorDb.isReady(), true, "Vector database should be ready after initialization");
+      assert.strictEqual(
+        vectorDb.isReady(),
+        true,
+        "Vector database should be ready after initialization",
+      );
 
       const stats = vectorDb.getStats();
-      assert.strictEqual(stats.isInitialized, true, "Stats should show initialized state");
-      assert.strictEqual(stats.collectionName, "codebase_embeddings", "Collection name should be correct");
+      assert.strictEqual(
+        stats.isInitialized,
+        true,
+        "Stats should show initialized state",
+      );
+      assert.strictEqual(
+        stats.collectionName,
+        "codebase_embeddings",
+        "Collection name should be correct",
+      );
     } catch (error) {
       // Check that we get meaningful error messages for ChromaDB 3.x issues
       if (error instanceof Error) {
         if (error.message.includes("ChromaDB Connection Failed")) {
-          console.log("✅ Got expected ChromaDB 3.x connection guidance:", error.message.substring(0, 100));
-          assert.ok(true, "ChromaDB 3.x connection error provides helpful guidance");
+          console.log(
+            "✅ Got expected ChromaDB 3.x connection guidance:",
+            error.message.substring(0, 100),
+          );
+          assert.ok(
+            true,
+            "ChromaDB 3.x connection error provides helpful guidance",
+          );
         } else if (error.message.includes("Failed to connect to chromadb")) {
           console.log("✅ ChromaDB server connection error handled gracefully");
           assert.ok(true, "ChromaDB server connection error handled");
         } else if (error.message.includes("DefaultEmbeddingFunction")) {
-          assert.fail(`ChromaDB embedding function error still occurs: ${error.message}`);
+          assert.fail(
+            `ChromaDB embedding function error still occurs: ${error.message}`,
+          );
         } else {
-          console.log("Other initialization error (expected in test environment):", error.message);
-          assert.ok(true, "Other initialization errors are acceptable in test environment");
+          console.log(
+            "Other initialization error (expected in test environment):",
+            error.message,
+          );
+          assert.ok(
+            true,
+            "Other initialization errors are acceptable in test environment",
+          );
         }
       }
     }
@@ -75,7 +101,10 @@ suite("Vector Database Initialization Fix", () => {
       // Test that LanceDB can be imported
       const lanceDB = await import("@lancedb/lancedb");
 
-      assert.ok(lanceDB.connect, "LanceDB connect function should be available");
+      assert.ok(
+        lanceDB.connect,
+        "LanceDB connect function should be available",
+      );
 
       // Test that the apache-arrow package is installed
       const defaultEmbed = await import("@chroma-core/default-embed");
@@ -99,7 +128,7 @@ suite("Vector Database Initialization Fix", () => {
       assert.ok(error instanceof Error, "Should throw an Error object");
       assert.ok(
         error.message.includes("Gemini API key is required"),
-        `Error message should mention missing API key, got: ${error.message}`
+        `Error message should mention missing API key, got: ${error.message}`,
       );
     }
   });
@@ -120,13 +149,15 @@ suite("Vector Database Initialization Fix", () => {
       if (error instanceof Error) {
         // The specific error we fixed should not appear
         assert.ok(
-          !error.message.includes("Cannot instantiate a collection with the DefaultEmbeddingFunction"),
-          `Should not have DefaultEmbeddingFunction error: ${error.message}`
+          !error.message.includes(
+            "Cannot instantiate a collection with the DefaultEmbeddingFunction",
+          ),
+          `Should not have DefaultEmbeddingFunction error: ${error.message}`,
         );
 
         assert.ok(
           !error.message.includes("Please install @chroma-core/default-embed"),
-          `Should not ask to install @chroma-core/default-embed: ${error.message}`
+          `Should not ask to install @chroma-core/default-embed: ${error.message}`,
         );
 
         console.log("✅ No ChromaDB embedding function errors detected");

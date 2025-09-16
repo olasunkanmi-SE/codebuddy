@@ -58,8 +58,15 @@ export class VectorDatabaseService {
     // Initialize simple vector store as fallback
     this.simpleStore = new SimpleVectorStore();
 
-    // Set LanceDB database path
-    this.dbPath = path.join(this.context.extensionPath, "lancedb");
+    // Set LanceDB database path - use workspace root for project-specific storage
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+    if (workspaceRoot) {
+      this.dbPath = path.join(workspaceRoot, ".codebuddy", "lancedb");
+    } else {
+      // Fallback to extension path if no workspace is open
+      this.dbPath = path.join(this.context.extensionPath, "lancedb");
+      this.logger.warn("No workspace found, using extension directory for LanceDB storage");
+    }
 
     // Always use Gemini for embeddings to maintain consistency
     if (!this.geminiApiKey) {
@@ -93,6 +100,13 @@ export class VectorDatabaseService {
         this.isInitialized = true;
         this.stats.isInitialized = true;
         return;
+      }
+
+      // Ensure storage directory exists
+      const fs = await import("fs");
+      if (!fs.existsSync(path.dirname(this.dbPath))) {
+        fs.mkdirSync(path.dirname(this.dbPath), { recursive: true });
+        this.logger.info(`Created LanceDB storage directory: ${path.dirname(this.dbPath)}`);
       }
 
       // Connect to LanceDB

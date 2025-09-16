@@ -59,7 +59,11 @@ export class SimpleVectorStore {
   async query(params: {
     queryEmbeddings: number[][];
     nResults: number;
-  }): Promise<{ documents: string[][]; metadatas: any[][]; distances: number[][] }> {
+  }): Promise<{
+    documents: string[][];
+    metadatas: any[][];
+    distances: number[][];
+  }> {
     const { queryEmbeddings, nResults } = params;
     const queryEmbedding = queryEmbeddings[0]; // Use first query embedding
 
@@ -109,7 +113,9 @@ export class SimpleVectorStore {
   /**
    * Get entries by metadata filter (simple implementation)
    */
-  async get(params: { where?: Record<string, any> }): Promise<{ ids: string[] }> {
+  async get(params: {
+    where?: Record<string, any>;
+  }): Promise<{ ids: string[] }> {
     const { where } = params;
     const matchingIds: string[] = [];
 

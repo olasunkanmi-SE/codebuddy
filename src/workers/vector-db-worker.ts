@@ -7,7 +7,13 @@
 export const WORKER_DISABLED = true;
 
 export interface VectorDbWorkerTask {
-  type: "initialize" | "index" | "search" | "deleteByFile" | "clearAll" | "getStats";
+  type:
+    | "initialize"
+    | "index"
+    | "search"
+    | "deleteByFile"
+    | "clearAll"
+    | "getStats";
   payload: any;
 }
 
@@ -33,9 +39,14 @@ export class VectorDbWorkerManager {
     console.log("Stub: Would index " + files.length + " files with LanceDB");
   }
 
-  async indexFunctionData(functionData: any[], progressCallback?: (progress: number) => void): Promise<void> {
+  async indexFunctionData(
+    functionData: any[],
+    progressCallback?: (progress: number) => void,
+  ): Promise<void> {
     // TODO: Implement LanceDB function indexing
-    console.log("Stub: Would index " + functionData.length + " functions with LanceDB");
+    console.log(
+      "Stub: Would index " + functionData.length + " functions with LanceDB",
+    );
     if (progressCallback) {
       progressCallback(100);
     }

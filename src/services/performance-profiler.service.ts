@@ -31,11 +31,7 @@ export interface PerformanceReport {
  * Performance alert types
  */
 export interface PerformanceAlert {
-  type:
-    | "HIGH_SEARCH_LATENCY"
-    | "HIGH_MEMORY_USAGE"
-    | "HIGH_ERROR_RATE"
-    | "LOW_THROUGHPUT";
+  type: "HIGH_SEARCH_LATENCY" | "HIGH_MEMORY_USAGE" | "HIGH_ERROR_RATE" | "LOW_THROUGHPUT";
   severity: "info" | "warning" | "critical";
   message: string;
   timestamp: Date;
@@ -174,10 +170,7 @@ export class PerformanceProfiler implements vscode.Disposable {
         success: false,
       });
 
-      this.logger.error(
-        `Performance measurement failed for ${operation}:`,
-        error,
-      );
+      this.logger.error(`Performance measurement failed for ${operation}:`, error);
       throw error;
     }
   }
@@ -187,7 +180,7 @@ export class PerformanceProfiler implements vscode.Disposable {
    */
   private recordMeasurement(
     operation: string,
-    measurement: { duration: number; memoryDelta: number; success: boolean },
+    measurement: { duration: number; memoryDelta: number; success: boolean }
   ): void {
     // Record operation-specific metrics
     switch (operation) {
@@ -400,19 +393,12 @@ export class PerformanceProfiler implements vscode.Disposable {
    */
   private handlePerformanceAlerts(alerts: PerformanceAlert[]): void {
     for (const alert of alerts) {
-      this.logger.warn(
-        `Performance Alert [${alert.severity.toUpperCase()}]:`,
-        alert.message,
-      );
+      this.logger.warn(`Performance Alert [${alert.severity.toUpperCase()}]:`, alert.message);
 
       // Show user notification for critical alerts
       if (alert.severity === "critical") {
         vscode.window
-          .showWarningMessage(
-            `CodeBuddy Performance Alert: ${alert.message}`,
-            "View Details",
-            "Optimize Settings",
-          )
+          .showWarningMessage(`CodeBuddy Performance Alert: ${alert.message}`, "View Details", "Optimize Settings")
           .then((action) => {
             if (action === "View Details") {
               this.showPerformanceReport();
@@ -457,31 +443,81 @@ export class PerformanceProfiler implements vscode.Disposable {
     try {
       const optimizedConfig = this.getOptimizedConfig();
       const report = this.getPerformanceReport();
+      const changes: string[] = [];
 
       // Adjust batch size based on performance
       let newBatchSize = optimizedConfig.embeddings.batchSize;
-      if (report.avgSearchLatency > 1000) {
+      if (report.avgSearchLatency > 5000) {
+        // Very high latency - reduce batch size significantly
+        newBatchSize = Math.max(3, Math.floor(newBatchSize * 0.5));
+        changes.push(`Reduced batch size to ${newBatchSize} (high latency detected)`);
+      } else if (report.avgSearchLatency > 1000) {
+        // High latency - reduce batch size moderately
         newBatchSize = Math.max(5, Math.floor(newBatchSize * 0.7));
-      } else if (report.avgSearchLatency < 200) {
-        newBatchSize = Math.min(50, Math.floor(newBatchSize * 1.3));
+        changes.push(`Reduced batch size to ${newBatchSize} (moderate latency)`);
+      } else if (report.avgSearchLatency < 200 && report.avgMemoryUsage < 300) {
+        // Low latency and memory - can increase batch size
+        newBatchSize = Math.min(25, Math.floor(newBatchSize * 1.2));
+        changes.push(`Increased batch size to ${newBatchSize} (good performance)`);
       }
 
-      // Update configuration
+      // Update batch size
       await this.configManager.updateConfig("batchSize", newBatchSize);
 
-      // Adjust performance mode based on memory usage
+      // Adjust performance mode based on memory usage and latency
+      const currentConfig = this.configManager.getConfig();
+      let newPerformanceMode = currentConfig.performanceMode;
+
       if (report.avgMemoryUsage > 800) {
-        await this.configManager.updateConfig("performanceMode", "memory");
+        newPerformanceMode = "memory";
+        changes.push("Set performance mode to 'memory' (high memory usage)");
       } else if (report.avgMemoryUsage < 200 && report.avgSearchLatency > 500) {
-        await this.configManager.updateConfig("performanceMode", "performance");
+        newPerformanceMode = "performance";
+        changes.push("Set performance mode to 'performance' (low memory, high latency)");
+      } else if (report.avgSearchLatency < 300 && report.avgMemoryUsage < 400) {
+        newPerformanceMode = "balanced";
+        changes.push("Set performance mode to 'balanced' (good overall performance)");
       }
 
-      vscode.window.showInformationMessage(
-        `Configuration optimized: Batch size set to ${newBatchSize}`,
-      );
+      if (newPerformanceMode !== currentConfig.performanceMode) {
+        await this.configManager.updateConfig("performanceMode", newPerformanceMode);
+      }
+
+      // Adjust search result limit if latency is very high
+      if (report.avgSearchLatency > 10000) {
+        await this.configManager.updateConfig("searchResultLimit", 5);
+        changes.push("Reduced search result limit to 5 (very high latency)");
+      } else if (report.avgSearchLatency > 2000) {
+        await this.configManager.updateConfig("searchResultLimit", 6);
+        changes.push("Reduced search result limit to 6 (high latency)");
+      }
+
+      // Show results to user
+      if (changes.length > 0) {
+        const message = `Configuration optimized:\\n\\n${changes.join("\\n")}\\n\\nPerformance metrics:\\n• Search latency: ${report.avgSearchLatency.toFixed(0)}ms\\n• Memory usage: ${report.avgMemoryUsage.toFixed(0)}MB`;
+
+        vscode.window
+          .showInformationMessage(`Configuration optimized with ${changes.length} changes`, "View Details")
+          .then((action) => {
+            if (action === "View Details") {
+              vscode.window.showInformationMessage(message);
+            }
+          });
+      } else {
+        vscode.window.showInformationMessage("Configuration is already optimal for current performance metrics");
+      }
+
+      this.logger.info("Configuration optimization completed", {
+        changes,
+        newBatchSize,
+        newPerformanceMode,
+        avgLatency: report.avgSearchLatency,
+        avgMemory: report.avgMemoryUsage,
+      });
     } catch (error) {
       this.logger.error("Failed to optimize configuration:", error);
-      vscode.window.showErrorMessage("Failed to optimize configuration");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      vscode.window.showErrorMessage(`Failed to optimize configuration: ${errorMessage}`);
     }
   }
 
