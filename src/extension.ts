@@ -2,7 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { Orchestrator } from "./agents/orchestrator";
-import { APP_CONFIG, CODEBUDDY_ACTIONS, generativeAiModels } from "./application/constant";
+import {
+  APP_CONFIG,
+  CODEBUDDY_ACTIONS,
+  generativeAiModels,
+} from "./application/constant";
 import { Comments } from "./commands/comment";
 import { ExplainCode } from "./commands/explain";
 import { FixError } from "./commands/fixError";
@@ -30,6 +34,7 @@ import { PersistentCodebaseUnderstandingService } from "./services/persistent-co
 import { VectorDbSyncService } from "./services/vector-db-sync.service";
 import { VectorDatabaseService } from "./services/vector-database.service";
 import { VectorDbWorkerManager } from "./services/vector-db-worker-manager";
+import { getCodeIndexingStatusProvider } from "./services/code-indexing-status.service";
 import {
   generateDocumentationCommand,
   regenerateDocumentationCommand,
@@ -61,17 +66,159 @@ let vectorDbSyncService: VectorDbSyncService | undefined;
 let vectorDbWorkerManager: VectorDbWorkerManager | undefined;
 
 /**
+ * Initialize WebView providers lazily for faster startup
+ */
+function initializeWebViewProviders(
+  context: vscode.ExtensionContext,
+  selectedGenerativeAiModel: string,
+): void {
+  // Use setImmediate to defer until after current call stack
+  setImmediate(() => {
+    try {
+      console.log("🎨 CodeBuddy: Initializing WebView providers...");
+
+      const modelConfigurations: {
+        [key: string]: {
+          key: string;
+          model: string;
+          webviewProviderClass: any;
+        };
+      } = {
+        [generativeAiModels.GEMINI]: {
+          key: geminiKey,
+          model: geminiModel,
+          webviewProviderClass: GeminiWebViewProvider,
+        },
+        [generativeAiModels.GROQ]: {
+          key: groqApiKey,
+          model: groqModel,
+          webviewProviderClass: GroqWebViewProvider,
+        },
+        [generativeAiModels.ANTHROPIC]: {
+          key: anthropicApiKey,
+          model: anthropicModel,
+          webviewProviderClass: AnthropicWebViewProvider,
+        },
+        [generativeAiModels.GROK]: {
+          key: grokApiKey,
+          model: grokModel,
+          webviewProviderClass: AnthropicWebViewProvider,
+        },
+        [generativeAiModels.DEEPSEEK]: {
+          key: deepseekApiKey,
+          model: deepseekModel,
+          webviewProviderClass: DeepseekWebViewProvider,
+        },
+      };
+
+      const providerManager = WebViewProviderManager.getInstance(context);
+
+      if (selectedGenerativeAiModel in modelConfigurations) {
+        const modelConfig = modelConfigurations[selectedGenerativeAiModel];
+        const apiKey = getConfigValue(modelConfig.key);
+        const apiModel = getConfigValue(modelConfig.model);
+
+        providerManager.initializeProvider(
+          selectedGenerativeAiModel,
+          apiKey,
+          apiModel,
+          true,
+        );
+
+        console.log(
+          `✓ WebView provider initialized: ${selectedGenerativeAiModel}`,
+        );
+      }
+
+      // Store providerManager globally and add to subscriptions
+      (globalThis as any).providerManager = providerManager;
+      context.subscriptions.push(providerManager);
+    } catch (error) {
+      console.error("Failed to initialize WebView providers:", error);
+      vscode.window.showWarningMessage(
+        "CodeBuddy: WebView initialization failed, some features may be limited",
+      );
+    }
+  });
+}
+
+/**
+ * Initialize heavy background services after UI is ready
+ * This prevents blocking the extension startup and webview loading
+ */
+async function initializeBackgroundServices(
+  context: vscode.ExtensionContext,
+): Promise<void> {
+  try {
+    console.log("🔄 CodeBuddy: Starting background services...");
+    vscode.window.setStatusBarMessage(
+      "$(sync~spin) CodeBuddy: Loading background services...",
+      5000,
+    );
+
+    // Initialize persistent codebase understanding service
+    try {
+      const persistentCodebaseService =
+        PersistentCodebaseUnderstandingService.getInstance();
+      await persistentCodebaseService.initialize();
+      console.log("✓ Persistent codebase understanding service initialized");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.warn(
+        `Failed to initialize persistent codebase service: ${errorMessage}`,
+        error,
+      );
+    }
+
+    // Phase 4: Initialize Vector Database Orchestration (truly non-blocking)
+    initializeVectorDatabaseOrchestration(context)
+      .then(() => {
+        console.log("✓ Vector database orchestration initialized");
+        vscode.window.setStatusBarMessage(
+          "$(database) CodeBuddy: Vector search ready",
+          3000,
+        );
+      })
+      .catch((error) => {
+        console.warn(
+          "Vector database initialization failed, using fallback mode:",
+          error,
+        );
+        vscode.window.setStatusBarMessage(
+          "$(warning) CodeBuddy: Using fallback search",
+          3000,
+        );
+      });
+
+    // All background services ready
+    vscode.window.setStatusBarMessage("$(check) CodeBuddy: Ready", 3000);
+    console.log("🎉 CodeBuddy: All background services initialized");
+  } catch (error) {
+    console.error("Background services initialization failed:", error);
+    vscode.window.setStatusBarMessage(
+      "$(warning) CodeBuddy: Some features may be limited",
+      5000,
+    );
+  }
+}
+
+/**
  * Initialize Phase 4 Vector Database Orchestration
  * This sets up the comprehensive vector database system with multi-phase embedding
  */
-async function initializeVectorDatabaseOrchestration(context: vscode.ExtensionContext): Promise<void> {
+async function initializeVectorDatabaseOrchestration(
+  context: vscode.ExtensionContext,
+): Promise<void> {
   try {
     console.log("🚀 Starting Phase 4 Vector Database Orchestration...");
 
     // Get Gemini API key for consistent embeddings
     const { apiKey: geminiApiKey } = getAPIKeyAndModel("Gemini");
     if (!geminiApiKey) {
-      console.warn("Gemini API key not found, skipping vector database initialization");
+      console.warn(
+        "Gemini API key not found, skipping vector database initialization",
+      );
       return;
     }
 
@@ -81,33 +228,54 @@ async function initializeVectorDatabaseOrchestration(context: vscode.ExtensionCo
     console.log("✓ Vector database worker manager initialized");
 
     // Initialize vector database service
-    const vectorDatabaseService = new VectorDatabaseService(context, geminiApiKey);
+    const vectorDatabaseService = new VectorDatabaseService(
+      context,
+      geminiApiKey,
+    );
     await vectorDatabaseService.initialize();
     console.log("✓ Vector database service initialized");
 
     // Initialize sync service for real-time file monitoring
     // Use CodeIndexingService as the indexer for the sync service
     const { CodeIndexingService } = await import("./services/code-indexing");
-    const { CodeIndexingAdapter } = await import("./services/vector-db-sync.service");
+    const { CodeIndexingAdapter } = await import(
+      "./services/vector-db-sync.service"
+    );
     const codeIndexingService = CodeIndexingService.createInstance();
     const codeIndexingAdapter = new CodeIndexingAdapter(codeIndexingService);
 
-    vectorDbSyncService = new VectorDbSyncService(vectorDatabaseService, codeIndexingAdapter);
+    vectorDbSyncService = new VectorDbSyncService(
+      vectorDatabaseService,
+      codeIndexingAdapter,
+    );
     await vectorDbSyncService.initialize();
     console.log("✓ Vector database sync service initialized");
 
+    // Initialize status provider
+    const statusProvider = getCodeIndexingStatusProvider();
+    statusProvider.initialize(vectorDbSyncService);
+
+    // Create status bar item
+    const statusBarItem = statusProvider.createStatusBarItem();
+    context.subscriptions.push(statusBarItem);
+
     // Register commands for user control
-    registerVectorDatabaseCommands(context);
+    registerVectorDatabaseCommands(context, statusProvider);
 
     // Show success notification
-    vscode.window.setStatusBarMessage("$(check) CodeBuddy: Vector database orchestration ready", 5000);
+    vscode.window.setStatusBarMessage(
+      "$(check) CodeBuddy: Vector database orchestration ready",
+      5000,
+    );
 
-    console.log("🎉 Phase 4 Vector Database Orchestration completed successfully");
+    console.log(
+      "🎉 Phase 4 Vector Database Orchestration completed successfully",
+    );
   } catch (error: any) {
     console.error("Failed to initialize Phase 4 orchestration:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     vscode.window.showWarningMessage(
-      `CodeBuddy: Vector database initialization failed: ${errorMessage}. Using fallback search mode.`
+      `CodeBuddy: Vector database initialization failed: ${errorMessage}. Using fallback search mode.`,
     );
   }
 }
@@ -115,80 +283,277 @@ async function initializeVectorDatabaseOrchestration(context: vscode.ExtensionCo
 /**
  * Register vector database related commands
  */
-function registerVectorDatabaseCommands(context: vscode.ExtensionContext): void {
+function registerVectorDatabaseCommands(
+  context: vscode.ExtensionContext,
+  statusProvider?: import("./services/code-indexing-status.service").CodeIndexingStatusProvider,
+): void {
   // Command to force full reindex
-  const forceReindexCommand = vscode.commands.registerCommand("codebuddy.vectorDb.forceReindex", async () => {
-    if (!vectorDbSyncService) {
-      vscode.window.showErrorMessage("Vector database not initialized");
-      return;
-    }
-
-    const confirm = await vscode.window.showWarningMessage(
-      "This will clear all embeddings and reindex the entire codebase. Continue?",
-      "Yes, Reindex",
-      "Cancel"
-    );
-
-    if (confirm === "Yes, Reindex") {
-      try {
-        // Force a full reindex using the available method
-        await vectorDbSyncService.performFullReindex();
-        vscode.window.showInformationMessage("Full reindex completed successfully");
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Reindex failed: ${errorMessage}`);
+  const forceReindexCommand = vscode.commands.registerCommand(
+    "codebuddy.vectorDb.forceReindex",
+    async () => {
+      if (!vectorDbSyncService) {
+        vscode.window.showErrorMessage("Vector database not initialized");
+        return;
       }
-    }
-  });
+
+      const confirm = await vscode.window.showWarningMessage(
+        "This will clear all embeddings and reindex the entire codebase. Continue?",
+        "Yes, Reindex",
+        "Cancel",
+      );
+
+      if (confirm === "Yes, Reindex") {
+        try {
+          // Force a full reindex using the available method
+          await vectorDbSyncService.performFullReindex();
+          vscode.window.showInformationMessage(
+            "Full reindex completed successfully",
+          );
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          vscode.window.showErrorMessage(`Reindex failed: ${errorMessage}`);
+        }
+      }
+    },
+  );
 
   // Command to show vector database stats
-  const showStatsCommand = vscode.commands.registerCommand("codebuddy.vectorDb.showStats", async () => {
-    if (!vectorDbSyncService) {
-      vscode.window.showErrorMessage("Vector database not initialized");
-      return;
-    }
+  const showStatsCommand = vscode.commands.registerCommand(
+    "codebuddy.vectorDb.showStats",
+    async () => {
+      if (!vectorDbSyncService) {
+        vscode.window.showInformationMessage(
+          "🔄 Vector database is still initializing in the background. Please wait a moment and try again.",
+          "OK",
+        );
+        return;
+      }
 
-    const stats = vectorDbSyncService.getStats();
-    const message = `**Vector Database Statistics**\n\n
+      const stats = vectorDbSyncService.getStats();
+      const message = `**Vector Database Statistics**\n\n
 • Files Monitored: ${stats.filesMonitored}\n
 • Sync Operations: ${stats.syncOperations}\n
 • Failed Operations: ${stats.failedOperations}\n
 • Queue Size: ${stats.queueSize}\n
 • Last Sync: ${stats.lastSync || "Never"}`;
 
-    vscode.window.showInformationMessage(message);
-  });
+      vscode.window.showInformationMessage(message);
+    },
+  );
 
-  context.subscriptions.push(forceReindexCommand, showStatsCommand);
+  // Command to show indexing status
+  const showIndexingStatusCommand = vscode.commands.registerCommand(
+    "codebuddy.showIndexingStatus",
+    async () => {
+      if (statusProvider) {
+        await statusProvider.showDetailedStatus();
+      } else {
+        vscode.window.showInformationMessage("Indexing status not available");
+      }
+    },
+  );
+
+  // Phase 5: Performance & Production Commands
+  const showPerformanceReportCommand = vscode.commands.registerCommand(
+    "codebuddy.showPerformanceReport",
+    async () => {
+      // This will be handled by the webview provider's performance profiler
+      vscode.commands.executeCommand("codebuddy.webview.showPerformanceReport");
+    },
+  );
+
+  const clearVectorCacheCommand = vscode.commands.registerCommand(
+    "codebuddy.clearVectorCache",
+    async () => {
+      // This will be handled by the webview provider's enhanced cache manager
+      vscode.commands.executeCommand("codebuddy.webview.clearCache", "all");
+    },
+  );
+
+  const reduceBatchSizeCommand = vscode.commands.registerCommand(
+    "codebuddy.reduceBatchSize",
+    async () => {
+      // This will be handled by the webview provider's configuration manager
+      vscode.commands.executeCommand("codebuddy.webview.reduceBatchSize");
+    },
+  );
+
+  const pauseIndexingCommand = vscode.commands.registerCommand(
+    "codebuddy.pauseIndexing",
+    async () => {
+      // This will be handled by the webview provider's orchestrator
+      vscode.commands.executeCommand("codebuddy.webview.pauseIndexing");
+    },
+  );
+
+  const resumeIndexingCommand = vscode.commands.registerCommand(
+    "codebuddy.resumeIndexing",
+    async () => {
+      // This will be handled by the webview provider's orchestrator
+      vscode.commands.executeCommand("codebuddy.webview.resumeIndexing");
+    },
+  );
+
+  const restartVectorWorkerCommand = vscode.commands.registerCommand(
+    "codebuddy.restartVectorWorker",
+    async () => {
+      // This will be handled by the webview provider's vector worker manager
+      vscode.commands.executeCommand("codebuddy.webview.restartWorker");
+    },
+  );
+
+  const emergencyStopCommand = vscode.commands.registerCommand(
+    "codebuddy.emergencyStop",
+    async () => {
+      // This will be handled by the webview provider's production safeguards
+      vscode.commands.executeCommand("codebuddy.webview.emergencyStop");
+    },
+  );
+
+  const resumeFromEmergencyStopCommand = vscode.commands.registerCommand(
+    "codebuddy.resumeFromEmergencyStop",
+    async () => {
+      // This will be handled by the webview provider's production safeguards
+      vscode.commands.executeCommand(
+        "codebuddy.webview.resumeFromEmergencyStop",
+      );
+    },
+  );
+
+  const optimizePerformanceCommand = vscode.commands.registerCommand(
+    "codebuddy.optimizePerformance",
+    async () => {
+      // This will be handled by the webview provider's performance profiler
+      vscode.commands.executeCommand("codebuddy.webview.optimizePerformance");
+    },
+  );
+
+  const diagnosticCommand = vscode.commands.registerCommand(
+    "codebuddy.vectorDb.diagnostic",
+    async () => {
+      try {
+        // Check LanceDB installation
+        const lanceDB = await import("@lancedb/lancedb");
+        let lanceStatus = "✅ LanceDB installed";
+
+        // Check Apache Arrow
+        let arrowStatus = "❌ Apache Arrow not available";
+        try {
+          await import("apache-arrow");
+          arrowStatus = "✅ Apache Arrow available";
+        } catch {
+          arrowStatus = "❌ Apache Arrow not available";
+        }
+
+        // Check vector database service status
+        let serviceStatus = "❌ Service not initialized";
+        if (vectorDbSyncService) {
+          const stats = vectorDbSyncService.getStats();
+          serviceStatus = `✅ Service initialized (${stats.filesMonitored} files monitored)`;
+        }
+
+        const diagnosticMessage = `
+**CodeBuddy Vector Database Diagnostic**
+
+• **LanceDB**: ${lanceStatus}
+• **Apache Arrow**: ${arrowStatus}
+• **Service Status**: ${serviceStatus}
+• **Node.js Version**: ${process.version}
+
+**Fix Issues**:
+1. Install missing dependencies: \`npm install @chroma-core/default-embed\`
+2. Restart VS Code
+3. Check API keys in settings
+      `.trim();
+
+        vscode.window
+          .showInformationMessage(diagnosticMessage, "Copy to Clipboard")
+          .then((action) => {
+            if (action === "Copy to Clipboard") {
+              vscode.env.clipboard.writeText(diagnosticMessage);
+            }
+          });
+      } catch (error) {
+        vscode.window.showErrorMessage(`Diagnostic failed: ${error}`);
+      }
+    },
+  );
+
+  context.subscriptions.push(
+    forceReindexCommand,
+    showStatsCommand,
+    showIndexingStatusCommand,
+    showPerformanceReportCommand,
+    clearVectorCacheCommand,
+    reduceBatchSizeCommand,
+    pauseIndexingCommand,
+    resumeIndexingCommand,
+    restartVectorWorkerCommand,
+    emergencyStopCommand,
+    resumeFromEmergencyStopCommand,
+    optimizePerformanceCommand,
+    diagnosticCommand,
+  );
 }
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    console.log("🚀 CodeBuddy: Starting fast activation...");
+
+    // ⚡ FAST STARTUP: Only essential sync operations
     orchestrator.start();
 
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     FileUploadService.initialize(apiKey);
     Memory.getInstance();
 
-    // Initialize persistent codebase understanding service
-    try {
-      const persistentCodebaseService = PersistentCodebaseUnderstandingService.getInstance();
-      await persistentCodebaseService.initialize();
-      console.log("Persistent codebase understanding service initialized");
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn(`Failed to initialize persistent codebase service: ${errorMessage}`, error);
+    // Show early status
+    vscode.window.setStatusBarMessage(
+      "$(loading~spin) CodeBuddy: Initializing...",
+      3000,
+    );
+
+    // ⚡ DEFER HEAVY OPERATIONS: Initialize in background after UI is ready
+    setImmediate(() => {
+      initializeBackgroundServices(context);
+    });
+
+    console.log("✓ CodeBuddy: Core services started, UI ready");
+
+    // ⚡ IMMEDIATE: Show that extension is ready
+    vscode.window.setStatusBarMessage(
+      "$(check) CodeBuddy: Ready! Loading features...",
+      2000,
+    );
+
+    // Show welcome message for first-time users
+    const hasShownWelcome = context.globalState.get(
+      "codebuddy.welcomeShown",
+      false,
+    );
+    if (!hasShownWelcome) {
+      setTimeout(() => {
+        vscode.window
+          .showInformationMessage(
+            "🎉 CodeBuddy is ready! Features are loading in the background.",
+            "Open Chat",
+            "Learn More",
+          )
+          .then((action) => {
+            if (action === "Open Chat") {
+              vscode.commands.executeCommand(
+                "workbench.view.extension.codeBuddy-view-container",
+              );
+            } else if (action === "Learn More") {
+              vscode.env.openExternal(
+                vscode.Uri.parse("https://github.com/olasunkanmi-SE/codebuddy"),
+              );
+            }
+          });
+        context.globalState.update("codebuddy.welcomeShown", true);
+      }, 1000);
     }
-
-    // Phase 4: Initialize Vector Database Orchestration
-    await initializeVectorDatabaseOrchestration(context);
-
-    // TODO for RAG codeIndexing incase user allows
-    // const index = CodeIndexingService.createInstance();
-    // Get each of the folders and call the next line for each
-    // const result = await index.buildFunctionStructureMap();
-    // await index.insertFunctionsinDB();
-    // console.log(result);
     const {
       comment,
       review,
@@ -209,54 +574,99 @@ export async function activate(context: vscode.ExtensionContext) {
     } = CODEBUDDY_ACTIONS;
     const getComment = new Comments(CODEBUDDY_ACTIONS.comment, context);
     const getInLineChat = new InLineChat(CODEBUDDY_ACTIONS.inlineChat, context);
-    const generateOptimizeCode = new OptimizeCode(CODEBUDDY_ACTIONS.optimize, context);
-    const generateRefactoredCode = new RefactorCode(CODEBUDDY_ACTIONS.refactor, context);
+    const generateOptimizeCode = new OptimizeCode(
+      CODEBUDDY_ACTIONS.optimize,
+      context,
+    );
+    const generateRefactoredCode = new RefactorCode(
+      CODEBUDDY_ACTIONS.refactor,
+      context,
+    );
     const explainCode = new ExplainCode(CODEBUDDY_ACTIONS.explain, context);
     const generateReview = new ReviewCode(CODEBUDDY_ACTIONS.review, context);
-    const generateMermaidDiagram = new GenerateMermaidDiagram(CODEBUDDY_ACTIONS.generateDiagram, context);
-    const generateCommitMessage = new GenerateCommitMessage(CODEBUDDY_ACTIONS.commitMessage, context);
-    const generateInterviewQuestions = new InterviewMe(CODEBUDDY_ACTIONS.interviewMe, context);
+    const generateMermaidDiagram = new GenerateMermaidDiagram(
+      CODEBUDDY_ACTIONS.generateDiagram,
+      context,
+    );
+    const generateCommitMessage = new GenerateCommitMessage(
+      CODEBUDDY_ACTIONS.commitMessage,
+      context,
+    );
+    const generateInterviewQuestions = new InterviewMe(
+      CODEBUDDY_ACTIONS.interviewMe,
+      context,
+    );
     const reviewPRCommand = new ReviewPR(CODEBUDDY_ACTIONS.reviewPR, context);
 
     const actionMap = {
       [comment]: async () => {
-        await getComment.execute(undefined, "💭 Add a helpful comment to explain the code logic");
+        await getComment.execute(
+          undefined,
+          "💭 Add a helpful comment to explain the code logic",
+        );
       },
       [review]: async () => {
-        await generateReview.execute(undefined, "🔍 Perform a thorough code review to ensure best practices");
+        await generateReview.execute(
+          undefined,
+          "🔍 Perform a thorough code review to ensure best practices",
+        );
       },
       [refactor]: async () => {
-        await generateRefactoredCode.execute(undefined, " 🔄 Improve code readability and maintainability");
+        await generateRefactoredCode.execute(
+          undefined,
+          " 🔄 Improve code readability and maintainability",
+        );
       },
       [optimize]: async () => {
-        await generateOptimizeCode.execute(undefined, "⚡ optimize for performance and efficiency");
+        await generateOptimizeCode.execute(
+          undefined,
+          "⚡ optimize for performance and efficiency",
+        );
       },
       [interviewMe]: async () => {
         await generateInterviewQuestions.execute(
           undefined,
-          "📚 Prepare for technical interviews with relevant questions"
+          "📚 Prepare for technical interviews with relevant questions",
         );
       },
       [fix]: (errorMessage: string) => {
-        new FixError(CODEBUDDY_ACTIONS.fix, context, errorMessage).execute(errorMessage, "🔧 Debug and fix the issue");
+        new FixError(CODEBUDDY_ACTIONS.fix, context, errorMessage).execute(
+          errorMessage,
+          "🔧 Debug and fix the issue",
+        );
       },
       [explain]: async () => {
-        await explainCode.execute(undefined, "💬 Get a clear and concise explanation of the code concept");
+        await explainCode.execute(
+          undefined,
+          "💬 Get a clear and concise explanation of the code concept",
+        );
       },
       [commitMessage]: async () => {
-        await generateCommitMessage.execute(undefined, "🧪 generating commit message");
+        await generateCommitMessage.execute(
+          undefined,
+          "🧪 generating commit message",
+        );
       },
       [generateDiagram]: async () => {
-        await generateMermaidDiagram.execute(undefined, "📈 Visualize the code with a Mermaid diagram");
+        await generateMermaidDiagram.execute(
+          undefined,
+          "📈 Visualize the code with a Mermaid diagram",
+        );
       },
       [inlineChat]: async () => {
-        await getInLineChat.execute(undefined, "💬 Discuss and reason about your code with me");
+        await getInLineChat.execute(
+          undefined,
+          "💬 Discuss and reason about your code with me",
+        );
       },
       [restart]: async () => {
         await restartExtension(context);
       },
       [reviewPR]: async () => {
-        await reviewPRCommand.execute(undefined, "🔍 Conducting comprehensive pull request review");
+        await reviewPRCommand.execute(
+          undefined,
+          "🔍 Conducting comprehensive pull request review",
+        );
       },
       [codebaseAnalysis]: async () => {
         await architecturalRecommendationCommand();
@@ -271,7 +681,8 @@ export async function activate(context: vscode.ExtensionContext) {
         await openDocumentationCommand();
       },
       "CodeBuddy.showCacheStatus": async () => {
-        const persistentCodebaseService = PersistentCodebaseUnderstandingService.getInstance();
+        const persistentCodebaseService =
+          PersistentCodebaseUnderstandingService.getInstance();
         const summary = await persistentCodebaseService.getAnalysisSummary();
         const stats = summary.stats;
 
@@ -298,9 +709,14 @@ export async function activate(context: vscode.ExtensionContext) {
           message += `• Newest: ${new Date(stats.newestSnapshot).toLocaleString()}\n`;
         }
 
-        const panel = vscode.window.createWebviewPanel("cacheStatus", "CodeBuddy Cache Status", vscode.ViewColumn.One, {
-          enableScripts: false,
-        });
+        const panel = vscode.window.createWebviewPanel(
+          "cacheStatus",
+          "CodeBuddy Cache Status",
+          vscode.ViewColumn.One,
+          {
+            enableScripts: false,
+          },
+        );
 
         panel.webview.html = `
           <!DOCTYPE html>
@@ -333,17 +749,20 @@ export async function activate(context: vscode.ExtensionContext) {
         const choice = await vscode.window.showWarningMessage(
           "Are you sure you want to clear the codebase analysis cache? This will require re-analysis next time.",
           "Clear Cache",
-          "Cancel"
+          "Cancel",
         );
 
         if (choice === "Clear Cache") {
           try {
-            const persistentCodebaseService = PersistentCodebaseUnderstandingService.getInstance();
+            const persistentCodebaseService =
+              PersistentCodebaseUnderstandingService.getInstance();
             await persistentCodebaseService.clearCache();
-            vscode.window.showInformationMessage("✅ Codebase analysis cache cleared successfully");
+            vscode.window.showInformationMessage(
+              "✅ Codebase analysis cache cleared successfully",
+            );
           } catch (error) {
             vscode.window.showErrorMessage(
-              `❌ Failed to clear cache: ${error instanceof Error ? error.message : "Unknown error"}`
+              `❌ Failed to clear cache: ${error instanceof Error ? error.message : "Unknown error"}`,
             );
           }
         }
@@ -352,12 +771,13 @@ export async function activate(context: vscode.ExtensionContext) {
         const choice = await vscode.window.showInformationMessage(
           "This will refresh the codebase analysis. It may take some time.",
           "Refresh Now",
-          "Cancel"
+          "Cancel",
         );
 
         if (choice === "Refresh Now") {
           try {
-            const persistentCodebaseService = PersistentCodebaseUnderstandingService.getInstance();
+            const persistentCodebaseService =
+              PersistentCodebaseUnderstandingService.getInstance();
 
             await vscode.window.withProgress(
               {
@@ -366,21 +786,24 @@ export async function activate(context: vscode.ExtensionContext) {
                 cancellable: true,
               },
               async (progress, token) => {
-                const analysis = await persistentCodebaseService.forceRefreshAnalysis(token);
+                const analysis =
+                  await persistentCodebaseService.forceRefreshAnalysis(token);
 
                 if (analysis && !token.isCancellationRequested) {
                   vscode.window.showInformationMessage(
-                    `✅ Analysis refreshed successfully! Found ${analysis.summary.totalFiles} files. Analysis completed at ${new Date(analysis.analysisMetadata.createdAt).toLocaleString()}.`
+                    `✅ Analysis refreshed successfully! Found ${analysis.summary.totalFiles} files. Analysis completed at ${new Date(analysis.analysisMetadata.createdAt).toLocaleString()}.`,
                   );
                 }
-              }
+              },
             );
           } catch (error) {
             if (error instanceof Error && error.message.includes("cancelled")) {
-              vscode.window.showInformationMessage("Analysis refresh cancelled");
+              vscode.window.showInformationMessage(
+                "Analysis refresh cancelled",
+              );
             } else {
               vscode.window.showErrorMessage(
-                `❌ Failed to refresh analysis: ${error instanceof Error ? error.message : "Unknown error"}`
+                `❌ Failed to refresh analysis: ${error instanceof Error ? error.message : "Unknown error"}`,
               );
             }
           }
@@ -388,73 +811,43 @@ export async function activate(context: vscode.ExtensionContext) {
       },
     };
 
-    let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(([action, handler]) => {
-      console.log(`Registering command: ${action}`);
-      return vscode.commands.registerCommand(action, handler);
-    });
+    let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
+      ([action, handler]) => {
+        console.log(`Registering command: ${action}`);
+        return vscode.commands.registerCommand(action, handler);
+      },
+    );
 
     console.log(`Total commands registered: ${subscriptions.length}`);
 
-    const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
-
+    // ⚡ FAST: Essential UI components only
     const quickFix = new CodeActionsProvider();
-    quickFixCodeAction = vscode.languages.registerCodeActionsProvider({ scheme: "file", language: "*" }, quickFix);
+    quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
+      { scheme: "file", language: "*" },
+      quickFix,
+    );
 
     agentEventEmmitter = new EventEmitter();
 
-    const modelConfigurations: {
-      [key: string]: {
-        key: string;
-        model: string;
-        webviewProviderClass: any;
-      };
-    } = {
-      [generativeAiModels.GEMINI]: {
-        key: geminiKey,
-        model: geminiModel,
-        webviewProviderClass: GeminiWebViewProvider,
-      },
-      [generativeAiModels.GROQ]: {
-        key: groqApiKey,
-        model: groqModel,
-        webviewProviderClass: GroqWebViewProvider,
-      },
-      [generativeAiModels.ANTHROPIC]: {
-        key: anthropicApiKey,
-        model: anthropicModel,
-        webviewProviderClass: AnthropicWebViewProvider,
-      },
-      [generativeAiModels.GROK]: {
-        key: grokApiKey,
-        model: grokModel,
-        webviewProviderClass: AnthropicWebViewProvider,
-      },
-      [generativeAiModels.DEEPSEEK]: {
-        key: deepseekApiKey,
-        model: deepseekModel,
-        webviewProviderClass: DeepseekWebViewProvider,
-      },
-    };
+    // ⚡ EARLY: Register vector database commands before webview providers need them
+    registerVectorDatabaseCommands(context);
 
-    const providerManager = WebViewProviderManager.getInstance(context);
-
-    if (selectedGenerativeAiModel in modelConfigurations) {
-      const modelConfig = modelConfigurations[selectedGenerativeAiModel];
-      const apiKey = getConfigValue(modelConfig.key);
-      const apiModel = getConfigValue(modelConfig.model);
-      providerManager.initializeProvider(selectedGenerativeAiModel, apiKey, apiModel, true);
-    }
+    // ⚡ DEFER: Initialize WebView providers lazily
+    const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
+    initializeWebViewProviders(context, selectedGenerativeAiModel);
     context.subscriptions.push(
       ...subscriptions,
       quickFixCodeAction,
       agentEventEmmitter,
       orchestrator,
-      providerManager
+      // Note: providerManager is handled in initializeWebViewProviders
       // secretStorageService,
     );
   } catch (error) {
     Memory.clear();
-    vscode.window.showErrorMessage("An Error occured while setting up generative AI model");
+    vscode.window.showErrorMessage(
+      "An Error occured while setting up generative AI model",
+    );
     console.log(error);
   }
 }
@@ -470,7 +863,7 @@ async function restartExtension(context: vscode.ExtensionContext) {
     const choice = await vscode.window.showInformationMessage(
       "Are you sure you want to restart the CodeBuddy extension?",
       "Restart",
-      "Cancel"
+      "Cancel",
     );
 
     if (choice === "Restart") {
@@ -500,12 +893,14 @@ async function restartExtension(context: vscode.ExtensionContext) {
           await new Promise((resolve) => setTimeout(resolve, 500));
           progress.report({ increment: 100, message: "Reloading..." });
           await vscode.commands.executeCommand("workbench.action.reloadWindow");
-        }
+        },
       );
     }
   } catch (error) {
     console.error("Error restarting extension:", error);
-    vscode.window.showErrorMessage("Failed to restart extension. Please reload VS Code manually.");
+    vscode.window.showErrorMessage(
+      "Failed to restart extension. Please reload VS Code manually.",
+    );
   }
 }
 
@@ -531,7 +926,8 @@ export function deactivate(context: vscode.ExtensionContext) {
 
   // Shutdown persistent codebase service
   try {
-    const persistentCodebaseService = PersistentCodebaseUnderstandingService.getInstance();
+    const persistentCodebaseService =
+      PersistentCodebaseUnderstandingService.getInstance();
     persistentCodebaseService.shutdown();
     console.log("Persistent codebase service shutdown");
   } catch (error) {
@@ -556,7 +952,8 @@ export function deactivate(context: vscode.ExtensionContext) {
  */
 function clearFileStorageData() {
   try {
-    const workSpaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+    const workSpaceRoot =
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
     const codeBuddyPath = path.join(workSpaceRoot, ".codebuddy");
 
     if (fs.existsSync(codeBuddyPath)) {

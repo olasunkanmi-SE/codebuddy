@@ -6,11 +6,8 @@ import * as vscode from "vscode";
 import { IFunctionData } from "../application/interfaces";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { WorkerEmbeddingService } from "../workers/embedding-worker";
-import {
-  WorkerVectorDatabaseService,
-  CodeSnippet,
-  SearchResult,
-} from "../workers/vector-db-worker";
+// import { VectorDbWorkerManager as StubWorkerManager } from "../workers/vector-db-worker";
+import { CodeSnippet, SearchResult } from "./vector-database.service";
 import { getAPIKeyAndModel } from "../utils/utils";
 
 export interface WorkerManagerOptions {
@@ -45,7 +42,7 @@ export interface VectorOperationProgress {
  */
 export class VectorDbWorkerManager implements vscode.Disposable {
   private embeddingService: WorkerEmbeddingService | null = null;
-  private vectorDbService: WorkerVectorDatabaseService | null = null;
+  private vectorDbService: any | null = null; // TODO: Fix after worker migration
   private isInitialized = false;
   private readonly logger = Logger.initialize("VectorDbWorkerManager", {
     minLevel: LogLevel.DEBUG,
@@ -83,13 +80,12 @@ export class VectorDbWorkerManager implements vscode.Disposable {
         "Embedding worker ready",
       );
 
-      // Initialize vector database worker
-      this.vectorDbService = new WorkerVectorDatabaseService(
-        this.context.extensionPath,
-        "http://localhost:8000", // ChromaDB URL
-      );
-
-      await this.vectorDbService.initialize();
+      // TODO: Initialize vector database worker after LanceDB migration
+      // this.vectorDbService = new WorkerVectorDatabaseService(
+      //   this.context.extensionPath,
+      //   "http://localhost:8000", // ChromaDB URL
+      // );
+      // await this.vectorDbService.initialize();
 
       this.reportProgress(
         VECTOR_OPERATIONS.INDEXING,
@@ -155,7 +151,8 @@ export class VectorDbWorkerManager implements vscode.Disposable {
           id: `${func.path}::${func.className}::${func.name}`,
           content: func.content,
           filePath: func.path,
-          embedding: func.embedding,
+          type: "function" as const,
+          name: func.name || "anonymous",
           metadata: {
             type: "function" as const,
             name: func.name,

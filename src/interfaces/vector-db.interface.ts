@@ -1,5 +1,3 @@
-import * as vscode from "vscode";
-
 /**
  * Interface for code indexing and embedding generation
  */
@@ -32,7 +30,10 @@ export interface ICodeIndexer {
   /**
    * Search for similar code based on query
    */
-  searchSimilar(query: string, options?: SearchOptions): Promise<SearchResult[]>;
+  searchSimilar(
+    query: string,
+    options?: SearchOptions,
+  ): Promise<SearchResult[]>;
 
   /**
    * Get indexing statistics
@@ -105,76 +106,24 @@ export interface IndexStats {
 }
 
 /**
- * Interface for vector database synchronization
- */
-export interface IVectorDbSync {
-  /**
-   * Initialize the sync service
-   */
-  initialize(): Promise<void>;
-
-  /**
-   * Start monitoring for file changes
-   */
-  startMonitoring(): Promise<void>;
-
-  /**
-   * Stop monitoring for file changes
-   */
-  stopMonitoring(): void;
-
-  /**
-   * Perform a full reindex of the workspace
-   */
-  performFullReindex(): Promise<void>;
-
-  /**
-   * Get synchronization statistics
-   */
-  getStats(): SyncStats;
-
-  /**
-   * Check if sync is active
-   */
-  isActive(): boolean;
-
-  /**
-   * Dispose of resources
-   */
-  dispose(): void;
-}
-
-/**
- * Synchronization statistics
- */
-export interface SyncStats {
-  /** Number of files being monitored */
-  filesMonitored: number;
-  /** Number of sync operations performed */
-  syncOperations: number;
-  /** Number of failed operations */
-  failedOperations: number;
-  /** Current queue size */
-  queueSize: number;
-  /** Last sync timestamp */
-  lastSync?: string;
-  /** Sync status */
-  status: "idle" | "syncing" | "error";
-}
-
-/**
  * Interface for smart context extraction
  */
 export interface ISmartContextExtractor {
   /**
    * Extract relevant context using vector search
    */
-  extractRelevantContextWithVector(query: string, currentFilePath?: string): Promise<SmartContextResult>;
+  extractRelevantContextWithVector(
+    query: string,
+    currentFilePath?: string,
+  ): Promise<SmartContextResult>;
 
   /**
    * Extract context using traditional methods as fallback
    */
-  extractTraditionalContext(query: string, currentFilePath?: string): Promise<SmartContextResult>;
+  extractTraditionalContext(
+    query: string,
+    currentFilePath?: string,
+  ): Promise<SmartContextResult>;
 
   /**
    * Configure extraction options

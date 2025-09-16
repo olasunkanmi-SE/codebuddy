@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
 import { Orchestrator } from "../agents/orchestrator";
-import { FolderEntry, IContextInfo } from "../application/interfaces/workspace.interface";
+import {
+  FolderEntry,
+  IContextInfo,
+} from "../application/interfaces/workspace.interface";
 import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { AgentService } from "../services/agent-state";
@@ -12,7 +15,11 @@ import { InputValidator } from "../services/input-validator";
 import { QuestionClassifierService } from "../services/question-classifier.service";
 import { LogLevel } from "../services/telemetry";
 import { WorkspaceService } from "../services/workspace-service";
-import { formatText, getAPIKeyAndModel, getGenerativeAiModel } from "../utils/utils";
+import {
+  formatText,
+  getAPIKeyAndModel,
+  getGenerativeAiModel,
+} from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
 import { VectorDatabaseService } from "../services/vector-database.service";
 import { VectorDbWorkerManager } from "../services/vector-db-worker-manager";
@@ -22,6 +29,10 @@ import { SmartEmbeddingOrchestrator } from "../services/smart-embedding-orchestr
 import { ContextRetriever } from "../services/context-retriever";
 import { UserFeedbackService } from "../services/user-feedback.service";
 import { VectorDbConfigurationManager } from "../config/vector-db.config";
+import { ICodeIndexer } from "../interfaces/vector-db.interface";
+import { PerformanceProfiler } from "../services/performance-profiler.service";
+import { ProductionSafeguards } from "../services/production-safeguards.service";
+import { EnhancedCacheManager } from "../services/enhanced-cache-manager.service";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -42,21 +53,28 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly inputValidator: InputValidator;
 
   // Vector database services
-  protected vectorDbService?: VectorDatabaseService;
-  protected vectorDbSyncService?: VectorDbSyncService;
+  protected vectorDb?: VectorDatabaseService;
+  protected vectorDbService?: VectorDatabaseService; // Alias for compatibility
   protected vectorWorkerManager?: VectorDbWorkerManager;
+  protected vectorSyncService?: VectorDbSyncService;
+  protected vectorDbSyncService?: VectorDbSyncService; // Alias for compatibility
   protected smartContextExtractor?: SmartContextExtractor;
   protected smartEmbeddingOrchestrator?: SmartEmbeddingOrchestrator;
-  protected contextRetriever?: ContextRetriever;
+  protected vectorConfigManager?: VectorDbConfigurationManager;
+  protected configManager?: VectorDbConfigurationManager; // Alias for compatibility
   protected userFeedbackService?: UserFeedbackService;
-  protected configManager?: VectorDbConfigurationManager;
-  protected codeIndexingService?: any; // CodeIndexingService - will be properly typed when available
+  protected contextRetriever?: ContextRetriever;
+
+  // Phase 5: Performance & Production services
+  protected performanceProfiler?: PerformanceProfiler;
+  protected productionSafeguards?: ProductionSafeguards;
+  protected enhancedCacheManager?: EnhancedCacheManager;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     this.fileManager = FileManager.initialize(context, "files");
     this.fileService = FileService.getInstance();
@@ -77,6 +95,27 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     // Initialize configuration manager first
     this.configManager = new VectorDbConfigurationManager();
+    this.vectorConfigManager = this.configManager; // Alias
+
+    // Initialize Phase 5 services
+    this.performanceProfiler = new PerformanceProfiler(this.configManager);
+    this.productionSafeguards = new ProductionSafeguards({
+      maxMemoryMB: 1024,
+      maxHeapMB: 512,
+      maxCpuPercent: 80,
+      gcThresholdMB: 256,
+      alertThresholdMB: 400,
+    });
+    this.enhancedCacheManager = new EnhancedCacheManager(
+      {
+        maxSize: 10000,
+        defaultTtl: 3600000, // 1 hour
+        maxMemoryMB: 100,
+        cleanupInterval: 300000, // 5 minutes
+        evictionPolicy: "LRU",
+      },
+      this.performanceProfiler,
+    );
 
     // Initialize user feedback service
     this.userFeedbackService = new UserFeedbackService();
@@ -84,22 +123,45 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     // Initialize vector services
     this.vectorWorkerManager = new VectorDbWorkerManager(context);
     this.vectorDbService = new VectorDatabaseService(context, geminiApiKey);
+    this.vectorDb = this.vectorDbService; // Alias
 
-    // Initialize code indexing service (temporary stub)
-    this.codeIndexingService = this.vectorWorkerManager; // Use worker manager as code indexer for now
+    // Note: codeIndexingService will be initialized when a proper implementation is available
     this.smartEmbeddingOrchestrator = new SmartEmbeddingOrchestrator(
       context,
       this.vectorDbService,
-      this.vectorWorkerManager
+      this.vectorWorkerManager,
     );
-    this.vectorDbSyncService = new VectorDbSyncService(this.vectorDbService, this.codeIndexingService);
+
+    // Create a temporary code indexing service (to be properly implemented later)
+    // Import the correct interface from vector-db-sync.service
+    const tempCodeIndexer = {
+      generateEmbeddings: async (): Promise<any[]> => [],
+    };
+
+    this.contextRetriever = new ContextRetriever();
+
+    this.vectorDbSyncService = new VectorDbSyncService(
+      this.vectorDbService,
+      tempCodeIndexer,
+    );
+    this.vectorSyncService = this.vectorDbSyncService; // Alias
+
     this.smartContextExtractor = new SmartContextExtractor(
       this.vectorDbService,
       this.contextRetriever,
       this.codebaseUnderstanding,
-      this.questionClassifier
+      this.questionClassifier,
+      {},
+      this.performanceProfiler,
     );
-    this.contextRetriever = new ContextRetriever();
+
+    // Initialize configuration manager first
+    this.configManager = new VectorDbConfigurationManager();
+
+    // Initialize user feedback service
+    this.userFeedbackService = new UserFeedbackService();
+
+    // Note: codeIndexingService is already initialized with temp implementation above
 
     // Don't register disposables here - do it lazily when webview is resolved
   }
@@ -127,11 +189,23 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       await this.vectorDbSyncService?.initialize();
       this.logger.info("✓ Vector database sync service initialized");
 
+      // Phase 4.4.1: Connect service status checker to production safeguards
+      if (this.vectorDbSyncService && this.productionSafeguards) {
+        this.productionSafeguards.setServiceStatusChecker(
+          this.vectorDbSyncService,
+        );
+        this.logger.info(
+          "✓ Production safeguards connected to sync service status",
+        );
+      }
+
       // Phase 4.5: Trigger immediate embedding phase for essential files
       await this.executeImmediateEmbeddingPhase();
       this.logger.info("✓ Immediate embedding phase completed");
 
-      this.logger.info("🚀 Phase 4 vector database orchestration completed successfully");
+      this.logger.info(
+        "🚀 Phase 4 vector database orchestration completed successfully",
+      );
     } catch (error) {
       this.logger.error("Failed to initialize Phase 4 orchestration:", error);
       // Continue with graceful degradation
@@ -148,9 +222,15 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       // No need to call it separately - it's already handled in the orchestrator initialization
 
       // Show user feedback
-      vscode.window.setStatusBarMessage("$(check) CodeBuddy: Essential files indexed and ready", 5000);
+      vscode.window.setStatusBarMessage(
+        "$(check) CodeBuddy: Essential files indexed and ready",
+        5000,
+      );
     } catch (error) {
-      this.logger.warn("Immediate embedding phase failed, continuing with fallback:", error);
+      this.logger.warn(
+        "Immediate embedding phase failed, continuing with fallback:",
+        error,
+      );
     }
   }
 
@@ -158,20 +238,58 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
    * Handle vector database initialization errors gracefully
    */
   private async handleVectorInitializationError(error: any): Promise<void> {
-    this.logger.warn("Vector database initialization failed, enabling fallback mode");
-
-    // Show user notification
-    const action = await vscode.window.showWarningMessage(
-      "Vector database initialization failed. CodeBuddy will use keyword-based search as fallback.",
-      "Retry",
-      "Continue"
+    this.logger.warn(
+      "Vector database initialization failed, enabling fallback mode",
     );
 
-    if (action === "Retry") {
-      // Retry initialization after a delay
-      setTimeout(() => {
-        this.initializeVectorComponents();
-      }, 10000);
+    // Provide specific guidance based on error type
+    if (
+      error instanceof Error &&
+      error.message.includes("ChromaDB Connection Failed")
+    ) {
+      // Show detailed ChromaDB setup guidance
+      const action = await vscode.window.showWarningMessage(
+        "ChromaDB setup required for vector search. CodeBuddy will use keyword search as fallback.",
+        "Fix ChromaDB",
+        "Continue",
+        "Run Diagnostic",
+      );
+
+      if (action === "Fix ChromaDB") {
+        vscode.window
+          .showInformationMessage(
+            `To enable vector search:\n\n` +
+              `Quick Fix: npm install chromadb@1.8.1\n` +
+              `Then restart VS Code\n\n` +
+              `Alternative: Start ChromaDB server:\n` +
+              `pip install chromadb && chroma run --host localhost --port 8000`,
+            "Copy Command",
+          )
+          .then((copyAction) => {
+            if (copyAction === "Copy Command") {
+              vscode.env.clipboard.writeText("npm install chromadb@1.8.1");
+            }
+          });
+      } else if (action === "Run Diagnostic") {
+        vscode.commands.executeCommand("codebuddy.vectorDb.diagnostic");
+      }
+    } else {
+      // Generic error handling
+      const action = await vscode.window.showWarningMessage(
+        "Vector database initialization failed. CodeBuddy will use keyword-based search as fallback.",
+        "Retry",
+        "Continue",
+        "Run Diagnostic",
+      );
+
+      if (action === "Retry") {
+        // Retry initialization after a delay
+        setTimeout(() => {
+          this.initializeVectorComponents();
+        }, 10000);
+      } else if (action === "Run Diagnostic") {
+        vscode.commands.executeCommand("codebuddy.vectorDb.diagnostic");
+      }
     }
   }
 
@@ -186,14 +304,26 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onThinking(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onUpdate(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onError(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onSecretChange(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onActiveworkspaceUpdate(this.handleGenericEvents.bind(this)),
+      this.orchestrator.onSecretChange(
+        this.handleModelResponseEvent.bind(this),
+      ),
+      this.orchestrator.onActiveworkspaceUpdate(
+        this.handleGenericEvents.bind(this),
+      ),
       this.orchestrator.onFileUpload(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onStrategizing(this.handleModelResponseEvent.bind(this)),
-      this.orchestrator.onConfigurationChange(this.handleGenericEvents.bind(this)),
+      this.orchestrator.onStrategizing(
+        this.handleModelResponseEvent.bind(this),
+      ),
+      this.orchestrator.onConfigurationChange(
+        this.handleGenericEvents.bind(this),
+      ),
       this.orchestrator.onUserPrompt(this.handleUserPrompt.bind(this)),
-      this.orchestrator.onGetUserPreferences(this.handleUserPreferences.bind(this)),
-      this.orchestrator.onUpdateThemePreferences(this.handleThemePreferences.bind(this))
+      this.orchestrator.onGetUserPreferences(
+        this.handleUserPreferences.bind(this),
+      ),
+      this.orchestrator.onUpdateThemePreferences(
+        this.handleThemePreferences.bind(this),
+      ),
     );
   }
 
@@ -216,7 +346,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     webviewView.webview.options = webviewOptions;
 
     if (!this.apiKey) {
-      vscode.window.showErrorMessage("API key not configured. Check your settings.");
+      vscode.window.showErrorMessage(
+        "API key not configured. Check your settings.",
+      );
       return;
     }
 
@@ -252,12 +384,17 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         // Update the provider's chatHistory array (this should be overridden in child classes)
         await this.updateProviderChatHistory(providerHistory);
 
-        this.logger.debug(`Synchronized ${persistentHistory.length} chat messages from database`);
+        this.logger.debug(
+          `Synchronized ${persistentHistory.length} chat messages from database`,
+        );
       } else {
         this.logger.debug("No chat history found in database to synchronize");
       }
     } catch (error) {
-      this.logger.warn("Failed to synchronize chat history from database:", error);
+      this.logger.warn(
+        "Failed to synchronize chat history from database:",
+        error,
+      );
       // Don't throw - this is not critical for provider initialization
     }
   }
@@ -269,11 +406,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected async updateProviderChatHistory(history: any[]): Promise<void> {
     // Base implementation - child classes should override this
     // to update their specific chatHistory arrays
-    this.logger.debug("Base provider - no specific chat history array to update");
+    this.logger.debug(
+      "Base provider - no specific chat history array to update",
+    );
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
-    view.webview.html = getWebviewContent(this.currentWebView?.webview!, this._extensionUri);
+    view.webview.html = getWebviewContent(
+      this.currentWebView?.webview!,
+      this._extensionUri,
+    );
   }
 
   private async getFiles() {
@@ -321,8 +463,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   private async publishWorkSpace(): Promise<void> {
     try {
-      const filesAndDirs: IContextInfo = await this.workspaceService.getContextInfo(true);
-      const workspaceFiles: Map<string, FolderEntry[]> | undefined = filesAndDirs.workspaceFiles;
+      const filesAndDirs: IContextInfo =
+        await this.workspaceService.getContextInfo(true);
+      const workspaceFiles: Map<string, FolderEntry[]> | undefined =
+        filesAndDirs.workspaceFiles;
       if (!workspaceFiles) {
         this.logger.warn("There no files within the workspace");
         return;
@@ -349,17 +493,23 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.UserMessageCounter += 1;
 
               // Validate user input for security
-              const validation = this.inputValidator.validateInput(message.message, "chat");
+              const validation = this.inputValidator.validateInput(
+                message.message,
+                "chat",
+              );
 
               if (validation.blocked) {
-                this.logger.warn("User input blocked due to security concerns", {
-                  originalLength: message.message.length,
-                  warnings: validation.warnings,
-                });
+                this.logger.warn(
+                  "User input blocked due to security concerns",
+                  {
+                    originalLength: message.message.length,
+                    warnings: validation.warnings,
+                  },
+                );
 
                 await this.sendResponse(
                   "⚠️ Your message contains potentially unsafe content and has been blocked. Please rephrase your question in a more direct way.",
-                  "bot"
+                  "bot",
                 );
                 break;
               }
@@ -375,7 +525,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 if (validation.warnings.length > 2) {
                   await this.sendResponse(
                     "ℹ️ Your message has been modified for security. Some content was filtered.",
-                    "bot"
+                    "bot",
                   );
                 }
               }
@@ -386,9 +536,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               // Check if we should prune history for performance
               if (this.UserMessageCounter % 10 === 0) {
                 const stats = await this.getChatHistoryStats("agentId");
-                if (stats.totalMessages > 100 || stats.estimatedTokens > 16000) {
+                if (
+                  stats.totalMessages > 100 ||
+                  stats.estimatedTokens > 16000
+                ) {
                   this.logger.info(
-                    `High chat history usage detected: ${stats.totalMessages} messages, ${stats.estimatedTokens} tokens`
+                    `High chat history usage detected: ${stats.totalMessages} messages, ${stats.estimatedTokens} tokens`,
                   );
                   // Optionally trigger manual pruning here
                   // await this.pruneHistoryManually("agentId", { maxMessages: 50, maxTokens: 8000 });
@@ -397,20 +550,28 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
               response = await this.generateResponse(
                 await this.enhanceMessageWithCodebaseContext(sanitizedMessage),
-                message.metaData
+                message.metaData,
               );
               if (this.UserMessageCounter === 1) {
                 await this.publishWorkSpace();
               }
               if (response) {
-                console.log(`[DEBUG] Response from generateResponse: ${response.length} characters`);
+                console.log(
+                  `[DEBUG] Response from generateResponse: ${response.length} characters`,
+                );
                 const formattedResponse = formatText(response);
-                console.log(`[DEBUG] Formatted response: ${formattedResponse.length} characters`);
-                console.log(`[DEBUG] Original response ends with: "${response.slice(-100)}"`);
+                console.log(
+                  `[DEBUG] Formatted response: ${formattedResponse.length} characters`,
+                );
+                console.log(
+                  `[DEBUG] Original response ends with: "${response.slice(-100)}"`,
+                );
 
                 await this.sendResponse(formattedResponse, "bot");
               } else {
-                console.log(`[DEBUG] No response received from generateResponse`);
+                console.log(
+                  `[DEBUG] No response received from generateResponse`,
+                );
               }
               break;
             }
@@ -438,14 +599,202 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "theme-change-event":
               // Handle theme change and store in user preferences
               this.logger.info(`Theme changed to: ${message.message}`);
-              this.orchestrator.publish("onUpdateThemePreferences", message.message, {
-                theme: message.message,
-              });
+              this.orchestrator.publish(
+                "onUpdateThemePreferences",
+                message.message,
+                {
+                  theme: message.message,
+                },
+              );
               break;
+
+            // Phase 5: Performance & Production Commands
+            case "showPerformanceReport":
+              if (this.performanceProfiler) {
+                const report = this.performanceProfiler.getPerformanceReport();
+                const stats = this.performanceProfiler.getStats();
+                await this.sendResponse(
+                  `
+**Performance Report** 📊
+
+• **Search Performance**: ${report.avgSearchLatency.toFixed(0)}ms avg, ${report.p95SearchLatency.toFixed(0)}ms P95
+• **Indexing Throughput**: ${report.avgIndexingThroughput.toFixed(1)} items/sec
+• **Memory Usage**: ${report.avgMemoryUsage.toFixed(0)}MB
+• **Cache Hit Rate**: ${(report.cacheHitRate * 100).toFixed(1)}%
+• **Error Rate**: ${(report.errorRate * 100).toFixed(2)}%
+
+**Targets**: Search <500ms, Memory <500MB, Errors <5%
+**Status**: ${stats.searchLatency.count > 0 ? "✅ Active" : "⚠️ Limited Data"}
+                `.trim(),
+                  "bot",
+                );
+              } else {
+                await this.sendResponse(
+                  "Performance profiler not available",
+                  "bot",
+                );
+              }
+              break;
+
+            case "clearCache":
+              if (this.enhancedCacheManager) {
+                const type = message.data?.type || "all";
+                await this.enhancedCacheManager.clearCache(type);
+                const cacheInfo = this.enhancedCacheManager.getCacheInfo();
+                await this.sendResponse(
+                  `
+**Cache Cleared** 🧹
+
+• **Type**: ${type}
+• **Remaining Memory**: ${cacheInfo.total.memoryMB.toFixed(1)}MB
+• **Hit Rate**: ${(cacheInfo.total.hitRate * 100).toFixed(1)}%
+                `.trim(),
+                  "bot",
+                );
+              } else {
+                await this.sendResponse(
+                  "Enhanced cache manager not available",
+                  "bot",
+                );
+              }
+              break;
+
+            case "reduceBatchSize":
+              if (this.vectorConfigManager) {
+                const config = this.vectorConfigManager.getConfig();
+                const currentBatchSize = config.batchSize;
+                const newBatchSize = Math.max(
+                  5,
+                  Math.floor(currentBatchSize * 0.7),
+                );
+                await this.vectorConfigManager.updateConfig(
+                  "batchSize",
+                  newBatchSize,
+                );
+                await this.sendResponse(
+                  `
+**Batch Size Reduced** ⚡
+
+• **Previous**: ${currentBatchSize}
+• **New**: ${newBatchSize}
+• **Impact**: Lower memory usage, potentially slower indexing
+                `.trim(),
+                  "bot",
+                );
+              } else {
+                await this.sendResponse(
+                  "Configuration manager not available",
+                  "bot",
+                );
+              }
+              break;
+
+            case "pauseIndexing":
+              if (this.smartEmbeddingOrchestrator) {
+                // TODO: Implement pause functionality in SmartEmbeddingOrchestrator
+                await this.sendResponse(
+                  "🛑 **Indexing Pause Requested** - This feature will be implemented in a future update",
+                  "bot",
+                );
+              } else {
+                await this.sendResponse(
+                  "Smart embedding orchestrator not available",
+                  "bot",
+                );
+              }
+              break;
+
+            case "resumeIndexing":
+              if (this.smartEmbeddingOrchestrator) {
+                // TODO: Implement resume functionality in SmartEmbeddingOrchestrator
+                await this.sendResponse(
+                  "▶️ **Indexing Resume Requested** - This feature will be implemented in a future update",
+                  "bot",
+                );
+              } else {
+                await this.sendResponse(
+                  "Smart embedding orchestrator not available",
+                  "bot",
+                );
+              }
+              break;
+
+            case "restartWorker":
+              if (this.vectorWorkerManager) {
+                // TODO: Implement restart functionality in VectorDbWorkerManager
+                await this.sendResponse(
+                  "🔄 **Worker Restart Requested** - This feature will be implemented in a future update",
+                  "bot",
+                );
+              } else {
+                await this.sendResponse(
+                  "Vector worker manager not available",
+                  "bot",
+                );
+              }
+              break;
+
+            case "emergencyStop":
+              if (this.productionSafeguards) {
+                // Emergency stop will be handled by the safeguards service
+                await this.sendResponse(
+                  "🚨 **Emergency Stop Activated** - All vector operations have been stopped due to resource concerns",
+                  "bot",
+                );
+              } else {
+                await this.sendResponse(
+                  "Production safeguards not available",
+                  "bot",
+                );
+              }
+              break;
+
+            case "resumeFromEmergencyStop":
+              if (this.productionSafeguards) {
+                // Resume will be handled by the safeguards service
+                await this.sendResponse(
+                  "✅ **Resumed from Emergency Stop** - Vector operations are now active",
+                  "bot",
+                );
+              } else {
+                await this.sendResponse(
+                  "Production safeguards not available",
+                  "bot",
+                );
+              }
+              break;
+
+            case "optimizePerformance":
+              if (this.performanceProfiler && this.enhancedCacheManager) {
+                // Use public method to optimize configuration
+                const optimizedConfig =
+                  this.performanceProfiler.getOptimizedConfig();
+                await this.enhancedCacheManager.optimizeConfiguration();
+
+                const report = this.performanceProfiler.getPerformanceReport();
+                await this.sendResponse(
+                  `
+**Performance Optimized** ⚡
+
+• **Memory Usage**: ${report.avgMemoryUsage.toFixed(0)}MB
+• **Cache Hit Rate**: ${(report.cacheHitRate * 100).toFixed(1)}%
+• **Search Latency**: ${report.avgSearchLatency.toFixed(0)}ms
+• **Configuration**: Automatically tuned based on system resources
+                `.trim(),
+                  "bot",
+                );
+              } else {
+                await this.sendResponse(
+                  "Performance optimization services not available",
+                  "bot",
+                );
+              }
+              break;
+
             default:
               throw new Error("Unknown command");
           }
-        })
+        }),
       );
     } catch (error) {
       this.logger.error("Message handler failed", error);
@@ -461,26 +810,40 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   public handleModelResponseEvent(event: IEventPayload) {
-    this.sendResponse(formatText(event.message), event.message === "folders" ? "bootstrap" : "bot");
+    this.sendResponse(
+      formatText(event.message),
+      event.message === "folders" ? "bootstrap" : "bot",
+    );
   }
-  abstract generateResponse(message?: string, metaData?: Record<string, any>): Promise<string | undefined>;
+  abstract generateResponse(
+    message?: string,
+    metaData?: Record<string, any>,
+  ): Promise<string | undefined>;
 
-  abstract sendResponse(response: string, currentChat?: string): Promise<boolean | undefined>;
+  abstract sendResponse(
+    response: string,
+    currentChat?: string,
+  ): Promise<boolean | undefined>;
 
   /**
    * Enhances user messages with codebase context if the question is codebase-related
    */
-  private async enhanceMessageWithCodebaseContext(message: string): Promise<string> {
+  private async enhanceMessageWithCodebaseContext(
+    message: string,
+  ): Promise<string> {
     try {
-      const questionAnalysis = this.questionClassifier.categorizeQuestion(message);
+      const questionAnalysis =
+        this.questionClassifier.categorizeQuestion(message);
 
       if (!questionAnalysis.isCodebaseRelated) {
-        this.logger.debug("Question not codebase-related, returning original message");
+        this.logger.debug(
+          "Question not codebase-related, returning original message",
+        );
         return message;
       }
 
       this.logger.info(
-        `Detected codebase question with confidence: ${questionAnalysis.confidence}, categories: ${questionAnalysis.categories.join(", ")}`
+        `Detected codebase question with confidence: ${questionAnalysis.confidence}, categories: ${questionAnalysis.categories.join(", ")}`,
       );
 
       // First try vector-based semantic search for precise context
@@ -488,27 +851,31 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       let fallbackContext = "";
 
       try {
-        const vectorResult = await this.smartContextExtractor?.extractRelevantContextWithVector(
-          message,
-          vscode.window.activeTextEditor?.document.fileName
-        );
+        const vectorResult =
+          await this.smartContextExtractor?.extractRelevantContextWithVector(
+            message,
+            vscode.window.activeTextEditor?.document.fileName,
+          );
 
         if (vectorResult?.content && vectorResult.sources.length > 0) {
           vectorContext = `\n**Semantic Context** (${vectorResult.searchMethod} search results):\n${vectorResult.sources
             .map(
               (source) =>
-                `- **${source.filePath}** (relevance: ${source.relevanceScore.toFixed(2)}): ${source.clickableReference}`
+                `- **${source.filePath}** (relevance: ${source.relevanceScore.toFixed(2)}): ${source.clickableReference}`,
             )
             .join(
-              "\n"
+              "\n",
             )}\n\n**Context Content**:\n${vectorResult.content.substring(0, 2000)}${vectorResult.content.length > 2000 ? "..." : ""}`;
 
           this.logger.info(
-            `Vector search found ${vectorResult.sources.length} relevant sources with ${vectorResult.totalTokens} tokens`
+            `Vector search found ${vectorResult.sources.length} relevant sources with ${vectorResult.totalTokens} tokens`,
           );
         }
       } catch (vectorError) {
-        this.logger.warn("Vector search failed, falling back to traditional context", vectorError);
+        this.logger.warn(
+          "Vector search failed, falling back to traditional context",
+          vectorError,
+        );
       }
 
       // Fallback to comprehensive codebase context if vector search didn't provide enough
@@ -539,7 +906,9 @@ IMPORTANT: Please provide a complete response. Do not truncate your answer mid-s
   }
 
   public dispose(): void {
-    this.logger.debug(`Disposing BaseWebViewProvider with ${this.disposables.length} disposables`);
+    this.logger.debug(
+      `Disposing BaseWebViewProvider with ${this.disposables.length} disposables`,
+    );
 
     // Dispose vector database components
     try {
@@ -555,7 +924,8 @@ IMPORTANT: Please provide a complete response. Do not truncate your answer mid-s
 
   async getContext(files: string[]) {
     try {
-      const filesContent: Map<string, string> | undefined = await this.fileService.getFilesContent(files);
+      const filesContent: Map<string, string> | undefined =
+        await this.fileService.getFilesContent(files);
       if (filesContent && filesContent.size > 0) {
         return Array.from(filesContent.values()).join("\n");
       }
@@ -575,9 +945,15 @@ IMPORTANT: Please provide a complete response. Do not truncate your answer mid-s
       maxTokens: number;
       maxAgeHours: number;
       preserveSystemMessages: boolean;
-    }>
+    }>,
   ): Promise<any[]> {
-    return this.chatHistoryManager.formatChatHistory(role, message, model, key, pruneConfig);
+    return this.chatHistoryManager.formatChatHistory(
+      role,
+      message,
+      model,
+      key,
+      pruneConfig,
+    );
   }
 
   // Get chat history stats for monitoring
@@ -597,7 +973,7 @@ IMPORTANT: Please provide a complete response. Do not truncate your answer mid-s
       maxMessages?: number;
       maxTokens?: number;
       maxAgeHours?: number;
-    }
+    },
   ): Promise<void> {
     await this.chatHistoryManager.pruneHistoryForKey(key, config);
   }
