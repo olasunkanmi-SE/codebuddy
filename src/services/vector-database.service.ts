@@ -78,6 +78,9 @@ export class VectorDatabaseService {
         throw new Error("Gemini API key is required for vector database initialization");
       }
 
+      // Validate ChromaDB availability with better error handling
+      await this.validateChromaDBDependency();
+
       // Initialize ChromaDB with local persistence
       const dbPath = path.join(this.context.extensionPath, "vector_db");
 
@@ -117,9 +120,7 @@ export class VectorDatabaseService {
    * Index code snippets using Gemini embeddings
    */
   async indexCodeSnippets(snippets: CodeSnippet[]): Promise<void> {
-    if (!this.isInitialized || !this.collection || !this.embeddingService) {
-      throw new Error("Vector database not initialized or Gemini API key missing");
-    }
+    const { collection, embeddingService } = this.assertReady();
 
     try {
       this.logger.info(`Indexing ${snippets.length} code snippets`);
@@ -133,7 +134,7 @@ export class VectorDatabaseService {
       for (const snippet of snippets) {
         try {
           // Use Gemini embedding service for consistency
-          const embedding = await this.embeddingService.generateEmbedding(snippet.content);
+          const embedding = await embeddingService.generateEmbedding(snippet.content);
 
           embeddings.push(embedding);
           ids.push(snippet.id);
@@ -156,7 +157,7 @@ export class VectorDatabaseService {
       }
 
       // Add to ChromaDB collection
-      await this.collection.add({
+      await collection.add({
         ids,
         embeddings,
         metadatas,
@@ -164,7 +165,7 @@ export class VectorDatabaseService {
       });
 
       // Update stats
-      this.stats.documentCount = await this.collection.count();
+      this.stats.documentCount = await collection.count();
       this.stats.lastSync = new Date().toISOString();
 
       this.logger.info(`Successfully indexed ${embeddings.length} code snippets`, {
@@ -180,17 +181,19 @@ export class VectorDatabaseService {
    * Perform semantic search using Gemini embeddings
    */
   async semanticSearch(query: string, limit = 5): Promise<SearchResult[]> {
-    if (!this.isInitialized || !this.collection || !this.embeddingService) {
+    if (!this.isReady()) {
       this.logger.warn("Vector database not initialized, returning empty results");
       return [];
     }
 
+    const { collection, embeddingService } = this.assertReady();
+
     try {
       // Generate query embedding using Gemini
-      const queryEmbedding = await this.embeddingService.generateEmbedding(query);
+      const queryEmbedding = await embeddingService.generateEmbedding(query);
 
       // Search in ChromaDB
-      const results = await this.collection.query({
+      const results = await collection.query({
         queryEmbeddings: [queryEmbedding],
         nResults: limit,
         include: ["documents", "metadatas", "distances"],
@@ -230,22 +233,24 @@ export class VectorDatabaseService {
    * Delete documents by file path
    */
   async deleteByFile(filePath: string): Promise<void> {
-    if (!this.isInitialized || !this.collection) {
+    if (!this.isReady()) {
       return;
     }
 
+    const { collection } = this.assertReady();
+
     try {
       // Query documents by file path
-      const results = await this.collection.get({
+      const results = await collection.get({
         where: { filePath },
       });
 
       if (results.ids && results.ids.length > 0) {
-        await this.collection.delete({
+        await collection.delete({
           ids: results.ids,
         });
 
-        this.stats.documentCount = await this.collection.count();
+        this.stats.documentCount = await collection.count();
         this.logger.info(`Deleted ${results.ids.length} documents for file: ${filePath}`);
       }
     } catch (error) {
@@ -257,7 +262,7 @@ export class VectorDatabaseService {
    * Update existing document
    */
   async updateDocument(snippet: CodeSnippet): Promise<void> {
-    if (!this.isInitialized || !this.collection || !this.embeddingService) {
+    if (!this.isReady()) {
       return;
     }
 
@@ -278,16 +283,18 @@ export class VectorDatabaseService {
    * Clear all documents from the collection
    */
   async clearAll(): Promise<void> {
-    if (!this.isInitialized || !this.collection) {
+    if (!this.isReady()) {
       return;
     }
 
+    const { collection } = this.assertReady();
+
     try {
       // Get all document IDs
-      const results = await this.collection.get();
+      const results = await collection.get();
 
       if (results.ids && results.ids.length > 0) {
-        await this.collection.delete({
+        await collection.delete({
           ids: results.ids,
         });
       }
@@ -313,6 +320,48 @@ export class VectorDatabaseService {
    */
   isReady(): boolean {
     return this.isInitialized && !!this.collection && !!this.embeddingService;
+  }
+
+  /**
+   * Assert that the service is ready and return non-null references
+   */
+  private assertReady(): { collection: Collection; embeddingService: EmbeddingService } {
+    if (!this.isReady()) {
+      throw new Error("Vector database not initialized or Gemini API key missing");
+    }
+    return {
+      collection: this.collection!,
+      embeddingService: this.embeddingService!,
+    };
+  }
+
+  /**
+   * Validate ChromaDB dependency availability with helpful error messages
+   */
+  private async validateChromaDBDependency(): Promise<void> {
+    try {
+      // Try to import ChromaDB to verify it's available
+      const chromaDB = await import("chromadb");
+      if (!chromaDB.ChromaClient) {
+        throw new Error("ChromaClient not found in chromadb package");
+      }
+      this.logger.debug("ChromaDB dependency validated successfully");
+    } catch (error) {
+      const errorMessage = `
+        ChromaDB dependency not available or corrupted.
+        
+        To fix this issue:
+        1. Ensure ChromaDB is installed: npm install chromadb
+        2. Restart VS Code after installation
+        3. Check that your Node.js version is compatible (>= 16.0.0)
+        
+        Current Node.js version: ${process.version}
+        Error details: ${error instanceof Error ? error.message : String(error)}
+      `.trim();
+
+      this.logger.error("ChromaDB dependency validation failed", { error, nodeVersion: process.version });
+      throw new Error(errorMessage);
+    }
   }
 
   /**

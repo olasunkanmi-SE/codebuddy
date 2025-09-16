@@ -15,8 +15,18 @@ export interface WorkerManagerOptions {
   progressCallback?: (operation: string, progress: number, details?: string) => void;
 }
 
+// Strongly typed operation constants
+export const VECTOR_OPERATIONS = {
+  EMBEDDING: "embedding" as const,
+  INDEXING: "indexing" as const,
+  SEARCHING: "searching" as const,
+  SYNCHRONIZING: "synchronizing" as const,
+} as const;
+
+export type VectorOperationType = (typeof VECTOR_OPERATIONS)[keyof typeof VECTOR_OPERATIONS];
+
 export interface VectorOperationProgress {
-  operation: "indexing" | "searching" | "embedding" | "synchronizing";
+  operation: VectorOperationType;
   progress: number;
   details: string;
 }
@@ -41,7 +51,7 @@ export class VectorDbWorkerManager implements vscode.Disposable {
    */
   async initialize(): Promise<void> {
     try {
-      this.reportProgress("embedding", 0, "Initializing embedding worker...");
+      this.reportProgress(VECTOR_OPERATIONS.EMBEDDING, 0, "Initializing embedding worker...");
 
       // Always use Gemini for embeddings (consistency requirement)
       const { apiKey: geminiApiKey } = getAPIKeyAndModel("Gemini");
@@ -52,7 +62,7 @@ export class VectorDbWorkerManager implements vscode.Disposable {
       });
       await this.embeddingService.initialize();
 
-      this.reportProgress("indexing", 25, "Embedding worker ready");
+      this.reportProgress(VECTOR_OPERATIONS.INDEXING, 25, "Embedding worker ready");
 
       // Initialize vector database worker
       this.vectorDbService = new WorkerVectorDatabaseService(
@@ -62,7 +72,7 @@ export class VectorDbWorkerManager implements vscode.Disposable {
 
       await this.vectorDbService.initialize();
 
-      this.reportProgress("indexing", 100, "Vector database ready");
+      this.reportProgress(VECTOR_OPERATIONS.INDEXING, 100, "Vector database ready");
       this.isInitialized = true;
 
       this.logger.info("Vector database worker manager initialized successfully");
@@ -86,17 +96,21 @@ export class VectorDbWorkerManager implements vscode.Disposable {
     this.progressCallback = progressCallback;
 
     try {
-      this.reportProgress("embedding", 0, `Generating embeddings for ${functionData.length} functions...`);
+      this.reportProgress(
+        VECTOR_OPERATIONS.EMBEDDING,
+        0,
+        `Generating embeddings for ${functionData.length} functions...`
+      );
 
       // Step 1: Generate embeddings using worker threads (non-blocking)
       const embeddedData = await this.embeddingService.processFunctions(
         functionData,
         (progress: number, completed: number, total: number) => {
-          this.reportProgress("embedding", progress, `Embedded ${completed}/${total} functions`);
+          this.reportProgress(VECTOR_OPERATIONS.EMBEDDING, progress, `Embedded ${completed}/${total} functions`);
         }
       );
 
-      this.reportProgress("indexing", 0, "Converting to code snippets...");
+      this.reportProgress(VECTOR_OPERATIONS.INDEXING, 0, "Converting to code snippets...");
 
       // Step 2: Convert to code snippets format
       const codeSnippets: CodeSnippet[] = embeddedData.map((func: IFunctionData) => ({
@@ -113,16 +127,16 @@ export class VectorDbWorkerManager implements vscode.Disposable {
         },
       }));
 
-      this.reportProgress("indexing", 25, "Indexing into vector database...");
+      this.reportProgress(VECTOR_OPERATIONS.INDEXING, 25, "Indexing into vector database...");
 
       // Step 3: Index into vector database using worker (non-blocking)
       await this.vectorDbService.indexCodeSnippets(codeSnippets, (progress: number, indexed: number, total: number) => {
-        this.reportProgress("indexing", 25 + progress * 0.75, `Indexed ${indexed}/${total} snippets`);
+        this.reportProgress(VECTOR_OPERATIONS.INDEXING, 25 + progress * 0.75, `Indexed ${indexed}/${total} snippets`);
       });
 
-      this.reportProgress("indexing", 100, `Successfully indexed ${embeddedData.length} functions`);
+      this.reportProgress(VECTOR_OPERATIONS.INDEXING, 100, `Successfully indexed ${embeddedData.length} functions`);
     } catch (error) {
-      this.reportProgress("indexing", -1, `Indexing failed: ${error}`);
+      this.reportProgress(VECTOR_OPERATIONS.INDEXING, -1, `Indexing failed: ${error}`);
       throw error;
     }
   }
@@ -140,21 +154,21 @@ export class VectorDbWorkerManager implements vscode.Disposable {
     }
 
     try {
-      this.reportProgress("searching", 0, "Generating query embedding...");
+      this.reportProgress(VECTOR_OPERATIONS.SEARCHING, 0, "Generating query embedding...");
 
       // Generate query embedding (non-blocking)
       const queryEmbedding = await this.embeddingService.generateEmbedding(query);
 
-      this.reportProgress("searching", 50, "Searching vector database...");
+      this.reportProgress(VECTOR_OPERATIONS.SEARCHING, 50, "Searching vector database...");
 
       // Perform semantic search (non-blocking)
       const results = await this.vectorDbService.semanticSearch(queryEmbedding, maxResults, filterOptions);
 
-      this.reportProgress("searching", 100, `Found ${results.length} relevant results`);
+      this.reportProgress(VECTOR_OPERATIONS.SEARCHING, 100, `Found ${results.length} relevant results`);
 
       return results;
     } catch (error) {
-      this.reportProgress("searching", -1, `Search failed: ${error}`);
+      this.reportProgress(VECTOR_OPERATIONS.SEARCHING, -1, `Search failed: ${error}`);
       throw error;
     }
   }
@@ -168,21 +182,21 @@ export class VectorDbWorkerManager implements vscode.Disposable {
     }
 
     try {
-      this.reportProgress("synchronizing", 0, `Removing old entries for ${filePath}...`);
+      this.reportProgress(VECTOR_OPERATIONS.SYNCHRONIZING, 0, `Removing old entries for ${filePath}...`);
 
       // Remove old entries for this file
       await this.vectorDbService.deleteByFilePath(filePath);
 
-      this.reportProgress("synchronizing", 50, `Reindexing ${filePath}...`);
+      this.reportProgress(VECTOR_OPERATIONS.SYNCHRONIZING, 50, `Reindexing ${filePath}...`);
 
       // Reindex with new data
       if (functionData.length > 0) {
         await this.indexFunctionData(functionData);
       }
 
-      this.reportProgress("synchronizing", 100, `Successfully reindexed ${filePath}`);
+      this.reportProgress(VECTOR_OPERATIONS.SYNCHRONIZING, 100, `Successfully reindexed ${filePath}`);
     } catch (error) {
-      this.reportProgress("synchronizing", -1, `Reindexing failed: ${error}`);
+      this.reportProgress(VECTOR_OPERATIONS.SYNCHRONIZING, -1, `Reindexing failed: ${error}`);
       throw error;
     }
   }
@@ -214,14 +228,14 @@ export class VectorDbWorkerManager implements vscode.Disposable {
   /**
    * Report progress to callback if available
    */
-  private reportProgress(operation: string, progress: number, details: string): void {
+  private reportProgress(operation: VectorOperationType, progress: number, details: string): void {
     if (this.options.progressCallback) {
       this.options.progressCallback(operation, progress, details);
     }
 
     if (this.progressCallback) {
       this.progressCallback({
-        operation: operation as any,
+        operation,
         progress,
         details,
       });

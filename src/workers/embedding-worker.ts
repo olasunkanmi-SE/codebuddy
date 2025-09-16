@@ -29,34 +29,49 @@ export interface EmbeddingWorkerOptions {
 if (!isMainThread && parentPort) {
   const genAI = new GoogleGenerativeAI(workerData.apiKey);
 
-  parentPort.on("message", async (task: WorkerTask) => {
-    try {
-      switch (task.type) {
-        case "ping":
-          parentPort?.postMessage({ success: true, data: "pong" });
-          break;
+  /**
+   * Centralized error formatting for consistent error handling
+   */
+  function formatError(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
+  }
 
-        case "generateEmbeddings":
+  parentPort.on("message", async (task: WorkerTask) => {
+    switch (task.type) {
+      case "ping":
+        try {
+          parentPort?.postMessage({ success: true, data: "pong" });
+        } catch (error) {
+          parentPort?.postMessage({ success: false, error: formatError(error) });
+        }
+        break;
+
+      case "generateEmbeddings":
+        try {
           const result = await generateEmbeddingsInWorker(task.payload);
           parentPort?.postMessage({ success: true, data: result });
-          break;
+        } catch (error) {
+          parentPort?.postMessage({ success: false, error: formatError(error) });
+        }
+        break;
 
-        case "generateBatch":
+      case "generateBatch":
+        try {
           const batchResult = await processBatchInWorker(task.payload);
           parentPort?.postMessage({ success: true, data: batchResult });
-          break;
+        } catch (error) {
+          parentPort?.postMessage({ success: false, error: formatError(error) });
+        }
+        break;
 
-        default:
-          parentPort?.postMessage({
-            success: false,
-            error: `Unknown task type: ${task.type}`,
-          });
-      }
-    } catch (error) {
-      parentPort?.postMessage({
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      default:
+        parentPort?.postMessage({
+          success: false,
+          error: `Unknown task type: ${task.type}`,
+        });
     }
   });
 

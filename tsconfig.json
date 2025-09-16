@@ -8,6 +8,7 @@
     "sourceMap": true,
     "rootDir": "src",
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
     "esModuleInterop": true,
     "strict": true /* enable all strict type-checking options */
     /* Additional Checks */
