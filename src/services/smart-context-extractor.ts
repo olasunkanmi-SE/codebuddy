@@ -45,7 +45,6 @@ export class SmartContextExtractor {
     activeFileBoost: 0.2,
     keywordMatch: 0.2,
   };
-  private readonly ENABLE_ADVANCED_RANKING = true;
 
   constructor(
     private vectorDb?: VectorDatabaseService,
@@ -88,8 +87,9 @@ export class SmartContextExtractor {
       const questionAnalysis = await this.analyzeQuestion(userQuestion);
 
       // Try vector search first if available and enabled
+      let vectorResult: ContextExtractionResult | null = null;
       if (this.options.enableVectorSearch && this.vectorDb) {
-        const vectorResult = await this.tryVectorSearch(userQuestion, activeFile, questionAnalysis);
+        vectorResult = await this.tryVectorSearch(userQuestion, activeFile, questionAnalysis);
 
         if (vectorResult && vectorResult.sources.length > 0) {
           this.logger.info(
@@ -99,26 +99,32 @@ export class SmartContextExtractor {
         }
       }
 
-      // Fallback to keyword-based search if enabled
+      // Fallback to keyword-based search if enabled and needed
       if (this.options.enableFallback) {
-        this.logger.debug("Vector search returned no results, using fallback method");
-        const fallbackResult = await this.tryKeywordSearch(userQuestion, activeFile);
+        const isVectorDbAvailable = this.vectorDb && (await this.isVectorDbReady());
+        const hasVectorResults = vectorResult && vectorResult.sources.length > 0;
 
-        if (fallbackResult) {
-          this.logger.info(
-            `Fallback search found ${fallbackResult.sources.length} relevant results in ${Date.now() - startTime}ms`
-          );
-          return fallbackResult;
+        if (!isVectorDbAvailable || !hasVectorResults) {
+          this.logger.debug("Vector search unavailable or returned no results, using fallback method");
+          const fallbackResult = await this.tryKeywordSearch(userQuestion, activeFile);
+
+          if (fallbackResult) {
+            this.logger.info(
+              `Fallback search found ${fallbackResult.sources.length} relevant results in ${Date.now() - startTime}ms`
+            );
+            return fallbackResult;
+          }
         }
       }
 
       // Return empty result if no context found
+      const actualSearchMethod = this.vectorDb && (await this.isVectorDbReady()) ? "vector" : "keyword";
       this.logger.warn("No relevant context found for question");
       return {
         content: "",
         sources: [],
         totalTokens: 0,
-        searchMethod: "vector",
+        searchMethod: actualSearchMethod,
         relevanceScore: 0,
       };
     } catch (error) {
@@ -261,31 +267,35 @@ export class SmartContextExtractor {
     let score = 0;
 
     // 1. Vector similarity score (primary) - weight: 40%
-    score += result.relevanceScore * 0.4;
+    score += this.calculateVectorSimilarityScore(result.relevanceScore);
 
     // 2. File proximity to active file (secondary) - weight: 25%
     if (activeFile && result.metadata.filePath) {
-      const proximityScore = this.calculateFileProximity(result.metadata.filePath, activeFile);
-      score += proximityScore * 0.25;
+      score += this.calculateFileProximityScore(result.metadata.filePath, activeFile) * 0.25;
     }
 
     // 3. Keyword overlap - weight: 20%
     if (questionKeywords.length > 0) {
-      const keywordScore = this.calculateKeywordOverlap(result.content, questionKeywords);
-      score += keywordScore * 0.2;
+      score += this.calculateKeywordOverlapScore(result.content, questionKeywords) * 0.2;
     }
 
     // 4. Code importance/complexity (metadata-based) - weight: 15%
-    const importanceScore = this.calculateCodeImportance(result.metadata);
-    score += importanceScore * 0.15;
+    score += this.calculateCodeImportanceScore(result.metadata) * 0.15;
 
     return Math.min(score, 1.0); // Cap at 1.0
   }
 
   /**
-   * Calculate file proximity score based on directory structure
+   * Calculate vector similarity score component
    */
-  private calculateFileProximity(resultPath: string, activeFile: string): number {
+  private calculateVectorSimilarityScore(relevanceScore: number): number {
+    return relevanceScore * 0.4;
+  }
+
+  /**
+   * Calculate file proximity score component
+   */
+  private calculateFileProximityScore(resultPath: string, activeFile: string): number {
     if (resultPath === activeFile) return 1.0;
 
     const resultDir = path.dirname(resultPath);
@@ -311,9 +321,9 @@ export class SmartContextExtractor {
   }
 
   /**
-   * Calculate keyword overlap score
+   * Calculate keyword overlap score component
    */
-  private calculateKeywordOverlap(content: string, keywords: string[]): number {
+  private calculateKeywordOverlapScore(content: string, keywords: string[]): number {
     if (keywords.length === 0) return 0;
 
     const contentLower = content.toLowerCase();
@@ -323,9 +333,9 @@ export class SmartContextExtractor {
   }
 
   /**
-   * Calculate code importance based on metadata
+   * Calculate code importance score component
    */
-  private calculateCodeImportance(metadata: any): number {
+  private calculateCodeImportanceScore(metadata: any): number {
     let importance = 0.5; // Base importance
 
     // Higher importance for certain code types
@@ -446,7 +456,7 @@ export class SmartContextExtractor {
     const relevantSections: Array<{ section: string; score: number }> = [];
 
     for (const section of contextSections) {
-      const score = this.calculateKeywordOverlap(section, keywords);
+      const score = this.calculateKeywordOverlapScore(section, keywords);
       if (score > 0.1) {
         // Minimum threshold
         relevantSections.push({ section, score });
@@ -606,28 +616,62 @@ export class SmartContextExtractor {
    * Get semantic similarity between two texts
    */
   async getSemanticSimilarity(query: string, content: string): Promise<number> {
-    if (!this.vectorDb) return 0;
+    if (!this.vectorDb || !(await this.isVectorDbReady())) {
+      return this.calculateBasicTextSimilarity(query, content);
+    }
 
     try {
-      // Create temporary snippet for similarity comparison
-      const tempSnippet = {
-        id: "temp",
-        filePath: "temp",
-        type: "module" as const,
-        name: "temp",
-        content: content,
-      };
+      // Use existing vector search functionality to avoid N+1 queries
+      // Search for similar content already in the database instead of indexing temporary snippets
+      const existingResults = await this.vectorDb.semanticSearch(query, 5);
 
-      await this.vectorDb.indexCodeSnippets([tempSnippet]);
-      const results = await this.vectorDb.semanticSearch(query, 1);
+      if (existingResults.length === 0) {
+        return this.calculateBasicTextSimilarity(query, content);
+      }
 
-      // Clean up temporary snippet
-      await this.vectorDb.deleteByFile("temp");
+      // Find the most similar existing content and use its relevance as a baseline
+      const maxSimilarity = Math.max(...existingResults.map((r) => r.relevanceScore));
 
-      return results.length > 0 ? results[0].relevanceScore : 0;
+      // Apply text similarity to adjust the score based on actual content match
+      const textSimilarity = this.calculateBasicTextSimilarity(query, content);
+
+      // Combine vector and text similarities for a more accurate score
+      return Math.min(1.0, maxSimilarity * 0.7 + textSimilarity * 0.3);
     } catch (error) {
       this.logger.error("Error calculating semantic similarity:", error);
-      return 0;
+      // Fallback to basic text similarity if vector DB fails
+      return this.calculateBasicTextSimilarity(query, content);
+    }
+  }
+
+  /**
+   * Calculate basic text similarity as fallback when vector DB is unavailable
+   */
+  private calculateBasicTextSimilarity(query: string, content: string): number {
+    const queryWords = query.toLowerCase().split(/\s+/);
+    const contentWords = content.toLowerCase().split(/\s+/);
+
+    const matchingWords = queryWords.filter((word) =>
+      contentWords.some((contentWord) => contentWord.includes(word) || word.includes(contentWord))
+    );
+
+    return queryWords.length > 0 ? matchingWords.length / queryWords.length : 0;
+  }
+
+  /**
+   * Check if vector database is ready for operations
+   */
+  private async isVectorDbReady(): Promise<boolean> {
+    if (!this.vectorDb) return false;
+
+    try {
+      // Check if vector database is initialized and operational
+      // Use a simple query to test if the database is responsive
+      await this.vectorDb.semanticSearch("test", 1);
+      return true;
+    } catch (error) {
+      this.logger.debug("Vector DB not ready:", error);
+      return false;
     }
   }
 

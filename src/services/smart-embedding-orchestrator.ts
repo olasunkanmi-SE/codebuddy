@@ -31,8 +31,9 @@ export interface OrchestrationStats {
 }
 
 export interface UserActivity {
-  type: "file_opened" | "file_edited" | "question_asked" | "search_performed";
+  type: "file_opened" | "file_edited" | "file_deleted" | "file_renamed" | "question_asked" | "search_performed";
   filePath?: string;
+  oldFilePath?: string; // For renames
   content?: string;
   timestamp: number;
 }
@@ -264,6 +265,42 @@ export class SmartEmbeddingOrchestrator {
         filePath: uri.fsPath,
         timestamp: Date.now(),
       });
+    });
+
+    fileWatcher.onDidDelete((uri) => {
+      this.recordActivity({
+        type: "file_deleted",
+        filePath: uri.fsPath,
+        timestamp: Date.now(),
+      });
+
+      // Clean up vector database entries for deleted files
+      this.handleFileDeleted(uri.fsPath);
+    });
+
+    // Monitor file renames (VS Code uses delete + create for renames)
+    // We need to track potential renames by monitoring create events closely after deletes
+    let recentDeletes: { path: string; timestamp: number }[] = [];
+
+    fileWatcher.onDidDelete((uri) => {
+      recentDeletes.push({ path: uri.fsPath, timestamp: Date.now() });
+      // Clean up old entries (older than 1 second)
+      recentDeletes = recentDeletes.filter((d) => Date.now() - d.timestamp < 1000);
+    });
+
+    fileWatcher.onDidCreate((uri) => {
+      // Check if this might be a rename (create shortly after delete)
+      const possibleRename = recentDeletes.find(
+        (d) =>
+          Date.now() - d.timestamp < 500 && // Within 500ms
+          path.basename(d.path) === path.basename(uri.fsPath) // Same filename
+      );
+
+      if (possibleRename) {
+        this.handleFileRenamed(possibleRename.path, uri.fsPath);
+        // Remove from recent deletes
+        recentDeletes = recentDeletes.filter((d) => d.path !== possibleRename.path);
+      }
     });
 
     // Monitor editor changes
@@ -606,6 +643,70 @@ export class SmartEmbeddingOrchestrator {
     } finally {
       this.stats.phasesActive.bulk = false;
     }
+  }
+
+  /**
+   * Handle file deletion by cleaning up vector database entries
+   */
+  private async handleFileDeleted(filePath: string): Promise<void> {
+    try {
+      await this.vectorDb.deleteByFile(filePath);
+      this.logger.info(`Cleaned up vector DB entries for deleted file: ${filePath}`);
+    } catch (error) {
+      this.logger.error(`Failed to clean up vector DB for deleted file ${filePath}:`, error);
+    }
+  }
+
+  /**
+   * Handle file rename by updating vector database entries
+   */
+  private async handleFileRenamed(oldPath: string, newPath: string): Promise<void> {
+    try {
+      // Record the rename activity
+      this.recordActivity({
+        type: "file_renamed",
+        oldFilePath: oldPath,
+        filePath: newPath,
+        timestamp: Date.now(),
+      });
+
+      // For now, delete old entries and re-index with new path
+      // In a more sophisticated implementation, we could update metadata in place
+      await this.vectorDb.deleteByFile(oldPath);
+
+      // Re-index the file under its new path
+      if (await this.shouldProcessFile(newPath)) {
+        await this.processEmbeddingForFile(newPath);
+      }
+
+      this.logger.info(`Updated vector DB for renamed file: ${oldPath} -> ${newPath}`);
+    } catch (error) {
+      this.logger.error(`Failed to handle file rename ${oldPath} -> ${newPath}:`, error);
+    }
+  }
+
+  /**
+   * Check if a file should be processed for embedding
+   */
+  private async shouldProcessFile(filePath: string): Promise<boolean> {
+    // Check file extension and other criteria
+    const ext = path.extname(filePath).toLowerCase();
+    const supportedExtensions = [
+      ".ts",
+      ".js",
+      ".tsx",
+      ".jsx",
+      ".py",
+      ".java",
+      ".cpp",
+      ".c",
+      ".cs",
+      ".go",
+      ".rs",
+      ".php",
+      ".rb",
+    ];
+    return supportedExtensions.includes(ext);
   }
 
   /**
