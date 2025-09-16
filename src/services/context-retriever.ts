@@ -1,18 +1,15 @@
 import * as vscode from "vscode";
 import { Orchestrator } from "../agents/orchestrator";
-import {
-  IFileToolConfig,
-  IFileToolResponse,
-} from "../application/interfaces/agent.interface";
+import { IFileToolConfig, IFileToolResponse } from "../application/interfaces/agent.interface";
 import { Logger } from "../infrastructure/logger/logger";
-import { getAPIKeyAndModel } from "./../utils/utils";
+import { getAPIKeyAndModel, getGenerativeAiModel } from "./../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { LogLevel } from "./telemetry";
 import { WebSearchService } from "./web-search-service";
 
 export class ContextRetriever {
   // private readonly codeRepository: CodeRepository;
-  private readonly embeddingService: EmbeddingService;
+  private readonly embeddingService: EmbeddingService; // Always uses Gemini for consistency
   private static readonly SEARCH_RESULT_COUNT = 2;
   private readonly logger: Logger;
   private static instance: ContextRetriever;
@@ -20,8 +17,11 @@ export class ContextRetriever {
   protected readonly orchestrator: Orchestrator;
   constructor() {
     // this.codeRepository = CodeRepository.getInstance();
-    const { apiKey, model } = getAPIKeyAndModel("gemini");
-    this.embeddingService = new EmbeddingService(apiKey);
+    // Always use Gemini for embeddings to ensure consistency
+    // regardless of the selected chat model (Groq, Anthropic, etc.)
+    const embeddingProvider = "Gemini";
+    const { apiKey: embeddingApiKey } = getAPIKeyAndModel(embeddingProvider);
+    this.embeddingService = new EmbeddingService(embeddingApiKey);
     this.logger = Logger.initialize("ContextRetriever", {
       minLevel: LogLevel.DEBUG,
     });
@@ -51,9 +51,7 @@ export class ContextRetriever {
   //   }
   // }
 
-  async readFiles(
-    fileConfigs: IFileToolConfig[],
-  ): Promise<IFileToolResponse[]> {
+  async readFiles(fileConfigs: IFileToolConfig[]): Promise<IFileToolResponse[]> {
     const files = fileConfigs.flatMap((file) => file);
     const promises = files.map(async (file) => {
       try {
@@ -67,9 +65,7 @@ export class ContextRetriever {
       }
     });
     const results = await Promise.all(promises);
-    return results.filter(
-      (result): result is IFileToolResponse => result !== undefined,
-    );
+    return results.filter((result): result is IFileToolResponse => result !== undefined);
   }
 
   async readFileContent(filePath: string): Promise<string> {
