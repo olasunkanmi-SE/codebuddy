@@ -5,6 +5,21 @@ import { CodeIndexingService } from "./code-indexing";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { VECTOR_OPERATIONS, VectorOperationType } from "./vector-db-worker-manager";
 import { IFunctionData } from "../application/interfaces";
+import { LanguageUtils, FileUtils, AsyncUtils, DisposableUtils } from "../utils/common-utils";
+
+// Interface for code indexing to support dependency injection
+export interface ICodeIndexer {
+  generateEmbeddings(): Promise<IFunctionData[]>;
+}
+
+// Adapter to make CodeIndexingService compatible with ICodeIndexer interface
+export class CodeIndexingAdapter implements ICodeIndexer {
+  constructor(private codeIndexingService: CodeIndexingService) {}
+
+  async generateEmbeddings(): Promise<IFunctionData[]> {
+    return await this.codeIndexingService.generateEmbeddings();
+  }
+}
 
 export interface SyncOperation {
   type: "created" | "modified" | "deleted";
@@ -26,7 +41,7 @@ export interface VectorDbSyncStats {
  */
 export class VectorDbSyncService implements vscode.Disposable {
   private vectorDb: VectorDatabaseService;
-  private codeIndexing: CodeIndexingService;
+  private codeIndexer: ICodeIndexer;
   private logger: Logger;
 
   private syncQueue = new Set<string>();
@@ -46,9 +61,9 @@ export class VectorDbSyncService implements vscode.Disposable {
     queueSize: 0,
   };
 
-  constructor(vectorDb: VectorDatabaseService, codeIndexing: CodeIndexingService) {
+  constructor(vectorDb: VectorDatabaseService, codeIndexer: ICodeIndexer) {
     this.vectorDb = vectorDb;
-    this.codeIndexing = codeIndexing;
+    this.codeIndexer = codeIndexer;
     this.logger = Logger.initialize("VectorDbSyncService", {
       minLevel: LogLevel.INFO,
     });
@@ -253,11 +268,20 @@ export class VectorDbSyncService implements vscode.Disposable {
     for (let i = 0; i < modifiedFiles.length; i += this.BATCH_SIZE) {
       const batch = modifiedFiles.slice(i, i + this.BATCH_SIZE);
 
-      await Promise.all(batch.map((filePath) => this.reindexSingleFile(filePath)));
+      await Promise.all(
+        batch.map(async (filePath) => {
+          try {
+            await this.reindexSingleFile(filePath);
+          } catch (error) {
+            this.logger.error(`Reindexing failed for ${filePath}:`, error);
+            this.stats.failedOperations++;
+          }
+        })
+      );
 
       // Small delay between batches
       if (i + this.BATCH_SIZE < modifiedFiles.length) {
-        await this.delay(100);
+        await AsyncUtils.delay(100);
       }
     }
   }
@@ -284,27 +308,43 @@ export class VectorDbSyncService implements vscode.Disposable {
   }
 
   /**
-   * Extract code snippets from a file
+   * Extract code snippets from a file using a more efficient approach
    */
   private async extractSnippetsFromFile(filePath: string): Promise<CodeSnippet[]> {
     try {
-      // Use the existing code indexing service to analyze the file
-      const functionData = await this.codeIndexing.generateEmbeddings();
+      // For now, create a simple file-based snippet
+      // In the future, this could be enhanced with more sophisticated parsing
+      const content = await AsyncUtils.safeExecute(
+        async () => {
+          const uri = vscode.Uri.file(filePath);
+          const bytes = await vscode.workspace.fs.readFile(uri);
+          return new TextDecoder().decode(bytes);
+        },
+        "",
+        (error) => this.logger.warn(`Could not read file ${filePath}:`, error)
+      );
 
-      return functionData
-        .filter((f) => f.path === filePath)
-        .map((f) => ({
-          id: `${f.path}::${f.className || "global"}::${f.name}`,
-          filePath: f.path || "",
-          type: "function" as const,
-          name: f.name || "",
-          content: f.compositeText || f.description || "",
+      if (!content) {
+        return [];
+      }
+
+      // Create a single snippet for the entire file
+      // This is a simplified approach - in practice, you might want to parse functions/classes
+      return [
+        {
+          id: `file::${filePath}`,
+          filePath,
+          type: "module" as const,
+          name: FileUtils.getRelativePath(filePath),
+          content: content.substring(0, 2000), // Limit content size
           metadata: {
-            className: f.className,
-            returnType: f.returnType,
-            dependencies: f.dependencies,
+            language: LanguageUtils.getLanguageFromPath(filePath),
+            fileSize: content.length,
+            startLine: 1,
+            endLine: content.split("\n").length,
           },
-        }));
+        },
+      ];
     } catch (error) {
       this.logger.error(`Error extracting snippets from ${filePath}:`, error);
       return [];
@@ -456,7 +496,7 @@ export class VectorDbSyncService implements vscode.Disposable {
     }
 
     // Dispose of all watchers and disposables
-    this.disposables.forEach((disposable) => disposable.dispose());
+    DisposableUtils.safeDispose(this.disposables);
     this.fileWatchers = [];
     this.disposables = [];
 

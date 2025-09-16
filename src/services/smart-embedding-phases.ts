@@ -4,6 +4,7 @@ import { VectorDbWorkerManager, VECTOR_OPERATIONS } from "./vector-db-worker-man
 import { CodeIndexingService } from "./code-indexing";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { IFunctionData } from "../application/interfaces";
+import { LanguageUtils, FileUtils, AsyncUtils, DisposableUtils } from "../utils/common-utils";
 
 export interface EmbeddingPhaseOptions {
   batchSize?: number;
@@ -20,13 +21,19 @@ export interface EmbeddingProgressCallback {
  * Phase 1: Immediate Embedding - Essential files for instant productivity
  * Embeds open files, entry points, and recently modified files
  */
-export class ImmediateEmbeddingPhase {
+export class ImmediateEmbeddingPhase implements vscode.Disposable {
   private logger: Logger;
+  private disposables: vscode.Disposable[] = [];
 
   constructor(private workerManager: VectorDbWorkerManager) {
     this.logger = Logger.initialize("ImmediateEmbeddingPhase", {
       minLevel: LogLevel.INFO,
     });
+  }
+
+  dispose(): void {
+    DisposableUtils.safeDispose(this.disposables);
+    this.disposables = [];
   }
 
   async embedEssentials(context: vscode.ExtensionContext, progressCallback?: EmbeddingProgressCallback): Promise<void> {
@@ -46,27 +53,27 @@ export class ImmediateEmbeddingPhase {
 
         this.logger.info(`Embedding ${essentialFiles.length} essential files`);
 
-        for (let i = 0; i < essentialFiles.length; i++) {
-          const file = essentialFiles[i];
-
-          try {
-            await this.embedFile(file);
-
-            const increment = 100 / essentialFiles.length;
-            const currentProgress = ((i + 1) / essentialFiles.length) * 100;
-
-            progress.report({
-              increment,
-              message: `Indexed ${path.basename(file)} (${i + 1}/${essentialFiles.length})`,
-            });
-
-            if (progressCallback) {
-              progressCallback("immediate", currentProgress, `Indexed ${path.basename(file)}`);
+        // Parallelize the embedding process for better performance
+        await AsyncUtils.processBatchesWithProgress(
+          essentialFiles,
+          async (file, index) => {
+            try {
+              await this.embedFile(file);
+              const currentProgress = ((index + 1) / essentialFiles.length) * 100;
+              const increment = 100 / essentialFiles.length;
+              progress.report({
+                increment,
+                message: `Indexed ${path.basename(file)} (${index + 1}/${essentialFiles.length})`,
+              });
+              if (progressCallback) {
+                progressCallback("immediate", currentProgress, `Indexed ${path.basename(file)}`);
+              }
+            } catch (error) {
+              this.logger.error(`Failed to embed file ${file}:`, error);
             }
-          } catch (error) {
-            this.logger.error(`Failed to embed file ${file}:`, error);
-          }
-        }
+          },
+          5 // Process 5 files at a time to avoid overwhelming the system
+        );
 
         this.logger.info("Essential files embedding completed");
       }
@@ -74,39 +81,65 @@ export class ImmediateEmbeddingPhase {
   }
 
   private async identifyEssentialFiles(): Promise<string[]> {
-    const essentials: string[] = [];
-
     try {
-      // 1. Currently open files (highest priority)
-      const openFiles = vscode.workspace.textDocuments
-        .filter((doc) => this.isCodeFile(doc.languageId) && !doc.isUntitled)
-        .map((doc) => doc.fileName);
+      // Collect files from different priority categories
+      const fileSources = await this.gatherEssentialFileSources();
 
-      // 2. Entry points from package.json
-      const entryPoints = await this.findEntryPoints();
-
-      // 3. Recently modified files (last 7 days)
-      const recentFiles = await this.getRecentlyModified(7);
-
-      // 4. Most imported files (dependency analysis)
-      const mostImported = await this.getMostImportedFiles(10);
-
-      // 5. Main directories' index files
-      const indexFiles = await this.findIndexFiles();
-
-      const allEssentials = [...openFiles, ...entryPoints, ...recentFiles.slice(0, 5), ...mostImported, ...indexFiles];
-
-      // Remove duplicates and limit to reasonable number
-      return [...new Set(allEssentials)].slice(0, 20);
+      // Combine and prioritize files
+      return this.prioritizeAndLimitFiles(fileSources);
     } catch (error) {
       this.logger.error("Error identifying essential files:", error);
       return [];
     }
   }
 
-  private isCodeFile(languageId: string): boolean {
-    const codeLanguages = ["typescript", "javascript", "python", "java", "cpp", "c", "csharp"];
-    return codeLanguages.includes(languageId);
+  private async gatherEssentialFileSources(): Promise<{
+    openFiles: string[];
+    entryPoints: string[];
+    recentFiles: string[];
+    mostImported: string[];
+    indexFiles: string[];
+  }> {
+    // Gather files from different sources in parallel for better performance
+    const [entryPoints, recentFiles, mostImported, indexFiles] = await Promise.all([
+      this.findEntryPoints(),
+      this.getRecentlyModified(7),
+      this.getMostImportedFiles(10),
+      this.findIndexFiles(),
+    ]);
+
+    // Currently open files (highest priority)
+    const openFiles = vscode.workspace.textDocuments
+      .filter((doc) => LanguageUtils.isCodeFile(doc.languageId) && !doc.isUntitled)
+      .map((doc) => doc.fileName);
+
+    return {
+      openFiles,
+      entryPoints,
+      recentFiles,
+      mostImported,
+      indexFiles,
+    };
+  }
+
+  private prioritizeAndLimitFiles(sources: {
+    openFiles: string[];
+    entryPoints: string[];
+    recentFiles: string[];
+    mostImported: string[];
+    indexFiles: string[];
+  }): string[] {
+    // Combine files with priority weighting
+    const allEssentials = [
+      ...sources.openFiles, // Highest priority
+      ...sources.entryPoints, // High priority
+      ...sources.recentFiles.slice(0, 5), // Recent activity
+      ...sources.mostImported, // Dependency importance
+      ...sources.indexFiles, // Structural importance
+    ];
+
+    // Remove duplicates and limit to reasonable number
+    return [...new Set(allEssentials)].slice(0, 20);
   }
 
   private async findEntryPoints(): Promise<string[]> {
@@ -162,13 +195,15 @@ export class ImmediateEmbeddingPhase {
 
       for (const file of files) {
         try {
-          const stat = await vscode.workspace.fs.stat(file);
-          const modifiedDate = new Date(stat.mtime);
-
-          if (modifiedDate > cutoffDate) {
-            recentFiles.push(file.fsPath);
+          const stat = await FileUtils.safeGetStats(file);
+          if (stat) {
+            const modifiedDate = new Date(stat.mtime);
+            if (modifiedDate > cutoffDate) {
+              recentFiles.push(file.fsPath);
+            }
           }
         } catch (error) {
+          this.logger.warn(`Could not get stats for file ${file.fsPath}:`, error);
           // Skip files that can't be read
         }
       }
@@ -258,7 +293,7 @@ export class ImmediateEmbeddingPhase {
  * Phase 2: Context-Aware On-Demand - Files based on user behavior
  * Triggered by user questions, file navigation, and editing
  */
-export class OnDemandEmbeddingPhase {
+export class OnDemandEmbeddingPhase implements vscode.Disposable {
   private logger: Logger;
   private disposables: vscode.Disposable[] = [];
 
@@ -271,14 +306,14 @@ export class OnDemandEmbeddingPhase {
   setupTriggers(): void {
     // Trigger 2: File navigation
     const activeEditorDisposable = vscode.window.onDidChangeActiveTextEditor(async (editor) => {
-      if (editor?.document.languageId && this.isCodeFile(editor.document.languageId)) {
+      if (editor?.document.languageId && LanguageUtils.isCodeFile(editor.document.languageId)) {
         await this.onFileOpened(editor.document.fileName);
       }
     });
 
     // Trigger 3: File editing
     const textDocumentDisposable = vscode.workspace.onDidChangeTextDocument(async (event) => {
-      if (this.isCodeFile(event.document.languageId)) {
+      if (LanguageUtils.isCodeFile(event.document.languageId)) {
         await this.onFileEdited(event.document.fileName);
       }
     });
@@ -321,27 +356,35 @@ export class OnDemandEmbeddingPhase {
     }
   }
 
-  private isCodeFile(languageId: string): boolean {
-    const codeLanguages = ["typescript", "javascript", "python", "java", "cpp", "c", "csharp"];
-    return codeLanguages.includes(languageId);
-  }
-
   private async identifyRelevantFiles(question: string): Promise<string[]> {
     const keywords = this.extractTechnicalKeywords(question);
+
+    // Collect candidates from multiple sources
+    const candidates = await this.collectRelevantCandidates(keywords);
+
+    // Rank and return the most relevant files
+    return this.rankByRelevance(candidates, question);
+  }
+
+  private async collectRelevantCandidates(keywords: string[]): Promise<string[]> {
     const candidates: string[] = [];
 
-    // Search by filename patterns
-    for (const keyword of keywords) {
-      const matchingFiles = await this.findFilesByPattern(keyword);
-      candidates.push(...matchingFiles);
-    }
+    // Collect files by filename patterns
+    const filenameMatches = await this.findFilesByPatterns(keywords);
+    candidates.push(...filenameMatches);
 
-    // Search by content patterns (without full embedding)
+    // Collect files by content patterns (without full embedding)
     const contentMatches = await this.findFilesByContentKeywords(keywords);
     candidates.push(...contentMatches);
 
-    // Rank by relevance to question
-    return this.rankByRelevance(candidates, question);
+    // Remove duplicates
+    return [...new Set(candidates)];
+  }
+
+  private async findFilesByPatterns(keywords: string[]): Promise<string[]> {
+    const allMatches = await Promise.all(keywords.map((keyword) => this.findFilesByPattern(keyword)));
+
+    return allMatches.flat();
   }
 
   private extractTechnicalKeywords(question: string): string[] {
@@ -490,7 +533,7 @@ export class OnDemandEmbeddingPhase {
   }
 
   dispose(): void {
-    this.disposables.forEach((d) => d.dispose());
+    DisposableUtils.safeDispose(this.disposables);
     this.disposables = [];
   }
 }
@@ -499,13 +542,14 @@ export class OnDemandEmbeddingPhase {
  * Phase 3: Background Processing - Gradual processing during idle time
  * Processes remaining files when user is idle
  */
-export class BackgroundEmbeddingPhase {
+export class BackgroundEmbeddingPhase implements vscode.Disposable {
   private logger: Logger;
   private isUserIdle = false;
   private readonly IDLE_THRESHOLD = 3000; // 3 seconds
   private readonly BATCH_SIZE = 8; // Files per batch
   private idleTimer?: NodeJS.Timeout;
   private isProcessing = false;
+  private disposables: vscode.Disposable[] = [];
 
   constructor(private workerManager: VectorDbWorkerManager) {
     this.logger = Logger.initialize("BackgroundEmbeddingPhase", {
@@ -520,12 +564,13 @@ export class BackgroundEmbeddingPhase {
 
   private setupIdleDetection(): void {
     // Monitor various VS Code events for user activity
-    const disposables = [
+    const eventDisposables = [
       vscode.workspace.onDidChangeTextDocument(() => this.resetIdleTimer()),
       vscode.window.onDidChangeActiveTextEditor(() => this.resetIdleTimer()),
       vscode.window.onDidChangeTextEditorSelection(() => this.resetIdleTimer()),
     ];
 
+    this.disposables.push(...eventDisposables);
     this.resetIdleTimer();
   }
 
@@ -639,14 +684,24 @@ export class BackgroundEmbeddingPhase {
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+
+  dispose(): void {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = undefined;
+    }
+    DisposableUtils.safeDispose(this.disposables);
+    this.disposables = [];
+  }
 }
 
 /**
  * Phase 4: Bulk Processing - Complete codebase indexing when requested
  * User-initiated complete indexing with progress reporting
  */
-export class BulkEmbeddingPhase {
+export class BulkEmbeddingPhase implements vscode.Disposable {
   private logger: Logger;
+  private disposables: vscode.Disposable[] = [];
 
   constructor(private workerManager: VectorDbWorkerManager) {
     this.logger = Logger.initialize("BulkEmbeddingPhase", {
@@ -793,5 +848,10 @@ export class BulkEmbeddingPhase {
   private async embedFile(filePath: string): Promise<void> {
     this.logger.debug(`Bulk embedding: ${path.basename(filePath)}`);
     await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  dispose(): void {
+    DisposableUtils.safeDispose(this.disposables);
+    this.disposables = [];
   }
 }
