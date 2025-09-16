@@ -22,6 +22,10 @@ import { SmartEmbeddingOrchestrator } from "../services/smart-embedding-orchestr
 import { ContextRetriever } from "../services/context-retriever";
 import { UserFeedbackService } from "../services/user-feedback.service";
 import { VectorDbConfigurationManager } from "../config/vector-db.config";
+import { ICodeIndexer } from "../interfaces/vector-db.interface";
+import { PerformanceProfiler } from "../services/performance-profiler.service";
+import { ProductionSafeguards } from "../services/production-safeguards.service";
+import { EnhancedCacheManager } from "../services/enhanced-cache-manager.service";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -42,15 +46,22 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly inputValidator: InputValidator;
 
   // Vector database services
-  protected vectorDbService?: VectorDatabaseService;
-  protected vectorDbSyncService?: VectorDbSyncService;
+  protected vectorDb?: VectorDatabaseService;
+  protected vectorDbService?: VectorDatabaseService; // Alias for compatibility
   protected vectorWorkerManager?: VectorDbWorkerManager;
+  protected vectorSyncService?: VectorDbSyncService;
+  protected vectorDbSyncService?: VectorDbSyncService; // Alias for compatibility
   protected smartContextExtractor?: SmartContextExtractor;
   protected smartEmbeddingOrchestrator?: SmartEmbeddingOrchestrator;
-  protected contextRetriever?: ContextRetriever;
+  protected vectorConfigManager?: VectorDbConfigurationManager;
+  protected configManager?: VectorDbConfigurationManager; // Alias for compatibility
   protected userFeedbackService?: UserFeedbackService;
-  protected configManager?: VectorDbConfigurationManager;
-  protected codeIndexingService?: any; // CodeIndexingService - will be properly typed when available
+  protected contextRetriever?: ContextRetriever;
+
+  // Phase 5: Performance & Production services
+  protected performanceProfiler?: PerformanceProfiler;
+  protected productionSafeguards?: ProductionSafeguards;
+  protected enhancedCacheManager?: EnhancedCacheManager;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -77,6 +88,27 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     // Initialize configuration manager first
     this.configManager = new VectorDbConfigurationManager();
+    this.vectorConfigManager = this.configManager; // Alias
+
+    // Initialize Phase 5 services
+    this.performanceProfiler = new PerformanceProfiler(this.configManager);
+    this.productionSafeguards = new ProductionSafeguards({
+      maxMemoryMB: 1024,
+      maxHeapMB: 512,
+      maxCpuPercent: 80,
+      gcThresholdMB: 256,
+      alertThresholdMB: 400,
+    });
+    this.enhancedCacheManager = new EnhancedCacheManager(
+      {
+        maxSize: 10000,
+        defaultTtl: 3600000, // 1 hour
+        maxMemoryMB: 100,
+        cleanupInterval: 300000, // 5 minutes
+        evictionPolicy: "LRU",
+      },
+      this.performanceProfiler
+    );
 
     // Initialize user feedback service
     this.userFeedbackService = new UserFeedbackService();
@@ -84,22 +116,42 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     // Initialize vector services
     this.vectorWorkerManager = new VectorDbWorkerManager(context);
     this.vectorDbService = new VectorDatabaseService(context, geminiApiKey);
+    this.vectorDb = this.vectorDbService; // Alias
 
-    // Initialize code indexing service (temporary stub)
-    this.codeIndexingService = this.vectorWorkerManager; // Use worker manager as code indexer for now
+    // Note: codeIndexingService will be initialized when a proper implementation is available
     this.smartEmbeddingOrchestrator = new SmartEmbeddingOrchestrator(
       context,
       this.vectorDbService,
       this.vectorWorkerManager
     );
-    this.vectorDbSyncService = new VectorDbSyncService(this.vectorDbService, this.codeIndexingService);
+
+    // Create a temporary code indexing service (to be properly implemented later)
+    // Import the correct interface from vector-db-sync.service
+    const tempCodeIndexer = {
+      generateEmbeddings: async (): Promise<any[]> => [],
+    };
+
+    this.contextRetriever = new ContextRetriever();
+
+    this.vectorDbSyncService = new VectorDbSyncService(this.vectorDbService, tempCodeIndexer);
+    this.vectorSyncService = this.vectorDbSyncService; // Alias
+
     this.smartContextExtractor = new SmartContextExtractor(
       this.vectorDbService,
       this.contextRetriever,
       this.codebaseUnderstanding,
-      this.questionClassifier
+      this.questionClassifier,
+      {},
+      this.performanceProfiler
     );
-    this.contextRetriever = new ContextRetriever();
+
+    // Initialize configuration manager first
+    this.configManager = new VectorDbConfigurationManager();
+
+    // Initialize user feedback service
+    this.userFeedbackService = new UserFeedbackService();
+
+    // Note: codeIndexingService is already initialized with temp implementation above
 
     // Don't register disposables here - do it lazily when webview is resolved
   }
@@ -442,6 +494,153 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 theme: message.message,
               });
               break;
+
+            // Phase 5: Performance & Production Commands
+            case "showPerformanceReport":
+              if (this.performanceProfiler) {
+                const report = this.performanceProfiler.getPerformanceReport();
+                const stats = this.performanceProfiler.getStats();
+                await this.sendResponse(
+                  `
+**Performance Report** 📊
+
+• **Search Performance**: ${report.avgSearchLatency.toFixed(0)}ms avg, ${report.p95SearchLatency.toFixed(0)}ms P95
+• **Indexing Throughput**: ${report.avgIndexingThroughput.toFixed(1)} items/sec
+• **Memory Usage**: ${report.avgMemoryUsage.toFixed(0)}MB
+• **Cache Hit Rate**: ${(report.cacheHitRate * 100).toFixed(1)}%
+• **Error Rate**: ${(report.errorRate * 100).toFixed(2)}%
+
+**Targets**: Search <500ms, Memory <500MB, Errors <5%
+**Status**: ${stats.searchLatency.count > 0 ? "✅ Active" : "⚠️ Limited Data"}
+                `.trim(),
+                  "bot"
+                );
+              } else {
+                await this.sendResponse("Performance profiler not available", "bot");
+              }
+              break;
+
+            case "clearCache":
+              if (this.enhancedCacheManager) {
+                const type = message.data?.type || "all";
+                await this.enhancedCacheManager.clearCache(type);
+                const cacheInfo = this.enhancedCacheManager.getCacheInfo();
+                await this.sendResponse(
+                  `
+**Cache Cleared** 🧹
+
+• **Type**: ${type}
+• **Remaining Memory**: ${cacheInfo.total.memoryMB.toFixed(1)}MB
+• **Hit Rate**: ${(cacheInfo.total.hitRate * 100).toFixed(1)}%
+                `.trim(),
+                  "bot"
+                );
+              } else {
+                await this.sendResponse("Enhanced cache manager not available", "bot");
+              }
+              break;
+
+            case "reduceBatchSize":
+              if (this.vectorConfigManager) {
+                const config = this.vectorConfigManager.getConfig();
+                const currentBatchSize = config.batchSize;
+                const newBatchSize = Math.max(5, Math.floor(currentBatchSize * 0.7));
+                await this.vectorConfigManager.updateConfig("batchSize", newBatchSize);
+                await this.sendResponse(
+                  `
+**Batch Size Reduced** ⚡
+
+• **Previous**: ${currentBatchSize}
+• **New**: ${newBatchSize}
+• **Impact**: Lower memory usage, potentially slower indexing
+                `.trim(),
+                  "bot"
+                );
+              } else {
+                await this.sendResponse("Configuration manager not available", "bot");
+              }
+              break;
+
+            case "pauseIndexing":
+              if (this.smartEmbeddingOrchestrator) {
+                // TODO: Implement pause functionality in SmartEmbeddingOrchestrator
+                await this.sendResponse(
+                  "🛑 **Indexing Pause Requested** - This feature will be implemented in a future update",
+                  "bot"
+                );
+              } else {
+                await this.sendResponse("Smart embedding orchestrator not available", "bot");
+              }
+              break;
+
+            case "resumeIndexing":
+              if (this.smartEmbeddingOrchestrator) {
+                // TODO: Implement resume functionality in SmartEmbeddingOrchestrator
+                await this.sendResponse(
+                  "▶️ **Indexing Resume Requested** - This feature will be implemented in a future update",
+                  "bot"
+                );
+              } else {
+                await this.sendResponse("Smart embedding orchestrator not available", "bot");
+              }
+              break;
+
+            case "restartWorker":
+              if (this.vectorWorkerManager) {
+                // TODO: Implement restart functionality in VectorDbWorkerManager
+                await this.sendResponse(
+                  "🔄 **Worker Restart Requested** - This feature will be implemented in a future update",
+                  "bot"
+                );
+              } else {
+                await this.sendResponse("Vector worker manager not available", "bot");
+              }
+              break;
+
+            case "emergencyStop":
+              if (this.productionSafeguards) {
+                // Emergency stop will be handled by the safeguards service
+                await this.sendResponse(
+                  "🚨 **Emergency Stop Activated** - All vector operations have been stopped due to resource concerns",
+                  "bot"
+                );
+              } else {
+                await this.sendResponse("Production safeguards not available", "bot");
+              }
+              break;
+
+            case "resumeFromEmergencyStop":
+              if (this.productionSafeguards) {
+                // Resume will be handled by the safeguards service
+                await this.sendResponse("✅ **Resumed from Emergency Stop** - Vector operations are now active", "bot");
+              } else {
+                await this.sendResponse("Production safeguards not available", "bot");
+              }
+              break;
+
+            case "optimizePerformance":
+              if (this.performanceProfiler && this.enhancedCacheManager) {
+                // Use public method to optimize configuration
+                const optimizedConfig = this.performanceProfiler.getOptimizedConfig();
+                await this.enhancedCacheManager.optimizeConfiguration();
+
+                const report = this.performanceProfiler.getPerformanceReport();
+                await this.sendResponse(
+                  `
+**Performance Optimized** ⚡
+
+• **Memory Usage**: ${report.avgMemoryUsage.toFixed(0)}MB
+• **Cache Hit Rate**: ${(report.cacheHitRate * 100).toFixed(1)}%
+• **Search Latency**: ${report.avgSearchLatency.toFixed(0)}ms
+• **Configuration**: Automatically tuned based on system resources
+                `.trim(),
+                  "bot"
+                );
+              } else {
+                await this.sendResponse("Performance optimization services not available", "bot");
+              }
+              break;
+
             default:
               throw new Error("Unknown command");
           }

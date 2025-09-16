@@ -159,7 +159,68 @@ function registerVectorDatabaseCommands(context: vscode.ExtensionContext): void 
     vscode.window.showInformationMessage(message);
   });
 
-  context.subscriptions.push(forceReindexCommand, showStatsCommand);
+  // Phase 5: Performance & Production Commands
+  const showPerformanceReportCommand = vscode.commands.registerCommand("codebuddy.showPerformanceReport", async () => {
+    // This will be handled by the webview provider's performance profiler
+    vscode.commands.executeCommand("codebuddy.webview.showPerformanceReport");
+  });
+
+  const clearVectorCacheCommand = vscode.commands.registerCommand("codebuddy.clearVectorCache", async () => {
+    // This will be handled by the webview provider's enhanced cache manager
+    vscode.commands.executeCommand("codebuddy.webview.clearCache", "all");
+  });
+
+  const reduceBatchSizeCommand = vscode.commands.registerCommand("codebuddy.reduceBatchSize", async () => {
+    // This will be handled by the webview provider's configuration manager
+    vscode.commands.executeCommand("codebuddy.webview.reduceBatchSize");
+  });
+
+  const pauseIndexingCommand = vscode.commands.registerCommand("codebuddy.pauseIndexing", async () => {
+    // This will be handled by the webview provider's orchestrator
+    vscode.commands.executeCommand("codebuddy.webview.pauseIndexing");
+  });
+
+  const resumeIndexingCommand = vscode.commands.registerCommand("codebuddy.resumeIndexing", async () => {
+    // This will be handled by the webview provider's orchestrator
+    vscode.commands.executeCommand("codebuddy.webview.resumeIndexing");
+  });
+
+  const restartVectorWorkerCommand = vscode.commands.registerCommand("codebuddy.restartVectorWorker", async () => {
+    // This will be handled by the webview provider's vector worker manager
+    vscode.commands.executeCommand("codebuddy.webview.restartWorker");
+  });
+
+  const emergencyStopCommand = vscode.commands.registerCommand("codebuddy.emergencyStop", async () => {
+    // This will be handled by the webview provider's production safeguards
+    vscode.commands.executeCommand("codebuddy.webview.emergencyStop");
+  });
+
+  const resumeFromEmergencyStopCommand = vscode.commands.registerCommand(
+    "codebuddy.resumeFromEmergencyStop",
+    async () => {
+      // This will be handled by the webview provider's production safeguards
+      vscode.commands.executeCommand("codebuddy.webview.resumeFromEmergencyStop");
+    }
+  );
+
+  const optimizePerformanceCommand = vscode.commands.registerCommand("codebuddy.optimizePerformance", async () => {
+    // This will be handled by the webview provider's performance profiler
+    vscode.commands.executeCommand("codebuddy.webview.optimizePerformance");
+  });
+
+  context.subscriptions.push(
+    forceReindexCommand,
+    showStatsCommand,
+    showPerformanceReportCommand,
+    clearVectorCacheCommand,
+    reduceBatchSizeCommand,
+    pauseIndexingCommand,
+    resumeIndexingCommand,
+    restartVectorWorkerCommand,
+    emergencyStopCommand,
+    resumeFromEmergencyStopCommand,
+    optimizePerformanceCommand
+  );
 }
 
 export async function activate(context: vscode.ExtensionContext) {

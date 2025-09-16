@@ -40,6 +40,7 @@ export interface ContextSource {
 export class SmartContextExtractor {
   private logger: Logger;
   private readonly options: Required<SmartContextOptions>;
+  private performanceProfiler?: any; // Will be injected for Phase 5
   private readonly RELEVANCE_RANKING_WEIGHTS = {
     vectorSimilarity: 0.6,
     activeFileBoost: 0.2,
@@ -51,8 +52,10 @@ export class SmartContextExtractor {
     private contextRetriever?: ContextRetriever,
     private codebaseUnderstanding?: CodebaseUnderstandingService,
     private questionClassifier?: QuestionClassifierService,
-    options: SmartContextOptions = {}
+    options: SmartContextOptions = {},
+    performanceProfiler?: any
   ) {
+    this.performanceProfiler = performanceProfiler;
     this.logger = Logger.initialize("SmartContextExtractor", {
       minLevel: LogLevel.INFO,
     });
@@ -78,6 +81,35 @@ export class SmartContextExtractor {
    * Main method for extracting relevant context with vector search capabilities
    */
   async extractRelevantContextWithVector(userQuestion: string, activeFile?: string): Promise<ContextExtractionResult> {
+    const startTime = Date.now();
+
+    try {
+      // Use performance profiler if available
+      if (this.performanceProfiler) {
+        return await this.performanceProfiler.measure("search", async () => {
+          return this.performContextExtraction(userQuestion, activeFile);
+        });
+      }
+
+      return await this.performContextExtraction(userQuestion, activeFile);
+    } catch (error) {
+      this.logger.error("Error in context extraction:", error);
+
+      // Return empty result on error to prevent breaking the flow
+      return {
+        content: "",
+        sources: [],
+        totalTokens: 0,
+        searchMethod: "vector",
+        relevanceScore: 0,
+      };
+    }
+  }
+
+  /**
+   * Core context extraction logic
+   */
+  private async performContextExtraction(userQuestion: string, activeFile?: string): Promise<ContextExtractionResult> {
     const startTime = Date.now();
 
     try {

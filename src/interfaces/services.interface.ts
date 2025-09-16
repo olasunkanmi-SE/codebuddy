@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { IVectorDbSync, SyncStats } from "./vector-db.interface";
 
 /**
  * Interface for Vector Database Service operations
