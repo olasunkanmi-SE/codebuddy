@@ -16,9 +16,12 @@ import { formatText, getAPIKeyAndModel, getGenerativeAiModel } from "../utils/ut
 import { getWebviewContent } from "../webview/chat";
 import { VectorDatabaseService } from "../services/vector-database.service";
 import { VectorDbWorkerManager } from "../services/vector-db-worker-manager";
+import { VectorDbSyncService } from "../services/vector-db-sync.service";
 import { SmartContextExtractor } from "../services/smart-context-extractor";
 import { SmartEmbeddingOrchestrator } from "../services/smart-embedding-orchestrator";
 import { ContextRetriever } from "../services/context-retriever";
+import { UserFeedbackService } from "../services/user-feedback.service";
+import { VectorDbConfigurationManager } from "../config/vector-db.config";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -38,11 +41,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly codebaseUnderstanding: CodebaseUnderstandingService;
   private readonly inputValidator: InputValidator;
 
-  // Vector database components
-  protected readonly vectorDbWorkerManager: VectorDbWorkerManager;
-  protected readonly vectorDatabaseService: VectorDatabaseService;
-  protected readonly smartContextExtractor: SmartContextExtractor;
-  protected readonly smartEmbeddingOrchestrator: SmartEmbeddingOrchestrator;
+  // Vector database services
+  protected vectorDbService?: VectorDatabaseService;
+  protected vectorDbSyncService?: VectorDbSyncService;
+  protected vectorWorkerManager?: VectorDbWorkerManager;
+  protected smartContextExtractor?: SmartContextExtractor;
+  protected smartEmbeddingOrchestrator?: SmartEmbeddingOrchestrator;
+  protected contextRetriever?: ContextRetriever;
+  protected userFeedbackService?: UserFeedbackService;
+  protected configManager?: VectorDbConfigurationManager;
+  protected codeIndexingService?: any; // CodeIndexingService - will be properly typed when available
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -64,45 +72,106 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.codebaseUnderstanding = CodebaseUnderstandingService.getInstance();
     this.inputValidator = InputValidator.getInstance();
 
-    // Initialize vector database components
+    // Initialize vector database components with Phase 4 orchestration
     const { apiKey: geminiApiKey } = getAPIKeyAndModel("Gemini");
-    this.vectorDbWorkerManager = new VectorDbWorkerManager(context);
-    this.vectorDatabaseService = new VectorDatabaseService(context, geminiApiKey);
+
+    // Initialize configuration manager first
+    this.configManager = new VectorDbConfigurationManager();
+
+    // Initialize user feedback service
+    this.userFeedbackService = new UserFeedbackService();
+
+    // Initialize vector services
+    this.vectorWorkerManager = new VectorDbWorkerManager(context);
+    this.vectorDbService = new VectorDatabaseService(context, geminiApiKey);
+
+    // Initialize code indexing service (temporary stub)
+    this.codeIndexingService = this.vectorWorkerManager; // Use worker manager as code indexer for now
+    this.smartEmbeddingOrchestrator = new SmartEmbeddingOrchestrator(
+      context,
+      this.vectorDbService,
+      this.vectorWorkerManager
+    );
+    this.vectorDbSyncService = new VectorDbSyncService(this.vectorDbService, this.codeIndexingService);
     this.smartContextExtractor = new SmartContextExtractor(
-      this.vectorDatabaseService,
-      undefined, // contextRetriever will be set later if needed
+      this.vectorDbService,
+      this.contextRetriever,
       this.codebaseUnderstanding,
       this.questionClassifier
     );
-    this.smartEmbeddingOrchestrator = new SmartEmbeddingOrchestrator(
-      context,
-      this.vectorDatabaseService,
-      this.vectorDbWorkerManager
-    );
+    this.contextRetriever = new ContextRetriever();
 
     // Don't register disposables here - do it lazily when webview is resolved
   }
 
   /**
-   * Initialize vector database components for enhanced context extraction
+   * Initialize vector database components with Phase 4 orchestration
    */
   protected async initializeVectorComponents(): Promise<void> {
     try {
-      this.logger.info("Initializing vector database components...");
+      this.logger.info("Starting Phase 4 vector database orchestration...");
 
-      // Initialize the vector database worker manager
-      await this.vectorDbWorkerManager.initialize();
+      // Phase 4.1: Initialize worker manager (non-blocking architecture)
+      await this.vectorWorkerManager?.initialize();
+      this.logger.info("✓ Vector database worker manager initialized");
 
-      // Initialize the vector database service
-      await this.vectorDatabaseService.initialize();
+      // Phase 4.2: Initialize vector database service
+      await this.vectorDbService?.initialize();
+      this.logger.info("✓ Vector database service initialized");
 
-      // Start the smart embedding orchestrator for background processing
-      await this.smartEmbeddingOrchestrator.initialize();
+      // Phase 4.3: Start smart embedding orchestrator (multi-phase strategy)
+      await this.smartEmbeddingOrchestrator?.initialize();
+      this.logger.info("✓ Smart embedding orchestrator started");
 
-      this.logger.info("Vector database components initialized successfully");
+      // Phase 4.4: Initialize sync service for real-time file monitoring
+      await this.vectorDbSyncService?.initialize();
+      this.logger.info("✓ Vector database sync service initialized");
+
+      // Phase 4.5: Trigger immediate embedding phase for essential files
+      await this.executeImmediateEmbeddingPhase();
+      this.logger.info("✓ Immediate embedding phase completed");
+
+      this.logger.info("🚀 Phase 4 vector database orchestration completed successfully");
     } catch (error) {
-      this.logger.error("Failed to initialize vector database components", error);
-      // Don't throw - continue with fallback functionality
+      this.logger.error("Failed to initialize Phase 4 orchestration:", error);
+      // Continue with graceful degradation
+      await this.handleVectorInitializationError(error);
+    }
+  }
+
+  /**
+   * Execute immediate embedding phase for essential files
+   */
+  private async executeImmediateEmbeddingPhase(): Promise<void> {
+    try {
+      // The orchestrator's initialize method handles the immediate phase internally
+      // No need to call it separately - it's already handled in the orchestrator initialization
+
+      // Show user feedback
+      vscode.window.setStatusBarMessage("$(check) CodeBuddy: Essential files indexed and ready", 5000);
+    } catch (error) {
+      this.logger.warn("Immediate embedding phase failed, continuing with fallback:", error);
+    }
+  }
+
+  /**
+   * Handle vector database initialization errors gracefully
+   */
+  private async handleVectorInitializationError(error: any): Promise<void> {
+    this.logger.warn("Vector database initialization failed, enabling fallback mode");
+
+    // Show user notification
+    const action = await vscode.window.showWarningMessage(
+      "Vector database initialization failed. CodeBuddy will use keyword-based search as fallback.",
+      "Retry",
+      "Continue"
+    );
+
+    if (action === "Retry") {
+      // Retry initialization after a delay
+      setTimeout(() => {
+        this.initializeVectorComponents();
+      }, 10000);
     }
   }
 
@@ -419,12 +488,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       let fallbackContext = "";
 
       try {
-        const vectorResult = await this.smartContextExtractor.extractRelevantContextWithVector(
+        const vectorResult = await this.smartContextExtractor?.extractRelevantContextWithVector(
           message,
           vscode.window.activeTextEditor?.document.fileName
         );
 
-        if (vectorResult.content && vectorResult.sources.length > 0) {
+        if (vectorResult?.content && vectorResult.sources.length > 0) {
           vectorContext = `\n**Semantic Context** (${vectorResult.searchMethod} search results):\n${vectorResult.sources
             .map(
               (source) =>
@@ -475,7 +544,7 @@ IMPORTANT: Please provide a complete response. Do not truncate your answer mid-s
     // Dispose vector database components
     try {
       this.smartEmbeddingOrchestrator?.dispose();
-      this.vectorDbWorkerManager?.dispose();
+      this.vectorWorkerManager?.dispose();
     } catch (error) {
       this.logger.error("Error disposing vector database components", error);
     }
