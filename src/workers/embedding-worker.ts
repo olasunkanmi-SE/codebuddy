@@ -45,7 +45,10 @@ if (!isMainThread && parentPort) {
         try {
           parentPort?.postMessage({ success: true, data: "pong" });
         } catch (error) {
-          parentPort?.postMessage({ success: false, error: formatError(error) });
+          parentPort?.postMessage({
+            success: false,
+            error: formatError(error),
+          });
         }
         break;
 
@@ -54,7 +57,10 @@ if (!isMainThread && parentPort) {
           const result = await generateEmbeddingsInWorker(task.payload);
           parentPort?.postMessage({ success: true, data: result });
         } catch (error) {
-          parentPort?.postMessage({ success: false, error: formatError(error) });
+          parentPort?.postMessage({
+            success: false,
+            error: formatError(error),
+          });
         }
         break;
 
@@ -63,7 +69,10 @@ if (!isMainThread && parentPort) {
           const batchResult = await processBatchInWorker(task.payload);
           parentPort?.postMessage({ success: true, data: batchResult });
         } catch (error) {
-          parentPort?.postMessage({ success: false, error: formatError(error) });
+          parentPort?.postMessage({
+            success: false,
+            error: formatError(error),
+          });
         }
         break;
 
@@ -90,7 +99,9 @@ if (!isMainThread && parentPort) {
   /**
    * Process a batch of function data in worker thread
    */
-  async function processBatchInWorker(batch: IFunctionData[]): Promise<IFunctionData[]> {
+  async function processBatchInWorker(
+    batch: IFunctionData[],
+  ): Promise<IFunctionData[]> {
     const results: IFunctionData[] = [];
 
     for (let i = 0; i < batch.length; i++) {
@@ -114,7 +125,10 @@ if (!isMainThread && parentPort) {
         // Small delay to prevent overwhelming the API
         await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`Failed to process item ${item.name || item.path || "unknown"}:`, error);
+        console.error(
+          `Failed to process item ${item.name || item.path || "unknown"}:`,
+          error,
+        );
         // Continue with next item
       }
     }
@@ -133,7 +147,7 @@ export class WorkerEmbeddingService {
 
   constructor(
     private readonly apiKey: string,
-    private readonly options: EmbeddingWorkerOptions = {}
+    private readonly options: EmbeddingWorkerOptions = {},
   ) {
     this.maxWorkers = Math.min(4, require("os").cpus().length);
   }
@@ -152,7 +166,11 @@ export class WorkerEmbeddingService {
     }
 
     // Test workers
-    await Promise.all(this.workers.map((worker) => this.sendTaskToWorker(worker, { type: "ping", payload: null })));
+    await Promise.all(
+      this.workers.map((worker) =>
+        this.sendTaskToWorker(worker, { type: "ping", payload: null }),
+      ),
+    );
   }
 
   /**
@@ -173,7 +191,11 @@ export class WorkerEmbeddingService {
    */
   async processFunctions(
     data: IFunctionData[],
-    progressCallback?: (progress: number, completed: number, total: number) => void
+    progressCallback?: (
+      progress: number,
+      completed: number,
+      total: number,
+    ) => void,
   ): Promise<IFunctionData[]> {
     const batchSize = this.options.batchSize || 10;
     const batches = this.chunkArray(data, batchSize);
@@ -186,8 +208,13 @@ export class WorkerEmbeddingService {
       // Set up progress listener for this worker
       const progressListener = (message: WorkerResponse) => {
         if (message.progress !== undefined && progressCallback) {
-          const overallProgress = ((index + message.progress / 100) / batches.length) * 100;
-          progressCallback(overallProgress, message.data?.completed || 0, message.data?.total || batch.length);
+          const overallProgress =
+            ((index + message.progress / 100) / batches.length) * 100;
+          progressCallback(
+            overallProgress,
+            message.data?.completed || 0,
+            message.data?.total || batch.length,
+          );
         }
       };
 
@@ -214,7 +241,10 @@ export class WorkerEmbeddingService {
   /**
    * Send task to worker and wait for response
    */
-  private async sendTaskToWorker(worker: Worker, task: WorkerTask): Promise<WorkerResponse> {
+  private async sendTaskToWorker(
+    worker: Worker,
+    task: WorkerTask,
+  ): Promise<WorkerResponse> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error("Worker timeout"));

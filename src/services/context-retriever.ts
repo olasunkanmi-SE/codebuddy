@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
 import { Orchestrator } from "../agents/orchestrator";
-import { IFileToolConfig, IFileToolResponse } from "../application/interfaces/agent.interface";
+import {
+  IFileToolConfig,
+  IFileToolResponse,
+} from "../application/interfaces/agent.interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { getAPIKeyAndModel, getGenerativeAiModel } from "./../utils/utils";
 import { EmbeddingService } from "./embedding";
@@ -51,7 +54,9 @@ export class ContextRetriever {
   //   }
   // }
 
-  async readFiles(fileConfigs: IFileToolConfig[]): Promise<IFileToolResponse[]> {
+  async readFiles(
+    fileConfigs: IFileToolConfig[],
+  ): Promise<IFileToolResponse[]> {
     const files = fileConfigs.flatMap((file) => file);
     const promises = files.map(async (file) => {
       try {
@@ -65,7 +70,9 @@ export class ContextRetriever {
       }
     });
     const results = await Promise.all(promises);
-    return results.filter((result): result is IFileToolResponse => result !== undefined);
+    return results.filter(
+      (result): result is IFileToolResponse => result !== undefined,
+    );
   }
 
   async readFileContent(filePath: string): Promise<string> {

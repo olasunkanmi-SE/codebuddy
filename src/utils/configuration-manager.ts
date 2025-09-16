@@ -42,7 +42,10 @@ export class ConfigurationManager {
    * Get current chat model API key and provider
    */
   getChatApiKey(): { apiKey: string; provider: string } {
-    const currentModel = this.getConfig<string>("generativeAi.option", "Gemini");
+    const currentModel = this.getConfig<string>(
+      "generativeAi.option",
+      "Gemini",
+    );
     const { apiKey } = getAPIKeyAndModel(currentModel);
     return { apiKey, provider: currentModel };
   }
@@ -51,7 +54,10 @@ export class ConfigurationManager {
    * Get embedding model configuration
    */
   getEmbeddingModel(): string {
-    return this.getConfig<string>("codebuddy.embeddingModel", "gemini-2.0-flash");
+    return this.getConfig<string>(
+      "codebuddy.embeddingModel",
+      "gemini-2.0-flash",
+    );
   }
 
   /**
@@ -65,7 +71,10 @@ export class ConfigurationManager {
   } {
     return {
       enabled: this.getConfig<boolean>("codebuddy.vectorDb.enabled", true),
-      chromaUrl: this.getConfig<string>("codebuddy.vectorDb.chromaUrl", "http://localhost:8000"),
+      chromaUrl: this.getConfig<string>(
+        "codebuddy.vectorDb.chromaUrl",
+        "http://localhost:8000",
+      ),
       maxResults: this.getConfig<number>("codebuddy.vectorDb.maxResults", 10),
       batchSize: this.getConfig<number>("codebuddy.vectorDb.batchSize", 50),
     };

@@ -24,7 +24,9 @@ export class VectorServiceFactory {
   /**
    * Create VectorDatabaseService with proper configuration
    */
-  createVectorDatabaseService(context: vscode.ExtensionContext): VectorDatabaseService {
+  createVectorDatabaseService(
+    context: vscode.ExtensionContext,
+  ): VectorDatabaseService {
     const { apiKey } = this.configManager.getEmbeddingApiKey();
 
     if (!apiKey) {
@@ -50,7 +52,9 @@ export class VectorServiceFactory {
   /**
    * Create VectorDbWorkerManager with proper configuration
    */
-  createVectorDbWorkerManager(context: vscode.ExtensionContext): VectorDbWorkerManager {
+  createVectorDbWorkerManager(
+    context: vscode.ExtensionContext,
+  ): VectorDbWorkerManager {
     const vectorDbConfig = this.configManager.getVectorDbConfig();
     const workerConfig = this.configManager.getWorkerConfig();
 
@@ -87,7 +91,7 @@ export class VectorServiceFactory {
     if (!apiKey) {
       throw new Error(
         "Gemini API key is required for vector database functionality. " +
-          "Please configure 'google.gemini.apiKeys' in VS Code settings."
+          "Please configure 'google.gemini.apiKeys' in VS Code settings.",
       );
     }
 
@@ -117,8 +121,12 @@ export class VectorServiceFactory {
    */
   getServiceConfiguration(): {
     embeddingConfig: ReturnType<typeof getEmbeddingConfig>;
-    vectorDbConfig: ReturnType<typeof VectorServiceFactory.prototype.configManager.getVectorDbConfig>;
-    workerConfig: ReturnType<typeof VectorServiceFactory.prototype.configManager.getWorkerConfig>;
+    vectorDbConfig: ReturnType<
+      typeof VectorServiceFactory.prototype.configManager.getVectorDbConfig
+    >;
+    workerConfig: ReturnType<
+      typeof VectorServiceFactory.prototype.configManager.getWorkerConfig
+    >;
   } {
     return {
       embeddingConfig: getEmbeddingConfig(),

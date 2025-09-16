@@ -8,7 +8,13 @@ import { Worker, isMainThread, parentPort, workerData } from "worker_threads";
 
 // Types for worker communication
 export interface VectorWorkerTask {
-  type: "initialize" | "indexSnippets" | "semanticSearch" | "deleteByFile" | "clearAll" | "getStats";
+  type:
+    | "initialize"
+    | "indexSnippets"
+    | "semanticSearch"
+    | "deleteByFile"
+    | "clearAll"
+    | "getStats";
   payload: any;
 }
 
@@ -50,7 +56,10 @@ if (!isMainThread && parentPort) {
       switch (task.type) {
         case "initialize":
           await initializeInWorker(task.payload);
-          parentPort?.postMessage({ success: true, data: { initialized: true } });
+          parentPort?.postMessage({
+            success: true,
+            data: { initialized: true },
+          });
           break;
 
         case "indexSnippets":
@@ -95,7 +104,9 @@ if (!isMainThread && parentPort) {
   /**
    * Initialize ChromaDB in worker thread
    */
-  async function initializeInWorker(config: { chromaUrl?: string }): Promise<void> {
+  async function initializeInWorker(config: {
+    chromaUrl?: string;
+  }): Promise<void> {
     // Dynamic import of ChromaDB
     const { ChromaClient } = await import("chromadb");
     chroma = new ChromaClient({
@@ -119,7 +130,9 @@ if (!isMainThread && parentPort) {
   /**
    * Index code snippets in worker thread
    */
-  async function indexSnippetsInWorker(snippets: CodeSnippet[]): Promise<{ indexed: number }> {
+  async function indexSnippetsInWorker(
+    snippets: CodeSnippet[],
+  ): Promise<{ indexed: number }> {
     if (!isInitialized || !collection) {
       throw new Error("Vector database not initialized");
     }
@@ -142,7 +155,9 @@ if (!isMainThread && parentPort) {
       }));
 
       // Filter out items without embeddings
-      const validIndices = embeddings.map((emb, idx) => (emb.length > 0 ? idx : -1)).filter((idx) => idx !== -1);
+      const validIndices = embeddings
+        .map((emb, idx) => (emb.length > 0 ? idx : -1))
+        .filter((idx) => idx !== -1);
 
       if (validIndices.length > 0) {
         await collection.add({
@@ -249,7 +264,10 @@ if (!isMainThread && parentPort) {
   /**
    * Get database statistics in worker thread
    */
-  function getStatsInWorker(): { isInitialized: boolean; collectionName?: string } {
+  function getStatsInWorker(): {
+    isInitialized: boolean;
+    collectionName?: string;
+  } {
     return {
       isInitialized,
       collectionName: isInitialized ? collectionName : undefined,
@@ -266,7 +284,7 @@ export class WorkerVectorDatabaseService {
 
   constructor(
     private extensionPath: string,
-    private chromaUrl?: string
+    private chromaUrl?: string,
   ) {}
 
   /**
@@ -296,7 +314,11 @@ export class WorkerVectorDatabaseService {
    */
   async indexCodeSnippets(
     snippets: CodeSnippet[],
-    progressCallback?: (progress: number, indexed: number, total: number) => void
+    progressCallback?: (
+      progress: number,
+      indexed: number,
+      total: number,
+    ) => void,
   ): Promise<void> {
     if (!this.isInitialized || !this.worker) {
       throw new Error("Vector database not initialized");
@@ -306,7 +328,11 @@ export class WorkerVectorDatabaseService {
     if (progressCallback) {
       const progressListener = (message: VectorWorkerResponse) => {
         if (message.progress !== undefined && message.data) {
-          progressCallback(message.progress, message.data.indexed || 0, message.data.total || snippets.length);
+          progressCallback(
+            message.progress,
+            message.data.indexed || 0,
+            message.data.total || snippets.length,
+          );
         }
       };
 
@@ -334,7 +360,7 @@ export class WorkerVectorDatabaseService {
   async semanticSearch(
     queryEmbedding: number[],
     nResults: number = 10,
-    filterOptions?: Record<string, any>
+    filterOptions?: Record<string, any>,
   ): Promise<SearchResult[]> {
     if (!this.isInitialized || !this.worker) {
       throw new Error("Vector database not initialized");
@@ -382,14 +408,18 @@ export class WorkerVectorDatabaseService {
   getStats(): { isInitialized: boolean; collectionName?: string } {
     return {
       isInitialized: this.isInitialized,
-      collectionName: this.isInitialized ? "codebuddy-code-snippets" : undefined,
+      collectionName: this.isInitialized
+        ? "codebuddy-code-snippets"
+        : undefined,
     };
   }
 
   /**
    * Send task to worker and wait for response
    */
-  private async sendTaskToWorker(task: VectorWorkerTask): Promise<VectorWorkerResponse> {
+  private async sendTaskToWorker(
+    task: VectorWorkerTask,
+  ): Promise<VectorWorkerResponse> {
     if (!this.worker) {
       throw new Error("Worker not initialized");
     }

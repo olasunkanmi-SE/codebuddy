@@ -23,8 +23,12 @@ interface IRerankingConfig {
 export class UrlReranker {
   private static readonly CONFIG: IRerankingConfig = URL_RERANKING_CONFIG;
   private static readonly KEYWORDS: string[] = RELEVANT_CODING_KEY_WORDS;
-  private static readonly WEBSITE_REPUTATIONS: Record<string, number> = REPUTATION_RANK_MAP;
-  private static readonly CATEGORIES: Record<string, { type: string; score: number }> = URL_CATEGORIES;
+  private static readonly WEBSITE_REPUTATIONS: Record<string, number> =
+    REPUTATION_RANK_MAP;
+  private static readonly CATEGORIES: Record<
+    string,
+    { type: string; score: number }
+  > = URL_CATEGORIES;
   private readonly groqLLM: GroqLLM;
   private static instance: UrlReranker;
   query: string;
@@ -36,7 +40,8 @@ export class UrlReranker {
     const { apiKey, model } = getAPIKeyAndModel(currentModel);
 
     // For URL reranking, prefer Groq if available, otherwise fallback to current selection
-    const rerankerModel = currentModel.toLowerCase() === "groq" ? currentModel : "Groq";
+    const rerankerModel =
+      currentModel.toLowerCase() === "groq" ? currentModel : "Groq";
     const { apiKey: rerankerApiKey } = getAPIKeyAndModel(rerankerModel);
 
     this.groqLLM = GroqLLM.getInstance({
@@ -69,7 +74,9 @@ export class UrlReranker {
   private calculateTitleRelevanceScore(title: string): number {
     if (!title) return 0;
 
-    const matches = UrlReranker.KEYWORDS.filter((keyword) => title.toLowerCase().includes(keyword.toLowerCase()));
+    const matches = UrlReranker.KEYWORDS.filter((keyword) =>
+      title.toLowerCase().includes(keyword.toLowerCase()),
+    );
 
     return matches.length / UrlReranker.KEYWORDS.length;
   }
@@ -83,7 +90,10 @@ export class UrlReranker {
     const hostname = this.extractHostname(metadata);
     const domain = hostname.split(".").slice(-2).join(".");
 
-    return UrlReranker.WEBSITE_REPUTATIONS[domain] || UrlReranker.WEBSITE_REPUTATIONS.default;
+    return (
+      UrlReranker.WEBSITE_REPUTATIONS[domain] ||
+      UrlReranker.WEBSITE_REPUTATIONS.default
+    );
   }
 
   /**
@@ -95,7 +105,9 @@ export class UrlReranker {
     if (!metadata.content) return 0;
 
     const codeBlockCount = this.countCodeBlocks(metadata.content);
-    const hasAdequateExplanation = this.hasAdequateExplanation(metadata.content);
+    const hasAdequateExplanation = this.hasAdequateExplanation(
+      metadata.content,
+    );
 
     return codeBlockCount + (hasAdequateExplanation ? 1 : 0);
   }
@@ -126,7 +138,9 @@ export class UrlReranker {
    * @returns Final score for reranking
    */
   calculateFinalScore(metadata: IPageMetada): number {
-    const titleRelevanceScore = this.calculateTitleRelevanceScore(metadata.title ?? "");
+    const titleRelevanceScore = this.calculateTitleRelevanceScore(
+      metadata.title ?? "",
+    );
     const reputationScore = this.calculateSourceReputationScore(metadata);
     const contentQualityScore = this.calculateContentQualityScore(metadata);
     const diversityScore = this.calculateDiversityScore(metadata);

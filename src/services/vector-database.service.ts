@@ -42,7 +42,7 @@ export class VectorDatabaseService {
 
   constructor(
     private context: vscode.ExtensionContext,
-    private geminiApiKey?: string
+    private geminiApiKey?: string,
   ) {
     this.logger = Logger.initialize("VectorDatabaseService", {
       minLevel: LogLevel.INFO,
@@ -55,7 +55,9 @@ export class VectorDatabaseService {
     }
 
     if (!this.geminiApiKey) {
-      this.logger.warn("Gemini API key not found. Vector database will be disabled.");
+      this.logger.warn(
+        "Gemini API key not found. Vector database will be disabled.",
+      );
     } else {
       this.embeddingService = new EmbeddingService(this.geminiApiKey);
     }
@@ -75,7 +77,9 @@ export class VectorDatabaseService {
   async initialize(): Promise<void> {
     try {
       if (!this.geminiApiKey) {
-        throw new Error("Gemini API key is required for vector database initialization");
+        throw new Error(
+          "Gemini API key is required for vector database initialization",
+        );
       }
 
       // Validate ChromaDB availability with better error handling
@@ -134,7 +138,9 @@ export class VectorDatabaseService {
       for (const snippet of snippets) {
         try {
           // Use Gemini embedding service for consistency
-          const embedding = await embeddingService.generateEmbedding(snippet.content);
+          const embedding = await embeddingService.generateEmbedding(
+            snippet.content,
+          );
 
           embeddings.push(embedding);
           ids.push(snippet.id);
@@ -146,7 +152,10 @@ export class VectorDatabaseService {
             ...snippet.metadata,
           });
         } catch (error) {
-          this.logger.error(`Failed to generate embedding for snippet ${snippet.id}:`, error);
+          this.logger.error(
+            `Failed to generate embedding for snippet ${snippet.id}:`,
+            error,
+          );
           // Continue with other snippets
         }
       }
@@ -168,9 +177,12 @@ export class VectorDatabaseService {
       this.stats.documentCount = await collection.count();
       this.stats.lastSync = new Date().toISOString();
 
-      this.logger.info(`Successfully indexed ${embeddings.length} code snippets`, {
-        totalDocuments: this.stats.documentCount,
-      });
+      this.logger.info(
+        `Successfully indexed ${embeddings.length} code snippets`,
+        {
+          totalDocuments: this.stats.documentCount,
+        },
+      );
     } catch (error) {
       this.logger.error("Failed to index code snippets:", error);
       throw error;
@@ -182,7 +194,9 @@ export class VectorDatabaseService {
    */
   async semanticSearch(query: string, limit = 5): Promise<SearchResult[]> {
     if (!this.isReady()) {
-      this.logger.warn("Vector database not initialized, returning empty results");
+      this.logger.warn(
+        "Vector database not initialized, returning empty results",
+      );
       return [];
     }
 
@@ -221,7 +235,9 @@ export class VectorDatabaseService {
         }
       }
 
-      this.logger.debug(`Semantic search returned ${searchResults.length} results for query: "${query}"`);
+      this.logger.debug(
+        `Semantic search returned ${searchResults.length} results for query: "${query}"`,
+      );
       return searchResults;
     } catch (error) {
       this.logger.error("Semantic search failed:", error);
@@ -251,10 +267,15 @@ export class VectorDatabaseService {
         });
 
         this.stats.documentCount = await collection.count();
-        this.logger.info(`Deleted ${results.ids.length} documents for file: ${filePath}`);
+        this.logger.info(
+          `Deleted ${results.ids.length} documents for file: ${filePath}`,
+        );
       }
     } catch (error) {
-      this.logger.error(`Failed to delete documents for file ${filePath}:`, error);
+      this.logger.error(
+        `Failed to delete documents for file ${filePath}:`,
+        error,
+      );
     }
   }
 
@@ -325,9 +346,14 @@ export class VectorDatabaseService {
   /**
    * Assert that the service is ready and return non-null references
    */
-  private assertReady(): { collection: Collection; embeddingService: EmbeddingService } {
+  private assertReady(): {
+    collection: Collection;
+    embeddingService: EmbeddingService;
+  } {
     if (!this.isReady()) {
-      throw new Error("Vector database not initialized or Gemini API key missing");
+      throw new Error(
+        "Vector database not initialized or Gemini API key missing",
+      );
     }
     return {
       collection: this.collection!,
@@ -359,7 +385,10 @@ export class VectorDatabaseService {
         Error details: ${error instanceof Error ? error.message : String(error)}
       `.trim();
 
-      this.logger.error("ChromaDB dependency validation failed", { error, nodeVersion: process.version });
+      this.logger.error("ChromaDB dependency validation failed", {
+        error,
+        nodeVersion: process.version,
+      });
       throw new Error(errorMessage);
     }
   }
