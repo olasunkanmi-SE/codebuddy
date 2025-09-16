@@ -317,8 +317,12 @@ export class UserFeedbackService implements vscode.Disposable {
 
     this.showStatusMessage(`$(search) ${message}`, 2000);
 
-    if (this.options.enableToastNotifications && searchTime > 2000) {
-      // Show warning if search is slow
+    // Configurable threshold for slow search warning
+    const slowSearchThreshold = vscode.workspace
+      .getConfiguration("codebuddy.vectorDb")
+      .get("slowSearchThreshold", 2000); // Default 2 seconds
+
+    if (this.options.enableToastNotifications && searchTime > slowSearchThreshold) {
       this.showWarning(`Search took ${searchTime}ms - consider reindexing for better performance`);
     }
   }

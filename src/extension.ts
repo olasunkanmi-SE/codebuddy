@@ -103,10 +103,12 @@ async function initializeVectorDatabaseOrchestration(context: vscode.ExtensionCo
     vscode.window.setStatusBarMessage("$(check) CodeBuddy: Vector database orchestration ready", 5000);
 
     console.log("🎉 Phase 4 Vector Database Orchestration completed successfully");
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to initialize Phase 4 orchestration:", error);
-    // Show user-friendly error message
-    vscode.window.showWarningMessage("CodeBuddy: Vector database initialization failed. Using fallback search mode.");
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    vscode.window.showWarningMessage(
+      `CodeBuddy: Vector database initialization failed: ${errorMessage}. Using fallback search mode.`
+    );
   }
 }
 
@@ -133,7 +135,8 @@ function registerVectorDatabaseCommands(context: vscode.ExtensionContext): void 
         await vectorDbSyncService.performFullReindex();
         vscode.window.showInformationMessage("Full reindex completed successfully");
       } catch (error) {
-        vscode.window.showErrorMessage(`Reindex failed: ${error}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Reindex failed: ${errorMessage}`);
       }
     }
   });
@@ -173,7 +176,8 @@ export async function activate(context: vscode.ExtensionContext) {
       await persistentCodebaseService.initialize();
       console.log("Persistent codebase understanding service initialized");
     } catch (error) {
-      console.warn("Failed to initialize persistent codebase service:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(`Failed to initialize persistent codebase service: ${errorMessage}`, error);
     }
 
     // Phase 4: Initialize Vector Database Orchestration
