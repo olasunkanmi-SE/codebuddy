@@ -69,19 +69,34 @@ export class EmbeddingService {
         };
       }
 
-      // Generate embeddings using worker
-      const embeddings = await this.generateEmbeddingsWithRetry(
-        filePath,
-        content,
-        retryCount,
-      );
+      // Create code snippets first (these may be multiple chunks)
+      const codeChunks = await this.createCodeSnippets(filePath, content, []);
 
-      // Create code snippets
-      const snippets = await this.createCodeSnippets(
-        filePath,
-        content,
-        embeddings,
-      );
+      // Generate embeddings for each chunk
+      const snippets: CodeSnippet[] = [];
+      for (const chunk of codeChunks) {
+        try {
+          const embedding = await this.generateEmbeddingsWithRetry(
+            filePath,
+            chunk.content,
+            retryCount,
+          );
+
+          snippets.push({
+            ...chunk,
+            metadata: {
+              ...chunk.metadata,
+              embedding,
+            },
+          });
+        } catch (error) {
+          this.logger.warn(
+            `Failed to generate embedding for chunk ${chunk.id}:`,
+            error,
+          );
+          // Continue with other chunks
+        }
+      }
 
       // Index in vector database
       if (snippets.length > 0) {
@@ -262,31 +277,233 @@ export class EmbeddingService {
   private async createCodeSnippets(
     filePath: string,
     content: string,
-    embeddings: number[],
+    _embeddings?: number[], // Deprecated parameter, kept for compatibility
   ): Promise<CodeSnippet[]> {
-    // For now, create a single snippet for the entire file
-    // In the future, this could be enhanced to parse functions/classes
+    const language = this.getLanguageFromPath(filePath);
     const lines = content.split("\n");
 
-    return [
-      {
-        id: `file::${filePath}::${Date.now()}`,
+    // Try intelligent chunking first for supported languages
+    if (language === "typescript" || language === "javascript") {
+      try {
+        const intelligentChunks = await this.createIntelligentChunks(
+          filePath,
+          content,
+        );
+        if (intelligentChunks.length > 0) {
+          return intelligentChunks;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Intelligent chunking failed for ${filePath}, falling back to basic chunking:`,
+          error,
+        );
+      }
+    }
+
+    // Fallback to improved basic chunking for unsupported languages or parsing failures
+    return this.createBasicChunks(filePath, content, lines);
+  }
+
+  /**
+   * Create intelligent code chunks based on AST parsing
+   */
+  private async createIntelligentChunks(
+    filePath: string,
+    content: string,
+  ): Promise<CodeSnippet[]> {
+    const chunks: CodeSnippet[] = [];
+    const language = this.getLanguageFromPath(filePath);
+
+    try {
+      // Parse TypeScript/JavaScript code to extract functions, classes, interfaces
+      const ts = await import("typescript");
+      const sourceFile = ts.createSourceFile(
         filePath,
-        type: "module" as const,
-        name: FileUtils.getRelativePath(filePath),
-        content:
-          content.length > 2000 ? content.substring(0, 2000) + "..." : content,
+        content,
+        ts.ScriptTarget.Latest,
+        true,
+      );
+
+      let chunkIndex = 0;
+
+      const visitNode = (node: any, parentName?: string) => {
+        const start = node.getStart();
+        const end = node.getEnd();
+        const nodeText = content.slice(start, end).trim();
+
+        if (nodeText.length < 10) return; // Skip very small nodes
+
+        let chunkInfo: { type: string; name: string; content: string } | null =
+          null;
+
+        // Extract functions
+        if (
+          ts.isFunctionDeclaration(node) ||
+          ts.isMethodDeclaration(node) ||
+          ts.isArrowFunction(node)
+        ) {
+          const name = node.name ? node.name.getText() : "anonymous";
+          chunkInfo = {
+            type: "function",
+            name: parentName ? `${parentName}.${name}` : name,
+            content: nodeText,
+          };
+        }
+        // Extract classes
+        else if (ts.isClassDeclaration(node)) {
+          const name = node.name ? node.name.getText() : "Anonymous";
+          chunkInfo = {
+            type: "class",
+            name,
+            content: nodeText,
+          };
+        }
+        // Extract interfaces
+        else if (ts.isInterfaceDeclaration(node)) {
+          const name = node.name.getText();
+          chunkInfo = {
+            type: "interface",
+            name,
+            content: nodeText,
+          };
+        }
+        // Extract type aliases
+        else if (ts.isTypeAliasDeclaration(node)) {
+          const name = node.name.getText();
+          chunkInfo = {
+            type: "type",
+            name,
+            content: nodeText,
+          };
+        }
+        // Extract enums
+        else if (ts.isEnumDeclaration(node)) {
+          const name = node.name.getText();
+          chunkInfo = {
+            type: "enum",
+            name,
+            content: nodeText,
+          };
+        }
+
+        if (
+          chunkInfo &&
+          chunkInfo.content.length >= 50 &&
+          chunkInfo.content.length <= 2000
+        ) {
+          const startLine =
+            sourceFile.getLineAndCharacterOfPosition(start).line + 1;
+          const endLine =
+            sourceFile.getLineAndCharacterOfPosition(end).line + 1;
+
+          chunks.push({
+            id: `${chunkInfo.type}::${filePath}::${chunkInfo.name}::${chunkIndex++}`,
+            filePath,
+            type: chunkInfo.type as any,
+            name: chunkInfo.name,
+            content: chunkInfo.content,
+            metadata: {
+              language,
+              startLine,
+              endLine,
+              chunkSize: chunkInfo.content.length,
+              parentContext: parentName,
+              lastModified: new Date().toISOString(),
+            },
+          });
+        }
+
+        // Recursively visit child nodes for classes
+        if (ts.isClassDeclaration(node)) {
+          const className = node.name ? node.name.getText() : "Anonymous";
+          ts.forEachChild(node, (child) => visitNode(child, className));
+        } else {
+          ts.forEachChild(node, (child) => visitNode(child, parentName));
+        }
+      };
+
+      ts.forEachChild(sourceFile, visitNode);
+
+      this.logger.debug(
+        `Intelligent chunking created ${chunks.length} chunks for ${FileUtils.getRelativePath(filePath)}`,
+      );
+      return chunks;
+    } catch (error) {
+      this.logger.warn(`AST parsing failed for ${filePath}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create basic chunks when intelligent parsing fails or isn't supported
+   */
+  private createBasicChunks(
+    filePath: string,
+    content: string,
+    lines: string[],
+  ): CodeSnippet[] {
+    const language = this.getLanguageFromPath(filePath);
+    const chunks: CodeSnippet[] = [];
+
+    // For basic chunking, split by logical sections
+    const maxChunkSize = 1500;
+    const overlapSize = 100;
+
+    if (content.length <= maxChunkSize) {
+      // Small file - create single chunk
+      return [
+        {
+          id: `module::${filePath}::0`,
+          filePath,
+          type: "module",
+          name: FileUtils.getRelativePath(filePath),
+          content,
+          metadata: {
+            language,
+            fileSize: content.length,
+            lineCount: lines.length,
+            startLine: 1,
+            endLine: lines.length,
+            lastModified: new Date().toISOString(),
+          },
+        },
+      ];
+    }
+
+    // Split into overlapping chunks for large files
+    let chunkIndex = 0;
+    for (let i = 0; i < content.length; i += maxChunkSize - overlapSize) {
+      const chunkContent = content.slice(
+        i,
+        Math.min(i + maxChunkSize, content.length),
+      );
+      const startLine = content.slice(0, i).split("\n").length;
+      const endLine = content
+        .slice(0, i + chunkContent.length)
+        .split("\n").length;
+
+      chunks.push({
+        id: `chunk::${filePath}::${chunkIndex++}`,
+        filePath,
+        type: "module",
+        name: `${FileUtils.getRelativePath(filePath)} (chunk ${chunkIndex})`,
+        content: chunkContent,
         metadata: {
-          language: this.getLanguageFromPath(filePath),
-          fileSize: content.length,
-          lineCount: lines.length,
-          startLine: 1,
-          endLine: lines.length,
-          embedding: embeddings,
+          language,
+          chunkIndex: chunkIndex - 1,
+          startLine,
+          endLine,
+          chunkSize: chunkContent.length,
+          isPartialChunk: true,
           lastModified: new Date().toISOString(),
         },
-      },
-    ];
+      });
+    }
+
+    this.logger.debug(
+      `Basic chunking created ${chunks.length} chunks for ${FileUtils.getRelativePath(filePath)}`,
+    );
+    return chunks;
   }
 
   private getLanguageFromPath(filePath: string): string {

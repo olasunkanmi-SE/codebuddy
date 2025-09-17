@@ -214,12 +214,16 @@ async function initializeVectorDatabaseOrchestration(
     console.log("🚀 Starting Phase 4 Vector Database Orchestration...");
 
     // Get Gemini API key for consistent embeddings
-    const { apiKey: geminiApiKey } = getAPIKeyAndModel("Gemini");
-    if (!geminiApiKey) {
+    let geminiApiKey: string | undefined;
+    try {
+      const result = getAPIKeyAndModel("Gemini");
+      geminiApiKey = result.apiKey;
+    } catch (error) {
       console.warn(
-        "Gemini API key not found, skipping vector database initialization",
+        "Gemini API key not found, vector database will use fallback mode:",
+        error instanceof Error ? error.message : String(error),
       );
-      return;
+      // Continue without API key - vector database can still work with SimpleVectorStore fallback
     }
 
     // Initialize worker manager for non-blocking operations
@@ -829,8 +833,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     agentEventEmmitter = new EventEmitter();
 
-    // ⚡ EARLY: Register vector database commands before webview providers need them
-    registerVectorDatabaseCommands(context);
+    // Vector database commands are already registered in initializePhase4Orchestration
+    // No need to register them again here
 
     // ⚡ DEFER: Initialize WebView providers lazily
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");

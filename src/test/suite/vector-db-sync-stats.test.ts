@@ -25,7 +25,10 @@ suite("VectorDbSyncService - Statistics Tracking", () => {
       generateEmbeddings: async () => [],
     };
 
-    vectorDbSyncService = new VectorDbSyncService(mockVectorDb, mockCodeIndexer);
+    vectorDbSyncService = new VectorDbSyncService(
+      mockVectorDb,
+      mockCodeIndexer,
+    );
   });
 
   teardown(() => {
@@ -46,9 +49,21 @@ suite("VectorDbSyncService - Statistics Tracking", () => {
     const stats = vectorDbSyncService.getStats();
 
     // Initially all stats should be zero/null
-    assert.strictEqual(stats.syncOperations, 0, "Sync operations should start at 0");
-    assert.strictEqual(stats.lastSync, null, "Last sync should be null initially");
-    assert.strictEqual(stats.failedOperations, 0, "Failed operations should start at 0");
+    assert.strictEqual(
+      stats.syncOperations,
+      0,
+      "Sync operations should start at 0",
+    );
+    assert.strictEqual(
+      stats.lastSync,
+      null,
+      "Last sync should be null initially",
+    );
+    assert.strictEqual(
+      stats.failedOperations,
+      0,
+      "Failed operations should start at 0",
+    );
   });
 
   test("should track files monitored correctly", async () => {
@@ -56,25 +71,64 @@ suite("VectorDbSyncService - Statistics Tracking", () => {
     const stats = vectorDbSyncService.getStats();
 
     // Check that the stats object has the expected structure
-    assert.ok(typeof stats.filesMonitored === "number", "filesMonitored should be a number");
-    assert.ok(typeof stats.syncOperations === "number", "syncOperations should be a number");
-    assert.ok(typeof stats.failedOperations === "number", "failedOperations should be a number");
-    assert.ok(typeof stats.queueSize === "number", "queueSize should be a number");
+    assert.ok(
+      typeof stats.filesMonitored === "number",
+      "filesMonitored should be a number",
+    );
+    assert.ok(
+      typeof stats.syncOperations === "number",
+      "syncOperations should be a number",
+    );
+    assert.ok(
+      typeof stats.failedOperations === "number",
+      "failedOperations should be a number",
+    );
+    assert.ok(
+      typeof stats.queueSize === "number",
+      "queueSize should be a number",
+    );
 
     // lastSync can be null or string
-    assert.ok(stats.lastSync === null || typeof stats.lastSync === "string", "lastSync should be null or string");
+    assert.ok(
+      stats.lastSync === null || typeof stats.lastSync === "string",
+      "lastSync should be null or string",
+    );
   });
 
   test("should have correct initial state", async () => {
     const stats = vectorDbSyncService.getStats();
 
     // Verify initial state matches expected defaults
-    assert.strictEqual(stats.filesMonitored, 0, "Should start with 0 files monitored");
-    assert.strictEqual(stats.syncOperations, 0, "Should start with 0 sync operations");
-    assert.strictEqual(stats.failedOperations, 0, "Should start with 0 failed operations");
+    assert.strictEqual(
+      stats.filesMonitored,
+      0,
+      "Should start with 0 files monitored",
+    );
+    assert.strictEqual(
+      stats.syncOperations,
+      0,
+      "Should start with 0 sync operations",
+    );
+    assert.strictEqual(
+      stats.failedOperations,
+      0,
+      "Should start with 0 failed operations",
+    );
     assert.strictEqual(stats.queueSize, 0, "Should start with 0 queue size");
-    assert.strictEqual(stats.lastSync, null, "Should start with null last sync");
-    assert.strictEqual(stats.isIndexing, false, "Should start with indexing false");
-    assert.strictEqual(stats.indexingPhase, "idle", "Should start in idle phase");
+    assert.strictEqual(
+      stats.lastSync,
+      null,
+      "Should start with null last sync",
+    );
+    assert.strictEqual(
+      stats.isIndexing,
+      false,
+      "Should start with indexing false",
+    );
+    assert.strictEqual(
+      stats.indexingPhase,
+      "idle",
+      "Should start in idle phase",
+    );
   });
 });
