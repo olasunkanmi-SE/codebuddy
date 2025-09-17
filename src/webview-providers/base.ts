@@ -33,6 +33,10 @@ import { ICodeIndexer } from "../interfaces/vector-db.interface";
 import { PerformanceProfiler } from "../services/performance-profiler.service";
 import { ProductionSafeguards } from "../services/production-safeguards.service";
 import { EnhancedCacheManager } from "../services/enhanced-cache-manager.service";
+import {
+  EnhancedPromptBuilderService,
+  PromptContext,
+} from "../services/enhanced-prompt-builder.service";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -69,6 +73,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected performanceProfiler?: PerformanceProfiler;
   protected productionSafeguards?: ProductionSafeguards;
   protected enhancedCacheManager?: EnhancedCacheManager;
+
+  // Prompt enhancement service
+  protected promptBuilderService: EnhancedPromptBuilderService;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -160,6 +167,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     // Initialize user feedback service
     this.userFeedbackService = new UserFeedbackService();
+
+    // Initialize prompt builder service
+    this.promptBuilderService = new EnhancedPromptBuilderService();
 
     // Note: codeIndexingService is already initialized with temp implementation above
 
@@ -856,21 +866,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             message,
             vscode.window.activeTextEditor?.document.fileName,
           );
-
-        if (vectorResult?.content && vectorResult.sources.length > 0) {
-          vectorContext = `\n**Semantic Context** (${vectorResult.searchMethod} search results):\n${vectorResult.sources
-            .map(
-              (source) =>
-                `- **${source.filePath}** (relevance: ${source.relevanceScore.toFixed(2)}): ${source.clickableReference}`,
-            )
-            .join(
-              "\n",
-            )}\n\n**Context Content**:\n${vectorResult.content.substring(0, 2000)}${vectorResult.content.length > 2000 ? "..." : ""}`;
-
-          this.logger.info(
-            `Vector search found ${vectorResult.sources.length} relevant sources with ${vectorResult.totalTokens} tokens`,
-          );
+        // Fallback to comprehensive codebase context if vector search didn't provide enough
+        if (!vectorResult) {
+          fallbackContext =
+            await this.codebaseUnderstanding.getCodebaseContext();
         }
+        vectorContext = vectorResult?.content as string;
       } catch (vectorError) {
         this.logger.warn(
           "Vector search failed, falling back to traditional context",
@@ -878,25 +879,25 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         );
       }
 
-      // Fallback to comprehensive codebase context if vector search didn't provide enough
-      if (!vectorContext) {
-        fallbackContext = await this.codebaseUnderstanding.getCodebaseContext();
-      }
+      // Create enhanced prompt using the dedicated service
+      const promptContext: PromptContext = {
+        vectorContext,
+        fallbackContext,
+        activeFile: vscode.window.activeTextEditor?.document.fileName,
+        questionAnalysis: {
+          ...questionAnalysis,
+          confidence:
+            typeof questionAnalysis.confidence === "string"
+              ? this.convertConfidenceToNumber(questionAnalysis.confidence)
+              : questionAnalysis.confidence,
+        },
+      };
 
-      // Create enhanced prompt with both vector and fallback context
-      const enhancedMessage = `
-**User Question**: ${message}
+      const enhancedMessage = this.promptBuilderService.createEnhancedPrompt(
+        message,
+        promptContext,
+      );
 
-${vectorContext}
-
-${!vectorContext ? `**Codebase Context** (Automatically included because your question is related to understanding this codebase):\n\n${fallbackContext}` : ""}
-
-**Instructions for AI**: Use the ${vectorContext ? "semantic context" : "codebase context"} above to provide accurate, specific answers about this project. Reference actual files, patterns, and implementations found in the analysis. Use the provided clickable file references (e.g., [[1]], [[2]]) so users can navigate directly to the source code.
-
-IMPORTANT: Please provide a complete response. Do not truncate your answer mid-sentence or mid-word. Ensure your response is fully finished before ending.
-`.trim();
-
-      this.logger.debug("Enhanced message with vector/codebase context");
       return enhancedMessage;
     } catch (error) {
       this.logger.error("Error enhancing message with codebase context", error);
@@ -981,5 +982,21 @@ IMPORTANT: Please provide a complete response. Do not truncate your answer mid-s
   // Initialize chat history with proper sync
   async initializeChatHistory(key: string): Promise<any[]> {
     return this.chatHistoryManager.initializeHistory(key);
+  }
+
+  /**
+   * Converts string-based confidence levels to numerical values
+   */
+  private convertConfidenceToNumber(confidence: string): number {
+    switch (confidence.toLowerCase()) {
+      case "high":
+        return 0.9;
+      case "medium":
+        return 0.7;
+      case "low":
+        return 0.4;
+      default:
+        return 0.7;
+    }
   }
 }

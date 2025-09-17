@@ -55,6 +55,8 @@ export class VectorDatabaseService {
       minLevel: LogLevel.INFO,
     });
 
+    this.initialize();
+
     // Initialize simple vector store as fallback
     this.simpleStore = new SimpleVectorStore();
 
@@ -120,12 +122,18 @@ export class VectorDatabaseService {
 
       // Connect to LanceDB
       this.db = await lancedb.connect(this.dbPath);
+      console.log(`🔗 Connected to LanceDB at: ${this.dbPath}`);
+
+      // List available tables for debugging
+      const tableNames = await this.db.tableNames();
+      console.log(`📋 Available LanceDB tables:`, tableNames);
 
       // Try to open existing table or create new one
       try {
         this.table = await this.db.openTable(this.tableName);
         this.logger.info("Opened existing LanceDB table");
       } catch (error) {
+        console.log(`⚠️ Could not open table "${this.tableName}":`, error);
         // Table doesn't exist, we'll create it when first documents are added
         this.logger.info(
           "LanceDB table doesn't exist yet, will create on first document",
@@ -250,8 +258,19 @@ export class VectorDatabaseService {
 
       // Create table if it doesn't exist
       if (!this.table) {
+        console.log(
+          `🏗️ Table "${this.tableName}" doesn't exist, creating with ${documents.length} documents`,
+        );
         await this.createTable(documents);
+        if (this.table) {
+          console.log(`✅ Table "${this.tableName}" created successfully`);
+        } else {
+          console.log(`❌ Failed to create table "${this.tableName}"`);
+        }
       } else {
+        console.log(
+          `📝 Adding ${documents.length} documents to existing table "${this.tableName}"`,
+        );
         // Add documents to existing table
         await this.table.add(documents);
       }
@@ -335,6 +354,14 @@ export class VectorDatabaseService {
    * Perform semantic search using Gemini embeddings
    */
   async semanticSearch(query: string, limit = 5): Promise<SearchResult[]> {
+    console.log(`🔍 Instance state:`, {
+      isInitialized: this.isInitialized,
+      hasEmbeddingService: !!this.embeddingService,
+      useSimpleStore: this.useSimpleStore,
+      hasTable: !!this.table,
+      hasDb: !!this.db,
+    });
+
     if (!this.isReady()) {
       this.logger.warn(
         "Vector database not initialized, returning empty results",
@@ -540,7 +567,9 @@ export class VectorDatabaseService {
    * Check if the service is properly initialized
    */
   isReady(): boolean {
-    return this.isInitialized && !!this.embeddingService;
+    const ready =
+      this.isInitialized && (!!this.embeddingService || this.useSimpleStore);
+    return ready;
   }
 
   /**
