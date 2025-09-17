@@ -4,11 +4,11 @@
   "author": {
     "name": "Oyinlola Olasunkanmi Raymond",
     "email": "oyinolasunkanmi@gmail.com",
-    "url": "https://olasunkanmi.app"
+    "url": "https://github.com/olasunkanmi-SE/codebuddy"
   },
   "publisher": "fiatinnovations",
   "description": "CodeBuddy is a Visual Studio Code extension that enhances developer productivity through AI-powered code assistance. It provides intelligent code review, refactoring suggestions, optimization tips, and interactive chat capabilities powered by multiple AI models including Gemini, Groq, Anthropic, and Deepseek.",
-  "version": "3.4.6",
+  "version": "3.4.8",
   "engines": {
     "vscode": "^1.78.0"
   },
