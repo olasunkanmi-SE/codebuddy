@@ -14,6 +14,15 @@
 🤖 **AI Agent Orchestration** - Multi-agent system for complex development tasks  
 💡 **Real-time Code Analysis** - Instant feedback and suggestions as you code  
 
+## 🌟 Support the Project
+
+If CodeBuddy enhances your development workflow:
+- ⭐ Star the repository
+- 📝 Leave a review on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
+- 🐛 Report bugs or suggest features
+- 🤝 Contribute to the codebase
+- 💬 Share with fellow developers
+
 ## 🎯 Core Features
 
 ### 🧠 **AI-Powered Code Assistance**
@@ -301,15 +310,6 @@ For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md)
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🌟 Support the Project
-
-If CodeBuddy enhances your development workflow:
-- ⭐ Star the repository
-- 📝 Leave a review on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
-- 🐛 Report bugs or suggest features
-- 🤝 Contribute to the codebase
-- 💬 Share with fellow developers
 
 ---
 
