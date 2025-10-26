@@ -6,6 +6,10 @@
 
 **CodeBuddy** is a revolutionary Visual Studio Code extension that transforms your development workflow with AI-powered assistance. From intelligent code completion to comprehensive documentation generation, CodeBuddy is your complete development companion.
 
+## 🏗️ Architecture
+
+<img width="1920" height="536" alt="Screenshot 2025-10-26 at 8 48 33 PM" src="https://github.com/user-attachments/assets/33a413fa-8c47-4f1c-84a1-d0f7f0f6b3c1" />
+
 ## ✨ What's New in v3.4.3
 
 🚀 **Context-Aware Code Completion** - Get Copilot-style inline suggestions based on your codebase patterns  
@@ -141,71 +145,6 @@ Access CodeBuddy settings in VS Code preferences:
 }
 ```
 
-## 🏗️ Architecture
-
-```mermaid
-flowchart TD
-    %% VS Code Extension Frontend
-    subgraph "VS Code Extension Frontend"
-        CE["Editor Interface"]:::frontend
-        CL["Commands Layer"]:::frontend
-        WV1["Webview (VS Code)"]:::frontend
-        WV2["Webview (React UI)"]:::frontend
-    end
-
-    %% Core Application Layer
-    subgraph "Core Application"
-        AA["AI Agents"]:::core
-        MS["Memory System"]:::core
-        subgraph "Application Services"
-            BL["Business Logic"]:::core
-            AI["Application Interfaces"]:::core
-        end
-        subgraph "Infrastructure Layer"
-            HTTP["HTTP Services"]:::infra
-            LOG["Logging"]:::infra
-            REP["Repository"]:::infra
-            LS["Local Storage"]:::infra
-        end
-    end
-
-    %% AI Providers
-    subgraph "AI Providers"
-        LLM["Language Model Integrations"]:::provider
-        ESP["External Service Providers"]:::provider
-    end
-
-    %% Storage Layer
-    subgraph "Storage Layer"
-        DB["Database (SQLite)"]:::storage
-        FS["File System"]:::storage
-        VD["Vector Database"]:::storage
-    end
-
-    %% Connections
-    CE -->|"User Input"| CL
-    CL -->|"Process Request"| AA
-    CL -->|"UI Update"| WV1
-    AA -->|"Context Management"| MS
-    AA -->|"Orchestration"| BL
-    AA -->|"Contract Call"| AI
-    AA -->|"API Request"| HTTP
-    HTTP -->|"API Call"| LLM
-    HTTP -->|"API Call"| ESP
-    HTTP -->|"Feedback"| WV1
-    BL -->|"Data Access"| DB
-    BL -->|"File Access"| FS
-    BL -->|"Embed Data"| VD
-    AI -->|"Repository Access"| REP
-    MS -->|"Store Context"| DB
-
-    %% Styling
-    classDef frontend fill:#e1f5fe,stroke:#0277bd,stroke-width:2px;
-    classDef core fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px;
-    classDef infra fill:#fff3e0,stroke:#ef6c00,stroke-width:2px;
-    classDef provider fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
-    classDef storage fill:#fce4ec,stroke:#c2185b,stroke-width:2px;
-```
 
 ## 🚀 Roadmap
 
