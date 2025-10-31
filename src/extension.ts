@@ -31,10 +31,6 @@ import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
 import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
 import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
-import { VectorDbSyncService } from "./services/vector-db-sync.service";
-import { VectorDatabaseService } from "./services/vector-database.service";
-import { VectorDbWorkerManager } from "./services/vector-db-worker-manager";
-import { getCodeIndexingStatusProvider } from "./services/code-indexing-status.service";
 import {
   generateDocumentationCommand,
   regenerateDocumentationCommand,
@@ -62,8 +58,8 @@ let agentEventEmmitter: EventEmitter;
 let orchestrator = Orchestrator.getInstance();
 
 // Global references for Phase 4 components
-let vectorDbSyncService: VectorDbSyncService | undefined;
-let vectorDbWorkerManager: VectorDbWorkerManager | undefined;
+// let vectorDbSyncService: VectorDbSyncService | undefined;
+// let vectorDbWorkerManager: VectorDbWorkerManager | undefined;
 
 /**
  * Initialize WebView providers lazily for faster startup
@@ -171,26 +167,6 @@ async function initializeBackgroundServices(
       );
     }
 
-    // Phase 4: Initialize Vector Database Orchestration (truly non-blocking)
-    initializeVectorDatabaseOrchestration(context)
-      .then(() => {
-        console.log("✓ Vector database orchestration initialized");
-        vscode.window.setStatusBarMessage(
-          "$(database) CodeBuddy: Vector search ready",
-          3000,
-        );
-      })
-      .catch((error) => {
-        console.warn(
-          "Vector database initialization failed, using fallback mode:",
-          error,
-        );
-        vscode.window.setStatusBarMessage(
-          "$(warning) CodeBuddy: Using fallback search",
-          3000,
-        );
-      });
-
     // All background services ready
     vscode.window.setStatusBarMessage("$(check) CodeBuddy: Ready", 3000);
     console.log("🎉 CodeBuddy: All background services initialized");
@@ -201,304 +177,6 @@ async function initializeBackgroundServices(
       5000,
     );
   }
-}
-
-/**
- * Initialize Phase 4 Vector Database Orchestration
- * This sets up the comprehensive vector database system with multi-phase embedding
- */
-async function initializeVectorDatabaseOrchestration(
-  context: vscode.ExtensionContext,
-): Promise<void> {
-  try {
-    console.log("🚀 Starting Phase 4 Vector Database Orchestration...");
-
-    // Get Gemini API key for consistent embeddings
-    let geminiApiKey: string | undefined;
-    try {
-      const result = getAPIKeyAndModel("Gemini");
-      geminiApiKey = result.apiKey;
-    } catch (error) {
-      console.warn(
-        "Gemini API key not found, vector database will use fallback mode:",
-        error instanceof Error ? error.message : String(error),
-      );
-      // Continue without API key - vector database can still work with SimpleVectorStore fallback
-    }
-
-    // Initialize worker manager for non-blocking operations
-    vectorDbWorkerManager = new VectorDbWorkerManager(context);
-    await vectorDbWorkerManager.initialize();
-    console.log("✓ Vector database worker manager initialized");
-
-    // Initialize vector database service
-    const vectorDatabaseService = new VectorDatabaseService(
-      context,
-      geminiApiKey,
-    );
-    await vectorDatabaseService.initialize();
-    console.log("✓ Vector database service initialized");
-
-    // Initialize sync service for real-time file monitoring
-    // Use CodeIndexingService as the indexer for the sync service
-    const { CodeIndexingService } = await import("./services/code-indexing");
-    const { CodeIndexingAdapter } = await import(
-      "./services/vector-db-sync.service"
-    );
-    const codeIndexingService = CodeIndexingService.createInstance();
-    const codeIndexingAdapter = new CodeIndexingAdapter(codeIndexingService);
-
-    vectorDbSyncService = new VectorDbSyncService(
-      vectorDatabaseService,
-      codeIndexingAdapter,
-    );
-    await vectorDbSyncService.initialize();
-    console.log("✓ Vector database sync service initialized");
-
-    // Initialize status provider
-    const statusProvider = getCodeIndexingStatusProvider();
-    statusProvider.initialize(vectorDbSyncService);
-
-    // Create status bar item
-    const statusBarItem = statusProvider.createStatusBarItem();
-    context.subscriptions.push(statusBarItem);
-
-    // Register commands for user control
-    registerVectorDatabaseCommands(context, statusProvider);
-
-    // Show success notification
-    vscode.window.setStatusBarMessage(
-      "$(check) CodeBuddy: Vector database orchestration ready",
-      5000,
-    );
-
-    console.log(
-      "🎉 Phase 4 Vector Database Orchestration completed successfully",
-    );
-  } catch (error: any) {
-    console.error("Failed to initialize Phase 4 orchestration:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    vscode.window.showWarningMessage(
-      `CodeBuddy: Vector database initialization failed: ${errorMessage}. Using fallback search mode.`,
-    );
-  }
-}
-
-/**
- * Register vector database related commands
- */
-function registerVectorDatabaseCommands(
-  context: vscode.ExtensionContext,
-  statusProvider?: import("./services/code-indexing-status.service").CodeIndexingStatusProvider,
-): void {
-  // Command to force full reindex
-  const forceReindexCommand = vscode.commands.registerCommand(
-    "codebuddy.vectorDb.forceReindex",
-    async () => {
-      if (!vectorDbSyncService) {
-        vscode.window.showErrorMessage("Vector database not initialized");
-        return;
-      }
-
-      const confirm = await vscode.window.showWarningMessage(
-        "This will clear all embeddings and reindex the entire codebase. Continue?",
-        "Yes, Reindex",
-        "Cancel",
-      );
-
-      if (confirm === "Yes, Reindex") {
-        try {
-          // Force a full reindex using the available method
-          await vectorDbSyncService.performFullReindex();
-          vscode.window.showInformationMessage(
-            "Full reindex completed successfully",
-          );
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          vscode.window.showErrorMessage(`Reindex failed: ${errorMessage}`);
-        }
-      }
-    },
-  );
-
-  // Command to show vector database stats
-  const showStatsCommand = vscode.commands.registerCommand(
-    "codebuddy.vectorDb.showStats",
-    async () => {
-      if (!vectorDbSyncService) {
-        vscode.window.showInformationMessage(
-          "🔄 Vector database is still initializing in the background. Please wait a moment and try again.",
-          "OK",
-        );
-        return;
-      }
-
-      const stats = vectorDbSyncService.getStats();
-      const message = `**Vector Database Statistics**\n\n
-• Files Monitored: ${stats.filesMonitored}\n
-• Sync Operations: ${stats.syncOperations}\n
-• Failed Operations: ${stats.failedOperations}\n
-• Queue Size: ${stats.queueSize}\n
-• Last Sync: ${stats.lastSync || "Never"}`;
-
-      vscode.window.showInformationMessage(message);
-    },
-  );
-
-  // Command to show indexing status
-  const showIndexingStatusCommand = vscode.commands.registerCommand(
-    "codebuddy.showIndexingStatus",
-    async () => {
-      if (statusProvider) {
-        await statusProvider.showDetailedStatus();
-      } else {
-        vscode.window.showInformationMessage("Indexing status not available");
-      }
-    },
-  );
-
-  // Phase 5: Performance & Production Commands
-  const showPerformanceReportCommand = vscode.commands.registerCommand(
-    "codebuddy.showPerformanceReport",
-    async () => {
-      // This will be handled by the webview provider's performance profiler
-      vscode.commands.executeCommand("codebuddy.webview.showPerformanceReport");
-    },
-  );
-
-  const clearVectorCacheCommand = vscode.commands.registerCommand(
-    "codebuddy.clearVectorCache",
-    async () => {
-      // This will be handled by the webview provider's enhanced cache manager
-      vscode.commands.executeCommand("codebuddy.webview.clearCache", "all");
-    },
-  );
-
-  const reduceBatchSizeCommand = vscode.commands.registerCommand(
-    "codebuddy.reduceBatchSize",
-    async () => {
-      // This will be handled by the webview provider's configuration manager
-      vscode.commands.executeCommand("codebuddy.webview.reduceBatchSize");
-    },
-  );
-
-  const pauseIndexingCommand = vscode.commands.registerCommand(
-    "codebuddy.pauseIndexing",
-    async () => {
-      // This will be handled by the webview provider's orchestrator
-      vscode.commands.executeCommand("codebuddy.webview.pauseIndexing");
-    },
-  );
-
-  const resumeIndexingCommand = vscode.commands.registerCommand(
-    "codebuddy.resumeIndexing",
-    async () => {
-      // This will be handled by the webview provider's orchestrator
-      vscode.commands.executeCommand("codebuddy.webview.resumeIndexing");
-    },
-  );
-
-  const restartVectorWorkerCommand = vscode.commands.registerCommand(
-    "codebuddy.restartVectorWorker",
-    async () => {
-      // This will be handled by the webview provider's vector worker manager
-      vscode.commands.executeCommand("codebuddy.webview.restartWorker");
-    },
-  );
-
-  const emergencyStopCommand = vscode.commands.registerCommand(
-    "codebuddy.emergencyStop",
-    async () => {
-      // This will be handled by the webview provider's production safeguards
-      vscode.commands.executeCommand("codebuddy.webview.emergencyStop");
-    },
-  );
-
-  const resumeFromEmergencyStopCommand = vscode.commands.registerCommand(
-    "codebuddy.resumeFromEmergencyStop",
-    async () => {
-      // This will be handled by the webview provider's production safeguards
-      vscode.commands.executeCommand(
-        "codebuddy.webview.resumeFromEmergencyStop",
-      );
-    },
-  );
-
-  const optimizePerformanceCommand = vscode.commands.registerCommand(
-    "codebuddy.optimizePerformance",
-    async () => {
-      // This will be handled by the webview provider's performance profiler
-      vscode.commands.executeCommand("codebuddy.webview.optimizePerformance");
-    },
-  );
-
-  const diagnosticCommand = vscode.commands.registerCommand(
-    "codebuddy.vectorDb.diagnostic",
-    async () => {
-      try {
-        // Check LanceDB installation
-        const lanceDB = await import("@lancedb/lancedb");
-        let lanceStatus = "✅ LanceDB installed";
-
-        // Check Apache Arrow
-        let arrowStatus = "❌ Apache Arrow not available";
-        try {
-          await import("apache-arrow");
-          arrowStatus = "✅ Apache Arrow available";
-        } catch {
-          arrowStatus = "❌ Apache Arrow not available";
-        }
-
-        // Check vector database service status
-        let serviceStatus = "❌ Service not initialized";
-        if (vectorDbSyncService) {
-          const stats = vectorDbSyncService.getStats();
-          serviceStatus = `✅ Service initialized (${stats.filesMonitored} files monitored)`;
-        }
-
-        const diagnosticMessage = `
-**CodeBuddy Vector Database Diagnostic**
-
-• **LanceDB**: ${lanceStatus}
-• **Apache Arrow**: ${arrowStatus}
-• **Service Status**: ${serviceStatus}
-• **Node.js Version**: ${process.version}
-
-**Fix Issues**:
-1. Install missing dependencies: \`npm install @chroma-core/default-embed\`
-2. Restart VS Code
-3. Check API keys in settings
-      `.trim();
-
-        vscode.window
-          .showInformationMessage(diagnosticMessage, "Copy to Clipboard")
-          .then((action) => {
-            if (action === "Copy to Clipboard") {
-              vscode.env.clipboard.writeText(diagnosticMessage);
-            }
-          });
-      } catch (error) {
-        vscode.window.showErrorMessage(`Diagnostic failed: ${error}`);
-      }
-    },
-  );
-
-  context.subscriptions.push(
-    forceReindexCommand,
-    showStatsCommand,
-    showIndexingStatusCommand,
-    showPerformanceReportCommand,
-    clearVectorCacheCommand,
-    reduceBatchSizeCommand,
-    pauseIndexingCommand,
-    resumeIndexingCommand,
-    restartVectorWorkerCommand,
-    emergencyStopCommand,
-    resumeFromEmergencyStopCommand,
-    optimizePerformanceCommand,
-    diagnosticCommand,
-  );
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -915,18 +593,18 @@ export function deactivate(context: vscode.ExtensionContext) {
   clearFileStorageData();
 
   // Phase 4: Dispose vector database components
-  try {
-    if (vectorDbSyncService) {
-      vectorDbSyncService.dispose();
-      console.log("✓ Vector database sync service disposed");
-    }
-    if (vectorDbWorkerManager) {
-      vectorDbWorkerManager.dispose();
-      console.log("✓ Vector database worker manager disposed");
-    }
-  } catch (error) {
-    console.warn("Error disposing Phase 4 vector components:", error);
-  }
+  // try {
+  //   if (vectorDbSyncService) {
+  //     vectorDbSyncService.dispose();
+  //     console.log("✓ Vector database sync service disposed");
+  //   }
+  //   if (vectorDbWorkerManager) {
+  //     vectorDbWorkerManager.dispose();
+  //     console.log("✓ Vector database worker manager disposed");
+  //   }
+  // } catch (error) {
+  //   console.warn("Error disposing Phase 4 vector components:", error);
+  // }
 
   // Shutdown persistent codebase service
   try {

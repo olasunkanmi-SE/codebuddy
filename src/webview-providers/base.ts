@@ -21,11 +21,6 @@ import {
   getGenerativeAiModel,
 } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
-import { VectorDatabaseService } from "../services/vector-database.service";
-import { VectorDbWorkerManager } from "../services/vector-db-worker-manager";
-import { VectorDbSyncService } from "../services/vector-db-sync.service";
-import { SmartContextExtractor } from "../services/smart-context-extractor";
-import { SmartEmbeddingOrchestrator } from "../services/smart-embedding-orchestrator";
 import { ContextRetriever } from "../services/context-retriever";
 import { UserFeedbackService } from "../services/user-feedback.service";
 import { VectorDbConfigurationManager } from "../config/vector-db.config";
@@ -57,13 +52,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly inputValidator: InputValidator;
 
   // Vector database services
-  protected vectorDb?: VectorDatabaseService;
-  protected vectorDbService?: VectorDatabaseService; // Alias for compatibility
-  protected vectorWorkerManager?: VectorDbWorkerManager;
-  protected vectorSyncService?: VectorDbSyncService;
-  protected vectorDbSyncService?: VectorDbSyncService; // Alias for compatibility
-  protected smartContextExtractor?: SmartContextExtractor;
-  protected smartEmbeddingOrchestrator?: SmartEmbeddingOrchestrator;
   protected vectorConfigManager?: VectorDbConfigurationManager;
   protected configManager?: VectorDbConfigurationManager; // Alias for compatibility
   protected userFeedbackService?: UserFeedbackService;
@@ -127,18 +115,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     // Initialize user feedback service
     this.userFeedbackService = new UserFeedbackService();
 
-    // Initialize vector services
-    this.vectorWorkerManager = new VectorDbWorkerManager(context);
-    this.vectorDbService = new VectorDatabaseService(context, geminiApiKey);
-    this.vectorDb = this.vectorDbService; // Alias
-
     // Note: codeIndexingService will be initialized when a proper implementation is available
-    this.smartEmbeddingOrchestrator = new SmartEmbeddingOrchestrator(
-      context,
-      this.vectorDbService,
-      this.vectorWorkerManager,
-    );
-
     // Create a temporary code indexing service (to be properly implemented later)
     // Import the correct interface from vector-db-sync.service
     const tempCodeIndexer = {
@@ -146,21 +123,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     };
 
     this.contextRetriever = new ContextRetriever();
-
-    this.vectorDbSyncService = new VectorDbSyncService(
-      this.vectorDbService,
-      tempCodeIndexer,
-    );
-    this.vectorSyncService = this.vectorDbSyncService; // Alias
-
-    this.smartContextExtractor = new SmartContextExtractor(
-      this.vectorDbService,
-      this.contextRetriever,
-      this.codebaseUnderstanding,
-      this.questionClassifier,
-      {},
-      this.performanceProfiler,
-    );
 
     // Initialize configuration manager first
     this.configManager = new VectorDbConfigurationManager();
@@ -183,31 +145,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     try {
       this.logger.info("Starting Phase 4 vector database orchestration...");
 
-      // Phase 4.1: Initialize worker manager (non-blocking architecture)
-      await this.vectorWorkerManager?.initialize();
-      this.logger.info("✓ Vector database worker manager initialized");
-
-      // Phase 4.2: Initialize vector database service
-      await this.vectorDbService?.initialize();
-      this.logger.info("✓ Vector database service initialized");
-
-      // Phase 4.3: Start smart embedding orchestrator (multi-phase strategy)
-      await this.smartEmbeddingOrchestrator?.initialize();
-      this.logger.info("✓ Smart embedding orchestrator started");
-
       // Phase 4.4: Initialize sync service for real-time file monitoring
-      await this.vectorDbSyncService?.initialize();
       this.logger.info("✓ Vector database sync service initialized");
-
-      // Phase 4.4.1: Connect service status checker to production safeguards
-      if (this.vectorDbSyncService && this.productionSafeguards) {
-        this.productionSafeguards.setServiceStatusChecker(
-          this.vectorDbSyncService,
-        );
-        this.logger.info(
-          "✓ Production safeguards connected to sync service status",
-        );
-      }
 
       // Phase 4.5: Trigger immediate embedding phase for essential files
       await this.executeImmediateEmbeddingPhase();
@@ -699,51 +638,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
               break;
 
-            case "pauseIndexing":
-              if (this.smartEmbeddingOrchestrator) {
-                // TODO: Implement pause functionality in SmartEmbeddingOrchestrator
-                await this.sendResponse(
-                  "🛑 **Indexing Pause Requested** - This feature will be implemented in a future update",
-                  "bot",
-                );
-              } else {
-                await this.sendResponse(
-                  "Smart embedding orchestrator not available",
-                  "bot",
-                );
-              }
-              break;
-
-            case "resumeIndexing":
-              if (this.smartEmbeddingOrchestrator) {
-                // TODO: Implement resume functionality in SmartEmbeddingOrchestrator
-                await this.sendResponse(
-                  "▶️ **Indexing Resume Requested** - This feature will be implemented in a future update",
-                  "bot",
-                );
-              } else {
-                await this.sendResponse(
-                  "Smart embedding orchestrator not available",
-                  "bot",
-                );
-              }
-              break;
-
-            case "restartWorker":
-              if (this.vectorWorkerManager) {
-                // TODO: Implement restart functionality in VectorDbWorkerManager
-                await this.sendResponse(
-                  "🔄 **Worker Restart Requested** - This feature will be implemented in a future update",
-                  "bot",
-                );
-              } else {
-                await this.sendResponse(
-                  "Vector worker manager not available",
-                  "bot",
-                );
-              }
-              break;
-
             case "emergencyStop":
               if (this.productionSafeguards) {
                 // Emergency stop will be handled by the safeguards service
@@ -860,25 +754,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       let vectorContext = "";
       let fallbackContext = "";
 
-      try {
-        const vectorResult =
-          await this.smartContextExtractor?.extractRelevantContextWithVector(
-            message,
-            vscode.window.activeTextEditor?.document.fileName,
-          );
-        // Fallback to comprehensive codebase context if vector search didn't provide enough
-        if (!vectorResult) {
-          fallbackContext =
-            await this.codebaseUnderstanding.getCodebaseContext();
-        }
-        vectorContext = vectorResult?.content as string;
-      } catch (vectorError) {
-        this.logger.warn(
-          "Vector search failed, falling back to traditional context",
-          vectorError,
-        );
-      }
-
       // Create enhanced prompt using the dedicated service
       const promptContext: PromptContext = {
         vectorContext,
@@ -910,14 +785,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.logger.debug(
       `Disposing BaseWebViewProvider with ${this.disposables.length} disposables`,
     );
-
-    // Dispose vector database components
-    try {
-      this.smartEmbeddingOrchestrator?.dispose();
-      this.vectorWorkerManager?.dispose();
-    } catch (error) {
-      this.logger.error("Error disposing vector database components", error);
-    }
 
     this.disposables.forEach((d) => d.dispose());
     this.disposables.length = 0; // Clear the array
