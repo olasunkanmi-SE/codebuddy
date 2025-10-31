@@ -70,7 +70,7 @@ const nodeModulesPlugin = {
     const filteredBuiltins = nodeBuiltins.filter((m) => m !== "punycode");
     build.onResolve({ filter: new RegExp(`^(${filteredBuiltins.join("|")})$`) }, () => ({ external: true }));
     build.onResolve({ filter: new RegExp(`^(${filteredBuiltins.join("|")})/`) }, () => ({ external: true }));
-    build.onResolve({ filter: /better-sqlite3|electron|@lancedb\/lancedb|apache-arrow/ }, () => ({ external: true })); // jsdom removed
+    build.onResolve({ filter: /better-sqlite3|electron|apache-arrow/ }, () => ({ external: true })); // jsdom removed
   },
 };
 

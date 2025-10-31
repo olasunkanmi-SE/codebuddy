@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "CodeBuddy is a Visual Studio Code extension that enhances developer productivity through AI-powered code assistance. It provides intelligent code review, refactoring suggestions, optimization tips, and interactive chat capabilities powered by multiple AI models including Gemini, Groq, Anthropic, and Deepseek.",
-  "version": "3.4.8",
+  "version": "3.6.3",
   "engines": {
     "vscode": "^1.78.0"
   },
@@ -40,7 +40,7 @@
     "productivity"
   ],
   "homepage": "https://github.com/olasunkanmi-SE/codebuddy#readme",
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "views": {
       "codeBuddy-view-container": [
@@ -151,58 +151,6 @@
       {
         "command": "CodeBuddy.reviewPR",
         "title": "CodeBuddy. Review Pull Request"
-      },
-      {
-        "command": "codebuddy.vectorDb.showStats",
-        "title": "CodeBuddy: Show Vector Database Statistics"
-      },
-      {
-        "command": "codebuddy.vectorDb.forceReindex",
-        "title": "CodeBuddy: Force Full Reindex"
-      },
-      {
-        "command": "codebuddy.showIndexingStatus",
-        "title": "CodeBuddy: Show Indexing Status"
-      },
-      {
-        "command": "codebuddy.vectorDb.diagnostic",
-        "title": "CodeBuddy: Vector Database Diagnostic"
-      },
-      {
-        "command": "codebuddy.showPerformanceReport",
-        "title": "CodeBuddy: Show Performance Report"
-      },
-      {
-        "command": "codebuddy.clearVectorCache",
-        "title": "CodeBuddy: Clear Vector Cache"
-      },
-      {
-        "command": "codebuddy.reduceBatchSize",
-        "title": "CodeBuddy: Reduce Batch Size"
-      },
-      {
-        "command": "codebuddy.pauseIndexing",
-        "title": "CodeBuddy: Pause Indexing"
-      },
-      {
-        "command": "codebuddy.resumeIndexing",
-        "title": "CodeBuddy: Resume Indexing"
-      },
-      {
-        "command": "codebuddy.restartVectorWorker",
-        "title": "CodeBuddy: Restart Vector Worker"
-      },
-      {
-        "command": "codebuddy.emergencyStop",
-        "title": "CodeBuddy: Emergency Stop"
-      },
-      {
-        "command": "codebuddy.resumeFromEmergencyStop",
-        "title": "CodeBuddy: Resume From Emergency Stop"
-      },
-      {
-        "command": "codebuddy.optimizePerformance",
-        "title": "CodeBuddy: Optimize Performance"
       }
     ],
     "viewsContainers": {
@@ -357,7 +305,7 @@
   },
   "scripts": {
     "package": "node esbuild.js --production",
-    "build": "npm run compile && npm run format && npm run build:webview",
+    "build": "npm run compile && npm run format && npm run build:webview && npm run package",
     "dev:webview": "cd webviewUi && npm run dev",
     "build:webview": "cd webviewUi && npm run build",
     "vscode:prepublish": "npm run compile",
@@ -394,7 +342,6 @@
     "@chroma-core/default-embed": "^0.1.8",
     "@google/genai": "^0.7.0",
     "@google/generative-ai": "^0.21.0",
-    "@lancedb/lancedb": "^0.22.0",
     "@mozilla/readability": "^0.4.1",
     "@types/node-fetch": "^2.6.11",
     "@types/sql.js": "^1.4.9",

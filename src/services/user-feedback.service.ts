@@ -54,22 +54,6 @@ export class UserFeedbackService implements vscode.Disposable {
     );
     this.statusBarItem.command = "codebuddy.vectorDb.showStats";
     this.disposables.push(this.statusBarItem);
-
-    this.initializeStatusBar();
-  }
-
-  /**
-   * Initialize the status bar with default state
-   */
-  private initializeStatusBar(): void {
-    if (!this.options.enableStatusBar) {
-      return;
-    }
-
-    this.updateStatus({
-      text: "$(database) CodeBuddy Vector DB",
-      tooltip: "CodeBuddy Vector Database - Click for statistics",
-    });
   }
 
   /**
