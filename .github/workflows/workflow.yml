@@ -2,7 +2,7 @@ name: CI Pipeline
 
 on:
   pull_request:
-    branches: [main, development]
+    branches: [main, development, dev]
 
 jobs:
   build:
@@ -20,14 +20,17 @@ jobs:
         with:
           name: git-diff
           path: diff.txt
-      - uses: actions/setup-node@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4 # Use v4 for latest features. Can also specify version this way
         with:
-          node-version: "21"
+          node-version: "20" # Use a more recent LTS version
+          cache: 'npm' # Enable caching for npm dependencies
+          cache-dependency-path: 'src/package-lock.json' # Where package-lock.json is
       - name: ci for api
         working-directory: ./src
         run: |
-          npm i
-          npm i typescript
+          npm ci # Use npm ci for faster and cleaner installs based on package-lock.json
           npm run compile
           npm run format
         env:
