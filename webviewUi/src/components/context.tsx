@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 
 interface WorkspceCategory {
   id: string;
@@ -79,65 +79,114 @@ const WorkspaceSelector: React.FC<WorkspceSelectorProps> = ({
   folders,
   activeEditor,
 }) => {
-  let workspaceFolders: any;
-  if (folders) {
-    try {
-      workspaceFolders = JSON.parse(folders.message);
-    } catch (error: any) {
-      console.log("folders prop is empty or not a valid string", error.message);
+  // Use useMemo to parse folders only when the folders prop changes
+  const workspaceFolders = useMemo(() => {
+    if (folders) {
+      try {
+        return JSON.parse(folders.message);
+      } catch (error: any) {
+        console.log("folders prop is empty or not a valid string", error.message);
+        return []; // Return an empty array to avoid further errors
+      }
     }
-  }
+    return []; // Return an empty array when folders is initially undefined
+  }, [folders]);
+
   const [isOpen, setIsOpen] = useState(false);
-  const [currentCategories, setCurrentCategories] = useState<
-    WorkspceCategory[]
-  >([{ id: "activeEditor", name: activeEditor }]);
+  const [currentCategories, setCurrentCategories] = useState<WorkspceCategory[]>([
+    { id: "activeEditor", name: activeEditor },
+  ]);
   const [breadcrumbs, setBreadcrumbs] = useState<WorkspceCategory[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState(initialValue);
+
+  // Use useCallback to prevent unnecessary re-renders
+  const setInput = useCallback(
+    (newValue: string) => {
+      setInputValue(newValue);
+      onInputChange(newValue);
+    },
+    [onInputChange]
+  );
 
   useEffect(() => {
     setInputValue(initialValue);
   }, [initialValue]);
 
-  // Handle input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setInputValue(newValue);
-    onInputChange(newValue);
+  // Memoize the activeEditor category object
+  const activeEditorCategory = useMemo(() => ({ id: "activeEditor", name: activeEditor }), [activeEditor]);
 
-    if (newValue.length > 0 && newValue.startsWith("@")) {
-      const lastAtIndex = newValue.lastIndexOf("@");
-      const lastAtIsValidStart =
-        lastAtIndex === 0 || newValue[lastAtIndex - 1] === " ";
-      setIsOpen(lastAtIsValidStart);
-      if (!lastAtIsValidStart) {
+  // Combine activeEditorCategory and workspaceFolders using useMemo
+  const initialCategories = useMemo(() => {
+    return [activeEditorCategory, ...workspaceFolders];
+  }, [activeEditorCategory, workspaceFolders]);
+
+  // Handle input changes using useCallback
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = e.target.value;
+      setInput(newValue);
+
+      if (newValue.length > 0 && newValue.startsWith("@")) {
+        const lastAtIndex = newValue.lastIndexOf("@");
+        const lastAtIsValidStart = lastAtIndex === 0 || newValue[lastAtIndex - 1] === " ";
+        setIsOpen(lastAtIsValidStart);
+        if (!lastAtIsValidStart) {
+          setIsOpen(false);
+          setCurrentCategories(initialCategories);
+          setBreadcrumbs([]);
+        }
+      } else {
         setIsOpen(false);
-        setCurrentCategories([
-          { id: "activeEditor", name: activeEditor },
-          ...workspaceFolders,
-        ]);
+        setCurrentCategories(initialCategories);
         setBreadcrumbs([]);
       }
-    } else {
+    },
+    [setInput, initialCategories]
+  );
+
+  const handleItemSelection = useCallback(
+    (item: WorkspceCategory) => {
+      console.log("Selected:", item);
       setIsOpen(false);
-      setCurrentCategories([
-        { id: "activeEditor", name: activeEditor },
-        ...workspaceFolders,
-      ]);
-      setBreadcrumbs([]);
-    }
-  };
+      if (inputRef.current) {
+        const cursorPosition = inputRef.current.selectionStart ?? 0;
+        const textBeforeCursor = inputValue.substring(0, cursorPosition);
+        const lastAtIndex = textBeforeCursor.lastIndexOf("@");
 
-  const navigateToCategory = (category: WorkspceCategory) => {
-    if (category.children) {
-      setCurrentCategories(category.children);
-      setBreadcrumbs((prev) => [...prev, category]);
-    } else {
-      handleItemSelection(category);
-    }
-  };
+        if (lastAtIndex !== -1 && (lastAtIndex === 0 || textBeforeCursor[lastAtIndex - 1] === " ")) {
+          const newInputValue =
+            textBeforeCursor.substring(0, lastAtIndex) + `@${item.name} ` + inputValue.substring(cursorPosition);
+          inputRef.current.value = newInputValue;
+          setInput(newInputValue);
+          inputRef.current.focus();
 
-  const goBack = () => {
+          const newCursorPosition = lastAtIndex + item.name.length + 2;
+          inputRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
+        } else {
+          inputRef.current.value = `@${item.name}`;
+          setInput(`@${item.name}`);
+        }
+      }
+    },
+    [inputValue, setInput]
+  );
+
+  // Navigate to category using useCallback
+  const navigateToCategory = useCallback(
+    (category: WorkspceCategory) => {
+      if (category.children) {
+        setCurrentCategories(category.children);
+        setBreadcrumbs((prev) => [...prev, category]);
+      } else {
+        handleItemSelection(category);
+      }
+    },
+    [handleItemSelection]
+  );
+
+  // Go back using useCallback
+  const goBack = useCallback(() => {
     if (breadcrumbs.length > 0) {
       const newBreadcrumbs = [...breadcrumbs];
       newBreadcrumbs.pop();
@@ -145,63 +194,34 @@ const WorkspaceSelector: React.FC<WorkspceSelectorProps> = ({
       const parentCategories =
         newBreadcrumbs.length === 0
           ? workspaceFolders
-          : newBreadcrumbs[newBreadcrumbs.length - 1].children ||
-            workspaceFolders;
+          : newBreadcrumbs[newBreadcrumbs.length - 1].children || workspaceFolders;
 
       setCurrentCategories(parentCategories);
       setBreadcrumbs(newBreadcrumbs);
     }
-  };
+  }, [breadcrumbs, workspaceFolders]);
 
-  const handleItemSelection = (item: WorkspceCategory) => {
-    console.log("Selected:", item);
-    setIsOpen(false);
-    if (inputRef.current) {
-      const cursorPosition = inputRef.current.selectionStart ?? 0;
-      const textBeforeCursor = inputValue.substring(0, cursorPosition);
-      const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+  // Handle item selection using useCallback
 
-      if (
-        lastAtIndex !== -1 &&
-        (lastAtIndex === 0 || textBeforeCursor[lastAtIndex - 1] === " ")
-      ) {
-        const newInputValue =
-          textBeforeCursor.substring(0, lastAtIndex) +
-          `@${item.name} ` +
-          inputValue.substring(cursorPosition);
-        inputRef.current.value = newInputValue;
-        setInputValue(newInputValue);
-        onInputChange(newInputValue);
-        inputRef.current.focus();
-
-        const newCursorPosition = lastAtIndex + item.name.length + 2;
-        inputRef.current.setSelectionRange(
-          newCursorPosition,
-          newCursorPosition
-        );
-      } else {
-        inputRef.current.value = `@${item.name}`;
-        setInputValue(`@${item.name}`);
-        onInputChange(`@${item.name}`);
-      }
-    }
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+  // Handle click outside using useCallback
+  const handleClickOutside = useCallback(
+    (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (isOpen && !target.closest("[data-Workspce-selector]")) {
         setIsOpen(false);
-        setCurrentCategories(workspaceFolders);
+        setCurrentCategories(initialCategories);
         setBreadcrumbs([]);
       }
-    };
+    },
+    [isOpen, initialCategories]
+  );
 
+  useEffect(() => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isOpen, workspaceFolders]);
+  }, [handleClickOutside]);
 
   return (
     <div style={styles.WorkspceSelector} data-Workspce-selector="true">
@@ -242,11 +262,7 @@ const WorkspaceSelector: React.FC<WorkspceSelectorProps> = ({
 
           <ul style={styles.list}>
             {currentCategories.map((category) => (
-              <li
-                key={category.id}
-                className="list-item"
-                style={styles.listItem}
-              >
+              <li key={category.id} className="list-item" style={styles.listItem}>
                 <button
                   onClick={() => navigateToCategory(category)}
                   style={{

@@ -12,9 +12,9 @@ export interface ExtensionMessage {
   payload: any;
 }
 
-import { VSCodeTextArea, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
+import { VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react"; // Use useCallback and useMemo
 import { codeBuddyMode, faqItems, modelOptions, themeOptions } from "../constants/constant";
 import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
@@ -30,6 +30,7 @@ import Button from "./button";
 import { FAQAccordion } from "./accordion";
 import { SkeletonLoader } from "./skeletonLoader";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
+import ChatInput from "./ChatInput";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -45,17 +46,17 @@ const vsCode = (() => {
   };
 })();
 
+// Define a type for configuration data for better type safety
+interface ConfigData {
+  username?: string;
+  theme?: string;
+}
+
 export const WebviewUI = () => {
+  // State variables
   const [selectedTheme, setSelectedTheme] = useState("tokyo night");
   const [selectedModel, setSelectedModel] = useState("Gemini");
   const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Ask");
-  const [userInput, setUserInput] = useState("");
-
-  // Update CSS whenever theme changes
-  useEffect(() => {
-    const css = getChatCss(selectedTheme);
-    updateStyles(css);
-  }, [selectedTheme]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isBotLoading, setIsBotLoading] = useState(false);
   const [commandAction, setCommandAction] = useState<string>("");
@@ -67,140 +68,156 @@ export const WebviewUI = () => {
   const [activeEditor, setActiveEditor] = useState("");
   const [username, setUsername] = useState("");
   const [darkMode, setDarkMode] = useState(false);
+
+  // Ref for username input element
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const messageHandler = (event: any) => {
-      const message = event.data;
-      switch (message.type) {
-        case "bot-response":
-          setMessages((prevMessages) => [
-            ...(prevMessages || []),
-            {
-              type: "bot",
-              content: message.message,
-              language: "Typescript",
-              alias: "O",
-            },
-          ]);
-          setIsBotLoading(false);
-          setIsCommandExecuting(false);
-          setCommandAction("");
-          setCommandDescription("");
-          break;
-        case "codebuddy-commands":
-          // Handle command feedback - show what action is being performed
-          console.log("Command feedback received:", message.message);
-          setIsCommandExecuting(true);
-          if (typeof message.message === "object" && message.message.action && message.message.description) {
-            setCommandAction(message.message.action);
-            setCommandDescription(message.message.description);
-          } else {
-            // Fallback for legacy string format
-            setCommandAction(message.message || "Processing request");
-            setCommandDescription("CodeBuddy is analyzing your code and generating a response...");
-          }
-          break;
-        case "bootstrap":
-          setFolders(message);
-          break;
-        case "chat-history":
-          try {
-            setMessages((prevMessages) => [...JSON.parse(message.message), ...(prevMessages || [])]);
-          } catch (error: any) {
-            console.log(error);
-            throw new Error(error.message);
-          }
-          break;
-        case "error":
-          console.error("Extension error", message.payload);
-          setIsBotLoading(false);
-          break;
-        case "onActiveworkspaceUpdate":
-          setActiveEditor(message.message ?? "");
-          break;
-        case "onConfigurationChange": {
-          //Listen for config change here
-          const data = JSON.parse(message.message);
-          return data;
+  // Memoize the chat CSS to prevent unnecessary re-renders
+  const chatCss = useMemo(() => getChatCss(selectedTheme), [selectedTheme]);
+
+  // Use useCallback to prevent unnecessary re-renders of the message handler
+  const messageHandler = useCallback((event: any) => {
+    const message = event.data;
+    switch (message.type) {
+      case "bot-response":
+        // Use functional updates to ensure we're working with the most recent state
+        setMessages((prevMessages) => [
+          ...(prevMessages || []),
+          {
+            type: "bot",
+            content: message.message,
+            language: "Typescript",
+            alias: "O",
+          },
+        ]);
+        setIsBotLoading(false);
+        setIsCommandExecuting(false);
+        setCommandAction("");
+        setCommandDescription("");
+        break;
+      case "codebuddy-commands":
+        // Handle command feedback - show what action is being performed
+        console.log("Command feedback received:", message.message);
+        setIsCommandExecuting(true);
+        if (typeof message.message === "object" && message.message.action && message.message.description) {
+          setCommandAction(message.message.action);
+          setCommandDescription(message.message.description);
+        } else {
+          // Fallback for legacy string format
+          setCommandAction(message.message || "Processing request");
+          setCommandDescription("CodeBuddy is analyzing your code and generating a response...");
         }
-        case "onGetUserPreferences": {
-          const data = JSON.parse(message.message);
-          if (data.username) {
-            setUsername(data.username);
-          }
-          if (data.theme) {
-            setSelectedTheme(data.theme);
-          }
-          return data;
+        break;
+      case "bootstrap":
+        setFolders(message);
+        break;
+      case "chat-history":
+        try {
+          // Parse the chat history efficiently using JSON.parse
+          const parsedMessages = JSON.parse(message.message);
+          setMessages((prevMessages) => [...parsedMessages, ...(prevMessages || [])]);
+        } catch (error: any) {
+          console.log(error);
+          throw new Error(error.message);
         }
-        case "theme-settings":
-          // Handle theme settings from extension
-          if (message.theme) {
-            setSelectedTheme(message.theme);
-          }
-          break;
-        default:
-          console.warn("Unknown message type", message.type);
+        break;
+      case "error":
+        console.error("Extension error", message.payload);
+        setIsBotLoading(false);
+        break;
+      case "onActiveworkspaceUpdate":
+        setActiveEditor(message.message ?? "");
+        break;
+      case "onConfigurationChange": {
+        const data = JSON.parse(message.message);
+        return data;
       }
-    };
+      case "onGetUserPreferences": {
+        const data: ConfigData = JSON.parse(message.message);
+        if (data.username) {
+          setUsername(data.username);
+        }
+        if (data.theme) {
+          setSelectedTheme(data.theme);
+        }
+        return data;
+      }
+      case "theme-settings":
+        // Handle theme settings from extension
+        if (message.theme) {
+          setSelectedTheme(message.theme);
+        }
+        break;
+      default:
+        console.warn("Unknown message type", message.type);
+    }
+  }, []);
+
+  // Update CSS whenever theme changes using useEffect
+  useEffect(() => {
+    // Update styles using dynamicCss utility
+    updateStyles(chatCss);
+  }, [chatCss]);
+
+  // Initialize event listener for messages from VS Code
+  useEffect(() => {
     window.addEventListener("message", messageHandler);
     return () => {
       window.removeEventListener("message", messageHandler);
     };
-  }, []);
+  }, [messageHandler]); // Dependency array includes messageHandler
 
-  // Separate effect for highlighting code blocks
+  // Separate effect for highlighting code blocks using highlightCodeBlocks utility
   useEffect(() => {
     highlightCodeBlocks(hljsApi, messages);
   }, [messages]);
 
-  const handleClearHistory = () => {
+  const handleClearHistory = useCallback(() => {
     setMessages([]);
-  };
+  }, []);
 
-  const handleUserPreferences = () => {
+  const handleUserPreferences = useCallback(() => {
     vsCode.postMessage({
       command: "update-user-info",
       message: JSON.stringify({
         username,
       }),
     });
-  };
+  }, [username]);
 
-  const handleContextChange = (value: string) => {
+  const handleContextChange = useCallback((value: string) => {
     setSelectedContext(value);
-  };
+  }, []);
 
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setUsername(e.target.value);
-  };
+  }, []);
 
-  const handleToggle = (isActive: boolean) => {
+  const handleToggle = useCallback((isActive: boolean) => {
     setDarkMode(isActive);
     // Apply theme change logic here
     document.body.classList.toggle("dark-mode", isActive);
-  };
+  }, []);
 
-  const handleModelChange = (e: any) => {
+  const handleModelChange = useCallback((e: any) => {
     const newValue = e.target.value;
     setSelectedModel(newValue);
     vsCode.postMessage({
       command: "update-model-event",
       message: newValue,
     });
-  };
+  }, []);
 
-  const handleCodeBuddyMode = (e: any) => {
+  const handleCodeBuddyMode = useCallback((e: any) => {
     const newValue = e.target.value;
     setSelectedCodeBuddyMode(newValue);
     vsCode.postMessage({
       command: "codebuddy-model-change-event",
       message: newValue,
     });
-  };
+  }, []);
 
-  const handleThemeChange = (e: any) => {
+  const handleThemeChange = useCallback((e: any) => {
     const newValue = e.target.value;
     setSelectedTheme(newValue);
     // Optionally save theme preference to extension storage
@@ -208,52 +225,57 @@ export const WebviewUI = () => {
       command: "theme-change-event",
       message: newValue,
     });
-  };
+  }, []);
 
-  const handleTextChange = (e: any) => {
-    const newValue = e.target.value;
-    setUserInput(newValue);
-  };
+  // Use useCallback to prevent unnecessary re-renders of the handleSend function
+  const handleSend = useCallback(
+    (message: string) => {
+      if (!message.trim()) return;
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+      setMessages((previousMessages) => [
+        ...(previousMessages || []),
+        {
+          type: "user",
+          content: message,
+          alias: "O",
+        },
+      ]);
 
-  const handleSend = () => {
-    if (!userInput.trim()) return;
+      setIsBotLoading(true);
 
-    setMessages((previousMessages) => [
-      ...(previousMessages || []),
-      {
-        type: "user",
-        content: userInput,
-        alias: "O",
-      },
-    ]);
+      vsCode.postMessage({
+        command: "user-input",
+        message: message,
+        metaData: {
+          mode: selectedCodeBuddyMode,
+          context: selectedContext.split("@"),
+        },
+      });
+    },
+    [selectedCodeBuddyMode, selectedContext]
+  );
 
-    setIsBotLoading(true);
-
-    vsCode.postMessage({
-      command: "user-input",
-      message: userInput,
-      metaData: {
-        mode: selectedCodeBuddyMode,
-        context: selectedContext.split("@"),
-      },
-    });
-
-    setUserInput("");
-  };
-
-  const handleGetContext = () => {
+  const handleGetContext = useCallback(() => {
     vsCode.postMessage({
       command: "upload-file",
-      message: userInput,
+      message: "",
     });
-  };
+  }, []);
+
+  const processedContext = useMemo(() => {
+    const contextArray = Array.from(new Set(selectedContext.split("@").join(", ").split(", ")));
+    return contextArray.filter((item) => item.length > 1);
+  }, [selectedContext]);
+
+  const memoizedMessages = useMemo(() => {
+    return messages.map((msg) =>
+      msg.type === "bot" ? (
+        <BotMessage key={msg.content} content={msg.content} />
+      ) : (
+        <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
+      )
+    );
+  }, [messages]);
 
   return (
     <div style={{ overflow: "hidden" }}>
@@ -275,13 +297,7 @@ export const WebviewUI = () => {
           <div className="chat-content">
             <div className="dropdown-container">
               <div>
-                {messages?.map((msg) =>
-                  msg.type === "bot" ? (
-                    <BotMessage key={msg.content} content={msg.content} />
-                  ) : (
-                    <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
-                  )
-                )}
+                {memoizedMessages}
                 {isCommandExecuting && (
                   <CommandFeedbackLoader commandAction={commandAction} commandDescription={commandDescription} />
                 )}
@@ -354,13 +370,11 @@ export const WebviewUI = () => {
                 <>
                   <small>Context: </small>
                   <small>
-                    {Array.from(new Set(selectedContext.split("@").join(", ").split(", "))).map((item) => {
-                      return item.length > 1 ? (
-                        <span className="attachment-icon" key={item}>
-                          {item}
-                        </span>
-                      ) : null;
-                    })}
+                    {processedContext.map((item) => (
+                      <span className="attachment-icon" key={item}>
+                        {item}
+                      </span>
+                    ))}
                   </small>
                 </>
               ) : (
@@ -374,16 +388,8 @@ export const WebviewUI = () => {
               <small className="attachment-icon">{activeEditor}</small>
             </span>
           </div>
-
           <WorkspaceSelector activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
-
-          <VSCodeTextArea
-            value={userInput}
-            onInput={handleTextChange}
-            placeholder="Ask Anything"
-            onKeyDown={handleKeyDown}
-            style={{ background: "#16161e" }}
-          />
+          <ChatInput onSendMessage={handleSend} /> {/* Replace VSCodeTextArea with ChatInput */}
         </div>
         <div className="horizontal-stack">
           <AttachmentIcon onClick={handleGetContext} disabled={true} />
