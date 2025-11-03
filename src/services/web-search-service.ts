@@ -6,6 +6,8 @@ import { PRIORITY_URLS, WEB_SEARCH_CONFIG } from "../application/constant";
 import { Logger } from "../infrastructure/logger/logger";
 import { generateQueryString } from "../utils/utils";
 import { UrlReranker } from "./url-reranker";
+import { LRUCache } from "lru-cache";
+import nlp from "compromise";
 
 interface ArticleContent {
   url: string;
@@ -30,43 +32,78 @@ export class WebSearchService {
   private readonly urlRanker: UrlReranker;
   static readonly URL_PRIORITY_LIST = PRIORITY_URLS;
 
+  private cache: LRUCache<string, ArticleContent>;
+
   private constructor(logger: Logger) {
     this.logger = logger;
     this.orchestrator = Orchestrator.getInstance();
     this.urlRanker = new UrlReranker("");
+    this.cache = new LRUCache({ max: 100 });
   }
 
   public static getInstance(): WebSearchService {
     if (!WebSearchService.instance) {
       WebSearchService.instance = new WebSearchService(
-        new Logger("WebSearchService"),
+        new Logger("WebSearchService")
       );
     }
     return WebSearchService.instance;
   }
 
-  private async fetchArticleContent(
-    url: string,
-  ): Promise<ArticleContent | undefined> {
+  public async fetchArticle(url: string): Promise<ArticleContent> {
+    if (this.cache.has(url)) {
+      return this.cache.get(url)!;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout
+
     try {
-      const response = await axios.get(url, { timeout: 5000 });
+      const response = await axios.get(url, {
+        signal: controller.signal,
+        maxContentLength: 5_000_000, // 5MB limit
+      });
+
+      if (response.status !== 200) {
+        throw new Error(`Received status code ${response.status} for ${url}`);
+      }
+
       const html = response.data;
-      const dom = new JSDOM(html);
+      const dom = new JSDOM(html, { url });
       const reader = new Readability(dom.window.document);
       const article = reader.parse();
 
-      const content = article?.textContent
-        ? article.textContent.trim().slice(0, 10000)
-        : "No readable content found";
-      return { url, content: content.trim() };
+      if (!article?.textContent) {
+        throw new Error(`Readability could not find main content for ${url}`);
+      }
+      const summarizedContent = this.summarizeArticle(article.textContent);
+
+      const content = summarizedContent.trim().slice(0, 20000);
+      const result: ArticleContent = { url, content };
+
+      this.cache.set(url, result);
+
+      return result;
     } catch (error: any) {
-      this.logger.warn(`Failed to fetch ${url}: ${error.message}`, error);
-      return { url: "", content: "" };
+      throw new Error(error.message);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
+  private summarizeArticle(article: string) {
+    const doc = nlp(article);
+    const allSentences = doc.sentences();
+    const numToTake = Math.min(10, Math.ceil(allSentences.length * 0.1));
+    const summary =
+      allSentences.slice(0, numToTake).text() +
+      "\n\nKeywords: " +
+      doc.topics().out("array").join(", ");
+    return summary;
+  }
+
   private async fetchSearchResultMetadata(
-    searchUrl: string,
+    searchUrl: string
   ): Promise<IPageMetada[]> {
     try {
       const response = await axios.get(searchUrl, {
@@ -90,32 +127,32 @@ export class WebSearchService {
         urls.map(async (url) => {
           const metadata = await this.extracturlMetaData(url);
           return metadata;
-        }),
+        })
       );
 
       this.logger.info(`Extracted URLs: ${urls.join(", ")}`);
       if (pagesMetaData?.length) {
         this.orchestrator.publish(
           "onUpdate",
-          pagesMetaData.map((item) => JSON.stringify(item)).join("\n\n"),
+          pagesMetaData.map((item) => JSON.stringify(item)).join("\n\n")
         );
       }
 
       console.log(pagesMetaData);
       return pagesMetaData.filter(
-        ({ url, favicon }) => url.length > 1 && favicon.length > 1,
+        ({ url, favicon }) => url.length > 1 && favicon.length > 1
       );
     } catch (error: any) {
       this.logger.error(
         `Error fetching or parsing search results: ${error.message}`,
-        error,
+        error
       );
       return [];
     }
   }
 
   private async extracturlMetaData(
-    url: string,
+    url: string
   ): Promise<{ url: string; title: string | undefined; favicon: string }> {
     try {
       const parsedUrl = new URL(url);
@@ -137,7 +174,7 @@ export class WebSearchService {
         title = this.extractTitle(doc);
 
         const faviconElement = doc.querySelector(
-          'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]',
+          'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'
         );
 
         favicon = await this.extractFavicon(faviconElement, origin, parsedUrl);
@@ -149,7 +186,7 @@ export class WebSearchService {
       return { url, favicon, title };
     } catch (error: any) {
       this.logger.warn(
-        `Error fetching favicon and title for ${url}: ${error.message}`,
+        `Error fetching favicon and title for ${url}: ${error.message}`
       );
       return { url: "", title: "", favicon: "" };
     }
@@ -183,7 +220,7 @@ export class WebSearchService {
   private async extractFavicon(
     faviconElement: Element | null,
     origin: string,
-    parsedUrl: URL,
+    parsedUrl: URL
   ): Promise<string> {
     let favicon = "";
 
@@ -255,15 +292,23 @@ export class WebSearchService {
 
       const urls = this.sortUrlsByPriority(
         crawleableMetadata,
-        WebSearchService.URL_PRIORITY_LIST,
+        WebSearchService.URL_PRIORITY_LIST
       ).filter((url) => !url.includes("youtube.com"));
 
       const contextPromises = urls
         .slice(0, 3)
-        .map((url) => this.fetchArticleContent(url));
-      const contextResults = await Promise.all(contextPromises);
-      const filteredContext = contextResults.filter((c) => c !== undefined);
-      return filteredContext.map((result) => result?.content).join("\n\n");
+        .map((url) => this.fetchArticle(url));
+      const contextResults = await Promise.allSettled(contextPromises);
+      const filteredContext = contextResults.filter(
+        (result): result is PromiseFulfilledResult<ArticleContent> => {
+          if (result.status === "rejected") {
+            this.logger.warn(`Article fetch failed:`, result.reason);
+            return false;
+          }
+          return result.status === "fulfilled" && result.value?.content !== "";
+        }
+      );
+      return filteredContext.map((result) => result.value.content).join("\n\n");
     } catch (error: any) {
       this.logger.info(`search error: ${error.message}`, error);
       return "";
@@ -272,7 +317,7 @@ export class WebSearchService {
 
   readonly sortUrlsByPriority = (
     metadata: IPageMetada[],
-    priorityDomains: string[],
+    priorityDomains: string[]
   ): string[] => {
     const priorityUrls: string[] = [];
     const otherUrls: string[] = [];

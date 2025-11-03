@@ -40,8 +40,11 @@ export class WebTool {
   config() {
     return {
       name: "web_search",
-      description:
-        "Search the internet for general programming knowledge, best practices, or solutions to common coding problems. Useful for understanding concepts, exploring different approaches, or finding external libraries.",
+      description: `Search the internet for general programming knowledge, 
+      best practices, or solutions to common coding problems. 
+      Useful for understanding concepts, exploring different approaches, 
+      or finding external libraries. After receiving results, 
+      you MUST synthesize the information into a natural, helpful response for the user.`,
       parameters: {
         type: SchemaType.OBJECT,
         properties: {

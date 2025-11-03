@@ -12,7 +12,9 @@ export class LangChainThinkTool extends StructuredTool<any> {
 
   constructor(private readonly toolInstance: ThinkTool) {
     super();
-    this.logger = Logger.initialize("LangChainThinkTool", { minLevel: LogLevel.INFO });
+    this.logger = Logger.initialize("LangChainThinkTool", {
+      minLevel: LogLevel.INFO,
+    });
   }
 
   name = "think";
@@ -21,16 +23,23 @@ export class LangChainThinkTool extends StructuredTool<any> {
   schema = z.object({
     thought: z
       .string()
-      .describe("Describe your detailed analysis, thought process, reasoning steps, or plan of action."),
+      .describe(
+        "Describe your detailed analysis, thought process, reasoning steps, or plan of action.",
+      ),
   });
 
   async _call(input: { thought: string }): Promise<string> {
-    this.logger.info(`Executing tool: ${this.name} with thought: ${input.thought.substring(0, 100)}...`);
+    this.logger.info(
+      `Executing tool: ${this.name} with thought: ${input.thought.substring(0, 100)}...`,
+    );
     try {
       const result = await this.executeThinkTool(input.thought);
       return JSON.stringify(result);
     } catch (error: any) {
-      this.logger.error(`Error in tool ${this.name}: ${error.message}`, { input, error });
+      this.logger.error(`Error in tool ${this.name}: ${error.message}`, {
+        input,
+        error,
+      });
       throw new Error(`Tool ${this.name} failed: ${error.message}`);
     }
   }
@@ -40,7 +49,10 @@ export class LangChainThinkTool extends StructuredTool<any> {
       const plan = await this.toolInstance.execute(thought);
       return { plan: plan };
     } catch (error: any) {
-      this.logger.error(`Error executing ThinkTool: ${error.message}`, { thought, error });
+      this.logger.error(`Error executing ThinkTool: ${error.message}`, {
+        thought,
+        error,
+      });
       throw error;
     }
   }

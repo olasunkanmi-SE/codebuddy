@@ -559,7 +559,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
 
               response = await this.generateResponse(
-                await this.enhanceMessageWithCodebaseContext(sanitizedMessage),
+                message.message,
                 message.metaData,
               );
               if (this.UserMessageCounter === 1) {

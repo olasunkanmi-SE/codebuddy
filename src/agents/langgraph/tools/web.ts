@@ -14,16 +14,25 @@ export class LangChainWebTool extends StructuredTool<any> {
   description: string =
     "Search the internet for general programming knowledge, best practices, or solutions to common coding problems. Useful for understanding concepts, exploring different approaches, or finding external libraries.";
   schema = z.object({
-    query: z.string().describe("The search query to use when searching the web for relevant information."),
+    query: z
+      .string()
+      .describe(
+        "The search query to use when searching the web for relevant information.",
+      ),
   });
 
   async _call(input: { query: string }): Promise<string> {
-    this.logger.info(`Executing tool: ${this.name} with args: ${JSON.stringify(input)}`);
+    this.logger.info(
+      `Executing tool: ${this.name} with args: ${JSON.stringify(input)}`,
+    );
     try {
       const result = await this.toolInstance.execute(input.query);
       return JSON.stringify(result);
     } catch (error: any) {
-      this.logger.error(`Error in tool ${this.name}: ${error.message}`, { input, error });
+      this.logger.error(`Error in tool ${this.name}: ${error.message}`, {
+        input,
+        error,
+      });
       throw error;
     }
   }
