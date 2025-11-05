@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 import { IFileUploader } from "../application/interfaces";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../agents/orchestrator";
+import { textFileExtensions } from "../application/constant";
 
 export class FileManager implements IFileUploader {
   private static instance: FileManager;
@@ -39,8 +40,8 @@ export class FileManager implements IFileUploader {
    * */
   async uploadFile(file: vscode.Uri): Promise<void> {
     try {
-      const content = await fs.promises.readFile(file.fsPath, "utf8");
       const fileName = path.basename(file.fsPath);
+      const fileExtension = path.extname(fileName).toLocaleLowerCase();
       const files = await this.getFiles();
       // if (files.length > 0) {
       //   await this.deleteFiles(files);
@@ -52,7 +53,13 @@ export class FileManager implements IFileUploader {
         return;
       }
 
-      await fs.promises.writeFile(filePath, content);
+      if (textFileExtensions.includes(fileExtension)) {
+        const content = await fs.promises.readFile(file.fsPath, "utf8");
+        await fs.promises.writeFile(filePath, content);
+      } else {
+        await fs.promises.copyFile(file.fsPath, filePath);
+      }
+
       vscode.window.showInformationMessage(`File uploaded successfully`);
       this.orchestrator.publish(
         "onFileUpload",
@@ -92,10 +99,9 @@ export class FileManager implements IFileUploader {
    * */
   async deleteFiles(files: string[]): Promise<void> {
     try {
-      const deletePromises = files.map((file) => {
-        const fileName = path.basename(file);
-        return fs.promises.unlink(path.join(this.fileDir, fileName));
-      });
+      const deletePromises = files.map((filePath) =>
+        fs.promises.unlink(path.join(filePath)),
+      );
       await Promise.all(deletePromises);
     } catch (error: any) {
       this.logger.info(`Unable to delete files`);
@@ -125,13 +131,13 @@ export class FileManager implements IFileUploader {
    * */
 
   async uploadFileHandler(): Promise<void> {
-    const MAX_FILE_SIZE = 40 * 1024 * 1024; // 5MB, adjust as needed
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB, adjust as needed
     const file: vscode.Uri[] | undefined = await vscode.window.showOpenDialog({
       canSelectFiles: true,
       canSelectFolders: false,
       canSelectMany: false,
       filters: {
-        files: ["pdf", "txt", "csv"],
+        files: ["pdf", "txt", "csv", "sql", "md", "json", "yaml", "yml"],
       },
     });
 

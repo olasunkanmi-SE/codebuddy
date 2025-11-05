@@ -44,7 +44,7 @@ export class WebSearchService {
   public static getInstance(): WebSearchService {
     if (!WebSearchService.instance) {
       WebSearchService.instance = new WebSearchService(
-        new Logger("WebSearchService")
+        new Logger("WebSearchService"),
       );
     }
     return WebSearchService.instance;
@@ -103,7 +103,7 @@ export class WebSearchService {
   }
 
   private async fetchSearchResultMetadata(
-    searchUrl: string
+    searchUrl: string,
   ): Promise<IPageMetada[]> {
     try {
       const response = await axios.get(searchUrl, {
@@ -127,32 +127,32 @@ export class WebSearchService {
         urls.map(async (url) => {
           const metadata = await this.extracturlMetaData(url);
           return metadata;
-        })
+        }),
       );
 
       this.logger.info(`Extracted URLs: ${urls.join(", ")}`);
       if (pagesMetaData?.length) {
         this.orchestrator.publish(
           "onUpdate",
-          pagesMetaData.map((item) => JSON.stringify(item)).join("\n\n")
+          pagesMetaData.map((item) => JSON.stringify(item)).join("\n\n"),
         );
       }
 
       console.log(pagesMetaData);
       return pagesMetaData.filter(
-        ({ url, favicon }) => url.length > 1 && favicon.length > 1
+        ({ url, favicon }) => url.length > 1 && favicon.length > 1,
       );
     } catch (error: any) {
       this.logger.error(
         `Error fetching or parsing search results: ${error.message}`,
-        error
+        error,
       );
       return [];
     }
   }
 
   private async extracturlMetaData(
-    url: string
+    url: string,
   ): Promise<{ url: string; title: string | undefined; favicon: string }> {
     try {
       const parsedUrl = new URL(url);
@@ -174,7 +174,7 @@ export class WebSearchService {
         title = this.extractTitle(doc);
 
         const faviconElement = doc.querySelector(
-          'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'
+          'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]',
         );
 
         favicon = await this.extractFavicon(faviconElement, origin, parsedUrl);
@@ -186,7 +186,7 @@ export class WebSearchService {
       return { url, favicon, title };
     } catch (error: any) {
       this.logger.warn(
-        `Error fetching favicon and title for ${url}: ${error.message}`
+        `Error fetching favicon and title for ${url}: ${error.message}`,
       );
       return { url: "", title: "", favicon: "" };
     }
@@ -220,7 +220,7 @@ export class WebSearchService {
   private async extractFavicon(
     faviconElement: Element | null,
     origin: string,
-    parsedUrl: URL
+    parsedUrl: URL,
   ): Promise<string> {
     let favicon = "";
 
@@ -292,7 +292,7 @@ export class WebSearchService {
 
       const urls = this.sortUrlsByPriority(
         crawleableMetadata,
-        WebSearchService.URL_PRIORITY_LIST
+        WebSearchService.URL_PRIORITY_LIST,
       ).filter((url) => !url.includes("youtube.com"));
 
       const contextPromises = urls
@@ -306,7 +306,7 @@ export class WebSearchService {
             return false;
           }
           return result.status === "fulfilled" && result.value?.content !== "";
-        }
+        },
       );
       return filteredContext.map((result) => result.value.content).join("\n\n");
     } catch (error: any) {
@@ -317,7 +317,7 @@ export class WebSearchService {
 
   readonly sortUrlsByPriority = (
     metadata: IPageMetada[],
-    priorityDomains: string[]
+    priorityDomains: string[],
   ): string[] => {
     const priorityUrls: string[] = [];
     const otherUrls: string[] = [];

@@ -1,5 +1,10 @@
-import { BaseMessage } from "@langchain/core/messages";
-import { Runnable } from "@langchain/core/runnables";
+import {
+  AIMessage,
+  BaseMessage,
+  HumanMessage,
+  SystemMessage,
+} from "@langchain/core/messages";
+import { Runnable, RunnableConfig } from "@langchain/core/runnables";
 import { IterableReadableStream } from "@langchain/core/utils/stream";
 import { END, MessagesAnnotation } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
@@ -9,10 +14,16 @@ import { Orchestrator } from "../../orchestrator";
 import { LLMFactory } from "../llm/factory";
 import { ToolProvider } from "../tools/provider";
 import { GraphBuilder, IGraphBuilder } from "./builder";
+import { Memory } from "../../../memory/base";
+import { generateUUID } from "../../../utils/utils";
 
 export class langGraphAgent {
   private readonly compiledGraph: Runnable;
   private readonly orchestrator: Orchestrator;
+
+  private conversationHistory: BaseMessage[] = [];
+  private readonly maxHistoryLength = 3;
+  private readonly threadId: string;
 
   constructor(
     private readonly llm: Runnable,
@@ -21,17 +32,41 @@ export class langGraphAgent {
     private readonly graphBuilder: IGraphBuilder = new GraphBuilder(),
     private readonly logger: Logger = Logger.initialize("langGraphAgent", {
       minLevel: LogLevel.DEBUG,
-    })
+    }),
   ) {
     this.llmCall = this.llmCall.bind(this);
     this.shouldContinue = this.shouldContinue.bind(this);
     this.compiledGraph = this.graphBuilder.build(
       this.llmCall,
       this.shouldContinue,
-      this.toolNode
+      this.toolNode,
     );
 
     this.orchestrator = Orchestrator.getInstance();
+    this.initializeHistory();
+    this.threadId = generateUUID();
+  }
+
+  private initializeHistory() {
+    const savedHistory = Memory.get(`agent-state-${this.threadId}`);
+    if (savedHistory?.length) {
+      this.conversationHistory = savedHistory;
+    } else {
+      this.conversationHistory = [
+        new SystemMessage(this.globalSystemInstruction ?? agentPrompt),
+      ];
+    }
+  }
+
+  private pruneHistory(): void {
+    if (this.conversationHistory.length > this.maxHistoryLength) {
+      const systemMessage = this.conversationHistory[0];
+      const recentMessages = this.conversationHistory.slice(
+        -this.maxHistoryLength,
+      );
+      this.conversationHistory = [systemMessage, ...recentMessages];
+      Memory.set(`agent-state-${this.threadId}`, this.conversationHistory);
+    }
   }
 
   async llmCall(state: typeof MessagesAnnotation.State) {
@@ -77,51 +112,36 @@ export class langGraphAgent {
     return new langGraphAgent(llm, toolNode, config.systemInstruction);
   }
 
+  updateAgentConversations(userMessage: string) {
+    this.conversationHistory.push(new HumanMessage(userMessage));
+  }
+
   async *runx(userMessage: string) {
     try {
-      const messages = [
-        {
-          role: "system",
-          content: this.globalSystemInstruction ?? agentPrompt,
-        },
-        {
-          role: "human",
-          content: userMessage,
-        },
-      ];
-      let finalState: typeof MessagesAnnotation.State = { messages: [] };
+      this.updateAgentConversations(userMessage);
+      const config: RunnableConfig = {
+        configurable: { thread_id: this.threadId },
+      };
       const stream: IterableReadableStream<any> =
-        await this.compiledGraph.stream({ messages });
+        await this.compiledGraph.stream(
+          { messages: this.conversationHistory },
+          config,
+        );
       for await (const event of stream) {
         for (const [nodeName, update] of Object.entries(
-          event as Record<string, any>
+          event as Record<string, any>,
         )) {
-          if (update && Array.isArray(update.messages)) {
-            for (const message of update.messages) {
-              if (
-                message.contentBlocks &&
-                Array.isArray(message.contentBlocks)
-              ) {
-                const reasoningSteps = message.contentBlocks.filter(
-                  (b: { type: string }) => b.type === "reasoning"
-                );
-                if (reasoningSteps?.length > 0) {
-                  this.orchestrator.publish("onQuery", message);
-                }
-              }
-            }
+          if (update?.messages) {
+            this.conversationHistory.push(...update.messages);
           }
-
-          if (update.messages) {
-            finalState.messages.push(...update.messages);
-          }
-
           yield { node: nodeName, update };
           this.logger.log(LogLevel.INFO, `Stream event from node: ${nodeName}`);
         }
-        console.log(finalState.messages);
       }
+      this.pruneHistory();
     } catch (error: any) {
+      this.conversationHistory.pop();
+      Memory.set(`agent-state-${this.threadId}`, this.conversationHistory);
       this.logger.error("Agent execution failed:", error);
       throw error;
     }

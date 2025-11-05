@@ -17,6 +17,7 @@ import { LogLevel } from "../services/telemetry";
 import { WorkspaceService } from "../services/workspace-service";
 import {
   formatText,
+  generateUUID,
   getAPIKeyAndModel,
   getGenerativeAiModel,
 } from "../utils/utils";
@@ -501,6 +502,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           switch (message.command) {
             case "user-input": {
               this.UserMessageCounter += 1;
+              const traceId = generateUUID();
+              Logger.setTraceId(traceId);
 
               // Validate user input for security
               const validation = this.inputValidator.validateInput(
@@ -562,6 +565,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 message.message,
                 message.metaData,
               );
+
               if (this.UserMessageCounter === 1) {
                 await this.publishWorkSpace();
               }

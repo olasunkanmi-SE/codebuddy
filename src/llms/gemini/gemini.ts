@@ -13,7 +13,7 @@ import { Logger } from "../../infrastructure/logger/logger";
 import { Memory } from "../../memory/base";
 import { LogLevel } from "../../services/telemetry";
 import { CodeBuddyToolProvider } from "../../tools/factory/tool";
-import { getAPIKeyAndModel } from "../../utils/utils";
+import { generateUUID, getAPIKeyAndModel } from "../../utils/utils";
 import { BaseLLM } from "../base";
 import { GroqLLM } from "../groq/groq";
 import { GeminiLLMSnapShot, ILlmConfig } from "../interface";
@@ -55,8 +55,8 @@ export class GeminiLLM
   private intializeDisposable(): void {
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration(() =>
-        this.handleConfigurationChange()
-      )
+        this.handleConfigurationChange(),
+      ),
     );
   }
 
@@ -84,7 +84,7 @@ export class GeminiLLM
 
   public async generateText(
     prompt: string,
-    instruction?: string
+    instruction?: string,
   ): Promise<string> {
     try {
       const model = this.getModel();
@@ -160,7 +160,7 @@ export class GeminiLLM
       return content
         .filter(
           (part): part is { type: "text"; text: string } =>
-            part.type === "text" && typeof part.text === "string"
+            part.type === "text" && typeof part.text === "string",
         )
         .map((textPart) => textPart.text)
         .join(" ");
@@ -186,6 +186,8 @@ export class GeminiLLM
 
   async run(userQuery: string) {
     try {
+      const traceId = generateUUID();
+      Logger.setTraceId(traceId);
       this.userQuery = userQuery;
       const result = await this.processUserQuery(userQuery);
       return result;

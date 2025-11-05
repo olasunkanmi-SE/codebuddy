@@ -1,7 +1,7 @@
-import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import * as crypto from "crypto";
+import * as vscode from "vscode";
+import { generateUUID } from "../../utils/utils";
 
 // TODO Log data in MongoDB Atlas, take advantage of telemetery
 
@@ -58,8 +58,8 @@ export class Logger {
 
   private static outputChannel: vscode.OutputChannel | undefined;
   private static telemetry: ITelemetry | undefined;
-  private static sessionId: string;
-  private static traceId: string;
+  static sessionId: string;
+  static traceId: string;
   static instance: Logger;
   constructor(private readonly module: string) {}
 
@@ -86,8 +86,7 @@ export class Logger {
     }
     Logger.outputChannel ??= vscode.window.createOutputChannel("CodeBuddy");
     Logger.telemetry = telemetry;
-    Logger.sessionId = Logger.generateId();
-    Logger.setTraceId(Logger.generateId());
+    Logger.sessionId ??= generateUUID();
     if (!Logger.instance) {
       Logger.instance = new Logger(module);
     }
@@ -96,10 +95,6 @@ export class Logger {
 
   public static setTraceId(traceId: string): void {
     Logger.traceId = traceId;
-  }
-
-  private static generateId(): string {
-    return crypto.randomBytes(16).toString("hex");
   }
 
   private shouldLog(logLevel: LogLevel) {

@@ -55,7 +55,15 @@ const {
 } = APP_CONFIG;
 console.log(APP_CONFIG);
 
-const logger = Logger.initialize("extension", { minLevel: LogLevel.DEBUG });
+Logger.initialize("extension-main", {
+  minLevel: LogLevel.DEBUG,
+  enableConsole: true,
+  enableFile: true,
+  enableTelemetry: true,
+});
+
+const mainLogger = new Logger("activate");
+mainLogger.info("CodeBuddy extension is now active!");
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
@@ -502,6 +510,15 @@ function registerVectorDatabaseCommands(
 }
 
 export async function activate(context: vscode.ExtensionContext) {
+  Logger.initialize("extension-main", {
+    minLevel: LogLevel.DEBUG,
+    enableConsole: true,
+    enableFile: true,
+    enableTelemetry: true,
+  });
+
+  const mainLogger = new Logger("activate");
+  mainLogger.info("CodeBuddy extension is now active!");
   try {
     console.log("🚀 CodeBuddy: Starting fast activation...");
 
