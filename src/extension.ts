@@ -51,8 +51,6 @@ const {
 } = APP_CONFIG;
 console.log(APP_CONFIG);
 
-const logger = Logger.initialize("extension", { minLevel: LogLevel.DEBUG });
-
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
 let orchestrator = Orchestrator.getInstance();
@@ -181,6 +179,15 @@ async function initializeBackgroundServices(
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    Logger.initialize("extension-main", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
+
+    const mainLogger = new Logger("activate");
+    mainLogger.info("CodeBuddy extension is now active!");
     console.log("🚀 CodeBuddy: Starting fast activation...");
 
     // ⚡ FAST STARTUP: Only essential sync operations
@@ -592,21 +599,6 @@ export function deactivate(context: vscode.ExtensionContext) {
   // Clear database history before deactivation
   clearFileStorageData();
 
-  // Phase 4: Dispose vector database components
-  // try {
-  //   if (vectorDbSyncService) {
-  //     vectorDbSyncService.dispose();
-  //     console.log("✓ Vector database sync service disposed");
-  //   }
-  //   if (vectorDbWorkerManager) {
-  //     vectorDbWorkerManager.dispose();
-  //     console.log("✓ Vector database worker manager disposed");
-  //   }
-  // } catch (error) {
-  //   console.warn("Error disposing Phase 4 vector components:", error);
-  // }
-
-  // Shutdown persistent codebase service
   try {
     const persistentCodebaseService =
       PersistentCodebaseUnderstandingService.getInstance();

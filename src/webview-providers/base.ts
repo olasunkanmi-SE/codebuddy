@@ -4,34 +4,29 @@ import {
   FolderEntry,
   IContextInfo,
 } from "../application/interfaces/workspace.interface";
+import { VectorDbConfigurationManager } from "../config/vector-db.config";
 import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
 import { AgentService } from "../services/agent-state";
 import { ChatHistoryManager } from "../services/chat-history-manager";
 import { CodebaseUnderstandingService } from "../services/codebase-understanding.service";
-import { FileManager } from "../services/file-manager";
-import { FileService } from "../services/file-system";
-import { InputValidator } from "../services/input-validator";
-import { QuestionClassifierService } from "../services/question-classifier.service";
-import { LogLevel } from "../services/telemetry";
-import { WorkspaceService } from "../services/workspace-service";
-import {
-  formatText,
-  getAPIKeyAndModel,
-  getGenerativeAiModel,
-} from "../utils/utils";
-import { getWebviewContent } from "../webview/chat";
 import { ContextRetriever } from "../services/context-retriever";
-import { UserFeedbackService } from "../services/user-feedback.service";
-import { VectorDbConfigurationManager } from "../config/vector-db.config";
-import { ICodeIndexer } from "../interfaces/vector-db.interface";
-import { PerformanceProfiler } from "../services/performance-profiler.service";
-import { ProductionSafeguards } from "../services/production-safeguards.service";
 import { EnhancedCacheManager } from "../services/enhanced-cache-manager.service";
 import {
   EnhancedPromptBuilderService,
   PromptContext,
 } from "../services/enhanced-prompt-builder.service";
+import { FileManager } from "../services/file-manager";
+import { FileService } from "../services/file-system";
+import { InputValidator } from "../services/input-validator";
+import { PerformanceProfiler } from "../services/performance-profiler.service";
+import { ProductionSafeguards } from "../services/production-safeguards.service";
+import { QuestionClassifierService } from "../services/question-classifier.service";
+import { LogLevel } from "../services/telemetry";
+import { UserFeedbackService } from "../services/user-feedback.service";
+import { WorkspaceService } from "../services/workspace-service";
+import { formatText, getAPIKeyAndModel } from "../utils/utils";
+import { getWebviewContent } from "../webview/chat";
 
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
@@ -112,138 +107,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.performanceProfiler,
     );
 
-    // Initialize user feedback service
     this.userFeedbackService = new UserFeedbackService();
-
-    // Note: codeIndexingService will be initialized when a proper implementation is available
-    // Create a temporary code indexing service (to be properly implemented later)
-    // Import the correct interface from vector-db-sync.service
-    const tempCodeIndexer = {
-      generateEmbeddings: async (): Promise<any[]> => [],
-    };
 
     this.contextRetriever = new ContextRetriever();
 
-    // Initialize configuration manager first
-    this.configManager = new VectorDbConfigurationManager();
-
-    // Initialize user feedback service
-    this.userFeedbackService = new UserFeedbackService();
-
-    // Initialize prompt builder service
     this.promptBuilderService = new EnhancedPromptBuilderService();
-
-    // Note: codeIndexingService is already initialized with temp implementation above
-
-    // Don't register disposables here - do it lazily when webview is resolved
-  }
-
-  /**
-   * Initialize vector database components with Phase 4 orchestration
-   */
-  protected async initializeVectorComponents(): Promise<void> {
-    try {
-      this.logger.info("Starting Phase 4 vector database orchestration...");
-
-      // Phase 4.4: Initialize sync service for real-time file monitoring
-      this.logger.info("✓ Vector database sync service initialized");
-
-      // Phase 4.5: Trigger immediate embedding phase for essential files
-      await this.executeImmediateEmbeddingPhase();
-      this.logger.info("✓ Immediate embedding phase completed");
-
-      this.logger.info(
-        "🚀 Phase 4 vector database orchestration completed successfully",
-      );
-    } catch (error) {
-      this.logger.error("Failed to initialize Phase 4 orchestration:", error);
-      // Continue with graceful degradation
-      await this.handleVectorInitializationError(error);
-    }
-  }
-
-  /**
-   * Execute immediate embedding phase for essential files
-   */
-  private async executeImmediateEmbeddingPhase(): Promise<void> {
-    try {
-      // The orchestrator's initialize method handles the immediate phase internally
-      // No need to call it separately - it's already handled in the orchestrator initialization
-
-      // Show user feedback
-      vscode.window.setStatusBarMessage(
-        "$(check) CodeBuddy: Essential files indexed and ready",
-        5000,
-      );
-    } catch (error) {
-      this.logger.warn(
-        "Immediate embedding phase failed, continuing with fallback:",
-        error,
-      );
-    }
-  }
-
-  /**
-   * Handle vector database initialization errors gracefully
-   */
-  private async handleVectorInitializationError(error: any): Promise<void> {
-    this.logger.warn(
-      "Vector database initialization failed, enabling fallback mode",
-    );
-
-    // Provide specific guidance based on error type
-    if (
-      error instanceof Error &&
-      error.message.includes("ChromaDB Connection Failed")
-    ) {
-      // Show detailed ChromaDB setup guidance
-      const action = await vscode.window.showWarningMessage(
-        "ChromaDB setup required for vector search. CodeBuddy will use keyword search as fallback.",
-        "Fix ChromaDB",
-        "Continue",
-        "Run Diagnostic",
-      );
-
-      if (action === "Fix ChromaDB") {
-        vscode.window
-          .showInformationMessage(
-            `To enable vector search:\n\n` +
-              `Quick Fix: npm install chromadb@1.8.1\n` +
-              `Then restart VS Code\n\n` +
-              `Alternative: Start ChromaDB server:\n` +
-              `pip install chromadb && chroma run --host localhost --port 8000`,
-            "Copy Command",
-          )
-          .then((copyAction) => {
-            if (copyAction === "Copy Command") {
-              vscode.env.clipboard.writeText("npm install chromadb@1.8.1");
-            }
-          });
-      } else if (action === "Run Diagnostic") {
-        vscode.commands.executeCommand("codebuddy.vectorDb.diagnostic");
-      }
-    } else {
-      // Generic error handling
-      const action = await vscode.window.showWarningMessage(
-        "Vector database initialization failed. CodeBuddy will use keyword-based search as fallback.",
-        "Retry",
-        "Continue",
-        "Run Diagnostic",
-      );
-
-      if (action === "Retry") {
-        // Retry initialization after a delay
-        setTimeout(() => {
-          this.initializeVectorComponents();
-        }, 10000);
-      } else if (action === "Run Diagnostic") {
-        vscode.commands.executeCommand("codebuddy.vectorDb.diagnostic");
-      }
-    }
   }
 
   registerDisposables() {
-    // Only register once per instance
     if (this.disposables.length > 0) {
       return;
     }
@@ -376,10 +247,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       });
     }
   }
-
-  // public async handleWorkspaceUpdate({ type, message }: IEventPayload) {
-  //   return this.publishWorkSpace();
-  // }
 
   public async handleUserPreferences({ type, message }: IEventPayload) {
     try {
@@ -564,16 +431,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 const stats = this.performanceProfiler.getStats();
                 await this.sendResponse(
                   `
-**Performance Report** 📊
+                **Performance Report** 📊
 
-• **Search Performance**: ${report.avgSearchLatency.toFixed(0)}ms avg, ${report.p95SearchLatency.toFixed(0)}ms P95
-• **Indexing Throughput**: ${report.avgIndexingThroughput.toFixed(1)} items/sec
-• **Memory Usage**: ${report.avgMemoryUsage.toFixed(0)}MB
-• **Cache Hit Rate**: ${(report.cacheHitRate * 100).toFixed(1)}%
-• **Error Rate**: ${(report.errorRate * 100).toFixed(2)}%
+                • **Search Performance**: ${report.avgSearchLatency.toFixed(0)}ms avg, ${report.p95SearchLatency.toFixed(0)}ms P95
+                • **Indexing Throughput**: ${report.avgIndexingThroughput.toFixed(1)} items/sec
+                • **Memory Usage**: ${report.avgMemoryUsage.toFixed(0)}MB
+                • **Cache Hit Rate**: ${(report.cacheHitRate * 100).toFixed(1)}%
+                • **Error Rate**: ${(report.errorRate * 100).toFixed(2)}%
 
-**Targets**: Search <500ms, Memory <500MB, Errors <5%
-**Status**: ${stats.searchLatency.count > 0 ? "✅ Active" : "⚠️ Limited Data"}
+                **Targets**: Search <500ms, Memory <500MB, Errors <5%
+                **Status**: ${stats.searchLatency.count > 0 ? "✅ Active" : "⚠️ Limited Data"}
                 `.trim(),
                   "bot",
                 );
@@ -592,11 +459,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 const cacheInfo = this.enhancedCacheManager.getCacheInfo();
                 await this.sendResponse(
                   `
-**Cache Cleared** 🧹
+                **Cache Cleared** 🧹
 
-• **Type**: ${type}
-• **Remaining Memory**: ${cacheInfo.total.memoryMB.toFixed(1)}MB
-• **Hit Rate**: ${(cacheInfo.total.hitRate * 100).toFixed(1)}%
+                • **Type**: ${type}
+                • **Remaining Memory**: ${cacheInfo.total.memoryMB.toFixed(1)}MB
+                • **Hit Rate**: ${(cacheInfo.total.hitRate * 100).toFixed(1)}%
                 `.trim(),
                   "bot",
                 );
@@ -622,11 +489,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 );
                 await this.sendResponse(
                   `
-**Batch Size Reduced** ⚡
+                **Batch Size Reduced** ⚡
 
-• **Previous**: ${currentBatchSize}
-• **New**: ${newBatchSize}
-• **Impact**: Lower memory usage, potentially slower indexing
+                • **Previous**: ${currentBatchSize}
+                • **New**: ${newBatchSize}
+                • **Impact**: Lower memory usage, potentially slower indexing
                 `.trim(),
                   "bot",
                 );
@@ -678,12 +545,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 const report = this.performanceProfiler.getPerformanceReport();
                 await this.sendResponse(
                   `
-**Performance Optimized** ⚡
+                **Performance Optimized** ⚡
 
-• **Memory Usage**: ${report.avgMemoryUsage.toFixed(0)}MB
-• **Cache Hit Rate**: ${(report.cacheHitRate * 100).toFixed(1)}%
-• **Search Latency**: ${report.avgSearchLatency.toFixed(0)}ms
-• **Configuration**: Automatically tuned based on system resources
+                • **Memory Usage**: ${report.avgMemoryUsage.toFixed(0)}MB
+                • **Cache Hit Rate**: ${(report.cacheHitRate * 100).toFixed(1)}%
+                • **Search Latency**: ${report.avgSearchLatency.toFixed(0)}ms
+                • **Configuration**: Automatically tuned based on system resources
                 `.trim(),
                   "bot",
                 );

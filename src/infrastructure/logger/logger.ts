@@ -56,7 +56,8 @@ export class Logger {
     filePath: undefined,
   };
 
-  private static outputChannel: vscode.OutputChannel | undefined;
+  private static outputChannel: vscode.OutputChannel =
+    vscode.window.createOutputChannel("CodeBuddy Extension Output");
   private static telemetry: ITelemetry | undefined;
   private static sessionId: string;
   private static traceId: string;
@@ -84,7 +85,6 @@ export class Logger {
         Logger.config.filePath = path.join(logDir, `codebuddy-${date}.log`);
       }
     }
-    Logger.outputChannel ??= vscode.window.createOutputChannel("CodeBuddy");
     Logger.telemetry = telemetry;
     Logger.sessionId = Logger.generateId();
     Logger.setTraceId(Logger.generateId());
