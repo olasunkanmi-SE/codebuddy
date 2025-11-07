@@ -745,6 +745,43 @@ export class CodebaseAnalysisWorker {
   /**
    * Analyze database schema from files
    */
+  // private async analyzeDatabaseSchema(files: string[], fileContents: Map<string, string>): Promise<any> {
+  //   const schema = {
+  //     tables: [] as any[],
+  //     relationships: [] as any[],
+  //     migrations: [] as string[],
+  //   };
+
+  //   // Look for common database patterns
+  //   for (const [filePath, content] of fileContents) {
+  //     const filename = path.basename(filePath).toLowerCase();
+
+  //     // SQL migration files
+  //     if (filename.includes("migration") || filename.endsWith(".sql")) {
+  //       schema.migrations.push(filePath);
+  //     }
+
+  //     // Prisma schema
+  //     if (filename === "schema.prisma") {
+  //       // Parse Prisma models (simplified)
+  //       const modelRegex = /model\s+(\w+)\s*{([^}]+)}/gi;
+  //       let match;
+  //       while ((match = modelRegex.exec(content)) !== null) {
+  //         schema.tables.push({
+  //           name: match[1],
+  //           file: filePath,
+  //           columns: this.extractPrismaColumns(match[2]),
+  //         });
+  //       }
+  //     }
+  //   }
+
+  //   return schema;
+  // }
+
+  /**
+   * Analyze database schema from files
+   */
   private async analyzeDatabaseSchema(
     files: string[],
     fileContents: Map<string, string>,
@@ -753,6 +790,7 @@ export class CodebaseAnalysisWorker {
       tables: [] as any[],
       relationships: [] as any[],
       migrations: [] as string[],
+      orms: [] as string[], // Added to track detected ORMs
     };
 
     // Look for common database patterns
@@ -766,6 +804,7 @@ export class CodebaseAnalysisWorker {
 
       // Prisma schema
       if (filename === "schema.prisma") {
+        schema.orms.push("Prisma"); // Track the ORM
         // Parse Prisma models (simplified)
         const modelRegex = /model\s+(\w+)\s*{([^}]+)}/gi;
         let match;
@@ -777,7 +816,72 @@ export class CodebaseAnalysisWorker {
           });
         }
       }
+
+      // TypeORM entities (Decorator-based)
+      if (content.includes("@Entity")) {
+        schema.orms.push("TypeORM");
+        const entityRegex = /@Entity\s*\(\s*['"`]?(\w+)['"`]?\s*\)/g; //Captures table name
+        let entityMatch;
+
+        while ((entityMatch = entityRegex.exec(content)) !== null) {
+          const tableName =
+            entityMatch[1] || path.basename(filePath, path.extname(filePath)); // Use filename as fallback
+
+          const columnRegex =
+            /@Column\s*\(\s*([^)]*)\s*\)\s*\n?\s*(.+?):\s*(.+?);/g; // Match @Column decorators
+          let columnMatch;
+          const columns = [];
+
+          while ((columnMatch = columnRegex.exec(content)) !== null) {
+            const columnOptions = columnMatch[1];
+            const columnName = columnMatch[2].trim();
+            const columnType = columnMatch[3].trim();
+
+            columns.push({
+              name: columnName,
+              type: columnType,
+              options: columnOptions,
+            });
+          }
+
+          schema.tables.push({
+            name: tableName,
+            file: filePath,
+            columns: columns,
+          });
+        }
+      }
+
+      // Mongoose schema (JavaScript/TypeScript)
+      if (content.includes("Schema")) {
+        schema.orms.push("Mongoose");
+        const schemaNameRegex = /(\w+)\s*=\s*new\s*Schema\s*\(/;
+        const schemaNameMatch = schemaNameRegex.exec(content);
+        const schemaName = schemaNameMatch
+          ? schemaNameMatch[1]
+          : "UnknownSchema";
+
+        const fieldRegex = /(\w+)\s*:\s*{(.*?)}/g;
+        let fieldMatch;
+        const fields = [];
+
+        while ((fieldMatch = fieldRegex.exec(content)) !== null) {
+          const fieldName = fieldMatch[1].trim();
+          const fieldOptions = fieldMatch[2].trim();
+
+          fields.push({ name: fieldName, options: fieldOptions });
+        }
+
+        schema.tables.push({
+          name: schemaName,
+          file: filePath,
+          columns: fields,
+        });
+      }
     }
+
+    // Convert the Set to an array for the final result
+    schema.orms = Array.from(schema.orms);
 
     return schema;
   }

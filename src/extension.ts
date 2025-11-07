@@ -7,11 +7,17 @@ import {
   CODEBUDDY_ACTIONS,
   generativeAiModels,
 } from "./application/constant";
+import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
 import { Comments } from "./commands/comment";
 import { ExplainCode } from "./commands/explain";
 import { FixError } from "./commands/fixError";
 import { GenerateMermaidDiagram } from "./commands/generate-code-chart";
 import { GenerateCommitMessage } from "./commands/generate-commit-message";
+import {
+  generateDocumentationCommand,
+  openDocumentationCommand,
+  regenerateDocumentationCommand,
+} from "./commands/generate-documentation";
 import { InLineChat } from "./commands/inline-chat";
 import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
@@ -21,7 +27,12 @@ import { ReviewPR } from "./commands/review-pr";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
+import { getCodeIndexingStatusProvider } from "./services/code-indexing-status.service";
 import { FileUploadService } from "./services/file-upload";
+import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
+import { VectorDatabaseService } from "./services/vector-database.service";
+import { VectorDbSyncService } from "./services/vector-db-sync.service";
+import { VectorDbWorkerManager } from "./services/vector-db-worker-manager";
 import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
@@ -29,17 +40,7 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
-import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
-import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
-import { VectorDbSyncService } from "./services/vector-db-sync.service";
-import { VectorDatabaseService } from "./services/vector-database.service";
-import { VectorDbWorkerManager } from "./services/vector-db-worker-manager";
-import { getCodeIndexingStatusProvider } from "./services/code-indexing-status.service";
-import {
-  generateDocumentationCommand,
-  regenerateDocumentationCommand,
-  openDocumentationCommand,
-} from "./commands/generate-documentation";
+import { CodeIndexingService } from "./services/code-indexing";
 
 const {
   geminiKey,
@@ -63,6 +64,7 @@ Logger.initialize("extension-main", {
 });
 
 const mainLogger = new Logger("activate");
+
 mainLogger.info("CodeBuddy extension is now active!");
 
 let quickFixCodeAction: vscode.Disposable;
@@ -520,6 +522,9 @@ export async function activate(context: vscode.ExtensionContext) {
   const mainLogger = new Logger("activate");
   mainLogger.info("CodeBuddy extension is now active!");
   try {
+    const codeIndexingService = await CodeIndexingService.createInstance();
+    const codeIndex = await codeIndexingService.buildFunctionStructureMap();
+    console.log(codeIndex);
     console.log("🚀 CodeBuddy: Starting fast activation...");
 
     // ⚡ FAST STARTUP: Only essential sync operations
@@ -955,15 +960,44 @@ export function deactivate(context: vscode.ExtensionContext) {
     console.warn("Error shutting down persistent codebase service:", error);
   }
 
-  quickFixCodeAction.dispose();
-  agentEventEmmitter.dispose();
-  orchestrator.dispose();
+  try {
+    if (quickFixCodeAction) {
+      quickFixCodeAction.dispose();
+      console.log("✓ quickFixCodeAction disposed");
+    }
+
+    if (agentEventEmmitter) {
+      agentEventEmmitter.dispose();
+      console.log("✓ agentEventEmmitter disposed");
+    }
+
+    if (orchestrator) {
+      orchestrator.dispose();
+      console.log("✓ orchestrator disposed");
+    }
+  } catch (error) {
+    console.warn("Error disposing core components:", error);
+  }
 
   // Dispose provider manager
-  const providerManager = WebViewProviderManager.getInstance(context);
-  providerManager.dispose();
+  try {
+    const providerManager = WebViewProviderManager.getInstance(context);
+    providerManager.dispose();
+    console.log("✓ providerManager disposed");
+  } catch (error) {
+    console.warn("Error disposing providerManager:", error);
+  }
 
-  context.subscriptions.forEach((subscription) => subscription.dispose());
+  // Dispose of all subscriptions in context.subscriptions
+  try {
+    for (const subscription of context.subscriptions) {
+      subscription.dispose();
+    }
+    context.subscriptions.length = 0; // Clear the array after disposing
+    console.log("✓ All subscriptions disposed");
+  } catch (error) {
+    console.warn("Error disposing subscriptions:", error);
+  }
 
   console.log("CodeBuddy extension deactivated successfully");
 }

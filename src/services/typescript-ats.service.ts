@@ -575,7 +575,6 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
           codebaseMap[repoNames].modules[moduleRalativePath] = moduleInfo;
         });
       });
-      Memory.set("codeIndex", filesMap);
       return codebaseMap;
     } catch (error) {
       handleError(error, "Error fetching the files");

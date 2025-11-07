@@ -267,22 +267,26 @@ export class WebViewProviderManager implements vscode.Disposable {
   }
 
   dispose(): void {
-    console.log("WebViewProviderManager disposing...");
+    try {
+      console.log("WebViewProviderManager disposing...");
 
-    if (this.currentProvider) {
-      this.currentProvider.dispose();
-      this.currentProvider = undefined;
-    }
+      if (this.currentProvider) {
+        this.currentProvider.dispose();
+        this.currentProvider = undefined;
+      }
 
-    this.disposables.forEach((d) => d.dispose());
-    this.disposables.length = 0;
-    this.isInitialized = false;
+      this.disposables.forEach((d) => d.dispose());
+      this.disposables.length = 0;
+      this.isInitialized = false;
 
-    // Note: Don't dispose extensionContext.subscriptions here as they're managed by VS Code
+      // Note: Don't dispose extensionContext.subscriptions here as they're managed by VS Code
 
-    // Clear singleton instance if needed
-    if (WebViewProviderManager.instance === this) {
-      WebViewProviderManager.instance = undefined as any;
+      // Clear singleton instance if needed
+      if (WebViewProviderManager.instance === this) {
+        WebViewProviderManager.instance = undefined as any;
+      }
+    } catch (error) {
+      this.disposables.forEach((d) => d.dispose());
     }
   }
 }

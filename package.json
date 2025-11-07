@@ -357,7 +357,7 @@
   },
   "scripts": {
     "package": "node esbuild.js --production",
-    "build": "npm run compile && npm run format && npm run build:webview",
+    "build": "npm run compile && npm run format && npm run build:webview && npm run package",
     "dev:webview": "cd webviewUi && npm run dev",
     "build:webview": "cd webviewUi && npm run build",
     "vscode:prepublish": "npm run compile",
@@ -400,6 +400,7 @@
     "@langchain/google-genai": "^0.2.18",
     "@langchain/langgraph": "^0.4.9",
     "@mozilla/readability": "^0.4.1",
+    "@traversets/code-extractor": "^0.0.8",
     "@types/node-fetch": "^2.6.11",
     "@types/sql.js": "^1.4.9",
     "apache-arrow": "18.1.0",

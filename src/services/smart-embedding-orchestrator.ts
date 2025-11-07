@@ -51,7 +51,7 @@ export interface UserActivity {
  * SmartEmbeddingOrchestrator coordinates all embedding phases and manages
  * the overall vector database experience in CodeBuddy.
  */
-export class SmartEmbeddingOrchestrator {
+export class SmartEmbeddingOrchestrator implements vscode.Disposable {
   private logger: Logger;
   private configManager: EmbeddingConfigurationManager;
   private phaseFactory: EmbeddingPhaseFactory;

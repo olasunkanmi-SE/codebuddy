@@ -919,10 +919,22 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     try {
       this.smartEmbeddingOrchestrator?.dispose();
       this.vectorWorkerManager?.dispose();
+      this.vectorDbService?.dispose();
+      this.vectorSyncService?.dispose();
+      this.vectorDbSyncService?.dispose();
+      this.smartEmbeddingOrchestrator?.dispose();
+      this.vectorConfigManager?.dispose();
+      this.configManager?.dispose();
+      this.userFeedbackService?.dispose();
+      this.performanceProfiler?.dispose();
+      this.productionSafeguards?.dispose();
+      this.enhancedCacheManager?.dispose();
+
+      this.disposables.forEach((d) => d.dispose());
+      this.disposables.length = 0;
     } catch (error) {
       this.logger.error("Error disposing vector database components", error);
     }
-
     this.disposables.forEach((d) => d.dispose());
     this.disposables.length = 0; // Clear the array
   }

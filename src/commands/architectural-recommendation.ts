@@ -281,7 +281,7 @@ ${sanitizedQuestion}
           </body>
           </html>
         `;
-
+        // TODO publish an event and send to webview instead.
         panel.webview.html = secureHtml;
       } catch (error) {
         console.error("Error in architectural recommendation:", error);

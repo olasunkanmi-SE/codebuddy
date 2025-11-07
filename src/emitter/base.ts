@@ -52,5 +52,6 @@ export class BaseEmitter<EventMap extends Record<string, IEventPayload>> {
    */
   public dispose(): void {
     this.emitters.forEach((emitter) => emitter.dispose());
+    this.emitters.clear();
   }
 }
