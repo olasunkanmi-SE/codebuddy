@@ -106,7 +106,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
 
       let chatHistory = await this.modelChatHistory(
         "user",
-        `${userMessage ?? message} \n context: ${context}`,
+        `${userMessage?.length ? userMessage : message} \n context: ${context ?? ""}`,
         "gemini",
         "agentId",
       );

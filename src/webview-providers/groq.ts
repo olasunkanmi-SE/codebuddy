@@ -99,9 +99,13 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       }
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
 
+      const msg = userMessage?.length ? userMessage : message;
+
+      const chatContext = context ?? "";
+
       let chatHistory = await this.modelChatHistory(
         "user",
-        `${userMessage ?? message} \n context: ${context}`,
+        `${msg} \n context: ${chatContext}`,
         "groq",
         "agentId",
       );

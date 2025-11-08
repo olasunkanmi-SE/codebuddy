@@ -12,7 +12,7 @@ import {
   getGenerativeAiModel,
   getXGroKBaseURL,
 } from "../utils/utils";
-import { BaseWebViewProvider } from "./base";
+import { BaseWebViewProvider, LLMMessage } from "./base";
 
 export class AnthropicWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
@@ -76,9 +76,16 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
   }
 
   async generateResponse(
-    message: string,
+    message: LLMMessage,
     metaData?: any,
   ): Promise<string | undefined> {
+    let systemInstruction = "";
+    let userMessage = "";
+
+    if (typeof message === "object") {
+      systemInstruction = message.systemInstruction;
+      userMessage = message.userMessage;
+    }
     try {
       let context: string | undefined;
       if (metaData?.context.length > 0) {
@@ -91,7 +98,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
 
       let chatHistory = await this.modelChatHistory(
         "user",
-        `${message} \n context: ${context}`,
+        `${userMessage?.length ? userMessage : message} \n context: ${context ?? ""}`,
         "anthropic",
         "agentId",
       );
@@ -101,6 +108,15 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         model: this.generativeAiModel,
         max_tokens,
         stream: false,
+        system: [
+          {
+            text: systemInstruction?.length
+              ? systemInstruction
+              : "You are an helpful assistant",
+
+            type: "text",
+          },
+        ],
       });
       const firstContent = chatCompletion.content[0];
       let response = "";
