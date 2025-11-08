@@ -48,7 +48,7 @@ export class ContextRetriever {
   //       embedding,
   //       ContextRetriever.SEARCH_RESULT_COUNT,
   //     );
-  //   } catch (error) {
+  //   } catch (error:any) {
   //     this.logger.error("Unable to retrieve context", error);
   //     throw error;
   //   }
@@ -64,7 +64,7 @@ export class ContextRetriever {
           const content = await this.readFileContent(file.file_path);
           return { function: file.function_name, content: content };
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`Error reading file ${file.file_path}:`, error);
         throw new Error(`Error reading file ${file.file_path}: ${error}`);
       }
@@ -80,7 +80,7 @@ export class ContextRetriever {
       const uri = vscode.Uri.file(filePath);
       const fileContent = await vscode.workspace.fs.readFile(uri);
       return Buffer.from(fileContent).toString("utf-8");
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error reading file:", error);
       throw error;
     }
@@ -90,7 +90,7 @@ export class ContextRetriever {
     try {
       const text = Array.isArray(query) ? query.join("") : query;
       return await this.webSearchService.run(text);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error reading file:", error);
       throw error;
     }

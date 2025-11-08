@@ -54,7 +54,7 @@ export const formatText = (text?: string): string => {
 
     const md = markdownit();
     return md.render(processedText);
-  } catch (error) {
+  } catch (error: any) {
     // If markdown parsing fails, provide a more robust fallback
     console.warn(
       "Markdown parsing failed, providing HTML-safe fallback:",

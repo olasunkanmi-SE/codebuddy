@@ -3,6 +3,8 @@ import { PersistentCodebaseUnderstandingService } from "../services/persistent-c
 import { GeminiLLM } from "../llms/gemini/gemini";
 import { getAPIKeyAndModel, formatText } from "../utils/utils";
 import { LLMOutputSanitizer } from "../utils/llm-output-sanitizer";
+import { Logger } from "../infrastructure/logger/logger";
+import { LogLevel } from "../services/telemetry";
 
 /**
  * Determines if analysis cache should be refreshed based on age and availability
@@ -21,6 +23,13 @@ async function shouldRefreshAnalysis(summary: any): Promise<boolean> {
 
   return false;
 }
+
+const logger = Logger.initialize("extension-main", {
+  minLevel: LogLevel.DEBUG,
+  enableConsole: true,
+  enableFile: true,
+  enableTelemetry: true,
+});
 
 /**
  * Prompts user for cache refresh decision when analysis is stale
@@ -63,15 +72,15 @@ export async function architecturalRecommendationCommand(): Promise<void> {
     PersistentCodebaseUnderstandingService.getInstance();
 
   // Initialize the service if not already done
-  try {
-    await persistentCodebaseService.initialize();
-  } catch (error) {
-    const errorMessage = "Failed to initialize codebase analysis service.";
-    vscode.window.showErrorMessage(
-      `${errorMessage} ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
-    return;
-  }
+  // try {
+  //   await persistentCodebaseService.initialize();
+  // } catch (error: any) {
+  //   const errorMessage = "Failed to initialize codebase analysis service.";
+  //   vscode.window.showErrorMessage(
+  //     `${errorMessage} ${error instanceof Error ? error.message : "Unknown error"}`,
+  //   );
+  //   return;
+  // }
 
   const apiKeyInfo = getAPIKeyAndModel("gemini");
 
@@ -199,7 +208,7 @@ ${sanitizedQuestion}
         let formattedContent: string;
         try {
           formattedContent = formatText(sanitizedContent);
-        } catch (error) {
+        } catch (error: any) {
           console.warn(
             "Markdown parsing failed, falling back to plain text:",
             error,
@@ -283,8 +292,8 @@ ${sanitizedQuestion}
         `;
 
         panel.webview.html = secureHtml;
-      } catch (error) {
-        console.error("Error in architectural recommendation:", error);
+      } catch (error: any) {
+        logger.error("Error in architectural recommendation:", error);
         vscode.window.showErrorMessage(
           `Failed to analyze codebase: ${error instanceof Error ? error.message : "Unknown error"}`,
         );

@@ -50,8 +50,8 @@ export class FileUploadService implements vscode.Disposable {
         await this.uploadAndProcessFile(filePath, fileName);
       }
     } catch (error: any) {
-      console.log(error);
-      throw new Error(error);
+      this.logger.error('Error while uploading file, try again"', error.stack);
+      throw error;
     }
   }
 
@@ -61,8 +61,8 @@ export class FileUploadService implements vscode.Disposable {
         file: filePath,
         config: { displayName },
       });
-    } catch (error) {
-      console.error(`Failed to upload file: ${filePath}`, error);
+    } catch (error: any) {
+      this.logger.error(`Failed to upload file: ${filePath}`, error);
       throw new Error(
         `File upload failed: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -84,7 +84,7 @@ export class FileUploadService implements vscode.Disposable {
         this.orchestrator.publish("onResponse", JSON.stringify(result));
       }
       return result.response;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.info(`Failed to process file: ${file.name}`);
       throw new Error(
         `File processing pipeline failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -111,7 +111,7 @@ export class FileUploadService implements vscode.Disposable {
       }
       return getFile;
     } catch (error: any) {
-      console.error("File processing failed.", error);
+      this.logger.error("File processing failed.", error);
       throw new Error(error.message);
     }
   }
@@ -142,7 +142,7 @@ export class FileUploadService implements vscode.Disposable {
         fileName: fileName ?? file.displayName,
         cache: cached.name,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to generate content with file", error);
       return {
         response: undefined,
@@ -158,7 +158,7 @@ export class FileUploadService implements vscode.Disposable {
   ): Promise<CachedContent> {
     try {
       return await this.getDocCache(cacheName);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error finding cache, creating a new one", error);
       return await this.createNewCache(fileContent);
     }

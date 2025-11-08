@@ -165,7 +165,7 @@ export class PerformanceProfiler implements vscode.Disposable {
       });
 
       return result;
-    } catch (error) {
+    } catch (error: any) {
       const duration = performance.now() - start;
 
       this.recordMeasurement(operation, {
@@ -546,7 +546,7 @@ export class PerformanceProfiler implements vscode.Disposable {
         avgLatency: report.avgSearchLatency,
         avgMemory: report.avgMemoryUsage,
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to optimize configuration:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";

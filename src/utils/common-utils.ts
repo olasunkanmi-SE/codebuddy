@@ -127,7 +127,7 @@ export class FileUtils {
   static async safeGetStats(uri: vscode.Uri): Promise<vscode.FileStat | null> {
     try {
       return await vscode.workspace.fs.stat(uri);
-    } catch (error) {
+    } catch (error: any) {
       return null;
     }
   }
@@ -307,7 +307,7 @@ export class AsyncUtils {
   ): Promise<T> {
     try {
       return await operation();
-    } catch (error) {
+    } catch (error: any) {
       if (errorHandler) {
         errorHandler(error as Error);
       }
@@ -327,7 +327,7 @@ export class DisposableUtils {
     disposables.forEach((disposable) => {
       try {
         disposable.dispose();
-      } catch (error) {
+      } catch (error: any) {
         console.warn("Error disposing resource:", error);
       }
     });

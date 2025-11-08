@@ -69,7 +69,7 @@ export class ApiEndpointStrategy extends BaseAnalysisStrategy {
       this.visitNodeForEndpoints(sourceFile, endpoints, filePath);
 
       return endpoints;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Failed to parse TypeScript file ${filePath}`, error);
       return this.fallbackTextAnalysis(content, filePath);
     }

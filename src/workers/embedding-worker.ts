@@ -6,6 +6,7 @@ import { Worker, isMainThread, parentPort, workerData } from "worker_threads";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { IFunctionData } from "../application/interfaces";
 import { EmbeddingsConfig } from "../application/constant";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 // Types for worker communication
 export interface WorkerTask {
@@ -24,6 +25,13 @@ export interface EmbeddingWorkerOptions {
   batchSize?: number;
   maxRetries?: number;
 }
+
+const logger = Logger.initialize("extension-main", {
+  minLevel: LogLevel.DEBUG,
+  enableConsole: true,
+  enableFile: true,
+  enableTelemetry: true,
+});
 
 // Worker thread code (runs when this file is executed as a worker)
 if (!isMainThread && parentPort) {
@@ -44,7 +52,7 @@ if (!isMainThread && parentPort) {
       case "ping":
         try {
           parentPort?.postMessage({ success: true, data: "pong" });
-        } catch (error) {
+        } catch (error: any) {
           parentPort?.postMessage({
             success: false,
             error: formatError(error),
@@ -56,7 +64,7 @@ if (!isMainThread && parentPort) {
         try {
           const result = await generateEmbeddingsInWorker(task.payload);
           parentPort?.postMessage({ success: true, data: result });
-        } catch (error) {
+        } catch (error: any) {
           parentPort?.postMessage({
             success: false,
             error: formatError(error),
@@ -68,7 +76,7 @@ if (!isMainThread && parentPort) {
         try {
           const batchResult = await processBatchInWorker(task.payload);
           parentPort?.postMessage({ success: true, data: batchResult });
-        } catch (error) {
+        } catch (error: any) {
           parentPort?.postMessage({
             success: false,
             error: formatError(error),
@@ -124,8 +132,8 @@ if (!isMainThread && parentPort) {
 
         // Small delay to prevent overwhelming the API
         await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error) {
-        console.error(
+      } catch (error: any) {
+        logger.error(
           `Failed to process item ${item.name || item.path || "unknown"}:`,
           error,
         );
@@ -228,7 +236,7 @@ export class WorkerEmbeddingService {
 
         worker.off("message", progressListener);
         return response.data as IFunctionData[];
-      } catch (error) {
+      } catch (error: any) {
         worker.off("message", progressListener);
         throw error;
       }

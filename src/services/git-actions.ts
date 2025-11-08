@@ -1,5 +1,6 @@
 import simpleGit, { GitError, SimpleGit, SimpleGitOptions } from "simple-git";
 import * as vscode from "vscode";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export interface GitDiffResult {
   file: string;
@@ -16,6 +17,7 @@ export interface BranchInfo {
 export class GitActions {
   private readonly git: SimpleGit;
   private readonly rootPath: string;
+  private readonly logger: Logger;
 
   constructor(rootPath?: string) {
     this.rootPath = rootPath || this.getWorkspaceRoot();
@@ -26,6 +28,9 @@ export class GitActions {
       baseDir: this.rootPath,
     };
     this.git = simpleGit(options);
+    this.logger = Logger.initialize(GitActions.name, {
+      minLevel: LogLevel.DEBUG,
+    });
   }
 
   /**
@@ -92,15 +97,15 @@ export class GitActions {
 
       fileDiffs.forEach(({ file, diff, error }) => {
         if (error) {
-          console.error(`Error processing ${file}: ${error}`);
+          this.logger.error(`Error processing ${file}: ${error}`);
         } else if (diff) {
           differenceSummary += `\nFile: ${file}\n${diff}\n`;
         }
       });
 
       return differenceSummary;
-    } catch (error) {
-      console.error("Error getting staged differences:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting staged differences:", error);
       throw error;
     }
   }
@@ -140,8 +145,8 @@ export class GitActions {
       }
 
       return branchInfo;
-    } catch (error) {
-      console.error("Error getting branch info:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting branch info:", error);
       throw error;
     }
   }
@@ -189,8 +194,8 @@ export class GitActions {
 
       // Final fallback
       return "main";
-    } catch (error) {
-      console.error("Error getting base branch:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting base branch:", error);
       return "main";
     }
   }
@@ -240,15 +245,15 @@ export class GitActions {
 
       fileDiffs.forEach(({ file, diff, error }) => {
         if (error) {
-          console.error(`Error processing ${file}: ${error}`);
+          this.logger.error(`Error processing ${file}: ${error}`);
         } else if (diff) {
           differenceSummary += `\nFile: ${file}\n${diff}\n`;
         }
       });
 
       return differenceSummary;
-    } catch (error) {
-      console.error("Error getting PR differences:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting PR differences:", error);
       throw error;
     }
   }
@@ -262,8 +267,8 @@ export class GitActions {
       return branches.all
         .filter((branch) => !branch.startsWith("remotes/origin/HEAD"))
         .map((branch) => branch.replace("remotes/origin/", ""));
-    } catch (error) {
-      console.error("Error getting available branches:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting available branches:", error);
       throw error;
     }
   }
@@ -283,8 +288,8 @@ export class GitActions {
       return log.all.map(
         (commit) => `${commit.hash.substring(0, 7)}: ${commit.message}`,
       );
-    } catch (error) {
-      console.error("Error getting commit history:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting commit history:", error);
       throw error;
     }
   }
@@ -295,8 +300,8 @@ export class GitActions {
   async getRepositoryStatus(): Promise<any> {
     try {
       return await this.git.status();
-    } catch (error) {
-      console.error("Error getting repository status:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting repository status:", error);
       throw error;
     }
   }
@@ -308,8 +313,8 @@ export class GitActions {
     try {
       const status = await this.getRepositoryStatus();
       return status.files.length === 0;
-    } catch (error) {
-      console.error("Error checking repository status:", error);
+    } catch (error: any) {
+      this.logger.error("Error checking repository status:", error);
       return false;
     }
   }
@@ -320,8 +325,8 @@ export class GitActions {
   async getFileAtCommit(filePath: string, commitHash: string): Promise<string> {
     try {
       return await this.git.raw(["show", `${commitHash}:${filePath}`]);
-    } catch (error) {
-      console.error(
+    } catch (error: any) {
+      this.logger.error(
         `Error getting file ${filePath} at commit ${commitHash}:`,
         error,
       );
@@ -344,8 +349,8 @@ export class GitActions {
         targetBranch,
       ]);
       return diff.trim().split("\n").filter(Boolean);
-    } catch (error) {
-      console.error("Error getting modified files:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting modified files:", error);
       throw error;
     }
   }
@@ -359,8 +364,8 @@ export class GitActions {
   ): Promise<string> {
     try {
       return await this.git.raw(["diff", "--stat", baseBranch, targetBranch]);
-    } catch (error) {
-      console.error("Error getting diff stats:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting diff stats:", error);
       throw error;
     }
   }
@@ -383,8 +388,8 @@ export class GitActions {
   async getRemoteUrl(remoteName: string = "origin"): Promise<string> {
     try {
       return await this.git.raw(["remote", "get-url", remoteName]);
-    } catch (error) {
-      console.error(`Error getting remote URL for ${remoteName}:`, error);
+    } catch (error: any) {
+      this.logger.error(`Error getting remote URL for ${remoteName}:`, error);
       throw error;
     }
   }

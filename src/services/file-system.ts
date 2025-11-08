@@ -30,7 +30,7 @@ export class FileService {
         root: workspaceFolder.uri,
         srcPath: vscode.Uri.joinPath(workspaceFolder.uri, dir).fsPath,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Unable to get workspace ${dir}", error);
       throw error;
     }
@@ -92,7 +92,7 @@ export class FileService {
         }
       }
       return tsFilePaths;
-    } catch (error) {
+    } catch (error: any) {
       handleError(
         error,
         `Error fetching the files from ${dir} with pattern ${pattern}`,
@@ -127,7 +127,7 @@ export class FileService {
         string: fileContent ? Buffer.from(fileContent).toString("utf8") : "",
         filePath: fileUri ? fileUri.fsPath : "",
       };
-    } catch (error) {
+    } catch (error: any) {
       handleError(error, `Error while reading file ${fileName}`);
       throw error;
     }
@@ -170,7 +170,7 @@ export class FileService {
               Buffer.from(fileContent).toString("utf8"),
             );
           } catch (error: any) {
-            console.log(`Error reading file ${fileName}: ${error}`);
+            this.logger.error(`Error reading file ${fileName}: ${error}`);
             throw new Error(error);
           }
         } else {
@@ -178,7 +178,7 @@ export class FileService {
         }
       }
       return filesContent;
-    } catch (error) {
+    } catch (error: any) {
       return filesContent;
     }
   }

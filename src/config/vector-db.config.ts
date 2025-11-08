@@ -212,7 +212,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       // Notify listeners
       const newConfig = this.getConfig();
       this.notifyConfigChange(newConfig);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to update configuration ${key}:`, error);
       throw error;
     }
@@ -242,7 +242,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       vscode.window.showInformationMessage(
         "Vector database configuration reset to defaults",
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to reset configuration:", error);
       vscode.window.showErrorMessage("Failed to reset configuration");
       throw error;
@@ -428,7 +428,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       vscode.window.showInformationMessage(
         "Vector database configuration updated successfully!",
       );
-    } catch (error) {
+    } catch (error: any) {
       vscode.window.showErrorMessage("Failed to update configuration");
     }
   }
@@ -455,7 +455,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       vscode.window.showInformationMessage(
         `Configuration auto-tuned for ${workspaceStats.totalFiles} files`,
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Auto-tune failed:", error);
       vscode.window.showErrorMessage("Failed to auto-tune configuration");
     }
@@ -504,7 +504,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
 
           const ext = file.fsPath.split(".").pop();
           if (ext) fileTypes.add(ext);
-        } catch (error) {
+        } catch (error: any) {
           // Ignore files that can't be read
         }
       }
@@ -610,7 +610,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
     for (const listener of this.configChangeListeners) {
       try {
         listener(config);
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error("Error in config change listener:", error);
       }
     }
@@ -644,7 +644,7 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
       vscode.window.showInformationMessage(
         "Configuration imported successfully",
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to import configuration:", error);
       vscode.window.showErrorMessage(
         "Failed to import configuration: Invalid JSON",

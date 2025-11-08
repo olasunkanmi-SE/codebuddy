@@ -170,7 +170,7 @@ export class DocumentationGeneratorService {
       vscode.window.showInformationMessage(
         "📚 Documentation generated successfully! Check the docs/generated folder.",
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error generating documentation", error);
       vscode.window.showErrorMessage(
         `Documentation generation failed: ${error}`,
@@ -212,7 +212,7 @@ export class DocumentationGeneratorService {
           author: packageJson.author || "",
           license: packageJson.license || projectInfo.license,
         };
-      } catch (error) {
+      } catch (error: any) {
         this.logger.warn("Could not parse package.json", error);
       }
     }

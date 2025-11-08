@@ -44,35 +44,10 @@ export class EnhancedPromptBuilderService {
    * This method generates rich, detailed prompts that help the LLM understand context and provide optimal responses
    */
   createEnhancedPrompt(message: string, context: PromptContext): string {
-    const { vectorContext, fallbackContext, activeFile, questionAnalysis } =
-      context;
+    const { questionAnalysis } = context;
 
     // Classify the question type and intent
     const questionType = this.classifyQuestionType(message);
-
-    // Get active file context
-    const activeFileContext = activeFile
-      ? `\n**Currently Active File**: ${activeFile}`
-      : "";
-
-    // Determine context quality and type
-    const hasVectorContext = !!(
-      vectorContext && vectorContext.trim().length > 0
-    );
-    const hasFallbackContext = !!(
-      fallbackContext && fallbackContext.trim().length > 0
-    );
-    const contextType = hasVectorContext ? "semantic" : "comprehensive";
-    const contextConfidence = questionAnalysis.confidence || 0.7;
-
-    // Build context section with intelligent formatting
-    const contextSection = this.buildContextSection(
-      hasVectorContext,
-      hasFallbackContext,
-      vectorContext || "",
-      fallbackContext || "",
-      contextConfidence,
-    );
 
     // Generate question-type specific instructions
     const specificInstructions = this.generateQuestionSpecificInstructions(
@@ -85,41 +60,33 @@ export class EnhancedPromptBuilderService {
 
     // Create the enhanced prompt
     const enhancedPrompt = `
-**🤖 You are CodeBuddy**, an expert software engineer and architect with deep knowledge of this codebase. You have access to relevant context and should provide comprehensive, accurate, and actionable responses.
+      **🤖 You are CodeBuddy**, an expert software engineer and architect with deep knowledge of this codebase. You have access to relevant context and should provide comprehensive, accurate, and actionable responses.
 
-**📝 User's Question**:
-${message}
+      **🔍 Context Analysis**:
+      - **Question Type**: ${this.categorizeQuestionTypeForDisplay(questionType)}
 
-**🔍 Context Analysis**:
-- **Question Type**: ${this.categorizeQuestionTypeForDisplay(questionType)}
-- **Context Method**: ${contextType} search
-- **Confidence Level**: ${(contextConfidence * 100).toFixed(1)}%
-- **Categories**: ${questionAnalysis.categories?.join(", ") || "General"}${activeFileContext}
+      **🎯 Response Instructions**:
+      ${specificInstructions}
 
-${contextSection}
+      **📋 Response Format**:
+      ${responseFormat}
 
-**🎯 Response Instructions**:
-${specificInstructions}
+      **⚡ Key Guidelines**:
+      - **Be Specific**: Reference actual files, functions, and implementations from the context
+      - **Be Actionable**: Provide concrete steps, code examples, and clear guidance
+      - **Be Comprehensive**: Cover edge cases, best practices, and potential pitfalls
+      - **Be Accurate**: Base your response on the actual codebase context provided
+      - **Include Examples**: Show real code snippets when explaining concepts
+      - **Provide Navigation**: Use file references so users can explore the codebase
+      - **Consider Dependencies**: Account for frameworks, libraries, and patterns in use
 
-**📋 Response Format**:
-${responseFormat}
+      **🚨 Critical Requirements**:
+      1. **Complete your response fully** - Do not truncate or end abruptly
+      2. **Use the provided context** - Don't make assumptions outside the given information
+      3. **Be honest about limitations** - If context is insufficient, explain what additional information would help
+      4. **Maintain consistency** - Follow the existing patterns and conventions shown in the codebase
 
-**⚡ Key Guidelines**:
-- **Be Specific**: Reference actual files, functions, and implementations from the context
-- **Be Actionable**: Provide concrete steps, code examples, and clear guidance
-- **Be Comprehensive**: Cover edge cases, best practices, and potential pitfalls
-- **Be Accurate**: Base your response on the actual codebase context provided
-- **Include Examples**: Show real code snippets when explaining concepts
-- **Provide Navigation**: Use file references so users can explore the codebase
-- **Consider Dependencies**: Account for frameworks, libraries, and patterns in use
-
-**🚨 Critical Requirements**:
-1. **Complete your response fully** - Do not truncate or end abruptly
-2. **Use the provided context** - Don't make assumptions outside the given information
-3. **Be honest about limitations** - If context is insufficient, explain what additional information would help
-4. **Maintain consistency** - Follow the existing patterns and conventions shown in the codebase
-
-Please provide a detailed, helpful response based on the context and guidelines above.`.trim();
+      Please provide a detailed, helpful response based on the context and guidelines above.`.trim();
 
     this.logger.debug(
       `Enhanced prompt created for ${questionType.isImplementation ? "implementation" : "general"} question`,
@@ -265,35 +232,6 @@ Please provide a detailed, helpful response based on the context and guidelines 
     if (questionType.isCodeExplanation) types.push("Explanation");
     if (questionType.isFeatureRequest) types.push("Feature Request");
     return types.length > 0 ? types.join(" + ") : "General Inquiry";
-  }
-
-  /**
-   * Builds the context section with intelligent formatting
-   */
-  private buildContextSection(
-    hasVectorContext: boolean,
-    hasFallbackContext: boolean,
-    vectorContext: string,
-    fallbackContext: string,
-    contextConfidence?: number,
-  ): string {
-    let contextSection = "";
-
-    if (hasVectorContext && vectorContext.trim().length > 0) {
-      contextSection = `
-**🎯 Semantically Relevant Code Context** (Confidence: ${((contextConfidence || 0.7) * 100).toFixed(1)}%):
-*This context was intelligently selected based on semantic similarity to your question*
-
-${this.formatContextWithMetadata(vectorContext)}`;
-    } else if (hasFallbackContext && fallbackContext.trim().length > 0) {
-      contextSection = `
-**📚 Comprehensive Codebase Context**:
-*Broad codebase overview since specific context wasn't available*
-
-${this.formatContextWithMetadata(fallbackContext)}`;
-    }
-
-    return contextSection;
   }
 
   /**

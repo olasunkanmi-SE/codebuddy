@@ -7,11 +7,17 @@ import {
   CODEBUDDY_ACTIONS,
   generativeAiModels,
 } from "./application/constant";
+import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
 import { Comments } from "./commands/comment";
 import { ExplainCode } from "./commands/explain";
 import { FixError } from "./commands/fixError";
 import { GenerateMermaidDiagram } from "./commands/generate-code-chart";
 import { GenerateCommitMessage } from "./commands/generate-commit-message";
+import {
+  generateDocumentationCommand,
+  openDocumentationCommand,
+  regenerateDocumentationCommand,
+} from "./commands/generate-documentation";
 import { InLineChat } from "./commands/inline-chat";
 import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
@@ -22,6 +28,8 @@ import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
 import { FileUploadService } from "./services/file-upload";
+import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
+import { SqliteDatabaseService } from "./services/sqlite-database.service";
 import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
@@ -29,13 +37,13 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
-import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
-import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
-import {
-  generateDocumentationCommand,
-  regenerateDocumentationCommand,
-  openDocumentationCommand,
-} from "./commands/generate-documentation";
+
+const logger = Logger.initialize("extension-main", {
+  minLevel: LogLevel.DEBUG,
+  enableConsole: true,
+  enableFile: true,
+  enableTelemetry: true,
+});
 
 const {
   geminiKey,
@@ -49,15 +57,10 @@ const {
   deepseekApiKey,
   deepseekModel,
 } = APP_CONFIG;
-console.log(APP_CONFIG);
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
 let orchestrator = Orchestrator.getInstance();
-
-// Global references for Phase 4 components
-// let vectorDbSyncService: VectorDbSyncService | undefined;
-// let vectorDbWorkerManager: VectorDbWorkerManager | undefined;
 
 /**
  * Initialize WebView providers lazily for faster startup
@@ -69,7 +72,7 @@ function initializeWebViewProviders(
   // Use setImmediate to defer until after current call stack
   setImmediate(() => {
     try {
-      console.log("🎨 CodeBuddy: Initializing WebView providers...");
+      logger.info("🎨 CodeBuddy: Initializing WebView providers...");
 
       const modelConfigurations: {
         [key: string]: {
@@ -119,7 +122,7 @@ function initializeWebViewProviders(
           true,
         );
 
-        console.log(
+        logger.info(
           `✓ WebView provider initialized: ${selectedGenerativeAiModel}`,
         );
       }
@@ -127,8 +130,8 @@ function initializeWebViewProviders(
       // Store providerManager globally and add to subscriptions
       (globalThis as any).providerManager = providerManager;
       context.subscriptions.push(providerManager);
-    } catch (error) {
-      console.error("Failed to initialize WebView providers:", error);
+    } catch (error: any) {
+      logger.error("Failed to initialize WebView providers:", error);
       vscode.window.showWarningMessage(
         "CodeBuddy: WebView initialization failed, some features may be limited",
       );
@@ -136,59 +139,17 @@ function initializeWebViewProviders(
   });
 }
 
-/**
- * Initialize heavy background services after UI is ready
- * This prevents blocking the extension startup and webview loading
- */
-async function initializeBackgroundServices(
-  context: vscode.ExtensionContext,
-): Promise<void> {
-  try {
-    console.log("🔄 CodeBuddy: Starting background services...");
-    vscode.window.setStatusBarMessage(
-      "$(sync~spin) CodeBuddy: Loading background services...",
-      5000,
-    );
-
-    // Initialize persistent codebase understanding service
-    try {
-      const persistentCodebaseService =
-        PersistentCodebaseUnderstandingService.getInstance();
-      await persistentCodebaseService.initialize();
-      console.log("✓ Persistent codebase understanding service initialized");
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.warn(
-        `Failed to initialize persistent codebase service: ${errorMessage}`,
-        error,
-      );
-    }
-
-    // All background services ready
-    vscode.window.setStatusBarMessage("$(check) CodeBuddy: Ready", 3000);
-    console.log("🎉 CodeBuddy: All background services initialized");
-  } catch (error) {
-    console.error("Background services initialization failed:", error);
-    vscode.window.setStatusBarMessage(
-      "$(warning) CodeBuddy: Some features may be limited",
-      5000,
-    );
-  }
-}
-
 export async function activate(context: vscode.ExtensionContext) {
   try {
-    Logger.initialize("extension-main", {
-      minLevel: LogLevel.DEBUG,
-      enableConsole: true,
-      enableFile: true,
-      enableTelemetry: true,
-    });
+    Logger.sessionId = Logger.generateId();
+
+    const databaseService: SqliteDatabaseService =
+      SqliteDatabaseService.getInstance();
+    databaseService.initialize();
 
     const mainLogger = new Logger("activate");
     mainLogger.info("CodeBuddy extension is now active!");
-    console.log("🚀 CodeBuddy: Starting fast activation...");
+    logger.info("🚀 CodeBuddy: Starting fast activation...");
 
     // ⚡ FAST STARTUP: Only essential sync operations
     orchestrator.start();
@@ -204,11 +165,11 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     // ⚡ DEFER HEAVY OPERATIONS: Initialize in background after UI is ready
-    setImmediate(() => {
-      initializeBackgroundServices(context);
-    });
+    // setImmediate(() => {
+    //   initializeBackgroundServices(context);
+    // });
 
-    console.log("✓ CodeBuddy: Core services started, UI ready");
+    logger.info("✓ CodeBuddy: Core services started, UI ready");
 
     // ⚡ IMMEDIATE: Show that extension is ready
     vscode.window.setStatusBarMessage(
@@ -449,7 +410,7 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.window.showInformationMessage(
               "✅ Codebase analysis cache cleared successfully",
             );
-          } catch (error) {
+          } catch (error: any) {
             vscode.window.showErrorMessage(
               `❌ Failed to clear cache: ${error instanceof Error ? error.message : "Unknown error"}`,
             );
@@ -485,7 +446,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 }
               },
             );
-          } catch (error) {
+          } catch (error: any) {
             if (error instanceof Error && error.message.includes("cancelled")) {
               vscode.window.showInformationMessage(
                 "Analysis refresh cancelled",
@@ -502,12 +463,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
     let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
       ([action, handler]) => {
-        console.log(`Registering command: ${action}`);
+        logger.info(`Registering command: ${action}`);
         return vscode.commands.registerCommand(action, handler);
       },
     );
 
-    console.log(`Total commands registered: ${subscriptions.length}`);
+    logger.info(`Total commands registered: ${subscriptions.length}`);
 
     // ⚡ FAST: Essential UI components only
     const quickFix = new CodeActionsProvider();
@@ -532,12 +493,12 @@ export async function activate(context: vscode.ExtensionContext) {
       // Note: providerManager is handled in initializeWebViewProviders
       // secretStorageService,
     );
-  } catch (error) {
+  } catch (error: any) {
     Memory.clear();
     vscode.window.showErrorMessage(
       "An Error occured while setting up generative AI model",
     );
-    console.log(error);
+    logger.info(error);
   }
 }
 
@@ -546,7 +507,7 @@ export async function activate(context: vscode.ExtensionContext) {
  */
 async function restartExtension(context: vscode.ExtensionContext) {
   try {
-    console.log("Restarting CodeBuddy extension...");
+    logger.info("Restarting CodeBuddy extension...");
 
     // Show confirmation dialog
     const choice = await vscode.window.showInformationMessage(
@@ -585,8 +546,8 @@ async function restartExtension(context: vscode.ExtensionContext) {
         },
       );
     }
-  } catch (error) {
-    console.error("Error restarting extension:", error);
+  } catch (error: any) {
+    logger.error("Error restarting extension:", error);
     vscode.window.showErrorMessage(
       "Failed to restart extension. Please reload VS Code manually.",
     );
@@ -594,7 +555,7 @@ async function restartExtension(context: vscode.ExtensionContext) {
 }
 
 export function deactivate(context: vscode.ExtensionContext) {
-  console.log("Deactivating CodeBuddy extension...");
+  logger.info("Deactivating CodeBuddy extension...");
 
   // Clear database history before deactivation
   clearFileStorageData();
@@ -603,8 +564,8 @@ export function deactivate(context: vscode.ExtensionContext) {
     const persistentCodebaseService =
       PersistentCodebaseUnderstandingService.getInstance();
     persistentCodebaseService.shutdown();
-    console.log("Persistent codebase service shutdown");
-  } catch (error) {
+    logger.info("Persistent codebase service shutdown");
+  } catch (error: any) {
     console.warn("Error shutting down persistent codebase service:", error);
   }
 
@@ -618,13 +579,13 @@ export function deactivate(context: vscode.ExtensionContext) {
 
   context.subscriptions.forEach((subscription) => subscription.dispose());
 
-  console.log("CodeBuddy extension deactivated successfully");
+  logger.info("CodeBuddy extension deactivated successfully");
 }
 
 /**
  * Clears file storage data (.codebuddy folder contents)
  */
-function clearFileStorageData() {
+async function clearFileStorageData() {
   try {
     const workSpaceRoot =
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
@@ -638,9 +599,9 @@ function clearFileStorageData() {
           fs.unlinkSync(filePath);
         }
       });
-      console.log(`Cleared ${files.length} files from .codebuddy folder`);
+      logger.info(`Cleared ${files.length} files from .codebuddy folder`);
     }
-  } catch (error) {
-    console.error("Error clearing file storage data:", error);
+  } catch (error: any) {
+    logger.error("Error clearing file storage data:", error);
   }
 }

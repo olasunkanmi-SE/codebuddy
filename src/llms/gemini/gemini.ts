@@ -83,7 +83,7 @@ export class GeminiLLM
       const result: EmbedContentResponse = await model.embedContent(text);
       this.response = result;
       return result.embedding.values;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to generate embeddings", { error, text });
       throw new Error("Embedding generation failed");
     }
@@ -98,7 +98,7 @@ export class GeminiLLM
       const result: GenerateContentResult = await model.generateContent(prompt);
       this.response = result;
       return result.response.text();
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to generate text", error);
       throw new Error("Text generation failed");
     }
@@ -126,7 +126,7 @@ export class GeminiLLM
       }
       this.model = model;
       return model;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("An error occurred while retrieving the model", error);
       throw new Error("Failed to retrieve model");
     }
@@ -232,7 +232,7 @@ export class GeminiLLM
           Memory.set(COMMON.GEMINI_SNAPSHOT, snapShot);
           callCount++;
         } catch (error: any) {
-          console.error("Error processing function call", error);
+          this.logger.error("Error processing function call", error);
           // Send this to the webview instead
           const retry = await vscode.window.showErrorMessage(
             `Function call failed: ${error.message}. Retry or abort?`,
@@ -251,8 +251,8 @@ export class GeminiLLM
         }
       }
       return finalResult;
-    } catch (error) {
-      console.error("Error processing tool calls", error);
+    } catch (error: any) {
+      this.logger.error("Error processing tool calls", error);
       finalResult = await this.fallBackToGroq(
         `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`,
       );
@@ -370,15 +370,18 @@ export class GeminiLLM
       this.orchestrator.publish("onQuery", String(finalResult));
       return finalResult;
     } catch (error: any) {
-      // this.orchestrator.publish(
-      //   "onError",
-      //   "Model not responding at this time, please try again"
-      // );
-      console.log("Error processing user query", error);
       finalResult = await this.fallBackToGroq(
         `User Input: ${this.userQuery} \n Plans: ${userInput}Write production ready code to demonstrate your solution`,
       );
-      console.log("Model not responding at this time, please try again", error);
+      if (error.status === "401") {
+        vscode.window.showErrorMessage(
+          "Invalid API key. Please update your API key",
+        );
+      }
+      this.logger.error(
+        "Model not responding at this time, please try again",
+        error.stack,
+      );
     }
   }
 
@@ -418,8 +421,8 @@ export class GeminiLLM
       this.userQuery = userQuery;
       const result = await this.processUserQuery(userQuery);
       return result;
-    } catch (error) {
-      console.error("Error occured will running the agent", error);
+    } catch (error: any) {
+      this.logger.error("Error occured will running the agent", error);
       throw error;
     }
   }

@@ -61,7 +61,7 @@ export class RetryableOperation {
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
       try {
         return await operation();
-      } catch (error) {
+      } catch (error: any) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
         // Only retry for specific error types

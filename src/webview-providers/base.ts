@@ -28,6 +28,13 @@ import { WorkspaceService } from "../services/workspace-service";
 import { formatText, getAPIKeyAndModel } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
 
+export interface ImessageAndSystemInstruction {
+  systemInstruction: string;
+  userMessage: string;
+}
+
+export type LLMMessage = ImessageAndSystemInstruction | string;
+
 let _view: vscode.WebviewView | undefined;
 export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected readonly orchestrator: Orchestrator;
@@ -176,10 +183,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.setupMessageHandler(this.currentWebView);
 
     // Synchronize provider chat history with database on startup
-    await this.synchronizeChatHistoryFromDatabase();
+    setImmediate(() => this.synchronizeChatHistoryFromDatabase());
 
     // Get the current workspace files from DB.
-    await this.getFiles();
+    setImmediate(() => this.getFiles());
   }
 
   /**
@@ -210,7 +217,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       } else {
         this.logger.debug("No chat history found in database to synchronize");
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(
         "Failed to synchronize chat history from database:",
         error,
@@ -364,28 +371,32 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
               }
 
-              response = await this.generateResponse(
-                await this.enhanceMessageWithCodebaseContext(sanitizedMessage),
-                message.metaData,
-              );
+              const messageAndSystemInstruction =
+                  await this.enhanceMessageWithCodebaseContext(
+                    sanitizedMessage,
+                  ),
+                response = await this.generateResponse(
+                  messageAndSystemInstruction,
+                  message.metaData,
+                );
               if (this.UserMessageCounter === 1) {
                 await this.publishWorkSpace();
               }
               if (response) {
-                console.log(
+                this.logger.info(
                   `[DEBUG] Response from generateResponse: ${response.length} characters`,
                 );
                 const formattedResponse = formatText(response);
-                console.log(
+                this.logger.info(
                   `[DEBUG] Formatted response: ${formattedResponse.length} characters`,
                 );
-                console.log(
+                this.logger.info(
                   `[DEBUG] Original response ends with: "${response.slice(-100)}"`,
                 );
 
                 await this.sendResponse(formattedResponse, "bot");
               } else {
-                console.log(
+                this.logger.info(
                   `[DEBUG] No response received from generateResponse`,
                 );
               }
@@ -567,9 +578,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           }
         }),
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Message handler failed", error);
-      console.error(error);
+      this.logger.error(error);
     }
   }
 
@@ -587,7 +598,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     );
   }
   abstract generateResponse(
-    message?: string,
+    message?: LLMMessage,
     metaData?: Record<string, any>,
   ): Promise<string | undefined>;
 
@@ -599,9 +610,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   /**
    * Enhances user messages with codebase context if the question is codebase-related
    */
-  private async enhanceMessageWithCodebaseContext(
-    message: string,
-  ): Promise<string> {
+  private enhanceMessageWithCodebaseContext(message: string): LLMMessage {
     try {
       const questionAnalysis =
         this.questionClassifier.categorizeQuestion(message);
@@ -617,15 +626,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         `Detected codebase question with confidence: ${questionAnalysis.confidence}, categories: ${questionAnalysis.categories.join(", ")}`,
       );
 
-      // First try vector-based semantic search for precise context
-      let vectorContext = "";
-      let fallbackContext = "";
-
       // Create enhanced prompt using the dedicated service
       const promptContext: PromptContext = {
-        vectorContext,
-        fallbackContext,
-        activeFile: vscode.window.activeTextEditor?.document.fileName,
         questionAnalysis: {
           ...questionAnalysis,
           confidence:
@@ -640,8 +642,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         promptContext,
       );
 
-      return enhancedMessage;
-    } catch (error) {
+      return { systemInstruction: enhancedMessage, userMessage: message };
+    } catch (error: any) {
       this.logger.error("Error enhancing message with codebase context", error);
       // Return original message if enhancement fails
       return message;
@@ -665,7 +667,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         return Array.from(filesContent.values()).join("\n");
       }
     } catch (error: any) {
-      console.log(error);
+      this.logger.info(error);
       throw new Error(error.message);
     }
   }
@@ -682,7 +684,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       preserveSystemMessages: boolean;
     }>,
   ): Promise<any[]> {
-    return this.chatHistoryManager.formatChatHistory(
+    return await this.chatHistoryManager.formatChatHistory(
       role,
       message,
       model,
@@ -698,7 +700,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     oldestMessageAge: number;
     newestMessageAge: number;
   }> {
-    return this.chatHistoryManager.getPruningStats(key);
+    return await this.chatHistoryManager.getPruningStats(key);
   }
 
   // Manual pruning for performance optimization
@@ -715,7 +717,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   // Initialize chat history with proper sync
   async initializeChatHistory(key: string): Promise<any[]> {
-    return this.chatHistoryManager.initializeHistory(key);
+    return await this.chatHistoryManager.initializeHistory(key);
   }
 
   /**

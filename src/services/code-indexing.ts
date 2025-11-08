@@ -63,7 +63,7 @@ export class CodeIndexingService {
       );
       const mapper = new CodeStructureMapper(ats);
       return mapper.normalizeData();
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error building function structure map:", error);
       throw error;
     }
@@ -81,7 +81,7 @@ export class CodeIndexingService {
         throw new Error("failed to generate ATS");
       }
       return await this.embeddingService.processFunctions(functions);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("LLM unable to generate description", error);
       throw error;
     }

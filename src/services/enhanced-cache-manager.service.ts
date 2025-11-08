@@ -224,7 +224,7 @@ export class EnhancedCacheManager implements vscode.Disposable {
       });
 
       return entry.data;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Cache get error for ${type}:`, error);
       this.stats.missCount++;
 
@@ -272,7 +272,7 @@ export class EnhancedCacheManager implements vscode.Disposable {
         size,
         ttl: entry.ttl,
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Cache set error for ${type}:`, error);
     }
   }
@@ -491,7 +491,7 @@ export class EnhancedCacheManager implements vscode.Disposable {
         const entriesToEvict = Math.ceil(largestCache.size * 0.1);
         await this.evictEntries(largestCache, 0);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Cache cleanup error:", error);
     }
   }
@@ -580,7 +580,7 @@ export class EnhancedCacheManager implements vscode.Disposable {
 
       this.updateCacheStats();
       this.logger.info(`Cleared ${type} cache`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to clear ${type} cache:`, error);
     }
   }
@@ -616,7 +616,7 @@ export class EnhancedCacheManager implements vscode.Disposable {
       }
 
       this.stats.maxSize = this.config.maxSize;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Cache optimization error:", error);
     }
   }

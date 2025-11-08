@@ -59,7 +59,7 @@ export class Logger {
   private static outputChannel: vscode.OutputChannel =
     vscode.window.createOutputChannel("CodeBuddy Extension Output");
   private static telemetry: ITelemetry | undefined;
-  private static sessionId: string;
+  static sessionId: string;
   private static traceId: string;
   static instance: Logger;
   constructor(private readonly module: string) {}
@@ -86,7 +86,6 @@ export class Logger {
       }
     }
     Logger.telemetry = telemetry;
-    Logger.sessionId = Logger.generateId();
     Logger.setTraceId(Logger.generateId());
     if (!Logger.instance) {
       Logger.instance = new Logger(module);
@@ -98,7 +97,7 @@ export class Logger {
     Logger.traceId = traceId;
   }
 
-  private static generateId(): string {
+  static generateId(): string {
     return crypto.randomBytes(16).toString("hex");
   }
 
@@ -140,7 +139,7 @@ export class Logger {
     try {
       const logEntry = JSON.stringify(event) + "\n";
       fs.appendFileSync(Logger.config.filePath, logEntry);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to write to log file:", error);
     }
   }

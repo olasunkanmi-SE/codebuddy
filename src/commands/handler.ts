@@ -42,7 +42,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   private readonly anthropicApiKey: string;
   private readonly xGrokApiKey: string;
   private readonly xGrokModel: string;
-  private readonly logger: Logger;
+  protected readonly logger: Logger;
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,
@@ -247,8 +247,8 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         model = this.createAnthropicModel(apiKey);
       }
       return { generativeAi: this.generativeAi, model, modelName };
-    } catch (error) {
-      console.error("Error creating model:", error);
+    } catch (error: any) {
+      this.logger.error("Error creating model:", error);
       vscode.window.showErrorMessage(
         "An error occurred while creating the model. Please try again.",
       );
@@ -335,7 +335,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         }
       }
       return response;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error generating response:", error);
       vscode.window.showErrorMessage(
         "An error occurred while generating the response. Please try again.",
@@ -380,7 +380,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         return firstContent.text;
       }
       return undefined;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error generating response:", error);
     }
   }
@@ -408,7 +408,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       const completion: Groq.Chat.ChatCompletion =
         await model.chat.completions.create(params);
       return completion.choices[0]?.message?.content ?? undefined;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error generating response:", error);
     }
   }
@@ -522,7 +522,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         },
       });
       return userPrompt;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error generating inline chat", error);
     }
   }
@@ -575,7 +575,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           this.logger.error("Unknown generative AI", "");
           break;
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         "Error while passing model response to the webview",
         error,

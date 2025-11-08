@@ -65,14 +65,9 @@ export class PersistentCodebaseUnderstandingService {
   /**
    * Initialize the service
    */
-  async initialize(): Promise<void> {
-    await ErrorHandler.handleAsyncError(
-      async () => await this.databaseService.initialize(),
-      "Failed to initialize persistent codebase understanding service",
-      this.logger,
-    );
-    this.logger.info("Persistent codebase understanding service initialized");
-  }
+  // async initialize(): Promise<void> {
+  //   SqliteDatabaseService.getInstance();
+  // }
 
   /**
    * Get comprehensive codebase analysis with intelligent caching
@@ -147,7 +142,7 @@ export class PersistentCodebaseUnderstandingService {
       // Need to perform fresh analysis
       this.logger.info("Performing fresh codebase analysis");
       return await this.performFreshAnalysis(gitState, cancellationToken);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to perform codebase analysis", error);
       throw error;
     }
@@ -242,7 +237,7 @@ export class PersistentCodebaseUnderstandingService {
           return persistentAnalysis;
         },
       );
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof Error && error.message.includes("cancelled")) {
         this.logger.info("Codebase analysis cancelled by user");
         return null;
@@ -332,7 +327,7 @@ export class PersistentCodebaseUnderstandingService {
       }
 
       return await this.performFreshAnalysis(gitState, cancellationToken);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to force refresh analysis", error);
       throw error;
     }
@@ -382,7 +377,7 @@ export class PersistentCodebaseUnderstandingService {
         gitState,
         stats,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to get analysis summary", error);
       return {
         hasCache: false,
@@ -403,7 +398,7 @@ export class PersistentCodebaseUnderstandingService {
     try {
       await this.databaseService.cleanupOldSnapshots(0); // Remove all
       this.logger.info("All cached analyses cleared");
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to clear cache", error);
       throw error;
     }
@@ -441,7 +436,7 @@ export class PersistentCodebaseUnderstandingService {
       this.analysisWorker.cancel();
       await this.databaseService.close();
       this.logger.info("Persistent codebase understanding service shutdown");
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error during service shutdown", error);
     }
   }

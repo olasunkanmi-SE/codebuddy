@@ -16,7 +16,7 @@ export class ErrorHandler {
   ): Promise<T | null> {
     try {
       return await operation();
-    } catch (error) {
+    } catch (error: any) {
       logger.error(errorMessage, error);
 
       if (shouldRethrow) {
@@ -38,7 +38,7 @@ export class ErrorHandler {
   ): T {
     try {
       return operation();
-    } catch (error) {
+    } catch (error: any) {
       logger.error(errorMessage, error);
       return defaultValue;
     }
@@ -61,7 +61,7 @@ export class ErrorHandler {
 
     try {
       return await Promise.race([operation(), timeoutPromise]);
-    } catch (error) {
+    } catch (error: any) {
       logger.error(errorMessage, error);
       throw error;
     }
@@ -78,7 +78,7 @@ export class ErrorHandler {
     return async (...args: TArgs): Promise<TReturn> => {
       try {
         return await fn(...args);
-      } catch (error) {
+      } catch (error: any) {
         logger.error(`Safe function call failed: ${fn.name}`, error);
         return defaultValue;
       }

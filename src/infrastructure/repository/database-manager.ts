@@ -75,7 +75,7 @@
 //           this.logger.info("Database connected successfully");
 //           return;
 //         }
-//       } catch (error) {
+//       } catch (error:any) {
 //         this.logger.error(`Failed to connect to database`, error);
 //         retryCount++;
 //         if (retryCount >= maxRetries) {
@@ -99,7 +99,7 @@
 //   async healthCheck(): Promise<boolean> {
 //     try {
 //       return Boolean(await this.client?.execute("SELECT 1"));
-//     } catch (error) {
+//     } catch (error:any) {
 //       this.logger.error("Failed to connect to database", error);
 //       return false;
 //     }

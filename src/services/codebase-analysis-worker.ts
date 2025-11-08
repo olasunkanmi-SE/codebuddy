@@ -342,7 +342,7 @@ export class CodebaseAnalysisWorker {
         if (i % 10 === 0) {
           await new Promise((resolve) => setTimeout(resolve, 1));
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn(`Failed to analyze file ${file}:`, error);
       }
     }
@@ -377,7 +377,7 @@ export class CodebaseAnalysisWorker {
         if (analyzer) {
           analysis = analyzer.analyze(content, filePath);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn(
           `Failed to run structured analysis on ${filePath}:`,
           error,
@@ -390,7 +390,7 @@ export class CodebaseAnalysisWorker {
 
       try {
         endpoints = this.extractApiEndpoints(filePath, content);
-      } catch (error) {
+      } catch (error: any) {
         console.warn(
           `Failed to extract API endpoints from ${filePath}:`,
           error,
@@ -399,7 +399,7 @@ export class CodebaseAnalysisWorker {
 
       try {
         models = this.extractDataModels(filePath, content);
-      } catch (error) {
+      } catch (error: any) {
         console.warn(`Failed to extract data models from ${filePath}:`, error);
       }
 
@@ -410,7 +410,7 @@ export class CodebaseAnalysisWorker {
         models,
         analysis,
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof Error) {
         if (error.message.includes("ENOENT")) {
           throw new Error(`File not found: ${filePath}`);
@@ -524,7 +524,7 @@ export class CodebaseAnalysisWorker {
         );
 
         files.push(...uris.map((uri) => uri.fsPath));
-      } catch (error) {
+      } catch (error: any) {
         console.warn(`Failed to find files with pattern ${pattern}:`, error);
       }
     }
@@ -550,7 +550,7 @@ export class CodebaseAnalysisWorker {
         );
         Object.assign(dependencies, packageJson.dependencies || {});
         Object.assign(dependencies, packageJson.devDependencies || {});
-      } catch (error) {
+      } catch (error: any) {
         console.warn("Failed to analyze package.json:", error);
       }
     }
@@ -569,7 +569,7 @@ export class CodebaseAnalysisWorker {
             dependencies[name.trim()] = version.trim();
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn("Failed to analyze requirements.txt:", error);
       }
     }

@@ -2,7 +2,6 @@ import { UUID } from "crypto";
 
 export interface IWorkspaceService {
   getWorkspaceFiles(rootPath: string): Promise<Record<string, string>>;
-  getActiveFile(): string | undefined;
   getContextInfo(useWorkspaceContext: boolean): Promise<IContextInfo>;
 }
 

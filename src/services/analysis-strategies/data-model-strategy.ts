@@ -77,7 +77,7 @@ export class DataModelStrategy extends BaseAnalysisStrategy {
       this.visitNodeForModels(sourceFile, models, filePath);
 
       return models;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Failed to parse TypeScript file ${filePath}`, error);
       return [];
     }

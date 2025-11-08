@@ -105,7 +105,7 @@ export class CodebaseUnderstandingService {
           ...packageJson.dependencies,
           ...packageJson.devDependencies,
         };
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error("Error parsing package.json", error);
       }
     } else {
@@ -216,7 +216,7 @@ export class CodebaseUnderstandingService {
       const fileUri = vscode.Uri.file(filePath);
       const fileContent = await vscode.workspace.fs.readFile(fileUri);
       return Buffer.from(fileContent).toString("utf8");
-    } catch (error) {
+    } catch (error: any) {
       this.logger.debug(`Could not read file: ${filePath}`, error);
       throw error;
     }
@@ -587,7 +587,7 @@ ${this.formatFileReferenceIndex()}
         if (classMatches) {
           models.push(`- ${file}: ${classMatches.slice(0, 3).join(", ")}`);
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.debug(`Could not read model file: ${file}`, error);
       }
     }
@@ -620,7 +620,7 @@ ${this.formatFileReferenceIndex()}
         if (allMatches.length > 0) {
           routes.push(`- ${file}: ${allMatches.slice(0, 5).join(", ")}`);
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.debug(`Could not read route file: ${file}`, error);
       }
     }
@@ -661,7 +661,7 @@ ${this.formatFileReferenceIndex()}
         ts.forEachChild(sourceFile, (node) => {
           this.extractEndpointsFromNode(node, file, endpoints);
         });
-      } catch (error) {
+      } catch (error: any) {
         this.logger.debug(`Could not parse TypeScript file: ${file}`, error);
       }
     }
@@ -818,7 +818,7 @@ ${this.formatFileReferenceIndex()}
             }
           }
         });
-      } catch (error) {
+      } catch (error: any) {
         this.logger.debug(`Could not parse model file: ${file}`, error);
       }
     }
@@ -963,7 +963,7 @@ ${this.formatFileReferenceIndex()}
       try {
         const content = await this.readFileContent(file);
         this.extractPrismaSchema(content, schema);
-      } catch (error) {
+      } catch (error: any) {
         this.logger.debug(`Could not read Prisma schema: ${file}`, error);
       }
     }
@@ -976,7 +976,7 @@ ${this.formatFileReferenceIndex()}
       try {
         const content = await this.readFileContent(file);
         this.extractTypeORMSchema(content, file, schema);
-      } catch (error) {
+      } catch (error: any) {
         this.logger.debug(`Could not parse entity file: ${file}`, error);
       }
     }
@@ -1180,7 +1180,7 @@ ${this.formatFileReferenceIndex()}
         const content = await this.readFileContent(file);
         const filePatterns = this.extractAuthPatterns(content, file);
         patterns.push(...filePatterns);
-      } catch (error) {
+      } catch (error: any) {
         this.logger.debug(`Could not read auth file: ${file}`, error);
       }
     }
@@ -1258,7 +1258,7 @@ ${this.formatFileReferenceIndex()}
         if (content.includes("sanitize") || content.includes("validate")) {
           patterns.push(`Input validation/sanitization found in ${file}`);
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.debug(`Could not read security file: ${file}`, error);
       }
     }
@@ -1331,7 +1331,7 @@ ${this.formatFileReferenceIndex()}
         if (content.includes("REDIS") || content.includes("CACHE")) {
           patterns.push(`Cache configuration in ${file}`);
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.debug(`Could not read env file: ${file}`, error);
       }
     }

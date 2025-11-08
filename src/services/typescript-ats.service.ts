@@ -221,7 +221,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
         this.aggregateEnums(node, sourceFile, info);
       }
       return classFunctions;
-    } catch (error) {
+    } catch (error: any) {
       handleError(error, `Unable to process class members`);
       throw error;
     }
@@ -287,7 +287,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
         };
       });
       return properties;
-    } catch (error) {
+    } catch (error: any) {
       handleError(error, "unable to extract function parameters");
       throw error;
     }
@@ -414,7 +414,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
         removeComments: true,
       });
       return printer.printNode(ts.EmitHint.Unspecified, node, sourceFile);
-    } catch (error) {
+    } catch (error: any) {
       handleError(error, `Unable to get function node text`);
       throw error;
     }
@@ -577,7 +577,7 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
       });
       Memory.set("codeIndex", filesMap);
       return codebaseMap;
-    } catch (error) {
+    } catch (error: any) {
       handleError(error, "Error fetching the files");
       throw Error;
     }

@@ -29,7 +29,7 @@ export class CodeRepository implements ICodeRepository {
   //     await transaction?.execute(createIndex());
   //     await transaction?.commit();
   //     return table;
-  //   } catch (error) {
+  //   } catch (error:any) {
   //     if (transaction) {
   //       await transaction.rollback();
   //     }
@@ -48,7 +48,7 @@ export class CodeRepository implements ICodeRepository {
   //   const retryDelay = 100;
   //   try {
   //     await this.createFunctionsTable();
-  //   } catch (error) {
+  //   } catch (error:any) {
   //     this.logger.error("Failed to create table", error);
   //     throw error;
   //   }
@@ -82,8 +82,8 @@ export class CodeRepository implements ICodeRepository {
   //         created_at FROM vector_top_k('code_functions_idx', '${JSON.stringify(queryEmbeddings)}', ${limit}) JOIN code_functions ON code_functions.rowid = id`
   //     );
   //     return result ? result.rows : undefined;
-  //   } catch (error) {
-  //     console.error("Failed to search similar code functions", error);
+  //   } catch (error:any) {
+  //     this.logger.error("Failed to search similar code functions", error);
   //     throw error;
   //   }
   // }

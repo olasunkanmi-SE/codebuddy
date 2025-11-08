@@ -44,7 +44,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       this.logger.debug(
         `Updated Anthropic chatHistory array with ${this.chatHistory.length} messages`,
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn("Failed to update Anthropic chat history array:", error);
       this.chatHistory = []; // Reset to empty on error
     }
@@ -70,8 +70,8 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         type,
         message: response,
       });
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      this.logger.error(error);
     }
   }
 
@@ -113,12 +113,18 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         response = (firstContent as any).content;
       }
       return response;
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      if (error.status === "401") {
+        vscode.window.showErrorMessage(
+          "Invalid API key. Please update your API key",
+        );
+      }
+      this.logger.error("Error generating anthropic response", error.stack);
       Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
         "Model not responding, please resend your question",
       );
+      throw error;
     }
   }
 

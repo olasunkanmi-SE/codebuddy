@@ -33,7 +33,7 @@ export const initializeGenerativeAiEnvironment = async (
       registerWebViewProvider,
       agentEventEmmitter,
     );
-  } catch (error) {
+  } catch (error: any) {
     vscode.window.showErrorMessage(
       "An Error occured while registering event subscriptions",
     );

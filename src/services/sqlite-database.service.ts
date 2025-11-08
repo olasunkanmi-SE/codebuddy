@@ -42,10 +42,7 @@ export class SqliteDatabaseService {
   }
 
   public static getInstance(): SqliteDatabaseService {
-    if (!SqliteDatabaseService.instance) {
-      SqliteDatabaseService.instance = new SqliteDatabaseService();
-    }
-    return SqliteDatabaseService.instance;
+    return (SqliteDatabaseService.instance ??= new SqliteDatabaseService());
   }
 
   /**
@@ -116,7 +113,7 @@ export class SqliteDatabaseService {
       this.logger.info(
         `SQLite database initialized successfully at: ${this.dbPath}`,
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to initialize database", error);
       if (error instanceof Error) {
         this.logger.error(`Error message: ${error.message}`);
@@ -172,9 +169,36 @@ export class SqliteDatabaseService {
     `);
 
     this.logger.debug("SQLite database tables and indexes created");
+    await this.initializeSchema();
 
     // Save the database to disk
     this.saveToDisk();
+  }
+
+  private async initializeSchema(): Promise<void> {
+    try {
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS chat_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          agent_id TEXT NOT NULL,
+          message_content TEXT NOT NULL,
+          message_type TEXT NOT NULL,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          session_id TEXT,
+          metadata TEXT
+        )
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_chat_agent_id ON chat_history(agent_id)
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_chat_timestamp ON chat_history(timestamp)
+      `);
+    } catch (error: any) {
+      console.warn("Failed to initialize chat history schema:", error);
+    }
   }
 
   /**
@@ -188,7 +212,7 @@ export class SqliteDatabaseService {
     try {
       const data = this.db.export();
       fs.writeFileSync(this.dbPath, data);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to save database to disk", error);
     }
   }
@@ -252,7 +276,7 @@ export class SqliteDatabaseService {
 
       this.logger.info(`Fallback git state: ${JSON.stringify(fallbackState)}`);
       return fallbackState;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to get git state", error);
       return null;
     }
@@ -283,7 +307,7 @@ export class SqliteDatabaseService {
         hash = hash & hash; // Convert to 32bit integer
       }
       return hash.toString(16);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn("Failed to create diff hash", error);
       return Date.now().toString();
     }
@@ -355,7 +379,7 @@ export class SqliteDatabaseService {
       this.saveToDisk();
 
       this.logger.info("Codebase analysis saved to SQLite database");
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to save codebase analysis", error);
       throw error;
     }
@@ -465,7 +489,7 @@ export class SqliteDatabaseService {
 
       this.logger.info("No cached codebase analysis found");
       return null;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to get cached codebase analysis", error);
       return null;
     }
@@ -522,7 +546,7 @@ export class SqliteDatabaseService {
       }
 
       return false;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to check for significant changes", error);
       return true; // Assume changes if we can't determine
     }
@@ -550,7 +574,7 @@ export class SqliteDatabaseService {
       this.saveToDisk();
 
       this.logger.info(`Cleaned up old snapshots`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to cleanup old snapshots", error);
     }
   }
@@ -594,7 +618,7 @@ export class SqliteDatabaseService {
           const stat = await fs.promises.stat(this.dbPath);
           totalSize = stat.size;
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.warn("Failed to get database file size", error);
       }
 
@@ -604,7 +628,7 @@ export class SqliteDatabaseService {
         newestSnapshot: results.newestSnapshot || "",
         totalSize,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to get database stats", error);
       return {
         totalSnapshots: 0,
@@ -627,8 +651,9 @@ export class SqliteDatabaseService {
       const stmt = this.db.prepare(query);
       const results = stmt.getAsObject(params);
       stmt.free();
+      this.saveToDisk();
       return Array.isArray(results) ? results : [results];
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`SQL execution failed: ${query}`, error);
       throw error;
     }
@@ -650,7 +675,7 @@ export class SqliteDatabaseService {
       const result = stmt.run(params);
       stmt.free();
       return result;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`SQL command execution failed: ${query}`, error);
       throw error;
     }
@@ -669,7 +694,7 @@ export class SqliteDatabaseService {
       const results = stmt.all(params);
       stmt.free();
       return results;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`SQL query execution failed: ${query}`, error);
       throw error;
     }

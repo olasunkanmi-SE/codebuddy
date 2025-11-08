@@ -101,7 +101,6 @@ export class WebSearchService {
         );
       }
 
-      console.log(pagesMetaData);
       return pagesMetaData.filter(
         ({ url, favicon }) => url.length > 1 && favicon.length > 1,
       );
@@ -141,7 +140,7 @@ export class WebSearchService {
         );
 
         favicon = await this.extractFavicon(faviconElement, origin, parsedUrl);
-      } catch (error) {
+      } catch (error: any) {
         favicon = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
         title = parsedUrl.hostname.slice(0, 20);
         return { url: url ?? "", favicon: favicon ?? "", title: title ?? "" };
@@ -287,7 +286,7 @@ export class WebSearchService {
         } else {
           otherUrls.push(m.url);
         }
-      } catch (error) {
+      } catch (error: any) {
         otherUrls.push(m.url);
       }
     });

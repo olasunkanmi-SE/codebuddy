@@ -62,7 +62,7 @@ export class CodebaseAnalysisCache {
 
       const combinedHash = fileHashes.join("|");
       return crypto.createHash("md5").update(combinedHash).digest("hex");
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn("Failed to generate workspace hash", error);
       return `fallback-${Date.now()}`;
     }

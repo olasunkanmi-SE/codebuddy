@@ -27,7 +27,7 @@ export abstract class BaseAnalysisStrategy implements IAnalysisStrategy {
         vscode.Uri.file(filePath),
       );
       return Buffer.from(content).toString("utf8");
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Failed to read file ${filePath}`, error);
       return null;
     }

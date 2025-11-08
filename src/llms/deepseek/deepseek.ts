@@ -81,7 +81,7 @@ export class DeepseekLLM
 
       this.response = response;
       return response.data[0].embedding;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to generate embeddings", { error, text });
       throw new Error(`Embedding generation failed: ${error}`);
     }
@@ -115,7 +115,7 @@ export class DeepseekLLM
 
       this.response = response;
       return response.choices[0].message.content || "";
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to generate text", error);
       throw new Error(`Text generation failed: ${error}`);
     }
@@ -432,7 +432,7 @@ export class DeepseekLLM
     try {
       const result = await this.processUserQuery(userQuery);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error occurred while running the agent", error);
       throw error;
     }

@@ -28,7 +28,7 @@ export abstract class BaseLLM<T extends Record<string, any>>
         validationErrors.forEach((error) => this.logger.info(`${error}`));
         this.logger.info("LLM configuration is invalid");
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("LLM configuration is invalid", error);
       throw error;
     }

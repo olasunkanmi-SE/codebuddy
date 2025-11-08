@@ -52,9 +52,14 @@ export class GroqLLM extends BaseLLM<any> implements vscode.Disposable {
     } catch (error: any) {
       this.logger.error(
         "Model not responding, please resend your question",
-        error,
+        error.stack,
       );
-      throw new Error(error.message);
+      if (error.status === "401") {
+        vscode.window.showErrorMessage(
+          "Invalid API key. Please update your API key",
+        );
+      }
+      throw error;
     }
   }
 

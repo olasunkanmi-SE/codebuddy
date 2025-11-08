@@ -144,7 +144,7 @@ export class EmbeddingService {
         description,
         processedAt: new Date().toISOString(),
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to generate text", { error, item });
       throw new Error("Text generation failed");
     }
@@ -189,7 +189,7 @@ export class EmbeddingService {
         embedding,
         processedAt: new Date().toISOString(),
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to generate function embeddings", {
         error,
         item,
@@ -249,7 +249,7 @@ export class EmbeddingService {
           generateEmbeddings,
           generateComments,
         };
-      } catch (error) {
+      } catch (error: any) {
         retries++;
         this.logger.error(`Retry ${retries}/${this.options.maxRetries}`, {
           error,
@@ -291,7 +291,7 @@ export class EmbeddingService {
       });
 
       return result.successful;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Processing failed", { error });
       throw error;
     }
@@ -337,7 +337,7 @@ export class EmbeddingService {
         lastRequestTime = Date.now();
 
         this.logger.info(`Batch processed`, { startIndex: i });
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`Batch processing failed`, {
           startIndex: i,
           error,

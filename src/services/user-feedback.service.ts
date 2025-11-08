@@ -126,7 +126,7 @@ export class UserFeedbackService implements vscode.Disposable {
 
           try {
             await phase.action();
-          } catch (error) {
+          } catch (error: any) {
             this.logger.error(`Phase ${phase.name} failed:`, error);
             throw error;
           }

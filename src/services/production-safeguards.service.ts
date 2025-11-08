@@ -247,7 +247,7 @@ export class ProductionSafeguards implements vscode.Disposable {
         this.circuitBreaker.failures = 0;
 
         return result;
-      } catch (error) {
+      } catch (error: any) {
         lastError = error as Error;
 
         this.logger.error(
@@ -433,7 +433,7 @@ export class ProductionSafeguards implements vscode.Disposable {
           this.retryCounters.delete(strategy.action);
           break;
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(
           `Recovery strategy ${strategy.action} failed:`,
           error,
@@ -551,7 +551,7 @@ export class ProductionSafeguards implements vscode.Disposable {
           // Every 5 minutes
           this.retryCounters.clear();
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error("Resource monitoring error:", error);
       }
     }, 10000); // Check every 10 seconds
@@ -647,7 +647,7 @@ export class ProductionSafeguards implements vscode.Disposable {
       vscode.window.showInformationMessage(
         `Recovery action ${action} executed successfully`,
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Manual recovery action ${action} failed:`, error);
 
       // Provide specific guidance for common vector database issues

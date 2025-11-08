@@ -78,7 +78,7 @@ export class FileService {
       );
 
       return new TextDecoder(encoding).decode(bytes);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error reading file ${filePath}:`, error);
       throw error;
     }
@@ -97,7 +97,7 @@ export class FileService {
       const bytes = new TextEncoder().encode(content);
       await vscode.workspace.fs.writeFile(uri, bytes);
       this.logger.debug(`File written: ${path.basename(filePath)}`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error writing file ${filePath}:`, error);
       throw error;
     }
@@ -119,7 +119,7 @@ export class FileService {
         isCode: LanguageUtils.isCodeFileByPath(filePath),
         lineCount: content ? content.split("\n").length : undefined,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Could not get metadata for ${filePath}:`, error);
       return null;
     }
@@ -152,7 +152,7 @@ export class FileService {
           );
 
           allFiles.push(...files.map((uri) => uri.fsPath));
-        } catch (error) {
+        } catch (error: any) {
           this.logger.warn(
             `Error finding files with pattern ${pattern}:`,
             error,
@@ -187,7 +187,7 @@ export class FileService {
         if (modifiedDate > cutoffDate) {
           recentFiles.push(filePath);
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.warn(`Could not get stats for file ${filePath}:`, error);
         continue;
       }
@@ -253,7 +253,7 @@ export class FileService {
             entryPoints.push(entryPath);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.debug(
           `No package.json found in ${folder.uri.fsPath}:`,
           error,
@@ -333,7 +333,7 @@ export class FileService {
         .map((f) => f.path);
 
       return relatedFiles;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Could not get related files for ${filePath}:`, error);
       return [];
     }
@@ -363,7 +363,7 @@ export class FileService {
           if (onDeleted) watcher.onDidDelete(onDeleted);
 
           disposables.push(watcher);
-        } catch (error) {
+        } catch (error: any) {
           this.logger.error(
             `Failed to create watcher for pattern ${pattern}:`,
             error,
