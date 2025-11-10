@@ -38,12 +38,12 @@ export class RelevanceScorer {
       const nameScore = this.calculateKeywordScore(nameKeywords);
       score += nameScore * 2;
       reasons.push(
-        `Name keywords: ${nameKeywords.join(", ")} (+${nameScore * 2})`
+        `Name keywords: ${nameKeywords.join(", ")} (+${nameScore * 2})`,
       );
     }
 
     const codeKeywords = this.findKeywordsInText(
-      element.codeSnippet.toLowerCase()
+      element.codeSnippet.toLowerCase(),
     );
     if (codeKeywords?.length > 0) {
       const codeScore = this.calculateKeywordScore(nameKeywords);
@@ -87,7 +87,7 @@ export class RelevanceScorer {
 
   filterByRelevance(
     elements: ICodeElement[],
-    config: IRelevanceConfig = {}
+    config: IRelevanceConfig = {},
   ): IScoredElement[] {
     const {
       minScore = 10,
@@ -102,7 +102,7 @@ export class RelevanceScorer {
 
     if (requireKeywordInName) {
       scored = scored.filter(
-        (s) => this.findKeywordsInText(s.element.name.toLowerCase()).length > 0
+        (s) => this.findKeywordsInText(s.element.name.toLowerCase()).length > 0,
       );
     }
 

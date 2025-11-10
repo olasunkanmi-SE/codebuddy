@@ -21,12 +21,12 @@ import { FileService } from "../services/file-system";
 import { InputValidator } from "../services/input-validator";
 import { PerformanceProfiler } from "../services/performance-profiler.service";
 import { ProductionSafeguards } from "../services/production-safeguards.service";
-import { QuestionClassifierService } from "../services/question-classifier.service";
 import { LogLevel } from "../services/telemetry";
 import { UserFeedbackService } from "../services/user-feedback.service";
 import { WorkspaceService } from "../services/workspace-service";
 import { formatText, getAPIKeyAndModel } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
+import { QuestionClassifierService } from "../services/question-classifier.service2";
 
 export interface ImessageAndSystemInstruction {
   systemInstruction: string;
