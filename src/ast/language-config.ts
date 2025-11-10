@@ -43,7 +43,8 @@ export const languageConfigs: Readonly<Record<string, ILanguageConfig>> = {
     queries: {
       functionDefinitions: `
                 (function_declaration name: (identifier) @name) @function.definition
-                (variable_declarator name: (identifier) @name value: (arrow_function | function)) @function.definition
+                (variable_declarator name: (identifier) @name value: (arrow_function)) @function.definition
+                (variable_declarator name: (identifier) @name value: (function_expression)) @function.definition
             `,
       classDefinitions: `(class_declaration name: (type_identifier) @name) @class.definition`,
       methodDefinitions: `(method_definition name: (property_identifier) @name) @method.definition`,

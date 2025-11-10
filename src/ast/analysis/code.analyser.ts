@@ -1,19 +1,21 @@
+import * as path from "path";
+import { TextDecoder } from "util";
+import * as vscode from "vscode";
+import { Logger, LogLevel } from "../../infrastructure/logger/logger";
+import { generateId } from "../../utils/utils";
+import { authKeywords } from "../constants";
+import { IAnalysisOutput, ICodeElement } from "../query-types";
 import { LairExtractor } from "./../query-extractor";
 import { CodeSearch } from "./code.search";
 import { FileParser } from "./file.parser";
-import * as vscode from "vscode";
-import * as path from "path";
-import { TextDecoder } from "util";
-import { authKeywords } from "../constants";
-import { IAnalysisOutput, ICodeElement } from "../query-types";
-import { Logger, LogLevel } from "../../infrastructure/logger/logger";
-import { generateId } from "../../utils/utils";
+import { RelevanceScorer } from "./relevance.scrorer";
 
 export class CodeAnalyzer {
   private readonly textDecoder = new TextDecoder();
   private readonly lairExtractor: LairExtractor;
   private readonly logger: Logger;
   private static instance: CodeAnalyzer;
+  private readonly relevanceScorer: RelevanceScorer;
 
   constructor(
     private codeSearcher: CodeSearch,
@@ -24,6 +26,7 @@ export class CodeAnalyzer {
       minLevel: LogLevel.DEBUG,
     });
     this.lairExtractor = LairExtractor.getInstance();
+    this.relevanceScorer = RelevanceScorer.getInstance();
   }
 
   static getInstance(
@@ -39,7 +42,7 @@ export class CodeAnalyzer {
   }
 
   async analyze(
-    workSpaceRoot: string,
+    workspaceRoot: string,
     progress: vscode.Progress<{ message?: string; increment?: number }>,
     cancellationToken: vscode.CancellationToken,
   ) {
@@ -52,7 +55,7 @@ export class CodeAnalyzer {
     try {
       result = await this.codeSearcher.search(
         authKeywords,
-        workSpaceRoot,
+        workspaceRoot,
         cancellationToken,
       );
 
@@ -110,7 +113,7 @@ export class CodeAnalyzer {
         } else {
           const textElements = await this.performTextSearch(
             filePath,
-            workSpaceRoot,
+            workspaceRoot,
           );
           allAuthElements.push(...textElements);
         }
@@ -139,7 +142,16 @@ export class CodeAnalyzer {
       return this.createEmptyOutput();
     }
 
-    return this.formatResult(allAuthElements, workSpaceRoot);
+    // Step 3: Apply relevance scoring and filtering
+    progress.report({
+      message: "Scoring and filtering results...",
+      increment: 15,
+    });
+    const filteredElements = this.applyRelevanceFiltering(allAuthElements);
+
+    // Step 4: Format final results
+    progress.report({ message: "Generating summary...", increment: 5 });
+    return this.formatResults(filteredElements, workspaceRoot);
   }
 
   private async performTextSearch(
@@ -187,7 +199,7 @@ export class CodeAnalyzer {
     return elements;
   }
 
-  private formatResult(
+  private formatResults(
     elements: ICodeElement[],
     workspaceRoot: string,
   ): IAnalysisOutput {
@@ -230,5 +242,76 @@ export class CodeAnalyzer {
       },
       files: [],
     };
+  }
+
+  private applyRelevanceFiltering(elements: ICodeElement[]): ICodeElement[] {
+    const uniqueElements = this.deduplicateElements(elements);
+    const filterConfig = this.relevanceScorer.recommendConfig(
+      uniqueElements.length,
+    );
+
+    this.outputChannel.appendLine(
+      `Using config: minScore=${filterConfig.minScore}, maxElements=${filterConfig.maxElements}`,
+    );
+    this.logger.info(
+      `Using config: minScore=${filterConfig.minScore}, maxElements=${filterConfig.maxElements}`,
+    );
+
+    const scoredElements = this.relevanceScorer.filterByRelevance(
+      uniqueElements,
+      filterConfig,
+    );
+
+    this.outputChannel.appendLine(
+      `Filtered to ${scoredElements.length} most relevant elements\n`,
+    );
+
+    this.logger.info(
+      `Filtered to ${scoredElements.length} most relevant elements\n`,
+    );
+
+    this.outputChannel.appendLine("=== TOP 10 MOST RELEVANT ELEMENTS ===");
+    this.logger.info("=== TOP 10 MOST RELEVANT ELEMENTS ===");
+
+    scoredElements.slice(0, 10).forEach((scored, i) => {
+      this.outputChannel.appendLine(
+        `${i + 1}. [${scored.element.type}] ${scored.element.name} (Score: ${scored.score})`,
+      );
+      this.outputChannel.appendLine(`Reasons: ${scored.reasons.join("; ")}`);
+      this.logger.info(`Reasons: ${scored.reasons.join("; ")}`);
+    });
+    this.outputChannel.appendLine("");
+
+    const llmSummary = this.relevanceScorer.generateLLMSummary(scoredElements);
+    this.outputChannel.appendLine("=== LLM SUMMARY ===");
+    this.logger.info("=== LLM SUMMARY ===");
+
+    this.outputChannel.appendLine(
+      `Total elements for LLM: ${llmSummary.elementCount}`,
+    );
+    this.logger.info("Total elements for LLM: ${llmSummary.elementCount}");
+
+    this.outputChannel.appendLine(
+      `Estimated tokens: ~${llmSummary.estimatedTokens}`,
+    );
+    this.logger.info(`Estimated tokens: ~${llmSummary.estimatedTokens}`);
+    this.outputChannel.appendLine("");
+    this.outputChannel.appendLine(llmSummary.summary);
+
+    return scoredElements.map((s) => s.element);
+  }
+
+  private deduplicateElements(elements: ICodeElement[]): ICodeElement[] {
+    const seen = new Set<string>();
+    const unique: ICodeElement[] = [];
+
+    for (const element of elements) {
+      const key = `${element.filePath}:${element.startPosition.row}:${element.startPosition.column}:${element.type}:${element.name}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(element);
+      }
+    }
+    return unique;
   }
 }

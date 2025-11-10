@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { execFile } from "child_process";
 import { rgPath } from "@vscode/ripgrep";
+import { defaultIgnorePatterns } from "../constants";
 
 export class CodeSearch {
   private logger: Logger;
@@ -11,6 +12,28 @@ export class CodeSearch {
     this.logger = Logger.initialize("QueryExecutor", {
       minLevel: LogLevel.DEBUG,
     });
+  }
+
+  private getIgnorePatterns() {
+    return defaultIgnorePatterns;
+  }
+
+  private buildRipgrepArgs(
+    pattern: string,
+    workspaceRoot: string,
+    additionalArgs: string[] = [],
+  ): string[] {
+    const args = ["--regexp", pattern, "--files-with-matches", "--ignore-case"];
+
+    for (const ignorePattern of this.getIgnorePatterns()) {
+      args.push("--glob", `!${ignorePattern}`);
+    }
+
+    args.push(...additionalArgs);
+
+    args.push(workspaceRoot);
+
+    return args;
   }
 
   static getInstance(outputChannel: vscode.OutputChannel) {
@@ -29,13 +52,8 @@ export class CodeSearch {
     const escapedPatterns = patterns.map((p) => this.escapeRegex(p));
     const combinedPattern = escapedPatterns.map((p) => `(${p})`).join("|");
 
-    const args = [
-      "--regexp",
-      combinedPattern,
-      "--files-with-matches",
-      "--ignore-case",
-      workspaceRoot,
-    ];
+    const args = this.buildRipgrepArgs(combinedPattern, workspaceRoot);
+
     this.outputChannel.appendLine(
       `Running ripgrep with pattern: ${combinedPattern}`,
     );
@@ -82,14 +100,11 @@ export class CodeSearch {
     workspaceRoot: string,
     cancellationToken?: vscode.CancellationToken,
   ): Promise<string[]> {
-    const args = [
-      "--fixed-strings",
-      "--files-with-matches",
-      "--ignore-case",
+    const args = this.buildRipgrepArgs(
       phrase,
       workspaceRoot,
-    ];
-
+      ["--fixed-strings"], // Additional arg
+    );
     return new Promise((resolve, reject) => {
       const child = execFile(
         rgPath,
@@ -127,15 +142,19 @@ export class CodeSearch {
     fileExtensions: string[],
     cancellationToken?: vscode.CancellationToken,
   ): Promise<string[]> {
-    const escapedPatterns = patterns.map((p) => this.escapeRegex(p));
-    const combinedPattern = escapedPatterns.map((p) => `(${p})`).join("|");
+    const combinedPattern = patterns.map((p) => `(${p})`).join("|");
 
-    const args = [
-      "--regexp",
+    // Build additional args for file types
+    const additionalArgs: string[] = [];
+    for (const ext of fileExtensions) {
+      additionalArgs.push("--glob", `*.${ext}`);
+    }
+
+    const args = this.buildRipgrepArgs(
       combinedPattern,
-      "--files-with-matches",
-      "--ignore-case",
-    ];
+      workspaceRoot,
+      additionalArgs, // Type filters added
+    );
 
     for (const ext of fileExtensions) {
       args.push("--glob", `*.${ext}`);
