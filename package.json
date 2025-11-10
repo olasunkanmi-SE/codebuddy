@@ -345,12 +345,14 @@
     "@mozilla/readability": "^0.4.1",
     "@types/node-fetch": "^2.6.11",
     "@types/sql.js": "^1.4.9",
+    "@vscode/ripgrep": "^1.17.0",
     "apache-arrow": "18.1.0",
     "axios": "^1.7.9",
     "dompurify": "^3.2.6",
     "dotenv": "^16.1.4",
     "groq-sdk": "^0.22.0",
     "jsdom": "^26.0.0",
+    "lru-cache": "^11.2.2",
     "markdown-it": "^14.1.0",
     "node-fetch": "^3.3.2",
     "openai": "^4.28.0",
@@ -358,7 +360,8 @@
     "readable-stream": "^4.5.2",
     "simple-git": "^3.25.0",
     "sinon": "^17.0.1",
-    "sql.js": "^1.13.0"
+    "sql.js": "^1.13.0",
+    "web-tree-sitter": "^0.25.10"
   },
   "license": "MIT"
 }

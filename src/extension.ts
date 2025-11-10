@@ -37,6 +37,10 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
+import { OutputManager } from "./services/output-manager";
+import { TreeSitterParser } from "./ast/parser/tree-sitter.parser";
+import { CacheManager } from "./ast/cache/cache.manager";
+import { AnalyzeCodeCommand } from "./ast/commands/analyze-auth-command";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -139,6 +143,10 @@ function initializeWebViewProviders(
   });
 }
 
+let outputManager: OutputManager;
+let parser: TreeSitterParser;
+let cacheManager: CacheManager;
+
 export async function activate(context: vscode.ExtensionContext) {
   try {
     Logger.sessionId = Logger.generateId();
@@ -171,39 +179,38 @@ export async function activate(context: vscode.ExtensionContext) {
 
     logger.info("✓ CodeBuddy: Core services started, UI ready");
 
-    // ⚡ IMMEDIATE: Show that extension is ready
-    vscode.window.setStatusBarMessage(
-      "$(check) CodeBuddy: Ready! Loading features...",
-      2000,
+    outputManager = OutputManager.getInstance();
+    context.subscriptions.push(outputManager.getChannel());
+
+    // Initialize Tree-sitter parser
+    parser = TreeSitterParser.getInstance(
+      context.extensionPath,
+      outputManager.getChannel(),
     );
 
-    // Show welcome message for first-time users
-    const hasShownWelcome = context.globalState.get(
-      "codebuddy.welcomeShown",
-      false,
+    // Initialize cache manager
+    cacheManager = CacheManager.getInstance(outputManager.getChannel());
+
+    // Start Tree-sitter initialization (non-blocking)
+    // This promise will be awaited in commands before they execute
+    const initPromise = parser.initialize().catch((error) => {
+      outputManager.appendLine(
+        `Fatal: Tree-sitter initialization failed: ${error}`,
+      );
+      vscode.window.showErrorMessage(
+        `CodeBuddy: Failed to initialize Tree-sitter. Extension may not work properly.`,
+      );
+      throw error; // Re-throw to be caught by command handlers
+    });
+
+    const codenalysis = new AnalyzeCodeCommand(
+      outputManager,
+      parser,
+      cacheManager,
+      initPromise,
     );
-    if (!hasShownWelcome) {
-      setTimeout(() => {
-        vscode.window
-          .showInformationMessage(
-            "🎉 CodeBuddy is ready! Features are loading in the background.",
-            "Open Chat",
-            "Learn More",
-          )
-          .then((action) => {
-            if (action === "Open Chat") {
-              vscode.commands.executeCommand(
-                "workbench.view.extension.codeBuddy-view-container",
-              );
-            } else if (action === "Learn More") {
-              vscode.env.openExternal(
-                vscode.Uri.parse("https://github.com/olasunkanmi-SE/codebuddy"),
-              );
-            }
-          });
-        context.globalState.update("codebuddy.welcomeShown", true);
-      }, 1000);
-    }
+    codenalysis.execute();
+
     const {
       comment,
       review,

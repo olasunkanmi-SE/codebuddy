@@ -7,6 +7,7 @@ import {
 } from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
 import { Memory } from "../memory/base";
+import * as crypto from "crypto";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -222,3 +223,7 @@ export const getAPIKeyAndModel = (
 
 export const generateQueryString = (query: string) =>
   `q=${encodeURIComponent(query)}`;
+
+export const generateId = (): string => {
+  return crypto.randomBytes(16).toString("hex");
+};

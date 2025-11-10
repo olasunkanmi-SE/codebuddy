@@ -58,7 +58,7 @@ export class SqliteDatabaseService {
 
       // Configure sql.js with the WASM file location
       // In the bundled extension, the WASM file is in the same directory as extension.js
-      const wasmPath = path.join(__dirname, "sql-wasm.wasm");
+      const wasmPath = path.join(__dirname, "grammars", "sql-wasm.wasm");
       this.logger.info(`Looking for WASM file at: ${wasmPath}`);
 
       this.SQL = await initSqlJs({

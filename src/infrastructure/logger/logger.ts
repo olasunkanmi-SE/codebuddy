@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
+import { OutputManager } from "../../services/output-manager";
 
 // TODO Log data in MongoDB Atlas, take advantage of telemetery
 
@@ -56,8 +57,9 @@ export class Logger {
     filePath: undefined,
   };
 
-  private static outputChannel: vscode.OutputChannel =
-    vscode.window.createOutputChannel("CodeBuddy Extension Output");
+  private readonly outputManager: OutputManager = OutputManager.getInstance(
+    "CodeBuddy Extension Output",
+  );
   private static telemetry: ITelemetry | undefined;
   static sessionId: string;
   private static traceId: string;
@@ -122,15 +124,12 @@ export class Logger {
 
     const formattedMessage = `[${event.timestamp}] [${event.level}] [${event.module}] ${event.message}`;
 
-    if (Logger.outputChannel) {
-      Logger.outputChannel.appendLine(formattedMessage);
-
-      if (event.data) {
-        Logger.outputChannel.appendLine(JSON.stringify(event.data, null, 2));
-      }
+    if (event.data) {
+      this.outputManager.appendLine(JSON.stringify(event.data, null, 2));
     } else {
-      console.log(formattedMessage, event.data || "");
+      this.outputManager.appendLine(formattedMessage);
     }
+    console.log(formattedMessage, event.data || "");
   }
 
   private logToFile(event: ILogEvent): void {

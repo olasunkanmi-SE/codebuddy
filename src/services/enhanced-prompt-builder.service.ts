@@ -322,7 +322,9 @@ export class EnhancedPromptBuilderService {
 2. **Detailed Analysis** - In-depth explanation with context
 3. **Code Examples** - Relevant snippets from the actual codebase
 4. **File References** - Specific paths and locations
-5. **Next Steps** - Actionable recommendations`;
+6. **Citations (if applicable)**: Where possible, link to official documentations, specs, or trusted resources like Github, Mozilla etc
+5. **Next Steps** - Actionable recommendations
+`;
 
     if (questionType.isDebugging) {
       format += `

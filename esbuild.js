@@ -31,6 +31,34 @@ const copyAssetsPlugin = {
   },
 };
 
+// Copy TreeSitter WASM files (core + grammar)
+const copyTreeSitterPlugin = {
+  name: "copy-tree-sitter",
+  setup(build) {
+    build.onEnd(async () => {
+      const grammarsSrcDir = path.join(__dirname, "src", "grammars");
+      const grammarDestDir = path.join(__dirname, "dist", "grammars");
+      if (fs.existsSync(grammarsSrcDir)) {
+        if (!fs.existsSync(grammarDestDir)) {
+          fs.mkdirSync(grammarDestDir, { recursive: true });
+        }
+        fs.readdirSync(grammarsSrcDir).forEach((file) => {
+          if (file.endsWith(".wasm")) {
+            fs.copyFileSync(path.join(grammarsSrcDir, file), path.join(grammarDestDir, file));
+          }
+        });
+      }
+
+      const treeSitterWasmSrc = path.join(__dirname, "node_modules", "web-tree-sitter", "tree-sitter.wasm");
+      const treeSitterWasmDest = path.join(__dirname, "dist", "grammars", "tree-sitter.wasm");
+      if (fs.existsSync(treeSitterWasmSrc)) {
+        fs.copyFileSync(treeSitterWasmSrc, treeSitterWasmDest);
+      } else {
+        console.warn("Warning: tree-sitter.wasm not found in node_modules/web-tree-sitter");
+      }
+    });
+  },
+};
 // List of Node.js built-in modules to mark as external
 const nodeBuiltins = [
   "assert",
@@ -156,6 +184,7 @@ async function main() {
         },
       },
       copyAssetsPlugin,
+      copyTreeSitterPlugin,
       treeShakingPlugin,
     ],
     define: {
