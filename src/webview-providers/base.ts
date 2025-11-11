@@ -71,7 +71,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     private readonly _extensionUri: vscode.Uri,
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     this.fileManager = FileManager.initialize(context, "files");
     this.fileService = FileService.getInstance();
@@ -111,14 +111,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         cleanupInterval: 300000, // 5 minutes
         evictionPolicy: "LRU",
       },
-      this.performanceProfiler
+      this.performanceProfiler,
     );
 
     this.userFeedbackService = new UserFeedbackService();
 
     this.contextRetriever = new ContextRetriever();
 
-    this.promptBuilderService = new EnhancedPromptBuilderService();
+    this.promptBuilderService = new EnhancedPromptBuilderService(context);
   }
 
   registerDisposables() {
@@ -132,25 +132,25 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onUpdate(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onError(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onSecretChange(
-        this.handleModelResponseEvent.bind(this)
+        this.handleModelResponseEvent.bind(this),
       ),
       this.orchestrator.onActiveworkspaceUpdate(
-        this.handleGenericEvents.bind(this)
+        this.handleGenericEvents.bind(this),
       ),
       this.orchestrator.onFileUpload(this.handleModelResponseEvent.bind(this)),
       this.orchestrator.onStrategizing(
-        this.handleModelResponseEvent.bind(this)
+        this.handleModelResponseEvent.bind(this),
       ),
       this.orchestrator.onConfigurationChange(
-        this.handleGenericEvents.bind(this)
+        this.handleGenericEvents.bind(this),
       ),
       this.orchestrator.onUserPrompt(this.handleUserPrompt.bind(this)),
       this.orchestrator.onGetUserPreferences(
-        this.handleUserPreferences.bind(this)
+        this.handleUserPreferences.bind(this),
       ),
       this.orchestrator.onUpdateThemePreferences(
-        this.handleThemePreferences.bind(this)
-      )
+        this.handleThemePreferences.bind(this),
+      ),
     );
   }
 
@@ -174,7 +174,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     if (!this.apiKey) {
       vscode.window.showErrorMessage(
-        "API key not configured. Check your settings."
+        "API key not configured. Check your settings.",
       );
       return;
     }
@@ -212,7 +212,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         await this.updateProviderChatHistory(providerHistory);
 
         this.logger.debug(
-          `Synchronized ${persistentHistory.length} chat messages from database`
+          `Synchronized ${persistentHistory.length} chat messages from database`,
         );
       } else {
         this.logger.debug("No chat history found in database to synchronize");
@@ -220,7 +220,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     } catch (error: any) {
       this.logger.warn(
         "Failed to synchronize chat history from database:",
-        error
+        error,
       );
       // Don't throw - this is not critical for provider initialization
     }
@@ -234,14 +234,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     // Base implementation - child classes should override this
     // to update their specific chatHistory arrays
     this.logger.debug(
-      "Base provider - no specific chat history array to update"
+      "Base provider - no specific chat history array to update",
     );
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
     view.webview.html = getWebviewContent(
       this.currentWebView?.webview!,
-      this._extensionUri
+      this._extensionUri,
     );
   }
 
@@ -318,7 +318,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               // Validate user input for security
               const validation = this.inputValidator.validateInput(
                 message.message,
-                "chat"
+                "chat",
               );
 
               if (validation.blocked) {
@@ -327,12 +327,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   {
                     originalLength: message.message.length,
                     warnings: validation.warnings,
-                  }
+                  },
                 );
 
                 await this.sendResponse(
                   "⚠️ Your message contains potentially unsafe content and has been blocked. Please rephrase your question in a more direct way.",
-                  "bot"
+                  "bot",
                 );
                 break;
               }
@@ -348,7 +348,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 if (validation.warnings.length > 2) {
                   await this.sendResponse(
                     "ℹ️ Your message has been modified for security. Some content was filtered.",
-                    "bot"
+                    "bot",
                   );
                 }
               }
@@ -364,7 +364,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   stats.estimatedTokens > 16000
                 ) {
                   this.logger.info(
-                    `High chat history usage detected: ${stats.totalMessages} messages, ${stats.estimatedTokens} tokens`
+                    `High chat history usage detected: ${stats.totalMessages} messages, ${stats.estimatedTokens} tokens`,
                   );
                   // Optionally trigger manual pruning here
                   // await this.pruneHistoryManually("agentId", { maxMessages: 50, maxTokens: 8000 });
@@ -373,31 +373,31 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
               const messageAndSystemInstruction =
                   await this.enhanceMessageWithCodebaseContext(
-                    sanitizedMessage
+                    sanitizedMessage,
                   ),
                 response = await this.generateResponse(
                   messageAndSystemInstruction,
-                  message.metaData
+                  message.metaData,
                 );
               if (this.UserMessageCounter === 1) {
                 await this.publishWorkSpace();
               }
               if (response) {
                 this.logger.info(
-                  `[DEBUG] Response from generateResponse: ${response.length} characters`
+                  `[DEBUG] Response from generateResponse: ${response.length} characters`,
                 );
                 const formattedResponse = formatText(response);
                 this.logger.info(
-                  `[DEBUG] Formatted response: ${formattedResponse.length} characters`
+                  `[DEBUG] Formatted response: ${formattedResponse.length} characters`,
                 );
                 this.logger.info(
-                  `[DEBUG] Original response ends with: "${response.slice(-100)}"`
+                  `[DEBUG] Original response ends with: "${response.slice(-100)}"`,
                 );
 
                 await this.sendResponse(formattedResponse, "bot");
               } else {
                 this.logger.info(
-                  `[DEBUG] No response received from generateResponse`
+                  `[DEBUG] No response received from generateResponse`,
                 );
               }
               break;
@@ -431,7 +431,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 message.message,
                 {
                   theme: message.message,
-                }
+                },
               );
               break;
 
@@ -453,12 +453,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 **Targets**: Search <500ms, Memory <500MB, Errors <5%
                 **Status**: ${stats.searchLatency.count > 0 ? "✅ Active" : "⚠️ Limited Data"}
                 `.trim(),
-                  "bot"
+                  "bot",
                 );
               } else {
                 await this.sendResponse(
                   "Performance profiler not available",
-                  "bot"
+                  "bot",
                 );
               }
               break;
@@ -476,12 +476,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 • **Remaining Memory**: ${cacheInfo.total.memoryMB.toFixed(1)}MB
                 • **Hit Rate**: ${(cacheInfo.total.hitRate * 100).toFixed(1)}%
                 `.trim(),
-                  "bot"
+                  "bot",
                 );
               } else {
                 await this.sendResponse(
                   "Enhanced cache manager not available",
-                  "bot"
+                  "bot",
                 );
               }
               break;
@@ -492,11 +492,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 const currentBatchSize = config.batchSize;
                 const newBatchSize = Math.max(
                   5,
-                  Math.floor(currentBatchSize * 0.7)
+                  Math.floor(currentBatchSize * 0.7),
                 );
                 await this.vectorConfigManager.updateConfig(
                   "batchSize",
-                  newBatchSize
+                  newBatchSize,
                 );
                 await this.sendResponse(
                   `
@@ -506,12 +506,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 • **New**: ${newBatchSize}
                 • **Impact**: Lower memory usage, potentially slower indexing
                 `.trim(),
-                  "bot"
+                  "bot",
                 );
               } else {
                 await this.sendResponse(
                   "Configuration manager not available",
-                  "bot"
+                  "bot",
                 );
               }
               break;
@@ -521,12 +521,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 // Emergency stop will be handled by the safeguards service
                 await this.sendResponse(
                   "🚨 **Emergency Stop Activated** - All vector operations have been stopped due to resource concerns",
-                  "bot"
+                  "bot",
                 );
               } else {
                 await this.sendResponse(
                   "Production safeguards not available",
-                  "bot"
+                  "bot",
                 );
               }
               break;
@@ -536,12 +536,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 // Resume will be handled by the safeguards service
                 await this.sendResponse(
                   "✅ **Resumed from Emergency Stop** - Vector operations are now active",
-                  "bot"
+                  "bot",
                 );
               } else {
                 await this.sendResponse(
                   "Production safeguards not available",
-                  "bot"
+                  "bot",
                 );
               }
               break;
@@ -563,12 +563,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 • **Search Latency**: ${report.avgSearchLatency.toFixed(0)}ms
                 • **Configuration**: Automatically tuned based on system resources
                 `.trim(),
-                  "bot"
+                  "bot",
                 );
               } else {
                 await this.sendResponse(
                   "Performance optimization services not available",
-                  "bot"
+                  "bot",
                 );
               }
               break;
@@ -576,7 +576,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             default:
               throw new Error("Unknown command");
           }
-        })
+        }),
       );
     } catch (error: any) {
       this.logger.error("Message handler failed", error);
@@ -594,36 +594,38 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   public handleModelResponseEvent(event: IEventPayload) {
     this.sendResponse(
       formatText(event.message),
-      event.message === "folders" ? "bootstrap" : "bot"
+      event.message === "folders" ? "bootstrap" : "bot",
     );
   }
   abstract generateResponse(
     message?: LLMMessage,
-    metaData?: Record<string, any>
+    metaData?: Record<string, any>,
   ): Promise<string | undefined>;
 
   abstract sendResponse(
     response: string,
-    currentChat?: string
+    currentChat?: string,
   ): Promise<boolean | undefined>;
 
   /**
    * Enhances user messages with codebase context if the question is codebase-related
    */
-  private enhanceMessageWithCodebaseContext(message: string): LLMMessage {
+  private async enhanceMessageWithCodebaseContext(
+    message: string,
+  ): Promise<LLMMessage> {
     try {
       const questionAnalysis =
         this.questionClassifier.categorizeQuestion(message);
 
       if (!questionAnalysis.isCodebaseRelated) {
         this.logger.debug(
-          "Question not codebase-related, returning original message"
+          "Question not codebase-related, returning original message",
         );
         return message;
       }
 
       this.logger.info(
-        `Detected codebase question with confidence: ${questionAnalysis.confidence}, categories: ${questionAnalysis.categories.join(", ")}`
+        `Detected codebase question with confidence: ${questionAnalysis.confidence}, categories: ${questionAnalysis.categories.join(", ")}`,
       );
 
       // Create enhanced prompt using the dedicated service
@@ -637,10 +639,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         },
       };
 
-      const enhancedMessage = this.promptBuilderService.createEnhancedPrompt(
-        message,
-        promptContext
-      );
+      const enhancedMessage =
+        await this.promptBuilderService.createEnhancedPrompt(
+          message,
+          promptContext,
+        );
 
       return { systemInstruction: enhancedMessage, userMessage: message };
     } catch (error: any) {
@@ -652,7 +655,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   public dispose(): void {
     this.logger.debug(
-      `Disposing BaseWebViewProvider with ${this.disposables.length} disposables`
+      `Disposing BaseWebViewProvider with ${this.disposables.length} disposables`,
     );
 
     this.disposables.forEach((d) => d.dispose());
@@ -682,14 +685,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       maxTokens: number;
       maxAgeHours: number;
       preserveSystemMessages: boolean;
-    }>
+    }>,
   ): Promise<any[]> {
     return await this.chatHistoryManager.formatChatHistory(
       role,
       message,
       model,
       key,
-      pruneConfig
+      pruneConfig,
     );
   }
 
@@ -710,7 +713,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       maxMessages?: number;
       maxTokens?: number;
       maxAgeHours?: number;
-    }
+    },
   ): Promise<void> {
     await this.chatHistoryManager.pruneHistoryForKey(key, config);
   }

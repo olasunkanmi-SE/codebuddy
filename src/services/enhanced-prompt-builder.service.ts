@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { GroqLLM } from "../llms/groq/groq";
+import { getAPIKeyAndModel } from "../utils/utils";
+import { AnalyzeCodeProvider } from "../ast/commands/analyze-code-provider";
+import { truncateForLLM } from "../ast/smart-truncate";
 
 export interface QuestionAnalysis {
   isCodebaseRelated: boolean;
@@ -32,22 +36,47 @@ export interface QuestionTypeClassification {
  */
 export class EnhancedPromptBuilderService {
   private logger: Logger;
+  private readonly groqLLM: GroqLLM | null;
+  private readonly _context: vscode.ExtensionContext;
+  private readonly codeAnalyzerProvider: AnalyzeCodeProvider;
 
-  constructor() {
+  constructor(context: vscode.ExtensionContext) {
     this.logger = Logger.initialize("EnhancedPromptBuilderService", {
       minLevel: LogLevel.DEBUG,
     });
+    const { apiKey, model } = getAPIKeyAndModel("groq");
+    const config = {
+      apiKey: apiKey,
+      model: model ?? "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    };
+    this.groqLLM = GroqLLM.getInstance(config);
+    this._context = context;
+    this.codeAnalyzerProvider = AnalyzeCodeProvider.getInstance(this._context);
   }
 
   /**
    * Creates an enhanced, sophisticated prompt with contextual awareness and specific instructions
    * This method generates rich, detailed prompts that help the LLM understand context and provide optimal responses
    */
-  createEnhancedPrompt(message: string, context: PromptContext): string {
+  async createEnhancedPrompt(
+    message: string,
+    context: PromptContext,
+  ): Promise<string> {
     const { questionAnalysis } = context;
+    const searchTerm = await this.generateSearchTerms(message);
+    if (searchTerm?.length) {
+      context.questionAnalysis.technicalKeywords = searchTerm;
+    }
+
+    const code = await this.codeAnalyzerProvider.analyse(searchTerm ?? []);
+    let truncatedCode: string | undefined;
+
+    if (code) {
+      truncatedCode = truncateForLLM(code, 100000);
+    }
 
     // Classify the question type and intent
-    const questionType = this.classifyQuestionType(message);
+    const questionType = await this.classifyQuestionType(message);
 
     // Generate question-type specific instructions
     const specificInstructions = this.generateQuestionSpecificInstructions(
@@ -86,6 +115,9 @@ export class EnhancedPromptBuilderService {
       3. **Be honest about limitations** - If context is insufficient, explain what additional information would help
       4. **Maintain consistency** - Follow the existing patterns and conventions shown in the codebase
 
+      ** Code From CodeBase
+      ${truncatedCode}
+
       Please provide a detailed, helpful response based on the context and guidelines above.`.trim();
 
     this.logger.debug(
@@ -94,17 +126,100 @@ export class EnhancedPromptBuilderService {
     return enhancedPrompt;
   }
 
+  async generateSearchTerms(
+    userQuestion: string,
+  ): Promise<string[] | undefined> {
+    if (!this.groqLLM) {
+      return;
+    }
+
+    const prompt = `You are a software engineering expert specializing in codebase analysis. Given a user's question about a codebase, extract the core concept (e.g., "Authentication" from "how was Authentication handled within this codebase") and generate exactly 10 similar words or short phrases that are synonyms, related technical terms, or common implementations in software engineering. These should be useful as search keywords for scanning code files (e.g., via ripgrep or similar tools) to find relevant sections.
+
+                  Focus on:
+                  - Technical accuracy in software contexts (e.g., APIs, patterns, libraries).
+                  - Variety: Include acronyms, protocols, functions, or modules (e.g., "jwt", "oauth", "login", "session").
+                  - Brevity: Each term should be 1-3 words max.
+                  - Relevance: Only terms directly related to the core concept.
+
+                  User question: "${userQuestion}"
+
+                  Output exactly as a comma-separated list of the 10 terms, nothing else (no explanations, no JSON, no numbering). Example: term1,term2,term3,term4,term5,term6,term7,term8,term9,term10`;
+
+    try {
+      const response = await this.groqLLM.generateText(prompt); // Adjust to your GroqLLM method (e.g., groqLLM.chat({ messages: [{ role: 'user', content: prompt }] }))
+      if (!response) {
+        throw new Error("No response from Groq LLM");
+      }
+      const terms = response
+        .trim()
+        .split(",")
+        .map((term) => term.trim());
+
+      return terms;
+    } catch (error) {
+      this.logger.error("Error generating search terms:", error);
+      return undefined;
+    }
+  }
+
   /**
    * Classifies the question into different types based on keywords and patterns
    */
-  private classifyQuestionType(message: string): QuestionTypeClassification {
-    return {
-      isImplementation: this.isImplementationQuestion(message),
-      isArchitectural: this.isArchitecturalQuestion(message),
-      isDebugging: this.isDebuggingQuestion(message),
-      isCodeExplanation: this.isCodeExplanationQuestion(message),
-      isFeatureRequest: this.isFeatureRequest(message),
-    };
+  private async classifyQuestionType(
+    message: string,
+  ): Promise<QuestionTypeClassification> {
+    if (!this.groqLLM) {
+      // Fallback to keyword-based if LLM init fails
+      return {
+        isImplementation: this.isImplementationQuestion(message),
+        isArchitectural: this.isArchitecturalQuestion(message),
+        isDebugging: this.isDebuggingQuestion(message),
+        isCodeExplanation: this.isCodeExplanationQuestion(message),
+        isFeatureRequest: this.isFeatureRequest(message),
+      };
+    }
+
+    const prompt = `
+        Classify the following user message into these exact categories (output as JSON only, no extra text):
+        - isImplementation: True if about implementation details, like "how is X implemented" or algorithms/logic.
+        - isArchitectural: True if about architectural decisions, like design patterns or system structure.
+        - isDebugging: True if about debugging, errors, bugs, or troubleshooting.
+        - isCodeExplanation: True if asking for code explanation, like "explain this code" or purpose/breakdown.
+        - isFeatureRequest: True if requesting a new feature or enhancement.
+
+        Message: "${message}"
+
+        Output format:
+        {
+          "isImplementation": true/false,
+          "isArchitectural": true/false,
+          "isDebugging": true/false,
+          "isCodeExplanation": true/false,
+          "isFeatureRequest": true/false
+        }
+`;
+
+    try {
+      const response = await this.groqLLM.generateText(prompt); // Adjust to your GroqLLM method (e.g., groqLLM.chat({ messages: [{ role: 'user', content: prompt }] }))
+      const classification = JSON.parse(response.trim()); // Parse the JSON output
+      return {
+        isImplementation: !!classification.isImplementation,
+        isArchitectural: !!classification.isArchitectural,
+        isDebugging: !!classification.isDebugging,
+        isCodeExplanation: !!classification.isCodeExplanation,
+        isFeatureRequest: !!classification.isFeatureRequest,
+      };
+    } catch (error) {
+      this.logger.error("LLM classification failed:", error);
+      // Fallback to keyword-based on error
+      return {
+        isImplementation: this.isImplementationQuestion(message),
+        isArchitectural: this.isArchitecturalQuestion(message),
+        isDebugging: this.isDebuggingQuestion(message),
+        isCodeExplanation: this.isCodeExplanationQuestion(message),
+        isFeatureRequest: this.isFeatureRequest(message),
+      };
+    }
   }
 
   /**
@@ -251,7 +366,25 @@ export class EnhancedPromptBuilderService {
 - Describe the data flow and control flow
 - Identify key functions, classes, and modules involved
 - Explain any frameworks or libraries being used
-- Highlight important design decisions and their rationale`);
+- Sequence diagram
+  #### ⏱️ **Sequence Diagram**
+  \`\`\`mermaid
+  sequenceDiagram
+      participant Client
+      participant API
+      participant Service
+      participant Database
+      
+      Client->>API: POST /users
+      API->>API: Validate Input
+      API->>Service: createUser(data)
+      Service->>Database: save(user)
+      Database-->>Service: user created
+      Service->>Service: sendWelcomeEmail()
+      Service-->>API: success response
+      API-->>Client: 201 Created
+  \`\`\`
+  - Highlight important design decisions and their rationale`);
     }
 
     if (questionType.isArchitectural) {

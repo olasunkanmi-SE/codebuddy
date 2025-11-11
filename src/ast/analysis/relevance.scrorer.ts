@@ -1,4 +1,5 @@
-import { authKeywords, keywordWeights, typeWeights } from "../constants";
+import { assignWeights } from "../../utils/assign-weight";
+import { typeWeights } from "../constants";
 import { ICodeElement } from "../query-types";
 import { IRelevanceConfig, IScoredElement } from "./analytics.interface";
 
@@ -9,9 +10,9 @@ export class RelevanceScorer {
     return (RelevanceScorer.instance ??= new RelevanceScorer());
   }
 
-  private findKeywordsInText(text: string): string[] {
+  private findKeywordsInText(text: string, keywords: string[]): string[] {
     const found: string[] = [];
-    for (const keyword of authKeywords) {
+    for (const keyword of keywords) {
       if (text.includes(keyword.toLowerCase())) {
         found.push(keyword);
       }
@@ -20,12 +21,13 @@ export class RelevanceScorer {
   }
 
   private calculateKeywordScore(keywords: string[]) {
+    const keywordWeights = new Map<string, number>(assignWeights(keywords));
     return keywords.reduce((sum, keyword) => {
       return sum + (keywordWeights.get(keyword.toLowerCase()) || 3);
     }, 0);
   }
 
-  scoreElement(element: ICodeElement): IScoredElement {
+  scoreElement(element: ICodeElement, keywords: string[]): IScoredElement {
     let score = 0;
     const reasons: string[] = [];
 
@@ -33,7 +35,10 @@ export class RelevanceScorer {
     score += typeScore;
     reasons.push(`Type: ${element.type} (+${typeScore})`);
 
-    const nameKeywords = this.findKeywordsInText(element.name.toLowerCase());
+    const nameKeywords = this.findKeywordsInText(
+      element.name.toLowerCase(),
+      keywords,
+    );
     if (nameKeywords?.length > 0) {
       const nameScore = this.calculateKeywordScore(nameKeywords);
       score += nameScore * 2;
@@ -44,6 +49,7 @@ export class RelevanceScorer {
 
     const codeKeywords = this.findKeywordsInText(
       element.codeSnippet.toLowerCase(),
+      keywords,
     );
     if (codeKeywords?.length > 0) {
       const codeScore = this.calculateKeywordScore(nameKeywords);
@@ -79,15 +85,19 @@ export class RelevanceScorer {
     return { element, score, reasons };
   }
 
-  scoreElements(elements: ICodeElement[]): IScoredElement[] {
+  scoreElements(
+    elements: ICodeElement[],
+    keywords: string[],
+  ): IScoredElement[] {
     return elements
-      .map((el) => this.scoreElement(el))
+      .map((el) => this.scoreElement(el, keywords))
       .sort((a, b) => b.score - a.score);
   }
 
   filterByRelevance(
     elements: ICodeElement[],
     config: IRelevanceConfig = {},
+    keywords: string[],
   ): IScoredElement[] {
     const {
       minScore = 10,
@@ -97,12 +107,14 @@ export class RelevanceScorer {
       includeChildren = true,
     } = config;
 
-    let scored = this.scoreElements(elements);
+    let scored = this.scoreElements(elements, keywords);
     scored = scored.filter((s) => s.score >= minScore);
 
     if (requireKeywordInName) {
       scored = scored.filter(
-        (s) => this.findKeywordsInText(s.element.name.toLowerCase()).length > 0,
+        (s) =>
+          this.findKeywordsInText(s.element.name.toLowerCase(), keywords)
+            .length > 0,
       );
     }
 

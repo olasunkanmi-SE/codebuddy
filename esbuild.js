@@ -17,14 +17,22 @@ const copyAssetsPlugin = {
   setup(build) {
     build.onEnd(async () => {
       // Copy built webview assets to dist/webview/assets
-      const builtAssetsDir = path.join(__dirname, "webviewUi", "dist", "assets");
+      const builtAssetsDir = path.join(
+        __dirname,
+        "webviewUi",
+        "dist",
+        "assets"
+      );
       const destDir = path.join(__dirname, "dist", "webview", "assets");
       if (fs.existsSync(builtAssetsDir)) {
         if (!fs.existsSync(destDir)) {
           fs.mkdirSync(destDir, { recursive: true });
         }
         fs.readdirSync(builtAssetsDir).forEach((file) => {
-          fs.copyFileSync(path.join(builtAssetsDir, file), path.join(destDir, file));
+          fs.copyFileSync(
+            path.join(builtAssetsDir, file),
+            path.join(destDir, file)
+          );
         });
       }
     });
@@ -44,17 +52,32 @@ const copyTreeSitterPlugin = {
         }
         fs.readdirSync(grammarsSrcDir).forEach((file) => {
           if (file.endsWith(".wasm")) {
-            fs.copyFileSync(path.join(grammarsSrcDir, file), path.join(grammarDestDir, file));
+            fs.copyFileSync(
+              path.join(grammarsSrcDir, file),
+              path.join(grammarDestDir, file)
+            );
           }
         });
       }
 
-      const treeSitterWasmSrc = path.join(__dirname, "node_modules", "web-tree-sitter", "tree-sitter.wasm");
-      const treeSitterWasmDest = path.join(__dirname, "dist", "grammars", "tree-sitter.wasm");
+      const treeSitterWasmSrc = path.join(
+        __dirname,
+        "node_modules",
+        "web-tree-sitter",
+        "tree-sitter.wasm"
+      );
+      const treeSitterWasmDest = path.join(
+        __dirname,
+        "dist",
+        "grammars",
+        "tree-sitter.wasm"
+      );
       if (fs.existsSync(treeSitterWasmSrc)) {
         fs.copyFileSync(treeSitterWasmSrc, treeSitterWasmDest);
       } else {
-        console.warn("Warning: tree-sitter.wasm not found in node_modules/web-tree-sitter");
+        console.warn(
+          "Warning: tree-sitter.wasm not found in node_modules/web-tree-sitter"
+        );
       }
     });
   },
@@ -96,9 +119,17 @@ const nodeModulesPlugin = {
   setup(build) {
     // Remove punycode from externals so it is bundled
     const filteredBuiltins = nodeBuiltins.filter((m) => m !== "punycode");
-    build.onResolve({ filter: new RegExp(`^(${filteredBuiltins.join("|")})$`) }, () => ({ external: true }));
-    build.onResolve({ filter: new RegExp(`^(${filteredBuiltins.join("|")})/`) }, () => ({ external: true }));
-    build.onResolve({ filter: /better-sqlite3|electron|apache-arrow/ }, () => ({ external: true })); // jsdom removed
+    build.onResolve(
+      { filter: new RegExp(`^(${filteredBuiltins.join("|")})$`) },
+      () => ({ external: true })
+    );
+    build.onResolve(
+      { filter: new RegExp(`^(${filteredBuiltins.join("|")})/`) },
+      () => ({ external: true })
+    );
+    build.onResolve({ filter: /better-sqlite3|electron|apache-arrow/ }, () => ({
+      external: true,
+    })); // jsdom removed
   },
 };
 
@@ -138,6 +169,8 @@ async function main() {
       "@lancedb/lancedb",
       "apache-arrow",
       "./node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js",
+      "web-tree-sitter",
+      "@vscode/ripgrep",
       // 'punycode' intentionally NOT external, so it is bundled
     ],
     format: "cjs",
@@ -178,7 +211,10 @@ async function main() {
         setup(build) {
           build.onLoad({ filter: /\.css$/ }, async (args) => {
             const css = fs.readFileSync(args.path, "utf8");
-            const scopedCss = css.replace(/(\.[a-zA-Z][a-zA-Z0-9-_]*)/g, `$1-${Date.now()}`);
+            const scopedCss = css.replace(
+              /(\.[a-zA-Z][a-zA-Z0-9-_]*)/g,
+              `$1-${Date.now()}`
+            );
             return { loader: "css", contents: scopedCss };
           });
         },
@@ -202,7 +238,10 @@ async function main() {
     } else {
       console.log("🚀 Building...");
       const startTime = Date.now();
-      const [mainResult, webviewResult] = await Promise.all([mainCtx.rebuild(), webviewCtx.rebuild()]);
+      const [mainResult, webviewResult] = await Promise.all([
+        mainCtx.rebuild(),
+        webviewCtx.rebuild(),
+      ]);
       const duration = Date.now() - startTime;
       console.log(`\n✨ Build completed in ${duration}ms`);
       if (production) {
@@ -210,7 +249,11 @@ async function main() {
         const webviewSize = fs
           .readdirSync("dist/webview")
           .filter((f) => f.endsWith(".js"))
-          .reduce((acc, file) => acc + fs.statSync(path.join("dist/webview", file)).size / 1024, 0);
+          .reduce(
+            (acc, file) =>
+              acc + fs.statSync(path.join("dist/webview", file)).size / 1024,
+            0
+          );
         console.log("\n📦 Bundle sizes:");
         console.log(`   Extension: ${mainSize.toFixed(2)}KB`);
         console.log(`   Webview:   ${webviewSize.toFixed(2)}KB`);

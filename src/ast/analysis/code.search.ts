@@ -74,7 +74,7 @@ export class CodeSearch {
           if (error && (error as any).code !== 1) {
             const errorMsg = error.message;
             this.outputChannel.appendLine(`Ripgrep error: ${errorMsg}`);
-            this.logger.info(`ipgrep error: ${errorMsg}`);
+            this.logger.error(`ipgrep error: ${errorMsg}`, error);
             reject(error);
           } else {
             const files = stdout.trim().split("\n").filter(Boolean);

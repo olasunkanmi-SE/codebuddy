@@ -4,8 +4,6 @@ import {
   URL_CATEGORIES,
   URL_RERANKING_CONFIG,
 } from "../application/constant";
-import { GroqLLM } from "../llms/groq/groq";
-import { getAPIKeyAndModel, getGenerativeAiModel } from "../utils/utils";
 import { IPageMetada } from "./web-search-service";
 
 /**
@@ -29,25 +27,11 @@ export class UrlReranker {
     string,
     { type: string; score: number }
   > = URL_CATEGORIES;
-  private readonly groqLLM: GroqLLM;
   private static instance: UrlReranker;
   query: string;
 
   constructor(_query: string) {
     this.query = _query;
-    // Use currently selected model from CodeBuddy configuration
-    const currentModel = getGenerativeAiModel() || "Groq";
-    const { apiKey, model } = getAPIKeyAndModel(currentModel);
-
-    // For URL reranking, prefer Groq if available, otherwise fallback to current selection
-    const rerankerModel =
-      currentModel.toLowerCase() === "groq" ? currentModel : "Groq";
-    const { apiKey: rerankerApiKey } = getAPIKeyAndModel(rerankerModel);
-
-    this.groqLLM = GroqLLM.getInstance({
-      apiKey: rerankerApiKey,
-      model: model || "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-    });
   }
 
   static getInstance(query: string) {

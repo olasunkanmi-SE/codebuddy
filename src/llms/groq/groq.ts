@@ -1,10 +1,8 @@
-import { BaseLLM } from "../base";
-import * as vscode from "vscode";
 import Groq from "groq-sdk";
+import * as vscode from "vscode";
+import { GROQ_CONFIG } from "../../application/constant";
+import { BaseLLM } from "../base";
 import { ILlmConfig } from "../interface";
-import { COMMON, GROQ_CONFIG } from "../../application/constant";
-import { Message } from "../message";
-import { Memory } from "../../memory/base";
 
 export class GroqLLM extends BaseLLM<any> implements vscode.Disposable {
   private static instance: GroqLLM;
@@ -30,17 +28,9 @@ export class GroqLLM extends BaseLLM<any> implements vscode.Disposable {
   async generateText(message: string): Promise<string> {
     try {
       const { temperature, top_p, stop } = GROQ_CONFIG;
-      const userMessage = Message.of({ role: "user", content: message });
-      let chatHistory = Memory.has(COMMON.GROQ_CHAT_HISTORY)
-        ? Memory.get(COMMON.GROQ_CHAT_HISTORY)
-        : [userMessage];
-
-      chatHistory = [...chatHistory, userMessage];
-
-      Memory.removeItems(COMMON.GROQ_CHAT_HISTORY);
 
       const chatCompletion = this.groq.chat.completions.create({
-        messages: [...chatHistory],
+        messages: [{ role: "user", content: message }],
         model: this.config.model,
         temperature,
         top_p,

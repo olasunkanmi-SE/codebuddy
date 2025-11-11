@@ -3,7 +3,6 @@ import { TextDecoder } from "util";
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { generateId } from "../../utils/utils";
-import { authKeywords } from "../constants";
 import { IAnalysisOutput, ICodeElement } from "../query-types";
 import { LairExtractor } from "./../query-extractor";
 import { CodeSearch } from "./code.search";
@@ -45,6 +44,7 @@ export class CodeAnalyzer {
     workspaceRoot: string,
     progress: vscode.Progress<{ message?: string; increment?: number }>,
     cancellationToken: vscode.CancellationToken,
+    keywords: string[],
   ) {
     progress.report({
       message: "Scanning files with ripgrep...",
@@ -54,7 +54,7 @@ export class CodeAnalyzer {
     let relevantFiles: string[];
     try {
       result = await this.codeSearcher.search(
-        authKeywords,
+        keywords,
         workspaceRoot,
         cancellationToken,
       );
@@ -75,7 +75,7 @@ export class CodeAnalyzer {
         return null;
       }
       this.logger.error(
-        `Error returning relevant files for keywords ${authKeywords}`,
+        `Error returning relevant files for keywords ${keywords}`,
         error.stack,
       );
       throw error;
@@ -106,7 +106,7 @@ export class CodeAnalyzer {
 
           const authElements = this.lairExtractor.filterByKeyWords(
             lairElements,
-            authKeywords,
+            keywords,
           );
 
           allAuthElements.push(...authElements);
@@ -114,6 +114,7 @@ export class CodeAnalyzer {
           const textElements = await this.performTextSearch(
             filePath,
             workspaceRoot,
+            keywords,
           );
           allAuthElements.push(...textElements);
         }
@@ -147,7 +148,10 @@ export class CodeAnalyzer {
       message: "Scoring and filtering results...",
       increment: 15,
     });
-    const filteredElements = this.applyRelevanceFiltering(allAuthElements);
+    const filteredElements = this.applyRelevanceFiltering(
+      allAuthElements,
+      keywords,
+    );
 
     // Step 4: Format final results
     progress.report({ message: "Generating summary...", increment: 5 });
@@ -157,6 +161,7 @@ export class CodeAnalyzer {
   private async performTextSearch(
     filePath: string,
     workspaceRoot: string,
+    keywords: string[],
   ): Promise<ICodeElement[]> {
     this.outputChannel.appendLine(
       `Falling back to text search for ${path.relative(workspaceRoot, filePath)}`,
@@ -173,7 +178,7 @@ export class CodeAnalyzer {
       );
 
       const lines = content.split("\n");
-      const lowerKeywords = authKeywords.map((k) => k.toLowerCase());
+      const lowerKeywords = keywords.map((k) => k.toLowerCase());
 
       lines.forEach((line, index) => {
         if (lowerKeywords.some((kw) => line.toLowerCase().includes(kw))) {
@@ -244,7 +249,10 @@ export class CodeAnalyzer {
     };
   }
 
-  private applyRelevanceFiltering(elements: ICodeElement[]): ICodeElement[] {
+  private applyRelevanceFiltering(
+    elements: ICodeElement[],
+    keywords: string[],
+  ): ICodeElement[] {
     const uniqueElements = this.deduplicateElements(elements);
     const filterConfig = this.relevanceScorer.recommendConfig(
       uniqueElements.length,
@@ -260,6 +268,7 @@ export class CodeAnalyzer {
     const scoredElements = this.relevanceScorer.filterByRelevance(
       uniqueElements,
       filterConfig,
+      keywords,
     );
 
     this.outputChannel.appendLine(

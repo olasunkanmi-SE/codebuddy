@@ -40,7 +40,7 @@ import { WebViewProviderManager } from "./webview-providers/manager";
 import { OutputManager } from "./services/output-manager";
 import { TreeSitterParser } from "./ast/parser/tree-sitter.parser";
 import { CacheManager } from "./ast/cache/cache.manager";
-import { AnalyzeCodeCommand } from "./ast/commands/analyze-auth-command";
+import { AnalyzeCodeCommand } from "./ast/commands/analyze-code-command";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -143,10 +143,6 @@ function initializeWebViewProviders(
   });
 }
 
-let outputManager: OutputManager;
-let parser: TreeSitterParser;
-let cacheManager: CacheManager;
-
 export async function activate(context: vscode.ExtensionContext) {
   try {
     Logger.sessionId = Logger.generateId();
@@ -178,38 +174,6 @@ export async function activate(context: vscode.ExtensionContext) {
     // });
 
     logger.info("✓ CodeBuddy: Core services started, UI ready");
-
-    outputManager = OutputManager.getInstance();
-    context.subscriptions.push(outputManager.getChannel());
-
-    // Initialize Tree-sitter parser
-    parser = TreeSitterParser.getInstance(
-      context.extensionPath,
-      outputManager.getChannel(),
-    );
-
-    // Initialize cache manager
-    cacheManager = CacheManager.getInstance(outputManager.getChannel());
-
-    // Start Tree-sitter initialization (non-blocking)
-    // This promise will be awaited in commands before they execute
-    const initPromise = parser.initialize().catch((error) => {
-      outputManager.appendLine(
-        `Fatal: Tree-sitter initialization failed: ${error}`,
-      );
-      vscode.window.showErrorMessage(
-        `CodeBuddy: Failed to initialize Tree-sitter. Extension may not work properly.`,
-      );
-      throw error; // Re-throw to be caught by command handlers
-    });
-
-    const codenalysis = new AnalyzeCodeCommand(
-      outputManager,
-      parser,
-      cacheManager,
-      initPromise,
-    );
-    codenalysis.execute();
 
     const {
       comment,

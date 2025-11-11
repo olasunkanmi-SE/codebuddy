@@ -1,7 +1,9 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import { Parser, Tree } from "web-tree-sitter";
-import { GrammarLoader } from "./grammar-loader";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
+import { GrammarLoader } from "./grammar-loader";
 
 export class TreeSitterParser {
   private static instance: TreeSitterParser | null = null;
@@ -14,7 +16,7 @@ export class TreeSitterParser {
     private readonly extensionPath: string,
     private readonly outputChannel: vscode.OutputChannel,
   ) {
-    this.logger = Logger.initialize("QueryExecutor", {
+    this.logger = Logger.initialize("TreeSitterParser", {
       minLevel: LogLevel.DEBUG,
     });
     this.grammarLoader = GrammarLoader.getInstance(
@@ -33,6 +35,37 @@ export class TreeSitterParser {
     ));
   }
 
+  /**
+   * Find WASM file in multiple possible locations
+   */
+  private findWasmPath(): string {
+    const possiblePaths = [
+      path.join(this.extensionPath, "dist", "grammars", "tree-sitter.wasm"),
+      path.join(this.extensionPath, "grammars", "tree-sitter.wasm"),
+      path.join(this.extensionPath, "out", "grammars", "tree-sitter.wasm"),
+      path.join(
+        this.extensionPath,
+        "node_modules",
+        "web-tree-sitter",
+        "tree-sitter.wasm",
+      ),
+    ];
+
+    this.logger.info("Searching for tree-sitter.wasm...");
+    this.logger.info(`Extension path: ${this.extensionPath}`);
+
+    for (const wasmPath of possiblePaths) {
+      this.logger.info(`Checking: ${wasmPath}`);
+      if (fs.existsSync(wasmPath)) {
+        this.logger.info(`✅ Found WASM at: ${wasmPath}`);
+        return wasmPath;
+      }
+    }
+
+    const errorMsg = `tree-sitter.wasm not found. Checked:\n${possiblePaths.join("\n")}`;
+    throw new Error(errorMsg);
+  }
+
   async initialize(): Promise<void> {
     if (this.parser) return;
 
@@ -41,33 +74,67 @@ export class TreeSitterParser {
     this.initializationPromise = (async () => {
       this.outputChannel.appendLine("Initializing Tree-sitter...");
       this.logger.info("Initializing Tree-sitter...");
-      try {
-        await Parser.init();
-        this.parser = new Parser();
-        this.outputChannel.appendLine("Tree-sitter initialized successfully.");
-        this.logger.info("Tree-sitter initialized successfully.");
 
+      try {
+        // Find WASM file
+        const wasmPath = this.findWasmPath();
+
+        this.outputChannel.appendLine(`Using WASM: ${wasmPath}`);
+        this.logger.info(`Using WASM: ${wasmPath}`);
+
+        // Get the directory containing the WASM file
+        const wasmDir = path.dirname(wasmPath);
+
+        // Initialize Parser with correct locateFile function
+        await Parser.init({
+          locateFile: (scriptName: string, scriptDirectory: string) => {
+            this.logger.debug(
+              `locateFile called: scriptName="${scriptName}", scriptDir="${scriptDirectory}"`,
+            );
+
+            // Always use our WASM directory
+            const fullPath = path.join(wasmDir, scriptName);
+            this.logger.debug(`Returning: ${fullPath}`);
+            return fullPath;
+          },
+        } as any);
+
+        this.parser = new Parser();
+        this.outputChannel.appendLine(
+          "✅ Tree-sitter initialized successfully",
+        );
+        this.logger.info("✅ Tree-sitter initialized successfully");
+
+        // Pre-load grammars
         await this.grammarLoader.prelodGrammars();
         this.outputChannel.appendLine(
-          `Pre-loaded ${this.grammarLoader.getCacheSize()} grammars.`,
+          `Pre-loaded ${this.grammarLoader.getCacheSize()} grammars`,
         );
         this.logger.info(
-          `Pre-loaded ${this.grammarLoader.getCacheSize()} grammars.`,
+          `Pre-loaded ${this.grammarLoader.getCacheSize()} grammars`,
         );
       } catch (error: any) {
         const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : "";
+
         this.outputChannel.appendLine(
+          `❌ Failed to initialize Tree-sitter: ${errorMsg}`,
+        );
+        this.logger.error(`Failed to initialize Tree-sitter: ${errorMsg}`, {
+          error: errorMsg,
+          stack: errorStack,
+        });
+
+        vscode.window.showErrorMessage(
           `Failed to initialize Tree-sitter: ${errorMsg}`,
         );
-        vscode.window.showErrorMessage(`Failed to initialize Tree-sitter`);
-        this.logger.info(
-          `Failed to initialize Tree-sitter: ${errorMsg}`,
-          error.stack,
-        );
+
         this.parser = null;
+        this.initializationPromise = null;
         throw error;
       }
     })();
+
     return this.initializationPromise;
   }
 
