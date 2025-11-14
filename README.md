@@ -15,6 +15,15 @@
 💡 **Advanced Embedding Service** - Better code understanding with intelligent chunking  
 �️ **Enhanced Error Handling** - Robust fallback mechanisms and better diagnostics
 
+## 🌟 Support the Project
+
+If CodeBuddy enhances your development workflow:
+- ⭐ Star the repository
+- 📝 Leave a review on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
+- 🐛 Report bugs or suggest features
+- 🤝 Contribute to the codebase
+- 💬 Share with fellow developers
+
 ## 🎯 Core Features
 
 ### 🧠 **AI-Powered Code Assistance**
