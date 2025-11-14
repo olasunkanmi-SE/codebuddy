@@ -4,6 +4,7 @@
  * Intelligently truncates analysis output to fit LLM token limits
  */
 
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { IScoredElement } from "./analysis/analytics.interface";
 
 export interface TruncationOptions {
@@ -24,6 +25,7 @@ export interface TruncatedOutput {
 }
 
 export class LLMOutputTruncator {
+  private logger: Logger;
   private readonly DEFAULT_OPTIONS: Required<TruncationOptions> = {
     maxTokens: 100000, // Conservative for most LLMs
     maxElements: 50,
@@ -31,6 +33,12 @@ export class LLMOutputTruncator {
     includeFullCode: true,
     priorityCutoff: 20,
   };
+
+  constructor() {
+    this.logger = Logger.initialize("EnhancedPromptBuilderService", {
+      minLevel: LogLevel.DEBUG,
+    });
+  }
 
   /**
    * Truncate analysis output to fit LLM token limits

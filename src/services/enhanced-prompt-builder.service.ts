@@ -4,6 +4,7 @@ import { GroqLLM } from "../llms/groq/groq";
 import { getAPIKeyAndModel } from "../utils/utils";
 import { AnalyzeCodeProvider } from "../ast/commands/analyze-code-provider";
 import { truncateForLLM } from "../ast/smart-truncate";
+import { QUESTION_TYPE_INSTRUCTIONS } from "../application/constant";
 
 export interface QuestionAnalysis {
   isCodebaseRelated: boolean;
@@ -47,22 +48,17 @@ export class EnhancedPromptBuilderService {
     const { apiKey, model } = getAPIKeyAndModel("groq");
     const config = {
       apiKey: apiKey,
-      model: model ?? "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+      model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",
     };
     this.groqLLM = GroqLLM.getInstance(config);
     this._context = context;
     this.codeAnalyzerProvider = AnalyzeCodeProvider.getInstance(this._context);
   }
 
-  /**
-   * Creates an enhanced, sophisticated prompt with contextual awareness and specific instructions
-   * This method generates rich, detailed prompts that help the LLM understand context and provide optimal responses
-   */
   async createEnhancedPrompt(
     message: string,
     context: PromptContext,
   ): Promise<string> {
-    const { questionAnalysis } = context;
     const searchTerm = await this.generateSearchTerms(message);
     if (searchTerm?.length) {
       context.questionAnalysis.technicalKeywords = searchTerm;
@@ -74,55 +70,43 @@ export class EnhancedPromptBuilderService {
     if (code) {
       truncatedCode = truncateForLLM(code, 100000);
     }
-
-    // Classify the question type and intent
     const questionType = await this.classifyQuestionType(message);
-
-    // Generate question-type specific instructions
-    const specificInstructions = this.generateQuestionSpecificInstructions(
-      questionType,
-      questionAnalysis,
-    );
-
-    // Generate response format guidelines
+    const specificInstructions =
+      this.generateQuestionSpecificInstructions(questionType);
     const responseFormat = this.generateResponseFormatGuidelines(questionType);
-
-    // Create the enhanced prompt
     const enhancedPrompt = `
-      **🤖 You are CodeBuddy**, an expert software engineer and architect with deep knowledge of this codebase. You have access to relevant context and should provide comprehensive, accurate, and actionable responses.
+      persona: |
+        You are CodeBuddy, an expert software engineer and architect with deep knowledge of the provided codebase context. Your goal is to provide comprehensive, accurate, and actionable responses.
 
-      **🔍 Context Analysis**:
-      - **Question Type**: ${this.categorizeQuestionTypeForDisplay(questionType)}
+      mission: |
+        Analyze the user's question and the provided codebase context to generate an expert-level response. Follow all instructions and formatting rules precisely.
 
-      **🎯 Response Instructions**:
+      context:
+        question_type: ${this.categorizeQuestionTypeForDisplay(questionType)}
+        codebase_snippets: |
+          ${truncatedCode || "No relevant code found."}
+
+      rules:
+        - Base your response *only* on the provided context. Do not invent APIs or file structures.
+        - Be specific: Reference actual files, functions, and variables from the context.
+        - Be actionable: Provide concrete steps, code, and clear guidance.
+        - If context is insufficient, state what is missing.
+        - Adhere strictly to the response format defined below.
+        - Complete your entire response. Do not truncate.
+
+      task_instructions:
       ${specificInstructions}
 
-      **📋 Response Format**:
+      response_format:
       ${responseFormat}
 
-      **⚡ Key Guidelines**:
-      - **Be Specific**: Reference actual files, functions, and implementations from the context
-      - **Be Actionable**: Provide concrete steps, code examples, and clear guidance
-      - **Be Comprehensive**: Cover edge cases, best practices, and potential pitfalls
-      - **Be Accurate**: Base your response on the actual codebase context provided
-      - **Include Examples**: Show real code snippets when explaining concepts
-      - **Provide Navigation**: Use file references so users can explore the codebase
-      - **Consider Dependencies**: Account for frameworks, libraries, and patterns in use
+      user_question: |
+        ${message}
 
-      **🚨 Critical Requirements**:
-      1. **Complete your response fully** - Do not truncate or end abruptly
-      2. **Use the provided context** - Don't make assumptions outside the given information
-      3. **Be honest about limitations** - If context is insufficient, explain what additional information would help
-      4. **Maintain consistency** - Follow the existing patterns and conventions shown in the codebase
+      Begin response:
+      `.trim();
 
-      ** Code From CodeBase
-      ${truncatedCode}
-
-      Please provide a detailed, helpful response based on the context and guidelines above.`.trim();
-
-    this.logger.debug(
-      `Enhanced prompt created for ${questionType.isImplementation ? "implementation" : "general"} question`,
-    );
+    this.logger.debug(`Enhanced prompt created.`);
     return enhancedPrompt;
   }
 
@@ -146,7 +130,7 @@ export class EnhancedPromptBuilderService {
                   Output exactly as a comma-separated list of the 10 terms, nothing else (no explanations, no JSON, no numbering). Example: term1,term2,term3,term4,term5,term6,term7,term8,term9,term10`;
 
     try {
-      const response = await this.groqLLM.generateText(prompt); // Adjust to your GroqLLM method (e.g., groqLLM.chat({ messages: [{ role: 'user', content: prompt }] }))
+      const response = await this.groqLLM.generateText(prompt.trim()); // Adjust to your GroqLLM method (e.g., groqLLM.chat({ messages: [{ role: 'user', content: prompt }] }))
       if (!response) {
         throw new Error("No response from Groq LLM");
       }
@@ -354,90 +338,21 @@ export class EnhancedPromptBuilderService {
    */
   private generateQuestionSpecificInstructions(
     questionType: QuestionTypeClassification,
-    questionAnalysis: QuestionAnalysis,
   ): string {
-    let instructions = [];
+    const instructions: string[] = [];
 
-    if (questionType.isImplementation) {
-      instructions.push(`
-**For Implementation Questions**:
-- Explain the current implementation approach and patterns
-- Show actual code examples from the context
-- Describe the data flow and control flow
-- Identify key functions, classes, and modules involved
-- Explain any frameworks or libraries being used
-- Sequence diagram
-  #### ⏱️ **Sequence Diagram**
-  \`\`\`mermaid
-  sequenceDiagram
-      participant Client
-      participant API
-      participant Service
-      participant Database
-      
-      Client->>API: POST /users
-      API->>API: Validate Input
-      API->>Service: createUser(data)
-      Service->>Database: save(user)
-      Database-->>Service: user created
-      Service->>Service: sendWelcomeEmail()
-      Service-->>API: success response
-      API-->>Client: 201 Created
-  \`\`\`
-  - Highlight important design decisions and their rationale`);
-    }
-
-    if (questionType.isArchitectural) {
-      instructions.push(`
-**For Architectural Questions**:
-- Describe the overall system design and structure
-- Explain component relationships and dependencies
-- Identify key architectural patterns in use
-- Discuss scalability and maintainability considerations
-- Reference configuration files and setup procedures
-- Explain how different parts of the system communicate`);
-    }
-
-    if (questionType.isDebugging) {
-      instructions.push(`
-**For Debugging Questions**:
-- Identify potential root causes based on the context
-- Suggest specific debugging approaches and tools
-- Recommend places to add logging or breakpoints
-- Explain common pitfalls and error patterns
-- Provide step-by-step troubleshooting guidance
-- Reference error handling patterns in the codebase`);
-    }
-
-    if (questionType.isCodeExplanation) {
-      instructions.push(`
-**For Code Explanation Questions**:
-- Break down complex code into understandable parts
-- Explain the purpose and functionality clearly
-- Use analogies when helpful for understanding
-- Show the bigger picture and context
-- Explain any non-obvious logic or algorithms
-- Connect the explanation to broader system concepts`);
-    }
-
-    if (questionType.isFeatureRequest) {
-      instructions.push(`
-**For Feature Requests**:
-- Analyze existing patterns to suggest consistent approaches
-- Identify reusable components and utilities
-- Suggest specific file locations and modifications
-- Consider impact on existing functionality
-- Recommend testing approaches
-- Provide implementation roadmap with steps`);
+    for (const [type, details] of QUESTION_TYPE_INSTRUCTIONS.entries()) {
+      if (questionType[type as keyof QuestionTypeClassification]) {
+        const title = type.replace("is", ""); // e.g., "Implementation"
+        instructions.push(`- ${title}:\n  - ${details.join("\n  - ")}`);
+      }
     }
 
     if (instructions.length === 0) {
-      instructions.push(`
-**For General Questions**:
-- Provide comprehensive information based on the available context
-- Use specific examples from the codebase when possible
-- Explain both the 'what' and the 'why' of implementations
-- Connect different parts of the system when relevant`);
+      return `- General:
+  - Provide a comprehensive answer using the codebase context.
+  - Use specific code examples.
+  - Explain both the "what" and the "why".`;
     }
 
     return instructions.join("\n");
@@ -449,127 +364,33 @@ export class EnhancedPromptBuilderService {
   private generateResponseFormatGuidelines(
     questionType: QuestionTypeClassification,
   ): string {
-    let format = `
-**Standard Format**:
-1. **Quick Summary** - Brief answer to the main question
-2. **Detailed Analysis** - In-depth explanation with context
-3. **Code Examples** - Relevant snippets from the actual codebase
-4. **File References** - Specific paths and locations
-6. **Citations (if applicable)**: Where possible, link to official documentations, specs, or trusted resources like Github, Mozilla etc
-5. **Next Steps** - Actionable recommendations
-`;
+    // Base structure is always present.
+    const formatSections = [
+      "1. Summary: Brief, direct answer.",
+      "2. Detailed Analysis: In-depth explanation with context.",
+      "3. Code Examples: Relevant snippets from the codebase.",
+      "4. File References: Paths and line numbers.",
+      "5. Citations: Links to official docs if applicable.",
+      "6. Next Steps: Actionable recommendations.",
+    ];
 
+    // Conditionally add section headers. They are self-explanatory.
     if (questionType.isDebugging) {
-      format += `
-
-**Additional for Debugging**:
-- **Root Cause Analysis** - Most likely causes
-- **Debugging Steps** - Specific actions to take
-- **Common Solutions** - Known fixes for similar issues`;
+      formatSections.push(
+        "7. Debugging Guide:\n   - Root Cause Analysis\n   - Step-by-Step Debugging\n   - Common Solutions",
+      );
     }
-
     if (questionType.isFeatureRequest) {
-      format += `
-
-**Additional for Features**:
-- **Implementation Plan** - Step-by-step approach
-- **Code Structure** - Where to add new functionality
-- **Testing Strategy** - How to validate the feature`;
+      formatSections.push(
+        "7. Feature Plan:\n   - Implementation Plan\n   - Code Structure\n   - Testing Strategy",
+      );
     }
-
     if (questionType.isArchitectural) {
-      format += `
-
-**Additional for Architecture**:
-- **System Overview** - High-level design explanation
-- **Component Relationships** - How parts interact
-- **Design Patterns** - Architectural patterns in use`;
+      formatSections.push(
+        "7. Architecture Overview:\n   - System Design\n   - Component Interaction\n   - Design Patterns",
+      );
     }
 
-    return format;
-  }
-
-  /**
-   * Formats context with metadata and structure for better LLM understanding
-   */
-  private formatContextWithMetadata(context: string): string {
-    if (!context || context.trim().length === 0) {
-      return "*No specific context available*";
-    }
-
-    // Add structure indicators to help the LLM parse the context better
-    const formattedContext = context
-      // Ensure code blocks are properly marked
-      .replace(
-        /```(\w+)?\n/g,
-        "```$1\n// Context: Code snippet from codebase\n",
-      )
-      // Add metadata markers for file references
-      .replace(/File: ([^\n]+)/g, "**📁 File**: `$1`")
-      // Enhance function/class markers
-      .replace(/Function: ([^\n]+)/g, "**🔧 Function**: `$1`")
-      .replace(/Class: ([^\n]+)/g, "**🏗️ Class**: `$1`")
-      // Mark interface/type definitions
-      .replace(/Interface: ([^\n]+)/g, "**📋 Interface**: `$1`")
-      .replace(/Type: ([^\n]+)/g, "**📝 Type**: `$1`");
-
-    return formattedContext;
-  }
-
-  /**
-   * Creates a simple prompt for basic questions without complex context
-   */
-  createSimplePrompt(message: string): string {
-    return `
-**🤖 You are CodeBuddy**, a helpful AI assistant for software development.
-
-**User's Question**:
-${message}
-
-Please provide a clear, helpful response to the user's question.`.trim();
-  }
-
-  /**
-   * Validates that the provided context is meaningful and not empty
-   */
-  validateContext(context: PromptContext): boolean {
-    const hasValidVectorContext = !!(
-      context.vectorContext && context.vectorContext.trim().length > 0
-    );
-    const hasValidFallbackContext = !!(
-      context.fallbackContext && context.fallbackContext.trim().length > 0
-    );
-    const hasValidAnalysis = !!(
-      context.questionAnalysis && context.questionAnalysis.confidence > 0
-    );
-
-    return (
-      (hasValidVectorContext || hasValidFallbackContext) && hasValidAnalysis
-    );
-  }
-
-  /**
-   * Get statistics about prompt complexity
-   */
-  getPromptStats(prompt: string): {
-    characterCount: number;
-    wordCount: number;
-    estimatedTokens: number;
-    hasCodeBlocks: boolean;
-    hasFileReferences: boolean;
-  } {
-    const characterCount = prompt.length;
-    const wordCount = prompt.split(/\s+/).length;
-    const estimatedTokens = Math.ceil(characterCount / 4); // Rough estimate
-    const hasCodeBlocks = /```/.test(prompt);
-    const hasFileReferences = /\*\*📁 File\*\*/.test(prompt);
-
-    return {
-      characterCount,
-      wordCount,
-      estimatedTokens,
-      hasCodeBlocks,
-      hasFileReferences,
-    };
+    return formatSections.join("\n");
   }
 }

@@ -1,7 +1,7 @@
 import { Part } from "@google/generative-ai";
 import * as vscode from "vscode";
 
-type Role = "function" | "user" | "model" | "assistant" | "system";
+export type Role = "function" | "user" | "model" | "assistant" | "system";
 
 export interface IBaseMessage {
   [key: string]: any;

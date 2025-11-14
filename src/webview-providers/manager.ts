@@ -204,7 +204,7 @@ export class WebViewProviderManager implements vscode.Disposable {
       if (!event.message) {
         return;
       }
-      const modelName = event.message.message as string;
+      const modelName = (event.message.message as string) ?? event.message;
       if (!modelName) {
         throw new Error("Unknown model");
       }

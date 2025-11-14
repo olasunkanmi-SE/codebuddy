@@ -438,3 +438,73 @@ export const DEFAULT_PRUNING_CONFIG = {
   preserveSystemMessages: true,
   enableAutoPruning: true,
 };
+
+export type QuestionTypeClassification = {
+  isImplementation: boolean;
+  isArchitectural: boolean;
+  isDebugging: boolean;
+  isCodeExplanation: boolean;
+  isFeatureRequest: boolean;
+};
+
+export const QUESTION_TYPE_INSTRUCTIONS = new Map<
+  keyof QuestionTypeClassification,
+  string[]
+>([
+  [
+    "isImplementation",
+    [
+      "Explain implementation approach and patterns.",
+      "Show relevant code examples from context.",
+      "Describe data and control flow.",
+      "Identify key functions, classes, modules.",
+      "Explain relevant frameworks/libraries.",
+      "Highlight key design decisions and rationale.",
+      "If complex, include a Mermaid sequence diagram.", // We removed the giant example.
+    ],
+  ],
+  [
+    "isArchitectural",
+    [
+      "Describe overall system design and structure.",
+      "Explain component relationships and dependencies.",
+      "Identify architectural patterns used.",
+      "Discuss scalability and maintainability.",
+      "Reference config files and setup procedures.",
+      "Detail inter-system communication methods.",
+    ],
+  ],
+  [
+    "isDebugging",
+    [
+      "Identify potential root causes from context.",
+      "Suggest specific debugging tools and approaches.",
+      "Recommend logging/breakpoint locations.",
+      "Explain common error patterns.",
+      "Provide step-by-step troubleshooting guidance.",
+      "Reference existing error handling patterns.",
+    ],
+  ],
+  [
+    "isCodeExplanation",
+    [
+      "Break down complex code into simple parts.",
+      "Explain purpose and functionality clearly.",
+      "Use analogies for complex concepts if helpful.",
+      "Provide the broader system context.",
+      "Clarify non-obvious logic or algorithms.",
+      "Connect code to high-level architectural concepts.",
+    ],
+  ],
+  [
+    "isFeatureRequest",
+    [
+      "Analyze existing patterns for consistency.",
+      "Identify reusable components/utilities.",
+      "Suggest specific file locations for modifications.",
+      "Consider impact on existing functionality.",
+      "Recommend a testing approach.",
+      "Provide a high-level implementation roadmap.",
+    ],
+  ],
+]);

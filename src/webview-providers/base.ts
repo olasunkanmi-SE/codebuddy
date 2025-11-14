@@ -27,6 +27,10 @@ import { WorkspaceService } from "../services/workspace-service";
 import { formatText, getAPIKeyAndModel } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
 import { QuestionClassifierService } from "../services/question-classifier.service";
+import { GroqLLM } from "../llms/groq/groq";
+import { Role } from "../llms/message";
+
+type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
 export interface ImessageAndSystemInstruction {
   systemInstruction: string;
@@ -52,6 +56,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly questionClassifier: QuestionClassifierService;
   private readonly codebaseUnderstanding: CodebaseUnderstandingService;
   private readonly inputValidator: InputValidator;
+  protected readonly MAX_HISTORY_MESSAGES = 3;
 
   // Vector database services
   protected vectorConfigManager?: VectorDbConfigurationManager;
@@ -66,6 +71,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   // Prompt enhancement service
   protected promptBuilderService: EnhancedPromptBuilderService;
+  private readonly groqLLM: GroqLLM | null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -73,6 +79,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     protected readonly generativeAiModel: string,
     context: vscode.ExtensionContext,
   ) {
+    const { apiKey: modelKey, model } = getAPIKeyAndModel("groq");
+    const config = {
+      apiKey: modelKey,
+      model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    };
+    this.groqLLM = GroqLLM.getInstance(config);
     this.fileManager = FileManager.initialize(context, "files");
     this.fileService = FileService.getInstance();
     this._context = context;
@@ -86,9 +98,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.questionClassifier = QuestionClassifierService.getInstance();
     this.codebaseUnderstanding = CodebaseUnderstandingService.getInstance();
     this.inputValidator = InputValidator.getInstance();
-
-    // Initialize vector database components with Phase 4 orchestration
-    const { apiKey: geminiApiKey } = getAPIKeyAndModel("Gemini");
 
     // Initialize configuration manager first
     this.configManager = new VectorDbConfigurationManager();
@@ -230,7 +239,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
    * Update the provider's specific chatHistory array
    * Should be overridden by child classes to update their specific chatHistory type
    */
-  protected async updateProviderChatHistory(history: any[]): Promise<void> {
+  protected updateProviderChatHistory(history: any[]): void {
     // Base implementation - child classes should override this
     // to update their specific chatHistory arrays
     this.logger.debug(
@@ -389,6 +398,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 const formattedResponse = formatText(response);
                 this.logger.info(
                   `[DEBUG] Formatted response: ${formattedResponse.length} characters`,
+                );
+                this.logger.info(
+                  `[DEBUG] Formatted response: ${formattedResponse}`,
                 );
                 this.logger.info(
                   `[DEBUG] Original response ends with: "${response.slice(-100)}"`,
@@ -607,6 +619,52 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     currentChat?: string,
   ): Promise<boolean | undefined>;
 
+  async categorizeQuestion(userQuestion: string): Promise<
+    | {
+        isCodebaseRelated: boolean;
+        categories: string[];
+        confidence: "high" | "medium" | "low";
+      }
+    | undefined
+  > {
+    const prompt = `You are an AI copilot expert in analyzing user questions to distinguish between codebase-specific queries and general knowledge questions. Given a user's question, determine if it is related to analyzing or querying details within a specific codebase (e.g., "how was authentication handled within this application" is codebase-related because it asks about implementation in a particular code context). If it's a general definition or non-code-specific question (e.g., "what is MCP, model context protocol" is not codebase-related because it's seeking a general explanation), classify it accordingly.
+
+                    Analyze the question to provide context about what type of codebase information is needed:
+                    - If codebase-related, extract relevant categories (e.g., "authentication", "database integration", "API endpoints") as strings in an array. These should represent key concepts or areas in the codebase that the question targets.
+                    - If not codebase-related, use an empty array for categories.
+                    - Assign a confidence level: "high" for clear cases, "medium" for ambiguous, "low" for uncertain.
+
+                    Focus on:
+                    - Codebase-related: Questions about code structure, implementation, feature handling, or specifics in "this application", "codebase", or implied project context.
+                    - Not codebase-related: General definitions, acronyms, protocols, or abstract concepts without reference to a specific code instance.
+                    - Edge cases: If the question implies code analysis (e.g., "how does authentication work here"), set isCodebaseRelated to true with appropriate categories; if purely explanatory (e.g., "define OAuth"), set to false.
+                    - Categories: Be concise, 1-5 items max, directly derived from the question's core topics.
+                    - Confidence: Base on clarity—e.g., explicit "in this codebase" is high; vague implications are medium/low.
+
+                    User question: "${userQuestion}"
+
+                    Output exactly as a JSON object in this format, nothing else (no explanations, no additional text)
+                    Output format:
+                    {
+                      "isCodebaseRelated": true/false,
+                      "categories": [architectural, debugging],
+                      "confidence": "high" | "medium" | "low"
+                    }`;
+
+    try {
+      const response = await this.groqLLM?.generateText(prompt);
+      if (!response) {
+        throw new Error("No response from Groq LLM");
+      }
+      const terms = JSON.parse(response.replace(/```/g, "").trim());
+
+      return terms;
+    } catch (error) {
+      this.logger.error("Error generating search terms:", error);
+      return undefined;
+    }
+  }
+
   /**
    * Enhances user messages with codebase context if the question is codebase-related
    */
@@ -614,7 +672,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     message: string,
   ): Promise<LLMMessage> {
     try {
+      const categorizedQuestion = await this.categorizeQuestion(message);
       const questionAnalysis =
+        categorizedQuestion ??
         this.questionClassifier.categorizeQuestion(message);
 
       if (!questionAnalysis.isCodebaseRelated) {
@@ -738,4 +798,247 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         return 0.7;
     }
   }
+
+  // Example of a generateSummary function
+  async generateSummaryForModel(
+    historyToSummarize: any[],
+  ): Promise<string | undefined> {
+    const summarizationPrompt = `
+    The following is a conversation history. Please provide a concise summary of the key information, decisions, and topics discussed. 
+    Focus on retaining facts, names, and important context that would be necessary to continue the conversation without confusion.
+
+    CONVERSATION HISTORY:
+    ${historyToSummarize.map((msg) => `${msg.role}: ${msg.parts[0].text}`).join("\n")}
+  `;
+
+    const response = await this.groqLLM?.generateText(summarizationPrompt);
+    if (!response) {
+      undefined;
+    }
+    return response;
+  }
+
+  /**
+   * A more advanced pruning strategy that summarizes the oldest part of the chat history
+   * once the token count exceeds a threshold, instead of just deleting it.
+   *
+   * @param history The current chat history.
+   * @param maxTokens The maximum number of tokens allowed for the context window.
+   * @param systemInstruction The system instruction, which also counts towards the token limit.
+   * @param generateSummary An async function that takes a list of messages and returns a summary string.
+   * @returns A promise that resolves to the new, potentially summarized and pruned, chat history.
+   */
+  async pruneChatHistoryWithSummary(
+    history: any[],
+    maxTokens: number,
+    systemInstruction: string,
+  ): Promise<any[]> {
+    // --- 1. Calculate initial token count (same as before) ---
+    const systemInstructionTokens =
+      systemInstruction.length > 0
+        ? await this.getTokenCounts(systemInstruction)
+        : 0;
+
+    const historyWithTokens = await Promise.all(
+      history.map(async (msg) => ({
+        message: msg,
+        tokens: await this.getTokenCounts(
+          msg.parts ? msg.parts[0].text : msg.content,
+        ),
+      })),
+    );
+
+    let currentTokenCount =
+      systemInstructionTokens +
+      historyWithTokens.reduce((sum, item) => sum + item.tokens, 0);
+    this.logger.info(
+      `Initial token count (history + system instruction): ${currentTokenCount}`,
+    );
+
+    if (currentTokenCount <= maxTokens) {
+      this.logger.info("Token count is within the limit. No pruning needed.");
+      return history;
+    }
+
+    this.logger.info(
+      `Token count ${currentTokenCount} exceeds limit of ${maxTokens}. Attempting summarization.`,
+    );
+
+    // --- 3. Partition the history for summarization ---
+    // We'll keep the last 4 messages (2 user/model turns) for recent context. This is configurable.
+    const MESSAGES_TO_KEEP_RECENT = 4;
+    // We need a minimum number of messages to make summarization worthwhile.
+    const MIN_MESSAGES_FOR_SUMMARY = MESSAGES_TO_KEEP_RECENT + 2; // e.g., at least 3 turns
+
+    if (historyWithTokens.length < MIN_MESSAGES_FOR_SUMMARY) {
+      this.logger.warn(
+        "History is too short to summarize. Falling back to simple pruning.",
+      );
+      // Fallback to the simple pruning logic from the original function
+      return this.pruneChatHistory(history, maxTokens, systemInstruction);
+    }
+
+    const sliceIndex = historyWithTokens.length - MESSAGES_TO_KEEP_RECENT;
+    const messagesToSummarize = historyWithTokens.slice(0, sliceIndex);
+    const recentMessages = historyWithTokens.slice(sliceIndex);
+
+    this.logger.info(
+      `Summarizing ${messagesToSummarize.length} messages and keeping ${recentMessages.length} recent messages.`,
+    );
+
+    // --- 4. Generate the summary ---
+    const summaryText = await this.generateSummaryForModel(
+      messagesToSummarize.map((item) => item.message),
+    );
+    const summaryTokens = await this.getTokenCounts(summaryText ?? "");
+
+    let summaryMessage;
+
+    // --- 5. Reconstruct the history with the summary ---
+    const geminiSummary = {
+      role: "user",
+      parts: [
+        {
+          text: `[System Note: This is a summary of our earlier conversation to preserve context]:\n${summaryText}`,
+        },
+      ],
+    };
+
+    const anthropicOrGroqSummary = {
+      role: "user",
+      content: `[System Note: This is a summary of our earlier conversation to preserve context]:\n${summaryText}`,
+    };
+
+    if (history[0].parts) {
+      summaryMessage = geminiSummary;
+    } else {
+      summaryMessage = anthropicOrGroqSummary;
+    }
+
+    let newHistoryWithTokens = [
+      { message: summaryMessage, tokens: summaryTokens },
+      ...recentMessages,
+    ];
+
+    // --- 6. Recalculate token count and perform final pruning if necessary (Fallback) ---
+    let newTotalTokens =
+      systemInstructionTokens +
+      newHistoryWithTokens.reduce((sum, item) => sum + item.tokens, 0);
+
+    this.logger.info(`History summarized. New token count: ${newTotalTokens}`);
+
+    // If we're *still* over the limit, prune the oldest messages from the *new* history
+    while (newTotalTokens > maxTokens && newHistoryWithTokens.length >= 2) {
+      this.logger.warn(
+        `Token count ${newTotalTokens} still exceeds limit after summarization. Pruning oldest message from new history...`,
+      );
+      // Remove the summary or the oldest "recent" message. It must start with a user message.
+      // The summary is a 'user' role, so this logic is sound.
+      const userMessage = newHistoryWithTokens.shift()!;
+      const modelMessage = newHistoryWithTokens.shift()!;
+      newTotalTokens -= userMessage.tokens + modelMessage.tokens;
+    }
+
+    // --- 7. Final checks and return ---
+    // Ensure the history starts with a 'user' role. The summary message we created has the 'user' role.
+    if (
+      newHistoryWithTokens.length > 0 &&
+      newHistoryWithTokens[0].message.role !== "user"
+    ) {
+      this.logger.error(
+        "History unexpectedly does not start with 'user' after summarization. Removing leading model message.",
+      );
+      newHistoryWithTokens.shift();
+    }
+
+    return newHistoryWithTokens.map((item) => item.message);
+  }
+
+  async pruneChatHistory(
+    history: any[],
+    maxTokens: number,
+    systemInstruction: string,
+  ): Promise<any[]> {
+    try {
+      let mutableHistory = [...history];
+      while (mutableHistory.length > 0 && mutableHistory[0].role !== "user") {
+        this.logger.warn(
+          `History does not start with 'user'. Removing oldest message to correct pattern.`,
+        );
+        mutableHistory.shift();
+      }
+
+      if (mutableHistory.length === 0) {
+        this.logger.warn(
+          "History is empty after initial validation. Starting fresh.",
+        );
+        return [];
+      }
+
+      const systemInstructionTokens =
+        await this.getTokenCounts(systemInstruction);
+
+      const historyWithTokens = await Promise.all(
+        mutableHistory.map(async (msg) => ({
+          message: msg,
+          tokens: await this.getTokenCounts(
+            msg.parts ? msg.parts[0].text : msg.content,
+          ),
+        })),
+      );
+
+      let currentTokenCount =
+        systemInstructionTokens +
+        historyWithTokens.reduce((sum, item) => sum + item.tokens, 0);
+      this.logger.info(
+        `Initial token count (history + system instruction): ${currentTokenCount}`,
+      );
+
+      while (currentTokenCount > maxTokens && historyWithTokens.length >= 2) {
+        this.logger.info(
+          `Token count ${currentTokenCount} exceeds limit of ${maxTokens}. Removing oldest user-model pair...`,
+        );
+
+        const userMessage = historyWithTokens.shift()!;
+        const modelMessage = historyWithTokens.shift()!;
+
+        const tokensRemoved = userMessage.tokens + modelMessage.tokens;
+        currentTokenCount -= tokensRemoved;
+
+        this.logger.info(
+          `Removed pair with ${tokensRemoved} tokens. New token count: ${currentTokenCount}`,
+        );
+      }
+
+      if (currentTokenCount > maxTokens) {
+        this.logger.warn(
+          `Token count ${currentTokenCount} still exceeds limit after pruning. This might happen if the last remaining messages are very large. Proceeding with current history.`,
+        );
+      }
+
+      if (historyWithTokens.length === 0) {
+        this.logger.warn(`History is empty after pruning. Starting fresh.`);
+      } else if (historyWithTokens[0].message.role !== "user") {
+        this.logger.error(
+          `History unexpectedly does not start with 'user' after pruning. Correcting...`,
+        );
+        while (
+          historyWithTokens.length > 0 &&
+          historyWithTokens[0].message.role !== "user"
+        ) {
+          const removed = historyWithTokens.shift()!;
+          currentTokenCount -= removed.tokens;
+        }
+      }
+
+      // 6. Return the pruned list of messages.
+      return historyWithTokens.map((item) => item.message);
+    } catch (error: any) {
+      this.logger.info("Error while prunning chat history", error);
+      throw error(error.message);
+    }
+    // 1. Create a mutable copy and ensure the history starts with a 'user' role.
+  }
+
+  abstract getTokenCounts(input: string): Promise<number>;
 }

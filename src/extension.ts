@@ -37,10 +37,6 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
-import { OutputManager } from "./services/output-manager";
-import { TreeSitterParser } from "./ast/parser/tree-sitter.parser";
-import { CacheManager } from "./ast/cache/cache.manager";
-import { AnalyzeCodeCommand } from "./ast/commands/analyze-code-command";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -158,8 +154,14 @@ export async function activate(context: vscode.ExtensionContext) {
     // ⚡ FAST STARTUP: Only essential sync operations
     orchestrator.start();
 
-    const { apiKey, model } = getAPIKeyAndModel("gemini");
-    FileUploadService.initialize(apiKey);
+    const { apiKey } = getAPIKeyAndModel("groq");
+
+    if (!apiKey) {
+      vscode.window.showInformationMessage(
+        "Groq API key is required. visit https://console.groq.com/keys to generate an API key",
+      );
+    }
+
     Memory.getInstance();
 
     // Show early status
@@ -465,7 +467,7 @@ export async function activate(context: vscode.ExtensionContext) {
       // secretStorageService,
     );
   } catch (error: any) {
-    Memory.clear();
+    // Memory.clear();
     vscode.window.showErrorMessage(
       "An Error occured while setting up generative AI model",
     );

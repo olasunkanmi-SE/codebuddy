@@ -38,7 +38,7 @@ export class SummaryGenerator {
     summary += `  Elements by Type:\n`;
 
     for (const [type, count] of Object.entries(
-      analysis.summary.elementsByType,
+      analysis.summary.elementsByType
     )) {
       summary += `    ${type}: ${count}\n`;
     }
@@ -52,7 +52,7 @@ export class SummaryGenerator {
    */
   private generateFileDetails(
     analysis: IAnalysisOutput,
-    workspaceRoot: string,
+    workspaceRoot: string
   ): string {
     let details = "";
 
@@ -76,7 +76,7 @@ export class SummaryGenerator {
    */
   private generateElementDetails(
     element: ICodeElement,
-    allElements: ICodeElement[],
+    allElements: ICodeElement[]
   ): string {
     let details = `  [${element.type.toUpperCase()}] ${element.name}\n`;
 
@@ -101,7 +101,7 @@ export class SummaryGenerator {
       for (const child of element.children) {
         const childLink = LinkGenerator.createLinkFromPosition(
           child.filePath,
-          child.startPosition,
+          child.startPosition
         );
         details += `      - ${child.name} (${childLink})\n`;
       }
@@ -130,7 +130,7 @@ export class SummaryGenerator {
   generateCompact(analysis: IAnalysisOutput): string {
     return (
       `Analysis complete. Found ${analysis.summary.totalElements} ` +
-      `authentication-related elements across ${analysis.summary.fileCount} files. ` +
+      `Related elements across ${analysis.summary.fileCount} files. ` +
       `See "CodeBuddy Analysis" output channel for details.`
     );
   }
@@ -154,7 +154,7 @@ export class SummaryGenerator {
 
     md += "### Elements by Type\n\n";
     for (const [type, count] of Object.entries(
-      analysis.summary.elementsByType,
+      analysis.summary.elementsByType
     )) {
       md += `- **${type}**: ${count}\n`;
     }

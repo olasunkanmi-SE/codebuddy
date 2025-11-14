@@ -134,4 +134,8 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
   generateContent(userInput: string) {
     return userInput;
   }
+
+  async getTokenCounts(input: string): Promise<number> {
+    return 0;
+  }
 }

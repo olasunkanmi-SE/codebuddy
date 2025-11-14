@@ -2,7 +2,7 @@ import { GenerativeModel } from "@google/generative-ai";
 import * as vscode from "vscode";
 import { COMMON } from "../application/constant";
 import { GeminiLLM } from "../llms/gemini/gemini";
-import { IMessageInput } from "../llms/message";
+import { IMessageInput, Message, Role } from "../llms/message";
 import { Memory } from "../memory/base";
 import {
   BaseWebViewProvider,
@@ -34,15 +34,15 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
   /**
    * Override to update Gemini-specific chatHistory array
    */
-  protected async updateProviderChatHistory(history: any[]): Promise<void> {
+  updateProviderChatHistory(history: any[]) {
     try {
       // Convert to Gemini's IMessageInput format
-      this.chatHistory = history.map((msg: any) => ({
-        role: msg.role === "user" ? "user" : "model",
-        content: msg.content,
-        timestamp: msg.timestamp,
-        metadata: msg.metadata,
-      }));
+      this.chatHistory = history.map((msg: any) =>
+        Message.of({
+          role: msg.role === "user" ? "user" : "model",
+          parts: [{ text: msg.content }],
+        }),
+      );
 
       this.logger.debug(
         `Updated Gemini chatHistory array with ${this.chatHistory.length} messages`,
@@ -60,16 +60,25 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
-        await this.modelChatHistory("model", response, "gemini", "agentId");
+        this.chatHistory.push(
+          Message.of({
+            role: "model",
+            parts: [{ text: response }],
+          }),
+        );
       } else {
-        await this.modelChatHistory("user", response, "gemini", "agentId");
+        this.chatHistory.push(
+          Message.of({
+            role: "user",
+            parts: [{ text: response }],
+          }),
+        );
       }
       return await this.currentWebView?.webview.postMessage({
         type,
         message: response,
       });
     } catch (error: any) {
-      Memory.set(COMMON.GEMINI_CHAT_HISTORY, []);
       this.logger.error(
         "Error sending sending Gemini response to webview ",
         error,
@@ -89,7 +98,15 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       userMessage = message.userMessage;
     }
 
+    this.chatHistory = Memory.has("chatHistory")
+      ? Memory.get("chatHistory")
+      : [];
+
     try {
+      if (this.chatHistory.length) {
+        this.updateProviderChatHistory(this.chatHistory);
+      }
+
       let context: string | undefined;
       if (metaData?.context.length > 0) {
         context = await this.getContext(metaData.context);
@@ -104,15 +121,31 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         return;
       }
 
-      let chatHistory = await this.modelChatHistory(
-        "user",
-        `${userMessage?.length ? userMessage : message} \n context: ${context ?? ""}`,
-        "gemini",
-        "agentId",
+      const msg = userMessage?.length ? userMessage : message;
+
+      const messageWithContext = `${msg} \n context: ${context}`;
+
+      const currentMessage = Message.of({
+        role: "user",
+        parts: [
+          {
+            text: messageWithContext,
+          },
+        ],
+      });
+
+      this.chatHistory = [...this.chatHistory, currentMessage];
+
+      Memory.set("chatHistory", this.chatHistory);
+
+      const history = await this.pruneChatHistoryWithSummary(
+        this.chatHistory,
+        6000,
+        systemInstruction,
       );
 
       const chat = this.model.startChat({
-        history: [...chatHistory],
+        history,
         systemInstruction: {
           role: "System",
           parts: [
@@ -132,22 +165,37 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         `[DEBUG] Received response length: ${responseText?.length || 0} characters`,
       );
       this.logger.info(
-        `[DEBUG] Response ends with: "${responseText?.slice(-50) || "empty"}"`,
+        `[DEBUG] Response ends with: "${responseText || "empty"}"`,
       );
 
       return responseText;
     } catch (error: any) {
+      if (
+        this.chatHistory?.length &&
+        this.chatHistory[this.chatHistory.length - 1].role === "user"
+      ) {
+        this.chatHistory.pop();
+      }
+
+      Memory.set("chatHistory", this.chatHistory);
       this.logger.error(`[DEBUG] Error in generateResponse:`, error.stack);
-      Memory.set(COMMON.GEMINI_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
-      );
+
       if (error.status === "401") {
         vscode.window.showErrorMessage(
           "Invalid API key. Please update your API key",
         );
+        this.logger.error("Invalid API key. Please update your API key", error);
       }
+      if (error.status === "503") {
+        vscode.window.showErrorMessage("Rate limiting error, try again later");
+      }
+      this.logger.error("Error generating anthropic response", error.stack);
       throw error;
     }
+  }
+
+  async getTokenCounts(input: string): Promise<number> {
+    const geminiResult = await this.model.countTokens(input);
+    return geminiResult.totalTokens;
   }
 }
