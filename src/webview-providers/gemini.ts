@@ -1,14 +1,9 @@
 import { GenerativeModel } from "@google/generative-ai";
 import * as vscode from "vscode";
-import { COMMON } from "../application/constant";
 import { GeminiLLM } from "../llms/gemini/gemini";
-import { IMessageInput, Message, Role } from "../llms/message";
+import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
-import {
-  BaseWebViewProvider,
-  ImessageAndSystemInstruction,
-  LLMMessage,
-} from "./base";
+import { BaseWebViewProvider, LLMMessage } from "./base";
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];

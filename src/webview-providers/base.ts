@@ -641,6 +641,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     - Categories: Be concise, 1-5 items max, directly derived from the question's core topics.
                     - Confidence: Base on clarity—e.g., explicit "in this codebase" is high; vague implications are medium/low.
 
+                    Questions like, what is MCP (Model Context Protocol) and A2A (Agent 2 Agent protocol), how do I use them together. These type of questions are not current codebase related question. These are general knowledge questions. Understand the tone and what the user is asking for.
+
                     User question: "${userQuestion}"
 
                     Output exactly as a JSON object in this format, nothing else (no explanations, no additional text)

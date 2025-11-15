@@ -19,7 +19,7 @@ export class CodeAnalyzer {
   constructor(
     private codeSearcher: CodeSearch,
     private readonly fileParser: FileParser,
-    private outputChannel: vscode.OutputChannel
+    private outputChannel: vscode.OutputChannel,
   ) {
     this.logger = Logger.initialize("QueryExecutor", {
       minLevel: LogLevel.DEBUG,
@@ -31,12 +31,12 @@ export class CodeAnalyzer {
   static getInstance(
     codeSearcher: CodeSearch,
     fileParser: FileParser,
-    outputChannel: vscode.OutputChannel
+    outputChannel: vscode.OutputChannel,
   ) {
     return (CodeAnalyzer.instance ??= new CodeAnalyzer(
       codeSearcher,
       fileParser,
-      outputChannel
+      outputChannel,
     ));
   }
 
@@ -44,7 +44,7 @@ export class CodeAnalyzer {
     workspaceRoot: string,
     progress: vscode.Progress<{ message?: string; increment?: number }>,
     cancellationToken: vscode.CancellationToken,
-    keywords: string[]
+    keywords: string[],
   ) {
     progress.report({
       message: "Scanning files with ripgrep...",
@@ -56,7 +56,7 @@ export class CodeAnalyzer {
       result = await this.codeSearcher.search(
         keywords,
         workspaceRoot,
-        cancellationToken
+        cancellationToken,
       );
 
       if (cancellationToken.isCancellationRequested) {
@@ -64,7 +64,7 @@ export class CodeAnalyzer {
       }
       if (result.length === 0) {
         this.outputChannel.appendLine(
-          "No files related to authentication found."
+          "No files related to authentication found.",
         );
         this.logger.info("No files related to authentication found.");
         return this.createEmptyOutput();
@@ -76,7 +76,7 @@ export class CodeAnalyzer {
       }
       this.logger.error(
         `Error returning relevant files for keywords ${keywords}`,
-        error.stack
+        error.stack,
       );
       throw error;
     }
@@ -106,7 +106,7 @@ export class CodeAnalyzer {
 
           const authElements = this.lairExtractor.filterByKeyWords(
             lairElements,
-            keywords
+            keywords,
           );
 
           allAuthElements.push(...authElements);
@@ -114,18 +114,18 @@ export class CodeAnalyzer {
           const textElements = await this.performTextSearch(
             filePath,
             workspaceRoot,
-            keywords
+            keywords,
           );
           allAuthElements.push(...textElements);
         }
       } catch (error: any) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         this.outputChannel.appendLine(
-          `Error processing file ${filePath}: ${errorMsg}`
+          `Error processing file ${filePath}: ${errorMsg}`,
         );
         this.logger.error(
           `Error processing file ${filePath}: ${errorMsg}`,
-          error.stack
+          error.stack,
         );
       }
     }
@@ -148,7 +148,7 @@ export class CodeAnalyzer {
     });
     const filteredElements = this.applyRelevanceFiltering(
       allAuthElements,
-      keywords
+      keywords,
     );
 
     // Step 4: Format final results
@@ -159,20 +159,20 @@ export class CodeAnalyzer {
   private async performTextSearch(
     filePath: string,
     workspaceRoot: string,
-    keywords: string[]
+    keywords: string[],
   ): Promise<ICodeElement[]> {
     this.outputChannel.appendLine(
-      `Falling back to text search for ${path.relative(workspaceRoot, filePath)}`
+      `Falling back to text search for ${path.relative(workspaceRoot, filePath)}`,
     );
     this.logger.info(
-      `Falling back to text search for ${path.relative(workspaceRoot, filePath)}`
+      `Falling back to text search for ${path.relative(workspaceRoot, filePath)}`,
     );
 
     const elements: ICodeElement[] = [];
 
     try {
       const content = this.textDecoder.decode(
-        await vscode.workspace.fs.readFile(vscode.Uri.file(filePath))
+        await vscode.workspace.fs.readFile(vscode.Uri.file(filePath)),
       );
 
       const lines = content.split("\n");
@@ -196,7 +196,7 @@ export class CodeAnalyzer {
       this.outputChannel.appendLine(`Error reading file ${filePath}: ${error}`);
       this.logger.error(
         `Error reading file ${filePath}: ${error}`,
-        error.stack
+        error.stack,
       );
     }
     return elements;
@@ -204,7 +204,7 @@ export class CodeAnalyzer {
 
   private formatResults(
     elements: ICodeElement[],
-    workspaceRoot: string
+    workspaceRoot: string,
   ): IAnalysisOutput {
     const groupedByFile = new Map<string, ICodeElement[]>();
     const elementsByType: Record<string, number> = {};
@@ -228,7 +228,7 @@ export class CodeAnalyzer {
           path: filePath,
           relativePath: path.relative(workspaceRoot, filePath),
           elements,
-        })
+        }),
       ),
     };
   }
@@ -249,32 +249,32 @@ export class CodeAnalyzer {
 
   private applyRelevanceFiltering(
     elements: ICodeElement[],
-    keywords: string[]
+    keywords: string[],
   ): ICodeElement[] {
     const uniqueElements = this.deduplicateElements(elements);
     const filterConfig = this.relevanceScorer.recommendConfig(
-      uniqueElements.length
+      uniqueElements.length,
     );
 
     this.outputChannel.appendLine(
-      `Using config: minScore=${filterConfig.minScore}, maxElements=${filterConfig.maxElements}`
+      `Using config: minScore=${filterConfig.minScore}, maxElements=${filterConfig.maxElements}`,
     );
     this.logger.info(
-      `Using config: minScore=${filterConfig.minScore}, maxElements=${filterConfig.maxElements}`
+      `Using config: minScore=${filterConfig.minScore}, maxElements=${filterConfig.maxElements}`,
     );
 
     const scoredElements = this.relevanceScorer.filterByRelevance(
       uniqueElements,
       filterConfig,
-      keywords
+      keywords,
     );
 
     this.outputChannel.appendLine(
-      `Filtered to ${scoredElements.length} most relevant elements\n`
+      `Filtered to ${scoredElements.length} most relevant elements\n`,
     );
 
     this.logger.info(
-      `Filtered to ${scoredElements.length} most relevant elements\n`
+      `Filtered to ${scoredElements.length} most relevant elements\n`,
     );
 
     this.outputChannel.appendLine("=== TOP 10 MOST RELEVANT ELEMENTS ===");
@@ -282,7 +282,7 @@ export class CodeAnalyzer {
 
     scoredElements.slice(0, 10).forEach((scored, i) => {
       this.outputChannel.appendLine(
-        `${i + 1}. [${scored.element.type}] ${scored.element.name} (Score: ${scored.score})`
+        `${i + 1}. [${scored.element.type}] ${scored.element.name} (Score: ${scored.score})`,
       );
       this.outputChannel.appendLine(`Reasons: ${scored.reasons.join("; ")}`);
       this.logger.info(`Reasons: ${scored.reasons.join("; ")}`);
@@ -294,12 +294,12 @@ export class CodeAnalyzer {
     this.logger.info("=== LLM SUMMARY ===");
 
     this.outputChannel.appendLine(
-      `Total elements for LLM: ${llmSummary.elementCount}`
+      `Total elements for LLM: ${llmSummary.elementCount}`,
     );
     this.logger.info("Total elements for LLM: ${llmSummary.elementCount}");
 
     this.outputChannel.appendLine(
-      `Estimated tokens: ~${llmSummary.estimatedTokens}`
+      `Estimated tokens: ~${llmSummary.estimatedTokens}`,
     );
     this.logger.info(`Estimated tokens: ~${llmSummary.estimatedTokens}`);
     this.outputChannel.appendLine("");

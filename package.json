@@ -365,7 +365,10 @@
     "simple-git": "^3.25.0",
     "sinon": "^17.0.1",
     "sql.js": "^1.13.0",
-    "web-tree-sitter": "^0.25.10"
+    "web-tree-sitter": "^0.25.10",
+    "@langchain/core": "^0.3.79",
+    "@langchain/google-genai": "^0.2.18",
+    "@langchain/langgraph": "^0.4.9"
   },
   "license": "MIT"
 }

@@ -1,36 +1,69 @@
 import React, { ErrorInfo } from "react";
+import { InlineErrorBanner } from "./errorFallBack";
 
 interface ErrorBoundaryProps {
-  fallBackComponent: React.ReactNode;
   children?: React.ReactNode;
 }
 
 interface ErrorBoundaryState {
-  hasError: boolean;
+  error: Error | null;
+  errorInfo: ErrorInfo | null;
 }
 
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends React.Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
-      hasError: false,
+      error: null,
+      errorInfo: null,
     };
   }
 
-  static getDerivedStateFromError(): ErrorBoundaryState {
-    return { hasError: true };
-  }
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error("Error:", error);
-    console.error("Error Info:", errorInfo);
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+    // Update state so the next render shows the error toast
+    return { error };
   }
 
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error("Error caught by boundary:", error);
+    console.error("Error Info:", errorInfo);
+
+    // Update state with full error info
+    this.setState({
+      error,
+      errorInfo,
+    });
+
+    // Optional: Send error to VS Code extension host for logging
+    // vscode.postMessage({
+    //   type: 'error',
+    //   error: error.message,
+    //   stack: error.stack,
+    // });
+  }
+
+  handleDismissError = () => {
+    this.setState({
+      error: null,
+      errorInfo: null,
+    });
+  };
+
   render() {
-    const { hasError } = this.state;
-    const { fallBackComponent, children } = this.props;
-    if (hasError) {
-      return fallBackComponent;
-    }
-    return <>{children}</>;
+    const { error } = this.state;
+    const { children } = this.props;
+
+    return (
+      <>
+        {/* Always render children - UI stays intact */}
+        {children}
+
+        {/* Show error toast overlay when there's an error */}
+        <InlineErrorBanner error={error} onDismiss={this.handleDismissError} />
+      </>
+    );
   }
 }

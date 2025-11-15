@@ -14,7 +14,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     extensionUri: vscode.Uri,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.model = new Groq({
@@ -33,11 +33,11 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         Message.of({
           role: msg.role === "user" ? "user" : "assistant",
           content: msg.content,
-        })
+        }),
       );
 
       this.logger.debug(
-        `Updated Groq chatHistory array with ${this.chatHistory.length} messages`
+        `Updated Groq chatHistory array with ${this.chatHistory.length} messages`,
       );
     } catch (error: any) {
       this.logger.warn("Failed to update Groq chat history array:", error);
@@ -49,21 +49,21 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     extensionUri: vscode.Uri,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     if (!GroqWebViewProvider.instance) {
       GroqWebViewProvider.instance = new GroqWebViewProvider(
         extensionUri,
         apiKey,
         generativeAiModel,
-        context
+        context,
       );
     }
   }
 
   public async sendResponse(
     response: string,
-    currentChat: string
+    currentChat: string,
   ): Promise<boolean | undefined> {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
@@ -72,14 +72,14 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
           Message.of({
             role: "assistant",
             content: response,
-          })
+          }),
         );
       } else {
         this.chatHistory.push(
           Message.of({
             role: "user",
             content: response,
-          })
+          }),
         );
       }
       return await this.currentWebView?.webview.postMessage({
@@ -94,7 +94,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
   // Corrected generateResponse function
   async generateResponse(
     message: LLMMessage,
-    metaData?: any
+    metaData?: any,
   ): Promise<string | undefined> {
     let systemInstruction = "";
     let userMessage = "";
@@ -136,7 +136,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       const history = await this.pruneChatHistoryWithSummary(
         this.chatHistory,
         6000,
-        systemInstruction
+        systemInstruction,
       );
 
       const chatCompletionStream = await this.model.chat.completions.create({
@@ -177,21 +177,21 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       // Improved error handling and logging
       if (error.status === 401) {
         vscode.window.showErrorMessage(
-          "Invalid Groq API key. Please check your settings."
+          "Invalid Groq API key. Please check your settings.",
         );
         this.logger.error("Invalid Groq API key.", error);
       } else if (error.status === 503 || error.status === 429) {
         vscode.window.showErrorMessage(
-          "Groq API rate limit reached or service unavailable. Please try again later."
+          "Groq API rate limit reached or service unavailable. Please try again later.",
         );
         this.logger.error(
           "Groq API rate limiting or availability error.",
-          error
+          error,
         );
       } else {
         this.logger.error(
           "Error generating Groq response:",
-          error.stack || error.message
+          error.stack || error.message,
         );
       }
 

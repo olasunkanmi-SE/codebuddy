@@ -227,3 +227,7 @@ export const generateQueryString = (query: string) =>
 export const generateId = (): string => {
   return crypto.randomBytes(16).toString("hex");
 };
+
+export const generateUUID = () => {
+  return crypto.randomUUID();
+};

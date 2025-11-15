@@ -19,19 +19,19 @@ export class AnalyzeCodeCommand {
     private readonly outputManager: OutputManager,
     private readonly parser: TreeSitterParser,
     private readonly cacheManager: CacheManager,
-    private readonly initPromise: Promise<void>
+    private readonly initPromise: Promise<void>,
   ) {
     const outputChannel = outputManager.getChannel();
     this.codeSearcher = CodeSearch.getInstance(outputChannel);
     this.fileParser = FileParser.getInstance(
       parser,
       cacheManager,
-      outputChannel
+      outputChannel,
     );
     this.codeAnalyser = CodeAnalyzer.getInstance(
       this.codeSearcher,
       this.fileParser,
-      outputChannel
+      outputChannel,
     );
     this.summaryGenerator = new SummaryGenerator();
 
@@ -86,7 +86,7 @@ export class AnalyzeCodeCommand {
           workspaceRoot,
           progress,
           cancellationToken,
-          keywords
+          keywords,
         );
 
         if (cancellationToken.isCancellationRequested || !result) {
@@ -102,7 +102,7 @@ export class AnalyzeCodeCommand {
           this.outputManager.appendLine(message);
           this.logger.info(message);
           vscode.window.showInformationMessage(
-            "No code data retrieved at the moment"
+            "No code data retrieved at the moment",
           );
           return;
         }
@@ -114,7 +114,7 @@ export class AnalyzeCodeCommand {
         vscode.window.showInformationMessage(compactMessage, { modal: false });
         codeSummary = summary;
         return;
-      }
+      },
     );
     return codeSummary;
   }
