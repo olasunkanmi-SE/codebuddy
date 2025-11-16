@@ -5,14 +5,14 @@ import {
   IFileToolResponse,
 } from "../application/interfaces/agent.interface";
 import { Logger } from "../infrastructure/logger/logger";
-import { getAPIKeyAndModel } from "./../utils/utils";
+import { getAPIKeyAndModel, getGenerativeAiModel } from "./../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { LogLevel } from "./telemetry";
 import { WebSearchService } from "./web-search-service";
 
 export class ContextRetriever {
   // private readonly codeRepository: CodeRepository;
-  private readonly embeddingService: EmbeddingService;
+  private readonly embeddingService: EmbeddingService; // Always uses Gemini for consistency
   private static readonly SEARCH_RESULT_COUNT = 2;
   private readonly logger: Logger;
   private static instance: ContextRetriever;
@@ -20,8 +20,11 @@ export class ContextRetriever {
   protected readonly orchestrator: Orchestrator;
   constructor() {
     // this.codeRepository = CodeRepository.getInstance();
-    const { apiKey, model } = getAPIKeyAndModel("gemini");
-    this.embeddingService = new EmbeddingService(apiKey);
+    // Always use Gemini for embeddings to ensure consistency
+    // regardless of the selected chat model (Groq, Anthropic, etc.)
+    const embeddingProvider = "Gemini";
+    const { apiKey: embeddingApiKey } = getAPIKeyAndModel(embeddingProvider);
+    this.embeddingService = new EmbeddingService(embeddingApiKey);
     this.logger = Logger.initialize("ContextRetriever", {
       minLevel: LogLevel.DEBUG,
     });
@@ -45,7 +48,7 @@ export class ContextRetriever {
   //       embedding,
   //       ContextRetriever.SEARCH_RESULT_COUNT,
   //     );
-  //   } catch (error) {
+  //   } catch (error:any) {
   //     this.logger.error("Unable to retrieve context", error);
   //     throw error;
   //   }
@@ -61,7 +64,7 @@ export class ContextRetriever {
           const content = await this.readFileContent(file.file_path);
           return { function: file.function_name, content: content };
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`Error reading file ${file.file_path}:`, error);
         throw new Error(`Error reading file ${file.file_path}: ${error}`);
       }
@@ -77,7 +80,7 @@ export class ContextRetriever {
       const uri = vscode.Uri.file(filePath);
       const fileContent = await vscode.workspace.fs.readFile(uri);
       return Buffer.from(fileContent).toString("utf-8");
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error reading file:", error);
       throw error;
     }
@@ -87,7 +90,7 @@ export class ContextRetriever {
     try {
       const text = Array.isArray(query) ? query.join("") : query;
       return await this.webSearchService.run(text);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error reading file:", error);
       throw error;
     }

@@ -63,8 +63,8 @@ function validateInput(data: unknown): asserts data is ValidData {
 function safeProcess(data: any) {
   try {
     return processData(data);
-  } catch (error) {
-    console.error('Processing failed:', error);
+  } catch (error:any) {
+    this.logger.error('Processing failed:', error);
     return []; // Safe fallback
   }
 }
@@ -109,8 +109,8 @@ function processWithLogging(data: any) {
     const result = processData(data);
     console.info('Processing completed', { resultCount: result.length });
     return result;
-  } catch (error) {
-    console.error('Processing failed', { 
+  } catch (error:any) {
+    this.logger.error('Processing failed', { 
       error: error.message, 
       data: JSON.stringify(data, null, 2) 
     });

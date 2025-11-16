@@ -204,7 +204,7 @@ export class WebViewProviderManager implements vscode.Disposable {
       if (!event.message) {
         return;
       }
-      const modelName = event.message.message as string;
+      const modelName = (event.message.message as string) ?? event.message;
       if (!modelName) {
         throw new Error("Unknown model");
       }
@@ -239,7 +239,7 @@ export class WebViewProviderManager implements vscode.Disposable {
       } else {
         this.logger.warn("Webview not available for chat history restoration");
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Failed to restore chat history:", error);
 
       // Send empty history to prevent UI hanging
@@ -267,7 +267,7 @@ export class WebViewProviderManager implements vscode.Disposable {
   }
 
   dispose(): void {
-    console.log("WebViewProviderManager disposing...");
+    this.logger.info("WebViewProviderManager disposing...");
 
     if (this.currentProvider) {
       this.currentProvider.dispose();

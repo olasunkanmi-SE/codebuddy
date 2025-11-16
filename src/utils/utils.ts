@@ -7,6 +7,7 @@ import {
 } from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
 import { Memory } from "../memory/base";
+import * as crypto from "crypto";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -54,7 +55,7 @@ export const formatText = (text?: string): string => {
 
     const md = markdownit();
     return md.render(processedText);
-  } catch (error) {
+  } catch (error: any) {
     // If markdown parsing fails, provide a more robust fallback
     console.warn(
       "Markdown parsing failed, providing HTML-safe fallback:",
@@ -222,3 +223,11 @@ export const getAPIKeyAndModel = (
 
 export const generateQueryString = (query: string) =>
   `q=${encodeURIComponent(query)}`;
+
+export const generateId = (): string => {
+  return crypto.randomBytes(16).toString("hex");
+};
+
+export const generateUUID = () => {
+  return crypto.randomUUID();
+};

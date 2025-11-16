@@ -9,8 +9,8 @@
       "name": "Run Extension",
       "type": "extensionHost",
       "request": "launch",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}", "--expose-gc"],
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "preLaunchTask": "npm: watch",
       "sourceMaps": true,
       "internalConsoleOptions": "openOnSessionStart"

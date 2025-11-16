@@ -9,6 +9,8 @@
 
 !package.json
 !node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js
+!node_modules/web-tree-sitter/**
+!node_modules/@vscode/ripgrep/**
 
 # Exclude all source, config, and dev files
 src/**
@@ -28,3 +30,4 @@ node_modules/**
 tsconfig*.json
 yarn.lock
 package-lock.json
+out/**

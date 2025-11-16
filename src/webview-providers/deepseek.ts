@@ -48,7 +48,7 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
       this.logger.debug(
         `Updated Deepseek chatHistory array with ${this.chatHistory.length} messages`,
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn("Failed to update Deepseek chat history array:", error);
       this.chatHistory = []; // Reset to empty on error
     }
@@ -89,10 +89,10 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
         type,
         message: response,
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error sending response", error);
       Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, []);
-      console.error(error);
+      this.logger.error(error);
     }
   }
 
@@ -121,7 +121,7 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
       Memory.removeItems(COMMON.DEEPSEEK_CHAT_HISTORY);
       const result = await this.deepseekLLM.generateText(message);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error generating response", error);
       Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, []);
       vscode.window.showErrorMessage(
@@ -133,5 +133,9 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
 
   generateContent(userInput: string) {
     return userInput;
+  }
+
+  async getTokenCounts(input: string): Promise<number> {
+    return 0;
   }
 }

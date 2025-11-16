@@ -1,0 +1,26 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 12,
+    "sourceType": "module"
+  },
+  "rules": {
+    "prefer-const": "warn",
+    "no-var": "error",
+    "no-unused-vars": "warn"
+  },
+  "ignorePatterns": [
+    "out/**",
+    "dist/**",
+    "**/*.d.ts",
+    "node_modules/**",
+    "webviewUi/**"
+  ]
+}

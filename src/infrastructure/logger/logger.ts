@@ -2,6 +2,8 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
+import { OutputManager } from "../../services/output-manager";
+import * as os from "os";
 
 // TODO Log data in MongoDB Atlas, take advantage of telemetery
 
@@ -56,9 +58,11 @@ export class Logger {
     filePath: undefined,
   };
 
-  private static outputChannel: vscode.OutputChannel | undefined;
+  private readonly outputManager: OutputManager = OutputManager.getInstance(
+    "CodeBuddy Extension Output",
+  );
   private static telemetry: ITelemetry | undefined;
-  private static sessionId: string;
+  static sessionId: string;
   private static traceId: string;
   static instance: Logger;
   constructor(private readonly module: string) {}
@@ -71,22 +75,22 @@ export class Logger {
     Logger.config = { ...Logger.config, ...config };
     if (Logger.config.enableFile && !Logger.config.filePath) {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-      if (workspaceFolder) {
-        const logDir = path.join(
-          workspaceFolder.uri.fsPath,
-          ".codebuddy",
-          "logs",
-        );
-        if (!fs.existsSync(logDir)) {
-          fs.mkdirSync(logDir, { recursive: true });
-        }
-        const date = new Date().toISOString();
-        Logger.config.filePath = path.join(logDir, `codebuddy-${date}.log`);
-      }
+      const baseDir = workspaceFolder
+        ? path.join(workspaceFolder.uri.fsPath, ".codebuddy", "logs")
+        : path.join(os.homedir(), ".codebuddy", "logs");
+
+      const date = new Date().toISOString();
+      const safeDate = date.replace(/[:.]/g, "-");
+      Logger.config.filePath = path.join(baseDir, `codebuddy-${safeDate}.log`);
     }
-    Logger.outputChannel ??= vscode.window.createOutputChannel("CodeBuddy");
+    if (Logger.config.enableFile && Logger.config.filePath) {
+      const logDir = path.dirname(Logger.config.filePath);
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+      console.log(Logger.config.filePath);
+    }
     Logger.telemetry = telemetry;
-    Logger.sessionId = Logger.generateId();
     Logger.setTraceId(Logger.generateId());
     if (!Logger.instance) {
       Logger.instance = new Logger(module);
@@ -98,7 +102,7 @@ export class Logger {
     Logger.traceId = traceId;
   }
 
-  private static generateId(): string {
+  static generateId(): string {
     return crypto.randomBytes(16).toString("hex");
   }
 
@@ -123,15 +127,12 @@ export class Logger {
 
     const formattedMessage = `[${event.timestamp}] [${event.level}] [${event.module}] ${event.message}`;
 
-    if (Logger.outputChannel) {
-      Logger.outputChannel.appendLine(formattedMessage);
-
-      if (event.data) {
-        Logger.outputChannel.appendLine(JSON.stringify(event.data, null, 2));
-      }
+    if (event.data) {
+      this.outputManager.appendLine(JSON.stringify(event.data, null, 2));
     } else {
-      console.log(formattedMessage, event.data || "");
+      this.outputManager.appendLine(formattedMessage);
     }
+    console.log(formattedMessage, event.data || "");
   }
 
   private logToFile(event: ILogEvent): void {
@@ -140,8 +141,9 @@ export class Logger {
     try {
       const logEntry = JSON.stringify(event) + "\n";
       fs.appendFileSync(Logger.config.filePath, logEntry);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to write to log file:", error);
+      this.error("Log file write failed", { error: error.message });
     }
   }
 

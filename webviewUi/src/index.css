@@ -1155,3 +1155,14 @@ hr {
   transition: background-color 0.3s ease;
   color: var(--vscode-dropdown-foreground);
 }
+
+.inline-error-banner {
+  position: sticky;
+  top: 0;
+  background: var(--vscode-inputValidation-errorBackground);
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1000;
+}

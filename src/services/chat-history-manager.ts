@@ -241,11 +241,11 @@ export class ChatHistoryManager {
     // 1. Remove messages older than maxAgeHours
     prunedHistory = this.pruneByAge(prunedHistory, config);
 
-    // 2. Limit by message count (keep most recent)
-    prunedHistory = this.pruneByMessageCount(prunedHistory, config);
+    // // 2. Limit by message count (keep most recent)
+    // prunedHistory = this.pruneByMessageCount(prunedHistory, config);
 
-    // 3. Limit by token count (remove oldest messages first)
-    prunedHistory = this.pruneByTokenCount(prunedHistory, config);
+    // // 3. Limit by token count (remove oldest messages first)
+    // prunedHistory = this.pruneByTokenCount(prunedHistory, config);
 
     return prunedHistory;
   }
@@ -255,7 +255,7 @@ export class ChatHistoryManager {
       return history;
     }
 
-    const cutoffTime = Date.now() - config.maxAgeHours * 60 * 60 * 1000;
+    const cutoffTime = Date.now() - config.maxAgeHours * 60 * 60 * 5000;
     return history.filter((msg) => {
       const timestamp = msg.timestamp || 0;
       return (

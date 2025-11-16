@@ -56,7 +56,7 @@ export class SecretStorageService implements vscode.Disposable {
       const preferences = JSON.parse(data);
       await this.add("codebuddy-username", preferences.username);
       await this.publishPreferences();
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error parsing message", error);
       throw new Error("Error parsing message");
     }
@@ -86,7 +86,7 @@ export class SecretStorageService implements vscode.Disposable {
       await this.add("codebuddy-theme", theme);
       await this.publishPreferences();
       this.logger.info(`Theme preference updated to: ${theme}`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error updating theme preferences", error);
       throw new Error("Error updating theme preferences");
     }

@@ -85,7 +85,6 @@ export class Logger {
     }
     Logger.outputChannel ??= vscode.window.createOutputChannel("CodeBuddy");
     Logger.telemetry = telemetry;
-    Logger.sessionId = Logger.generateId();
     Logger.setTraceId(Logger.generateId());
   }
 
@@ -135,7 +134,7 @@ export class Logger {
     try {
       const logEntry = JSON.stringify(event) + "\n";
       fs.appendFileSync(Logger.config.filePath, logEntry);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to write to log file:", error);
     }
   }

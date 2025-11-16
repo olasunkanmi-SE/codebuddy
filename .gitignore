@@ -8,7 +8,10 @@ node_modules
 config.ts
 database
 files
-webviewUi/dist
+webviewUi/dist/**
 samples
 patterns
 .codebuddy
+scripts
+lancedb
+dist

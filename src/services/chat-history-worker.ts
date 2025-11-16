@@ -15,6 +15,7 @@
  * @since 2025-01-25
  */
 
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { ChatHistoryRepository } from "../infrastructure/repository/db-chat-history";
 
 /**
@@ -78,9 +79,13 @@ export class ChatHistoryWorker {
   private readonly chatHistoryRepo: ChatHistoryRepository;
   private isProcessing: boolean = false;
   private currentRequestId: string | null = null;
+  private readonly logger: Logger;
 
   constructor() {
     this.chatHistoryRepo = ChatHistoryRepository.getInstance();
+    this.logger = Logger.initialize(ChatHistoryWorker.name, {
+      minLevel: LogLevel.DEBUG,
+    });
   }
 
   /**
@@ -160,10 +165,10 @@ export class ChatHistoryWorker {
         try {
           const history = this.chatHistoryRepo.get(agentId);
           resolve(history || []);
-        } catch (error) {
+        } catch (error: any) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          console.error(`Failed to get chat history: ${errorMessage}`);
+          this.logger.error(`Failed to get chat history: ${errorMessage}`);
           reject(new Error(`Failed to get chat history: ${errorMessage}`));
         }
       }, 0);
@@ -195,10 +200,10 @@ export class ChatHistoryWorker {
 
           this.chatHistoryRepo.set(agentId, formattedHistory);
           resolve();
-        } catch (error) {
+        } catch (error: any) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          console.error(`Failed to save chat history: ${errorMessage}`);
+          this.logger.error(`Failed to save chat history: ${errorMessage}`);
           reject(new Error(`Failed to save chat history: ${errorMessage}`));
         }
       }, 0);
@@ -214,10 +219,10 @@ export class ChatHistoryWorker {
         try {
           this.chatHistoryRepo.clear(agentId);
           resolve();
-        } catch (error) {
+        } catch (error: any) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          console.error(`Failed to clear chat history: ${errorMessage}`);
+          this.logger.error(`Failed to clear chat history: ${errorMessage}`);
           reject(new Error(`Failed to clear chat history: ${errorMessage}`));
         }
       }, 0);
@@ -251,10 +256,10 @@ export class ChatHistoryWorker {
             },
           });
           resolve();
-        } catch (error) {
+        } catch (error: any) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          console.error(`Failed to add chat message: ${errorMessage}`);
+          this.logger.error(`Failed to add chat message: ${errorMessage}`);
           reject(new Error(`Failed to add chat message: ${errorMessage}`));
         }
       }, 0);
@@ -273,10 +278,12 @@ export class ChatHistoryWorker {
         try {
           const history = this.chatHistoryRepo.getRecent(agentId, limit);
           resolve(history || []);
-        } catch (error) {
+        } catch (error: any) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          console.error(`Failed to get recent chat history: ${errorMessage}`);
+          this.logger.error(
+            `Failed to get recent chat history: ${errorMessage}`,
+          );
           reject(
             new Error(`Failed to get recent chat history: ${errorMessage}`),
           );
@@ -294,10 +301,12 @@ export class ChatHistoryWorker {
         try {
           this.chatHistoryRepo.cleanup(daysToKeep);
           resolve();
-        } catch (error) {
+        } catch (error: any) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          console.error(`Failed to cleanup old chat history: ${errorMessage}`);
+          this.logger.error(
+            `Failed to cleanup old chat history: ${errorMessage}`,
+          );
           reject(
             new Error(`Failed to cleanup old chat history: ${errorMessage}`),
           );

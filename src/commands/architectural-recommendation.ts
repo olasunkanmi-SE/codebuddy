@@ -1,8 +1,14 @@
 import * as vscode from "vscode";
 import { PersistentCodebaseUnderstandingService } from "../services/persistent-codebase-understanding.service";
 import { GeminiLLM } from "../llms/gemini/gemini";
-import { getAPIKeyAndModel, formatText } from "../utils/utils";
+// 💭 REASONING: Removed the 'formatText' import as it's no longer needed for HTML conversion.
+import { getAPIKeyAndModel } from "../utils/utils";
 import { LLMOutputSanitizer } from "../utils/llm-output-sanitizer";
+import { Logger } from "../infrastructure/logger/logger";
+import { LogLevel } from "../services/telemetry";
+import { Orchestrator } from "../agents/orchestrator";
+
+let orchestrator = Orchestrator.getInstance();
 
 /**
  * Determines if analysis cache should be refreshed based on age and availability
@@ -21,6 +27,10 @@ async function shouldRefreshAnalysis(summary: any): Promise<boolean> {
 
   return false;
 }
+
+const logger = Logger.initialize("extension-main", {
+  minLevel: LogLevel.DEBUG,
+});
 
 /**
  * Prompts user for cache refresh decision when analysis is stale
@@ -62,17 +72,6 @@ export async function architecturalRecommendationCommand(): Promise<void> {
   const persistentCodebaseService =
     PersistentCodebaseUnderstandingService.getInstance();
 
-  // Initialize the service if not already done
-  try {
-    await persistentCodebaseService.initialize();
-  } catch (error) {
-    const errorMessage = "Failed to initialize codebase analysis service.";
-    vscode.window.showErrorMessage(
-      `${errorMessage} ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
-    return;
-  }
-
   const apiKeyInfo = getAPIKeyAndModel("gemini");
 
   if (!apiKeyInfo.apiKey || !apiKeyInfo.model) {
@@ -95,7 +94,6 @@ export async function architecturalRecommendationCommand(): Promise<void> {
     return;
   }
 
-  // Check if we should force refresh or use cache
   const summary = await persistentCodebaseService.getAnalysisSummary();
   const cacheDecision = await getUserCacheDecision(summary);
 
@@ -115,7 +113,6 @@ export async function architecturalRecommendationCommand(): Promise<void> {
       progress.report({ increment: 0 });
 
       try {
-        // Get comprehensive codebase analysis
         const analysis = useCache
           ? await persistentCodebaseService.getComprehensiveAnalysis(token)
           : await persistentCodebaseService.forceRefreshAnalysis(token);
@@ -129,7 +126,6 @@ export async function architecturalRecommendationCommand(): Promise<void> {
           message: "Preparing analysis context...",
         });
 
-        // Create context from persistent analysis with sanitization
         const context = createContextFromAnalysis(analysis);
         const sanitizedContext = context
           .replace(/`/g, "\\`")
@@ -158,28 +154,25 @@ ${sanitizedQuestion}
    - If it's about HOW something is implemented (e.g., "How is authentication handled?"), focus on explaining existing patterns, files, and implementations
    - If it's about BUILDING something new (e.g., "I want to build an admin dashboard"), provide architectural recommendations and implementation guidance
    - If it's about UNDERSTANDING the codebase (e.g., "What are the main components?"), provide clear explanations of the architecture and structure
-
 2. **For implementation questions** ("How is X handled?"):
    - Explain the existing patterns found in the codebase
    - Reference specific files and code patterns
    - Describe the flow and architecture
    - Mention any dependencies or frameworks involved
-
 3. **For building/enhancement questions**:
    - Provide specific, actionable recommendations
    - Suggest exact endpoint paths, data models, and implementation approach
    - Consider the existing architecture and recommend consistent patterns
    - Include code examples where helpful
-
 4. **For general understanding questions**:
    - Provide clear overviews of the codebase structure
    - Explain the main architectural patterns
    - Describe key components and their relationships
-
 5. **Always include**:
    - Specific file references when possible
    - Concrete examples from the actual codebase
    - Clear, actionable next steps
+   - A Mermaid sequence diagram.
 
 **Focus on being accurate, specific, and helpful. Use the actual codebase analysis to provide concrete, evidence-based answers.**
 
@@ -187,104 +180,29 @@ ${sanitizedQuestion}
         `.trim();
 
         const result = await gemini.generateText(prompt);
-        progress.report({ increment: 90 });
+        progress.report({ increment: 90, message: "Finalizing response..." });
 
-        // Sanitize the LLM output before displaying in webview
+        // 💭 REASONING: Sanitize the LLM output to ensure it's valid, well-formed markdown.
         const sanitizedContent = LLMOutputSanitizer.sanitizeLLMOutput(
           result,
           false,
         );
 
-        // Format the content to HTML with markdown rendering
-        let formattedContent: string;
-        try {
-          formattedContent = formatText(sanitizedContent);
-        } catch (error) {
-          console.warn(
-            "Markdown parsing failed, falling back to plain text:",
-            error,
-          );
-          // Fallback to plain text if markdown parsing fails
-          formattedContent = `<pre>${LLMOutputSanitizer.sanitizeText(sanitizedContent)}</pre>`;
-        }
+        // 💡 CHANGE: Instead of creating a webview, we now create a new untitled markdown file.
+        // This makes the content easy for the user to copy, edit, and save.
+        const doc = await vscode.workspace.openTextDocument({
+          content: sanitizedContent,
+          language: "markdown",
+        });
 
-        progress.report({ increment: 100 });
+        orchestrator.publish("onQuery", String(sanitizedContent));
 
-        const panel = vscode.window.createWebviewPanel(
-          "codebaseAnalysis",
-          "Codebase Analysis & Recommendations",
-          vscode.ViewColumn.One,
-          {
-            enableScripts: false, // Disable scripts for security
-            localResourceRoots: [], // No local resources needed
-          },
-        );
+        // Show the document in a new editor tab.
+        await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
 
-        // Create secure HTML wrapper with proper CSP
-        const secureHtml = `
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' 'self'; font-src 'self' data: https://fonts.gstatic.com; connect-src https:;">
-              <title>Codebase Analysis</title>
-              <style>
-                  body { 
-                      font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
-                      color: var(--vscode-foreground); 
-                      background: var(--vscode-editor-background);
-                      padding: 20px;
-                      line-height: 1.6;
-                      font-size: 14px;
-                      -webkit-font-smoothing: antialiased;
-                      -moz-osx-font-smoothing: grayscale;
-                  }
-                  h1, h2, h3 { 
-                      color: var(--vscode-titleBar-activeForeground);
-                      font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
-                      font-weight: 600;
-                      letter-spacing: -0.025em;
-                  }
-                  code { 
-                      font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
-                      background: var(--vscode-textCodeBlock-background); 
-                      padding: 2px 6px; 
-                      border-radius: 4px;
-                      font-size: 13px;
-                      font-weight: 500;
-                  }
-                  pre { 
-                      font-family: "JetBrains Mono", "SF Mono", "Geist Mono", "Fira Code", "Cascadia Code", "Roboto Mono", "Consolas", "Monaco", monospace;
-                      background: var(--vscode-textCodeBlock-background); 
-                      padding: 16px; 
-                      border-radius: 8px; 
-                      overflow-x: auto;
-                      font-size: 13px;
-                      line-height: 1.5;
-                      border: 1px solid var(--vscode-widget-border);
-                  }
-                  pre code {
-                      background: transparent;
-                      padding: 0;
-                      font-size: inherit;
-                  }
-                  blockquote { 
-                      border-left: 4px solid var(--vscode-textLink-foreground); 
-                      margin: 0; 
-                      padding-left: 10px; 
-                  }
-              </style>
-          </head>
-          <body>
-              ${formattedContent}
-          </body>
-          </html>
-        `;
-
-        panel.webview.html = secureHtml;
-      } catch (error) {
-        console.error("Error in architectural recommendation:", error);
+        progress.report({ increment: 100, message: "Done!" });
+      } catch (error: any) {
+        logger.error("Error in architectural recommendation:", error);
         vscode.window.showErrorMessage(
           `Failed to analyze codebase: ${error instanceof Error ? error.message : "Unknown error"}`,
         );

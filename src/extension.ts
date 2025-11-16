@@ -7,11 +7,17 @@ import {
   CODEBUDDY_ACTIONS,
   generativeAiModels,
 } from "./application/constant";
+import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
 import { Comments } from "./commands/comment";
 import { ExplainCode } from "./commands/explain";
 import { FixError } from "./commands/fixError";
 import { GenerateMermaidDiagram } from "./commands/generate-code-chart";
 import { GenerateCommitMessage } from "./commands/generate-commit-message";
+import {
+  generateDocumentationCommand,
+  openDocumentationCommand,
+  regenerateDocumentationCommand,
+} from "./commands/generate-documentation";
 import { InLineChat } from "./commands/inline-chat";
 import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
@@ -22,6 +28,8 @@ import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
 import { FileUploadService } from "./services/file-upload";
+import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
+import { SqliteDatabaseService } from "./services/sqlite-database.service";
 import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
@@ -29,13 +37,10 @@ import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
-import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
-import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
-import {
-  generateDocumentationCommand,
-  regenerateDocumentationCommand,
-  openDocumentationCommand,
-} from "./commands/generate-documentation";
+
+const logger = Logger.initialize("extension-main", {
+  minLevel: LogLevel.DEBUG,
+});
 
 const {
   geminiKey,
@@ -49,38 +54,126 @@ const {
   deepseekApiKey,
   deepseekModel,
 } = APP_CONFIG;
-console.log(APP_CONFIG);
-
-const logger = Logger.initialize("extension", { minLevel: LogLevel.DEBUG });
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
 let orchestrator = Orchestrator.getInstance();
 
+/**
+ * Initialize WebView providers lazily for faster startup
+ */
+function initializeWebViewProviders(
+  context: vscode.ExtensionContext,
+  selectedGenerativeAiModel: string,
+): void {
+  // Use setImmediate to defer until after current call stack
+  setImmediate(() => {
+    try {
+      logger.info("🎨 CodeBuddy: Initializing WebView providers...");
+
+      const modelConfigurations: {
+        [key: string]: {
+          key: string;
+          model: string;
+          webviewProviderClass: any;
+        };
+      } = {
+        [generativeAiModels.GEMINI]: {
+          key: geminiKey,
+          model: geminiModel,
+          webviewProviderClass: GeminiWebViewProvider,
+        },
+        [generativeAiModels.GROQ]: {
+          key: groqApiKey,
+          model: groqModel,
+          webviewProviderClass: GroqWebViewProvider,
+        },
+        [generativeAiModels.ANTHROPIC]: {
+          key: anthropicApiKey,
+          model: anthropicModel,
+          webviewProviderClass: AnthropicWebViewProvider,
+        },
+        [generativeAiModels.GROK]: {
+          key: grokApiKey,
+          model: grokModel,
+          webviewProviderClass: AnthropicWebViewProvider,
+        },
+        [generativeAiModels.DEEPSEEK]: {
+          key: deepseekApiKey,
+          model: deepseekModel,
+          webviewProviderClass: DeepseekWebViewProvider,
+        },
+      };
+
+      const providerManager = WebViewProviderManager.getInstance(context);
+
+      if (selectedGenerativeAiModel in modelConfigurations) {
+        const modelConfig = modelConfigurations[selectedGenerativeAiModel];
+        const apiKey = getConfigValue(modelConfig.key);
+        const apiModel = getConfigValue(modelConfig.model);
+
+        providerManager.initializeProvider(
+          selectedGenerativeAiModel,
+          apiKey,
+          apiModel,
+          true,
+        );
+
+        logger.info(
+          `✓ WebView provider initialized: ${selectedGenerativeAiModel}`,
+        );
+      }
+
+      // Store providerManager globally and add to subscriptions
+      (globalThis as any).providerManager = providerManager;
+      context.subscriptions.push(providerManager);
+    } catch (error: any) {
+      logger.error("Failed to initialize WebView providers:", error);
+      vscode.window.showWarningMessage(
+        "CodeBuddy: WebView initialization failed, some features may be limited",
+      );
+    }
+  });
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    Logger.sessionId = Logger.generateId();
+
+    const databaseService: SqliteDatabaseService =
+      SqliteDatabaseService.getInstance();
+    databaseService.initialize();
+
+    const mainLogger = new Logger("activate");
+    mainLogger.info("CodeBuddy extension is now active!");
+    logger.info("🚀 CodeBuddy: Starting fast activation...");
+
+    // ⚡ FAST STARTUP: Only essential sync operations
     orchestrator.start();
 
-    const { apiKey, model } = getAPIKeyAndModel("gemini");
-    FileUploadService.initialize(apiKey);
-    Memory.getInstance();
+    const { apiKey } = getAPIKeyAndModel("groq");
 
-    // Initialize persistent codebase understanding service
-    try {
-      const persistentCodebaseService =
-        PersistentCodebaseUnderstandingService.getInstance();
-      await persistentCodebaseService.initialize();
-      console.log("Persistent codebase understanding service initialized");
-    } catch (error) {
-      console.warn("Failed to initialize persistent codebase service:", error);
+    if (!apiKey) {
+      vscode.window.showInformationMessage(
+        "Groq API key is required. visit https://console.groq.com/keys to generate an API key",
+      );
     }
 
-    // TODO for RAG codeIndexing incase user allows
-    // const index = CodeIndexingService.createInstance();
-    // Get each of the folders and call the next line for each
-    // const result = await index.buildFunctionStructureMap();
-    // await index.insertFunctionsinDB();
-    // console.log(result);
+    Memory.getInstance();
+
+    // Show early status
+    vscode.window.setStatusBarMessage(
+      "$(loading~spin) CodeBuddy: Initializing...",
+      3000,
+    );
+
+    // ⚡ DEFER HEAVY OPERATIONS: Initialize in background after UI is ready
+    // setImmediate(() => {
+    //   initializeBackgroundServices(context);
+    // });
+
+    logger.info("✓ CodeBuddy: Core services started, UI ready");
+
     const {
       comment,
       review,
@@ -287,7 +380,7 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.window.showInformationMessage(
               "✅ Codebase analysis cache cleared successfully",
             );
-          } catch (error) {
+          } catch (error: any) {
             vscode.window.showErrorMessage(
               `❌ Failed to clear cache: ${error instanceof Error ? error.message : "Unknown error"}`,
             );
@@ -323,7 +416,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 }
               },
             );
-          } catch (error) {
+          } catch (error: any) {
             if (error instanceof Error && error.message.includes("cancelled")) {
               vscode.window.showInformationMessage(
                 "Analysis refresh cancelled",
@@ -340,15 +433,14 @@ export async function activate(context: vscode.ExtensionContext) {
 
     let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
       ([action, handler]) => {
-        console.log(`Registering command: ${action}`);
+        logger.info(`Registering command: ${action}`);
         return vscode.commands.registerCommand(action, handler);
       },
     );
 
-    console.log(`Total commands registered: ${subscriptions.length}`);
+    logger.info(`Total commands registered: ${subscriptions.length}`);
 
-    const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
-
+    // ⚡ FAST: Essential UI components only
     const quickFix = new CodeActionsProvider();
     quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
       { scheme: "file", language: "*" },
@@ -357,67 +449,26 @@ export async function activate(context: vscode.ExtensionContext) {
 
     agentEventEmmitter = new EventEmitter();
 
-    const modelConfigurations: {
-      [key: string]: {
-        key: string;
-        model: string;
-        webviewProviderClass: any;
-      };
-    } = {
-      [generativeAiModels.GEMINI]: {
-        key: geminiKey,
-        model: geminiModel,
-        webviewProviderClass: GeminiWebViewProvider,
-      },
-      [generativeAiModels.GROQ]: {
-        key: groqApiKey,
-        model: groqModel,
-        webviewProviderClass: GroqWebViewProvider,
-      },
-      [generativeAiModels.ANTHROPIC]: {
-        key: anthropicApiKey,
-        model: anthropicModel,
-        webviewProviderClass: AnthropicWebViewProvider,
-      },
-      [generativeAiModels.GROK]: {
-        key: grokApiKey,
-        model: grokModel,
-        webviewProviderClass: AnthropicWebViewProvider,
-      },
-      [generativeAiModels.DEEPSEEK]: {
-        key: deepseekApiKey,
-        model: deepseekModel,
-        webviewProviderClass: DeepseekWebViewProvider,
-      },
-    };
+    // Vector database commands are already registered in initializePhase4Orchestration
+    // No need to register them again here
 
-    const providerManager = WebViewProviderManager.getInstance(context);
-
-    if (selectedGenerativeAiModel in modelConfigurations) {
-      const modelConfig = modelConfigurations[selectedGenerativeAiModel];
-      const apiKey = getConfigValue(modelConfig.key);
-      const apiModel = getConfigValue(modelConfig.model);
-      providerManager.initializeProvider(
-        selectedGenerativeAiModel,
-        apiKey,
-        apiModel,
-        true,
-      );
-    }
+    // ⚡ DEFER: Initialize WebView providers lazily
+    const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
+    initializeWebViewProviders(context, selectedGenerativeAiModel);
     context.subscriptions.push(
       ...subscriptions,
       quickFixCodeAction,
       agentEventEmmitter,
       orchestrator,
-      providerManager,
+      // Note: providerManager is handled in initializeWebViewProviders
       // secretStorageService,
     );
-  } catch (error) {
-    Memory.clear();
+  } catch (error: any) {
+    // Memory.clear();
     vscode.window.showErrorMessage(
       "An Error occured while setting up generative AI model",
     );
-    console.log(error);
+    logger.info(error);
   }
 }
 
@@ -426,7 +477,7 @@ export async function activate(context: vscode.ExtensionContext) {
  */
 async function restartExtension(context: vscode.ExtensionContext) {
   try {
-    console.log("Restarting CodeBuddy extension...");
+    logger.info("Restarting CodeBuddy extension...");
 
     // Show confirmation dialog
     const choice = await vscode.window.showInformationMessage(
@@ -465,8 +516,8 @@ async function restartExtension(context: vscode.ExtensionContext) {
         },
       );
     }
-  } catch (error) {
-    console.error("Error restarting extension:", error);
+  } catch (error: any) {
+    logger.error("Error restarting extension:", error);
     vscode.window.showErrorMessage(
       "Failed to restart extension. Please reload VS Code manually.",
     );
@@ -474,18 +525,17 @@ async function restartExtension(context: vscode.ExtensionContext) {
 }
 
 export function deactivate(context: vscode.ExtensionContext) {
-  console.log("Deactivating CodeBuddy extension...");
+  logger.info("Deactivating CodeBuddy extension...");
 
   // Clear database history before deactivation
   clearFileStorageData();
 
-  // Shutdown persistent codebase service
   try {
     const persistentCodebaseService =
       PersistentCodebaseUnderstandingService.getInstance();
     persistentCodebaseService.shutdown();
-    console.log("Persistent codebase service shutdown");
-  } catch (error) {
+    logger.info("Persistent codebase service shutdown");
+  } catch (error: any) {
     console.warn("Error shutting down persistent codebase service:", error);
   }
 
@@ -499,13 +549,13 @@ export function deactivate(context: vscode.ExtensionContext) {
 
   context.subscriptions.forEach((subscription) => subscription.dispose());
 
-  console.log("CodeBuddy extension deactivated successfully");
+  logger.info("CodeBuddy extension deactivated successfully");
 }
 
 /**
  * Clears file storage data (.codebuddy folder contents)
  */
-function clearFileStorageData() {
+async function clearFileStorageData() {
   try {
     const workSpaceRoot =
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
@@ -519,9 +569,9 @@ function clearFileStorageData() {
           fs.unlinkSync(filePath);
         }
       });
-      console.log(`Cleared ${files.length} files from .codebuddy folder`);
+      logger.info(`Cleared ${files.length} files from .codebuddy folder`);
     }
-  } catch (error) {
-    console.error("Error clearing file storage data:", error);
+  } catch (error: any) {
+    logger.error("Error clearing file storage data:", error);
   }
 }

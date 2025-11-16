@@ -17,8 +17,8 @@ export class GenerateCommitMessage extends CodeCommandHandler {
   async getStagedDifferenceSummary(): Promise<string> {
     try {
       return await this.gitActions.getStagedDifferenceSummary();
-    } catch (error) {
-      console.error("Error getting staged differences:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting staged differences:", error);
       vscode.window.showErrorMessage(
         "Failed to get staged changes. Please ensure you have staged changes.",
       );

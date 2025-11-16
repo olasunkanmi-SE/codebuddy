@@ -14,7 +14,7 @@ export class DocumentationEnhancerService {
       if (apiKey && model) {
         this.gemini = new GeminiLLM({ apiKey, model });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.warn(
         "Failed to initialize Gemini for documentation enhancement:",
         error,
@@ -38,7 +38,7 @@ export class DocumentationEnhancerService {
       if (this.gemini) {
         return await this.llmExtractAPIs(codebaseContext);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.warn(
         "LLM API extraction failed, falling back to pattern-based:",
         error,
@@ -63,7 +63,7 @@ export class DocumentationEnhancerService {
       if (this.gemini) {
         return await this.llmAnalyzeArchitecture(codebaseContext);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.warn(
         "LLM architecture analysis failed, falling back to pattern-based:",
         error,

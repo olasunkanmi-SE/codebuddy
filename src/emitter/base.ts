@@ -26,7 +26,7 @@ export class BaseEmitter<EventMap extends Record<string, IEventPayload>> {
         this.emitters.set(name, emitter);
       }
       return emitter.event;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error generating embeddings", error);
       throw new Error("Failed to generate embeddings");
     }
@@ -41,7 +41,7 @@ export class BaseEmitter<EventMap extends Record<string, IEventPayload>> {
     try {
       const emitter = this.emitters.get(name);
       if (emitter) emitter.fire(data);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Could not emit Event ${String(name)}`, error);
       throw new Error("Could not emit Event");
     }

@@ -44,7 +44,7 @@ export class AgentService {
         requestId,
       );
       return history || [];
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`Failed to get chat history for agent ${agentId}:`, error);
       // Fallback to file storage for backward compatibility
       return (
@@ -65,7 +65,7 @@ export class AgentService {
         { agentId, history },
         requestId,
       );
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`Failed to save chat history for agent ${agentId}:`, error);
       // Fallback to file storage only for catastrophic database failures
       await this.storage.set(
@@ -87,7 +87,7 @@ export class AgentService {
         { agentId },
         requestId,
       );
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`Failed to clear chat history for agent ${agentId}:`, error);
       // Fallback to file storage only for catastrophic database failures
       await this.storage.delete(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`);
@@ -115,7 +115,7 @@ export class AgentService {
         { agentId, message },
         requestId,
       );
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`Failed to add chat message for agent ${agentId}:`, error);
     }
   }
@@ -136,7 +136,7 @@ export class AgentService {
         requestId,
       );
       return history || [];
-    } catch (error) {
+    } catch (error: any) {
       console.warn(
         `Failed to get recent chat history for agent ${agentId}:`,
         error,
@@ -159,7 +159,7 @@ export class AgentService {
         { agentId: "", config: { daysToKeep } },
         requestId,
       );
-    } catch (error) {
+    } catch (error: any) {
       console.warn("Failed to cleanup old chat history:", error);
     }
   }
@@ -185,7 +185,7 @@ export class AgentService {
         { agentId },
         requestId,
       );
-    } catch (error) {
+    } catch (error: any) {
       console.warn(
         `Failed to clear chat history from SQLite for agent ${agentId}:`,
         error,

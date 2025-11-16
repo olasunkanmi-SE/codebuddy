@@ -10,43 +10,11 @@ export class ChatHistoryRepository {
 
   private constructor() {
     this.dbService = SqliteDatabaseService.getInstance();
-    this.initializeSchema();
+    // this.initializeSchema();
   }
 
   public static getInstance(): ChatHistoryRepository {
-    if (!ChatHistoryRepository.instance) {
-      ChatHistoryRepository.instance = new ChatHistoryRepository();
-    }
-    return ChatHistoryRepository.instance;
-  }
-
-  /**
-   * Initialize chat history database schema
-   */
-  private initializeSchema(): void {
-    try {
-      this.dbService.executeSqlCommand(`
-        CREATE TABLE IF NOT EXISTS chat_history (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          agent_id TEXT NOT NULL,
-          message_content TEXT NOT NULL,
-          message_type TEXT NOT NULL,
-          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-          session_id TEXT,
-          metadata TEXT
-        )
-      `);
-
-      this.dbService.executeSqlCommand(`
-        CREATE INDEX IF NOT EXISTS idx_chat_agent_id ON chat_history(agent_id)
-      `);
-
-      this.dbService.executeSqlCommand(`
-        CREATE INDEX IF NOT EXISTS idx_chat_timestamp ON chat_history(timestamp)
-      `);
-    } catch (error) {
-      console.warn("Failed to initialize chat history schema:", error);
-    }
+    return (ChatHistoryRepository.instance ??= new ChatHistoryRepository());
   }
 
   /**
@@ -54,7 +22,7 @@ export class ChatHistoryRepository {
    */
   public get(agentId: string): any[] {
     try {
-      const results = this.dbService.executeSqlAll(
+      const results = this.dbService.executeSql(
         "SELECT * FROM chat_history WHERE agent_id = ? ORDER BY timestamp ASC",
         [agentId],
       );
@@ -67,7 +35,7 @@ export class ChatHistoryRepository {
         sessionId: row.session_id,
         metadata: row.metadata ? JSON.parse(row.metadata) : null,
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`Failed to get chat history for agent ${agentId}:`, error);
       return [];
     }
@@ -78,9 +46,6 @@ export class ChatHistoryRepository {
    */
   public set(agentId: string, history: any[]): void {
     try {
-      // Clear existing history for this agent
-      this.clear(agentId);
-
       // Insert new history
       const insertStmt = `
         INSERT INTO chat_history (agent_id, message_content, message_type, session_id, metadata)
@@ -88,7 +53,7 @@ export class ChatHistoryRepository {
       `;
 
       for (const message of history) {
-        this.dbService.executeSqlCommand(insertStmt, [
+        this.dbService.executeSql(insertStmt, [
           agentId,
           message.content || "",
           message.type || "message",
@@ -96,7 +61,7 @@ export class ChatHistoryRepository {
           message.metadata ? JSON.stringify(message.metadata) : null,
         ]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`Failed to set chat history for agent ${agentId}:`, error);
     }
   }
@@ -119,14 +84,14 @@ export class ChatHistoryRepository {
         VALUES (?, ?, ?, ?, ?)
       `;
 
-      this.dbService.executeSqlCommand(insertStmt, [
+      this.dbService.executeSql(insertStmt, [
         agentId,
         message.content,
         message.type,
         message.sessionId || null,
         message.metadata ? JSON.stringify(message.metadata) : null,
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`Failed to add message for agent ${agentId}:`, error);
     }
   }
@@ -136,11 +101,10 @@ export class ChatHistoryRepository {
    */
   public clear(agentId: string): void {
     try {
-      this.dbService.executeSqlCommand(
-        "DELETE FROM chat_history WHERE agent_id = ?",
-        [agentId],
-      );
-    } catch (error) {
+      this.dbService.executeSql("DELETE FROM chat_history WHERE agent_id = ?", [
+        agentId,
+      ]);
+    } catch (error: any) {
       console.warn(`Failed to clear chat history for agent ${agentId}:`, error);
     }
   }
@@ -150,8 +114,8 @@ export class ChatHistoryRepository {
    */
   public clearAll(): void {
     try {
-      this.dbService.executeSqlCommand("DELETE FROM chat_history");
-    } catch (error) {
+      this.dbService.executeSql("DELETE FROM chat_history");
+    } catch (error: any) {
       console.warn("Failed to clear all chat history:", error);
     }
   }
@@ -161,7 +125,7 @@ export class ChatHistoryRepository {
    */
   public getRecent(agentId: string, limit: number = 50): any[] {
     try {
-      const results = this.dbService.executeSqlAll(
+      const results = this.dbService.executeSql(
         "SELECT * FROM chat_history WHERE agent_id = ? ORDER BY timestamp DESC LIMIT ?",
         [agentId, limit],
       );
@@ -175,7 +139,7 @@ export class ChatHistoryRepository {
         sessionId: row.session_id,
         metadata: row.metadata ? JSON.parse(row.metadata) : null,
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.warn(
         `Failed to get recent chat history for agent ${agentId}:`,
         error,
@@ -192,11 +156,11 @@ export class ChatHistoryRepository {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
-      this.dbService.executeSqlCommand(
+      this.dbService.executeSql(
         "DELETE FROM chat_history WHERE timestamp < ?",
         [cutoffDate.toISOString()],
       );
-    } catch (error) {
+    } catch (error: any) {
       console.warn("Failed to cleanup old chat history:", error);
     }
   }

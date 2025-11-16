@@ -1,18 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import * as vscode from "vscode";
-import {
-  COMMON,
-  generativeAiModels,
-  GROQ_CONFIG,
-} from "../application/constant";
+import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
-import {
-  createAnthropicClient,
-  getGenerativeAiModel,
-  getXGroKBaseURL,
-} from "../utils/utils";
-import { BaseWebViewProvider } from "./base";
+import { createAnthropicClient, getAPIKeyAndModel } from "../utils/utils";
+import { BaseWebViewProvider, LLMMessage } from "./base";
 
 export class AnthropicWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
@@ -31,7 +23,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
   /**
    * Override to update Anthropic-specific chatHistory array
    */
-  protected async updateProviderChatHistory(history: any[]): Promise<void> {
+  updateProviderChatHistory(history: any[]): void {
     try {
       // Convert to Anthropic's IMessageInput format
       this.chatHistory = history.map((msg: any) =>
@@ -44,7 +36,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       this.logger.debug(
         `Updated Anthropic chatHistory array with ${this.chatHistory.length} messages`,
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn("Failed to update Anthropic chat history array:", error);
       this.chatHistory = []; // Reset to empty on error
     }
@@ -57,50 +49,88 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
     try {
       const type = currentChat === "bot" ? "bot-response" : "user-input";
       if (currentChat === "bot") {
-        await this.modelChatHistory(
-          "assistant",
-          response,
-          "anthropic",
-          "agentId",
+        this.chatHistory.push(
+          Message.of({
+            role: "assistant",
+            content: response,
+          }),
         );
       } else {
-        await this.modelChatHistory("user", response, "anthropic", "agentId");
+        this.chatHistory.push(
+          Message.of({
+            role: "user",
+            content: response,
+          }),
+        );
       }
       return await this.currentWebView?.webview.postMessage({
         type,
         message: response,
       });
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      this.logger.error(error);
     }
   }
 
   async generateResponse(
-    message: string,
+    message: LLMMessage,
     metaData?: any,
   ): Promise<string | undefined> {
+    let systemInstruction = "";
+    let userMessage = "";
+
+    if (typeof message === "object") {
+      systemInstruction = message.systemInstruction;
+      userMessage = message.userMessage;
+    }
+
+    this.chatHistory = Memory.has("chatHistory")
+      ? Memory.get("chatHistory")
+      : [];
+
     try {
+      if (this.chatHistory?.length > 0) {
+        this.updateProviderChatHistory(this.chatHistory);
+      }
       let context: string | undefined;
       if (metaData?.context.length > 0) {
         context = await this.getContext(metaData.context);
       }
       const { max_tokens } = GROQ_CONFIG;
-      if (getGenerativeAiModel() === generativeAiModels.GROK) {
-        this.baseUrl = getXGroKBaseURL();
-      }
 
-      let chatHistory = await this.modelChatHistory(
-        "user",
-        `${message} \n context: ${context}`,
-        "anthropic",
-        "agentId",
+      const msg = userMessage?.length ? userMessage : message;
+
+      const messageWithContext = `${msg} \n context: ${context ?? ""}`;
+
+      const currentMessage = Message.of({
+        role: "user",
+        content: messageWithContext,
+      });
+
+      this.chatHistory = [...this.chatHistory, currentMessage];
+
+      Memory.set("chatHistory", this.chatHistory);
+
+      const history = await this.pruneChatHistoryWithSummary(
+        this.chatHistory,
+        6000,
+        systemInstruction,
       );
 
       const chatCompletion = await this.model.messages.create({
-        messages: [...chatHistory],
+        messages: history,
         model: this.generativeAiModel,
         max_tokens,
         stream: false,
+        system: [
+          {
+            text: systemInstruction?.length
+              ? systemInstruction
+              : "You are an helpful assistant",
+
+            type: "text",
+          },
+        ],
       });
       const firstContent = chatCompletion.content[0];
       let response = "";
@@ -113,16 +143,40 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         response = (firstContent as any).content;
       }
       return response;
-    } catch (error) {
-      console.error(error);
-      Memory.set(COMMON.ANTHROPIC_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
-      );
+    } catch (error: any) {
+      if (
+        this.chatHistory?.length &&
+        this.chatHistory[this.chatHistory.length - 1].role === "user"
+      ) {
+        this.chatHistory.pop();
+      }
+
+      Memory.set("chatHistory", this.chatHistory);
+      if (error.status === "401") {
+        vscode.window.showErrorMessage(
+          "Invalid API key. Please update your API key",
+        );
+        this.logger.error("Invalid API key. Please update your API key", error);
+      }
+      if (error.status === "503") {
+        vscode.window.showErrorMessage("Rate limiting error, try again later");
+      }
+      this.logger.error("Error generating anthropic response", error.stack);
+      throw error;
     }
   }
 
   generateContent(userInput: string) {
     return userInput;
+  }
+
+  async getTokenCounts(input: string): Promise<number> {
+    const { model: aiModel } = getAPIKeyAndModel("anthropic");
+    const body = {
+      model: aiModel,
+      messages: [{ role: "user", content: input }],
+    } as any;
+    const geminiResult = await this.model.messages.countTokens(body);
+    return geminiResult.input_tokens;
   }
 }

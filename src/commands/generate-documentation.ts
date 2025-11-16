@@ -1,6 +1,11 @@
 import * as vscode from "vscode";
 import { DocumentationConfig } from "../interfaces/documentation.interface";
 import { DocumentationGeneratorService } from "../services/documentation-generator.service";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
+
+const logger = Logger.initialize("extension-main", {
+  minLevel: LogLevel.DEBUG,
+});
 
 /**
  * Command to generate intelligent documentation for the codebase
@@ -37,14 +42,14 @@ export const generateDocumentationCommand = async () => {
             token,
             progress,
           );
-        } catch (error) {
-          console.error("Documentation generation failed:", error);
+        } catch (error: any) {
+          logger.error("Documentation generation failed:", error);
           throw error;
         }
       },
     );
-  } catch (error) {
-    console.error("Documentation generation command failed:", error);
+  } catch (error: any) {
+    logger.error("Documentation generation command failed:", error);
     vscode.window.showErrorMessage(
       `Failed to generate documentation: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
@@ -248,8 +253,8 @@ export const openDocumentationCommand = async () => {
       const document = await vscode.workspace.openTextDocument(selected.uri);
       await vscode.window.showTextDocument(document);
     }
-  } catch (error) {
-    console.error("Failed to open documentation:", error);
+  } catch (error: any) {
+    logger.error("Failed to open documentation:", error);
     vscode.window.showErrorMessage("Failed to open documentation");
   }
 };

@@ -130,7 +130,7 @@ export class ReadmeDocumentationSection extends DocumentationSectionBase {
             .replace(/[-_]/g, " ")
             .replace(/\b\w/g, (l: string) => l.toUpperCase());
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn("Failed to parse package.json:", error);
       }
     }

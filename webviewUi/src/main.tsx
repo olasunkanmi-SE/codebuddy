@@ -1,15 +1,14 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "./index.css";
 import App from "./App.tsx";
-import { VSCodeProvider } from "./context/vscodeProvider.tsx";
 import { ErrorBoundary } from "./components/errorBoundry.tsx";
-import { ErrorFallBackComponent } from "./components/errorFallBack.tsx";
+import { VSCodeProvider } from "./context/vscodeProvider.tsx";
+import "./index.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <VSCodeProvider>
-      <ErrorBoundary fallBackComponent={ErrorFallBackComponent()}>
+      <ErrorBoundary>
         <App />
       </ErrorBoundary>
     </VSCodeProvider>

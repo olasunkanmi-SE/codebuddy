@@ -27,7 +27,7 @@ export class VSCodeSecretStorage {
   async get(key: string): Promise<string | undefined> {
     try {
       return await this.context.secrets.get(key);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error retrieving secret for key: ${key}`, error);
       return undefined;
     }
@@ -38,7 +38,7 @@ export class VSCodeSecretStorage {
       if (value?.length > 0) {
         await this.context.secrets.store(key, value);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error storing secret for key: ${key}`, error);
       throw error;
     }
@@ -47,7 +47,7 @@ export class VSCodeSecretStorage {
   async delete(key: string): Promise<void> {
     try {
       await this.context.secrets.delete(key);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error deleting secret for key: ${key}`, error);
       throw error;
     }

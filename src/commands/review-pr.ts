@@ -82,8 +82,8 @@ export class ReviewPR extends CodeCommandHandler {
               if (stat.mtime >= oneDayAgo && stat.mtime <= now) {
                 return fileUri;
               }
-            } catch (error) {
-              console.error(
+            } catch (error: any) {
+              this.logger.error(
                 `Error getting file stat for ${fileUri.fsPath}:`,
                 error,
               );
@@ -117,15 +117,15 @@ export class ReviewPR extends CodeCommandHandler {
                 ? fileContent.substring(0, 800) + "... [truncated]"
                 : fileContent;
             content += `\n\n## File: ${relativePath}\n\`\`\`${this.getFileExtension(relativePath)}\n${truncatedContent}\n\`\`\``;
-          } catch (error) {
+          } catch (error: any) {
             content += `\n\n## File: ${relativePath}\n[Error reading file: ${error}]`;
           }
         }
       }
 
       return { files: changedFiles, content };
-    } catch (error) {
-      console.error("Error getting changed files from VS Code:", error);
+    } catch (error: any) {
+      this.logger.error("Error getting changed files from VS Code:", error);
       return { files: [], content: "Error detecting changed files" };
     }
   }
@@ -169,7 +169,7 @@ export class ReviewPR extends CodeCommandHandler {
       const fileUri = vscode.Uri.joinPath(workspaceUri, filePath);
       const document = await vscode.workspace.openTextDocument(fileUri);
       return document.getText();
-    } catch (error) {
+    } catch (error: any) {
       return `Error reading file: ${error}`;
     }
   }
@@ -228,8 +228,8 @@ export class ReviewPR extends CodeCommandHandler {
       });
 
       return selected?.label;
-    } catch (error) {
-      console.error("Error selecting target branch:", error);
+    } catch (error: any) {
+      this.logger.error("Error selecting target branch:", error);
       vscode.window.showErrorMessage(
         `Failed to get available branches: ${error}`,
       );
@@ -267,7 +267,7 @@ export class ReviewPR extends CodeCommandHandler {
         diffContent = prDiff;
         branchInfo = `${currentBranchInfo.current} → ${targetBranch}`;
 
-        console.log(
+        this.logger.info(
           `PR review: comparing ${currentBranchInfo.current} against ${targetBranch}`,
         );
 
@@ -276,7 +276,7 @@ export class ReviewPR extends CodeCommandHandler {
           `🔍 Reviewing PR: ${currentBranchInfo.current} → ${targetBranch} (${modifiedFiles.length} files changed)`,
         );
       } catch (gitError) {
-        console.log(
+        this.logger.info(
           "Git commands failed, falling back to VS Code git integration:",
           gitError,
         );
@@ -313,7 +313,7 @@ export class ReviewPR extends CodeCommandHandler {
             }
           }
         } catch (vscodeError) {
-          console.error(
+          this.logger.error(
             "Both git commands and VS Code git integration failed:",
             vscodeError,
           );
@@ -338,7 +338,7 @@ export class ReviewPR extends CodeCommandHandler {
 
       // If we still have no changes, let's check for any recent modifications in the workspace
       if (changedFiles.length === 0) {
-        console.log("No git changes found, using recent file detection");
+        this.logger.info("No git changes found, using recent file detection");
         const { files, content } = await this.getChangedFilesFromVSCode();
         changedFiles = files;
         if (content) {
@@ -422,8 +422,8 @@ return () => listeners.delete(event); // cleanup
 ${diffContent}
 
 Provide comprehensive review with optimization examples above.`;
-    } catch (error) {
-      console.error("Error generating PR review prompt:", error);
+    } catch (error: any) {
+      this.logger.error("Error generating PR review prompt:", error);
 
       // Return a basic prompt even if everything fails
       return `You are CodeBuddy, a senior software engineer conducting a code review. 

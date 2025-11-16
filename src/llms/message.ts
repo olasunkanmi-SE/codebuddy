@@ -1,7 +1,7 @@
 import { Part } from "@google/generative-ai";
 import * as vscode from "vscode";
 
-type Role = "function" | "user" | "model" | "assistant" | "system";
+export type Role = "function" | "user" | "model" | "assistant" | "system";
 
 export interface IBaseMessage {
   [key: string]: any;
@@ -36,9 +36,9 @@ export class Message {
     const { role, content, parts } = input;
 
     if (content && parts) {
-      vscode.window.showErrorMessage(
-        "Model message must have either content or parts.",
-      );
+      // vscode.window.showErrorMessage(
+      //   "Model message must have either content or parts.",
+      // );
       throw new Error("Model message must have either content or parts.");
     }
 

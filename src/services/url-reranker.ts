@@ -4,8 +4,6 @@ import {
   URL_CATEGORIES,
   URL_RERANKING_CONFIG,
 } from "../application/constant";
-import { GroqLLM } from "../llms/groq/groq";
-import { getAPIKeyAndModel } from "../utils/utils";
 import { IPageMetada } from "./web-search-service";
 
 /**
@@ -29,16 +27,11 @@ export class UrlReranker {
     string,
     { type: string; score: number }
   > = URL_CATEGORIES;
-  private readonly groqLLM: GroqLLM;
   private static instance: UrlReranker;
   query: string;
 
   constructor(_query: string) {
     this.query = _query;
-    this.groqLLM = GroqLLM.getInstance({
-      apiKey: getAPIKeyAndModel("groq").apiKey,
-      model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-    });
   }
 
   static getInstance(query: string) {

@@ -4,19 +4,16 @@
 [![Downloads](https://img.shields.io/visual-studio-marketplace/d/fiatinnovations.ola-code-buddy)](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
 [![Rating](https://img.shields.io/visual-studio-marketplace/r/fiatinnovations.ola-code-buddy)](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
 
-**CodeBuddy** is a revolutionary Visual Studio Code extension that transforms your development workflow with AI-powered assistance. From intelligent code completion to comprehensive documentation generation, CodeBuddy is your complete development companion.
+**CodeBuddy** is a revolutionary Visual Studio Code extension that transforms your development workflow with AI-powered assistance.
 
-## 🏗️ Architecture
+## ✨ What's New in v3.4.8
 
-<img width="1920" height="536" alt="Screenshot 2025-10-26 at 8 48 33 PM" src="https://github.com/user-attachments/assets/33a413fa-8c47-4f1c-84a1-d0f7f0f6b3c1" />
-
-## ✨ What's New in v3.4.3
-
-🚀 **Context-Aware Code Completion** - Get Copilot-style inline suggestions based on your codebase patterns  
-📚 **Intelligent Documentation Generator** - Auto-generate comprehensive project documentation  
-🔍 **Advanced Codebase Understanding** - Deep architectural analysis with RAG capabilities  
-🤖 **AI Agent Orchestration** - Multi-agent system for complex development tasks  
-💡 **Real-time Code Analysis** - Instant feedback and suggestions as you code  
+🚀 **Enhanced Vector Database** - Advanced semantic search with LanceDB integration  
+📚 **Smart Context Extraction** - Intelligent context retrieval for AI responses  
+🔍 **Improved Prompt Engineering** - Sophisticated prompt building for better AI responses  
+🤖 **Production-Ready Performance** - Optimized memory usage and faster response times  
+💡 **Advanced Embedding Service** - Better code understanding with intelligent chunking  
+�️ **Enhanced Error Handling** - Robust fallback mechanisms and better diagnostics
 
 ## 🌟 Support the Project
 
@@ -30,13 +27,16 @@ If CodeBuddy enhances your development workflow:
 ## 🎯 Core Features
 
 ### 🧠 **AI-Powered Code Assistance**
+
 - **Multiple AI Models**: Choose from Gemini, Anthropic Claude, Groq, Deepseek, and XGrok
 - **Intelligent Code Review**: Deep analysis of code quality, security, and best practices
 - **Smart Refactoring**: Context-aware code improvements and restructuring
 - **Performance Optimization**: AI-driven suggestions for better performance
 - **Bug Detection & Fixes**: Automatic error detection with intelligent fix suggestions
+- **Vector Database Integration**: Semantic search across your entire codebase
 
 ### 💫 **Context-Aware Code Completion**
+
 - **Inline Suggestions**: Copilot-style grey text completions as you type
 - **Pattern Learning**: Learns from your codebase to suggest relevant completions
 - **Function Signatures**: Smart parameter suggestions based on your patterns
@@ -44,40 +44,50 @@ If CodeBuddy enhances your development workflow:
 - **Block Completion**: Auto-completes common code structures (if/for/try blocks)
 
 ### 📚 **Intelligent Documentation Generator**
+
 - **Comprehensive README**: Auto-generates professional README.md files
-- **API Documentation**: Extracts and documents REST endpoints automatically  
+- **API Documentation**: Extracts and documents REST endpoints automatically
 - **Architecture Analysis**: Creates Mermaid diagrams and architectural overviews
 - **Component Documentation**: Documents classes, interfaces, and modules
 - **Smart Analysis**: Understands project structure and generates relevant docs
 
 ### 🔍 **Deep Codebase Understanding**
-- **RAG-Powered Analysis**: Retrieval-Augmented Generation for accurate codebase insights
+
+- **Vector-Powered Search**: LanceDB integration for semantic code search and retrieval
+- **Smart Context Extraction**: Intelligent context selection for AI conversations
 - **Architectural Recommendations**: Suggests improvements based on your project structure
 - **Framework Detection**: Identifies and analyzes technologies in use
 - **Pattern Recognition**: Understands your coding patterns and conventions
-- **Context-Aware Q&A**: Answer questions about your specific codebase
+- **Context-Aware Q&A**: Answer questions about your specific codebase with precise context
+- **Fallback Mechanisms**: Robust search with multiple strategies for maximum reliability
 
 ### 💬 **Interactive Chat Interface**
-- **Modern React UI**: Beautiful, responsive chat interface
-- **Code Context**: Automatic code context inclusion in conversations
+
+- **Modern React UI**: Beautiful, responsive chat interface with enhanced UX
+- **Smart Context Integration**: Automatic semantic context inclusion in conversations
 - **File Upload**: Support for various file formats (PDF, DOCX, CSV, JSON, TXT)
-- **Syntax Highlighting**: Code blocks with proper language detection
+- **Advanced Syntax Highlighting**: Code blocks with proper language detection
 - **Customizable Themes**: Multiple chat themes to match your preferences
+- **Enhanced Prompt Engineering**: Sophisticated prompt building for optimal AI responses
+- **Performance Monitoring**: Real-time performance metrics and diagnostics
 
 ## 🚀 Quick Start
 
 ### Installation
+
 1. Open VS Code
 2. Go to Extensions (Ctrl+Shift+X)
 3. Search for "CodeBuddy"
 4. Click Install
 
 ### Setup
+
 1. **Select AI Model**: Choose your preferred AI provider in VS Code settings
 2. **Add API Key**: Configure your API key for the chosen model
 3. **Start Coding**: CodeBuddy is now ready to assist!
 
 ### Getting Your API Keys
+
 - **Gemini**: [Get API Key](https://aistudio.google.com/app/apikey)
 - **Anthropic**: [Get API Key](https://docs.anthropic.com/en/docs/about-claude/models)
 - **Groq**: [Get API Key](https://console.groq.com/keys)
@@ -87,7 +97,9 @@ If CodeBuddy enhances your development workflow:
 ## 📋 How to Use
 
 ### Right-Click Context Menu
+
 Right-click on selected code to access these features:
+
 - 💭 **Add Comments** - Intelligent code documentation
 - 🔍 **Review Code** - Comprehensive code analysis
 - 🔄 **Refactor Code** - Smart code improvements
@@ -100,15 +112,23 @@ Right-click on selected code to access these features:
 - 🏗️ **Analyze Codebase** - Deep architectural analysis
 
 ### Command Palette
+
 Access additional features via Ctrl+Shift+P:
+
 - **CodeBuddy: Generate Documentation** - Create comprehensive docs
-- **CodeBuddy: Toggle Context Completion** - Enable/disable smart completion
-- **CodeBuddy: Test Completion** - Verify completion provider status
-- **CodeBuddy: Configure Context Completion** - Adjust completion settings
-- **CodeBuddy: Analyze Codebase Patterns** - View pattern analysis
+- **CodeBuddy: Show Vector Database Statistics** - View indexing and search stats
+- **CodeBuddy: Force Full Reindex** - Rebuild vector database index
+- **CodeBuddy: Show Indexing Status** - Check current indexing progress
+- **CodeBuddy: Vector Database Diagnostic** - Run comprehensive diagnostics
+- **CodeBuddy: Show Performance Report** - View performance metrics
+- **CodeBuddy: Clear Vector Cache** - Reset vector database cache
+- **CodeBuddy: Emergency Stop** - Stop all background operations
+- **CodeBuddy: Optimize Performance** - Run performance optimizations
 
 ### Chat Interface
+
 Click the CodeBuddy icon in the Activity Bar to open the interactive chat:
+
 - Ask questions about your code
 - Upload files for analysis
 - Get architectural recommendations
@@ -119,13 +139,15 @@ Click the CodeBuddy icon in the Activity Bar to open the interactive chat:
 Access CodeBuddy settings in VS Code preferences:
 
 ### AI Model Selection
+
 ```json
 {
-  "generativeAi.option": "Gemini", // or "Groq", "Anthropic", "XGrok", "Deepseek"
+  "generativeAi.option": "Gemini" // or "Groq", "Anthropic", "XGrok", "Deepseek"
 }
 ```
 
 ### Model-Specific Settings
+
 ```json
 {
   "google.gemini.apiKeys": "your-gemini-api-key",
@@ -137,6 +159,7 @@ Access CodeBuddy settings in VS Code preferences:
 ```
 
 ### UI Customization
+
 ```json
 {
   "font.family": "JetBrains Mono",
@@ -145,27 +168,76 @@ Access CodeBuddy settings in VS Code preferences:
 }
 ```
 
+## 🏗️ Architecture
+
+CodeBuddy follows a layered architecture pattern designed for scalability and maintainability:
+
+### Frontend Layer
+
+- **VS Code Integration**: Native VS Code commands and context menus
+- **React WebView**: Modern chat interface with responsive design
+- **Command Palette**: Rich set of developer commands
+
+### Core Application Layer
+
+- **AI Agent Orchestration**: Multi-agent system for complex tasks
+- **Memory System**: Persistent context and conversation management
+- **Business Logic**: Core application services and workflows
+- **Application Interfaces**: Clean contracts between layers
+
+### Service Layer
+
+- **Vector Database Service**: LanceDB integration for semantic search
+- **Smart Context Extraction**: Intelligent context retrieval
+- **Enhanced Prompt Building**: Sophisticated AI prompt engineering
+- **Embedding Service**: Code analysis and intelligent chunking
+- **Documentation Generator**: Automated documentation creation
+
+### Infrastructure Layer
+
+- **HTTP Services**: External API integrations
+- **Logging System**: Comprehensive logging and monitoring
+- **Repository Layer**: Data access and persistence
+- **Local Storage**: SQLite database and file system management
+
+### AI Provider Integration
+
+- **Multiple LLM Support**: Gemini, Anthropic, Groq, Deepseek, XGrok
+- **Fallback Mechanisms**: Robust error handling and service switching
+- **Performance Optimization**: Smart caching and request batching
+
+### Storage Layer
+
+- **SQLite Database**: Metadata and conversation storage
+- **LanceDB Vector Database**: High-performance semantic search
+- **File System**: Local file management and caching
+- **Apache Arrow**: Efficient data serialization and storage
 
 ## 🚀 Roadmap
 
 ### ✅ Completed Features
-- [x] **Codebase Understanding** - Comprehensive RAG-powered analysis
-- [x] **Code Search** - Semantic search across entire codebase  
+
+- [x] **Vector Database Integration** - LanceDB-powered semantic search
+- [x] **Smart Context Extraction** - Intelligent context retrieval system
+- [x] **Enhanced Prompt Engineering** - Sophisticated prompt building service
+- [x] **Production Safeguards** - Memory management and performance monitoring
+- [x] **Advanced Embedding Service** - Intelligent code chunking and embedding
 - [x] **React Webview UI** - Modern, responsive interface
 - [x] **AI Agent Orchestration** - Multi-agent workflow coordination
-- [x] **Context Pinning** - Persistent context for AI models
 - [x] **Documentation Generation** - Automated comprehensive docs
-- [x] **Real-time Data Access** - External API integration
 - [x] **Multiple AI Models** - Support for 5 different providers
-- [x] **Context-Aware Completion** - Copilot-style inline suggestions
+- [x] **Robust Error Handling** - Fallback mechanisms and diagnostics
 
 ### 🔜 Coming Soon
+
+- [ ] **MCP Integration** - Model Context Protocol support for enhanced tool usage
+- [ ] **Agent-to-Agent Communication** - Advanced multi-agent coordination
 - [ ] **Local LLM Support** - Ollama integration for offline usage
-- [ ] **Multi-language Support** - Python, Java, Go, and more
-- [ ] **Advanced Caching** - Redis support for better performance
-- [ ] **Team Collaboration** - Share contexts and documentation
-- [ ] **Custom Templates** - Personalized documentation templates
-- [ ] **Integration Testing** - Validate docs against actual code
+- [ ] **Multi-language Support** - Python, Java, Go, and more language support
+- [ ] **Advanced Caching** - Redis support for distributed caching
+- [ ] **Team Collaboration** - Share contexts and documentation across teams
+- [ ] **Custom Templates** - Personalized documentation and code templates
+- [ ] **Real-time Collaboration** - Live coding assistance and pair programming
 
 ## 📁 Repository Structure
 
@@ -173,14 +245,16 @@ Access CodeBuddy settings in VS Code preferences:
 codebuddy/
 ├── src/                          # Source code
 │   ├── agents/                   # AI agent orchestration
-│   ├── commands/                 # VS Code command implementations  
+│   ├── commands/                 # VS Code command implementations
 │   ├── llms/                     # AI provider integrations
 │   ├── services/                 # Core business logic
-│   │   ├── documentation-generator.service.ts
-│   │   ├── inline-completion.service.ts
-│   │   ├── context-aware-completion.service.ts
-│   │   └── codebase-understanding.service.ts
-│   ├── webview/                  # VS Code webview components
+│   │   ├── vector-database.service.ts         # Vector database integration
+│   │   ├── smart-context-extractor.ts         # Context extraction service
+│   │   ├── enhanced-prompt-builder.service.ts # Prompt engineering
+│   │   ├── embedding-service.ts               # Code embedding service
+│   │   ├── documentation-generator.service.ts # Documentation generation
+│   │   └── codebase-understanding.service.ts  # Codebase analysis
+│   ├── webview-providers/        # VS Code webview providers
 │   ├── infrastructure/           # Infrastructure layer
 │   └── extension.ts              # Main extension entry point
 ├── webviewUi/                    # React-based chat interface
@@ -201,8 +275,9 @@ We welcome contributions! Here's how to get started:
 7. **Submit a pull request**
 
 ### Development Setup
+
 - Main entry point: `src/extension.ts`
-- React UI entry: `webviewUi/src/App.tsx`  
+- React UI entry: `webviewUi/src/App.tsx`
 - Testing: New VS Code instance opens automatically
 - Build: `npm run compile` and `npm run build:webview`
 
@@ -212,27 +287,33 @@ For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### Common Issues
 
-**❓ Completion not working**
-- Ensure you're in a TypeScript/JavaScript file
-- Check if the completion provider is active in Command Palette
-- Try the "CodeBuddy: Test Completion" command
+**❓ Vector database not working**
+
+- Check if API key is properly configured for embeddings
+- Use "CodeBuddy: Vector Database Diagnostic" command
+- Try "CodeBuddy: Force Full Reindex" to rebuild the database
+- Check the output panel for detailed error messages
 
 **❓ API Key Issues**
+
 - Verify your API key is correctly entered in VS Code settings
 - Check that you've selected the matching AI model
 - Ensure your API key has sufficient credits/quota
 
 **❓ Documentation generation fails**
+
 - Make sure you have proper file permissions in the workspace
 - Check that your project structure is supported
 - Review the output panel for detailed error messages
 
 **❓ Performance Issues**
+
 - Try switching to a faster AI model (Groq is typically fastest)
 - Clear the extension cache: Use "CodeBuddy: Restart" command
 - Check your internet connection stability
 
 ### Getting Help
+
 - 📖 Check our [documentation](docs/)
 - 🐛 Report issues on [GitHub](https://github.com/olasunkanmi-SE/codebuddy/issues)
 - 💬 Join our community discussions
@@ -240,20 +321,32 @@ For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## 📊 Analytics & Performance
 
-- **Bundle Size**: ~8.7MB (Extension) + ~398KB (UI)
-- **Supported Languages**: TypeScript, JavaScript, React, Vue
+- **Bundle Size**: ~8.99MB (Extension) + ~397KB (UI)
+- **Supported Languages**: TypeScript, JavaScript, React, Vue, Python, Java, C++, and more
 - **VS Code Version**: 1.78.0+
-- **AI Models**: 5 providers supported
-- **Database**: SQLite for local storage, Vector embeddings for search
+- **AI Models**: 5 providers supported (Gemini, Anthropic, Groq, Deepseek, XGrok)
+- **Database**: SQLite for metadata, LanceDB for vector embeddings
+- **Vector Database**: Apache Arrow format with high-performance search
+- **Memory Management**: Intelligent caching and cleanup mechanisms
 
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+## 🌟 Support the Project
+
+If CodeBuddy enhances your development workflow:
+
+- ⭐ Star the repository
+- 📝 Leave a review on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
+- 🐛 Report bugs or suggest features
+- 🤝 Contribute to the codebase
+- 💬 Share with fellow developers
+
 ---
 
 **Made with ❤️ by [Olasunkanmi Raymond](https://olasunkanmi.app)**
 
-*Transform your coding experience with AI-powered assistance. Install CodeBuddy today and code smarter, not harder!*
+_Transform your coding experience with AI-powered assistance. Install CodeBuddy today and code smarter, not harder!_
 
 [![Install Now](https://img.shields.io/badge/Install%20Now-VS%20Code%20Marketplace-blue?style=for-the-badge&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)

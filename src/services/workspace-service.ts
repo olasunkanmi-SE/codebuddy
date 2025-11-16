@@ -28,7 +28,6 @@ export class WorkspaceService implements IWorkspaceService {
       minLevel: LogLevel.DEBUG,
     });
     this.orchestrator = Orchestrator.getInstance();
-    this.setUpWorkspaceListeners();
   }
 
   public static getInstance(): WorkspaceService {
@@ -38,23 +37,23 @@ export class WorkspaceService implements IWorkspaceService {
     return WorkspaceService.instance;
   }
 
-  public getActiveFile(): string | undefined {
-    const activeEditor = vscode.window.activeTextEditor;
-    const fileNameWithPath = activeEditor?.document?.fileName;
-    if (fileNameWithPath) {
-      this.setUpWorkspaceListeners();
-      return path.basename(fileNameWithPath);
-    }
-  }
+  // public getActiveFile(): string | undefined {
+  //   const activeEditor = vscode.window.activeTextEditor;
+  //   const fileNameWithPath = activeEditor?.document?.fileName;
+  //   if (fileNameWithPath) {
+  //     this.setUpWorkspaceListeners();
+  //     return path.basename(fileNameWithPath);
+  //   }
+  // }
 
-  private setUpWorkspaceListeners() {
-    vscode.window.onDidChangeActiveTextEditor((editor) =>
-      this.orchestrator.publish(
-        "onActiveworkspaceUpdate",
-        this.getActiveFile(),
-      ),
-    );
-  }
+  // private setUpWorkspaceListeners() {
+  //   vscode.window.onDidChangeActiveTextEditor((editor) =>
+  //     this.orchestrator.publish(
+  //       "onActiveworkspaceUpdate",
+  //       this.getActiveFile(),
+  //     ),
+  //   );
+  // }
 
   public async getWorkspaceFiles(
     rootPath: string,
@@ -113,7 +112,6 @@ export class WorkspaceService implements IWorkspaceService {
   public async getContextInfo(
     useWorkspaceContext: boolean,
   ): Promise<IContextInfo> {
-    const activeFileContent = this.getActiveFile();
     const openFiles = this.getOpenFiles();
     let workspaceFiles: FolderEntry | undefined;
 
@@ -129,7 +127,6 @@ export class WorkspaceService implements IWorkspaceService {
     }
 
     return {
-      activeFileContent,
       workspaceFiles: workspaceFiles
         ? new Map([["root", [workspaceFiles]]])
         : undefined,
@@ -190,7 +187,7 @@ export class WorkspaceService implements IWorkspaceService {
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      console.log("Entry Name:", entry.name);
+      this.logger.info("Entry Name:", entry.name);
       if (
         entry.isDirectory() &&
         this.excludedDirectories.some((dir) => entry.name.includes(dir))

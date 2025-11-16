@@ -42,7 +42,7 @@ export class CodeStructureMapper {
           dependencies: value.dependencies,
         };
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error mapping code structure:", error);
       throw error;
     }
@@ -65,7 +65,7 @@ export class CodeStructureMapper {
         return [];
       }
       return this.mapFunctions(sourceFunctions, codeEntry);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error getting mapped functions:", error);
       throw error;
     }
@@ -85,7 +85,7 @@ export class CodeStructureMapper {
       return (codeEntry.functions?.length ?? 0) > 0
         ? codeEntry.functions
         : (primaryClass?.functions ?? []);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error getting source functions:", error);
       throw error;
     }
@@ -116,7 +116,7 @@ export class CodeStructureMapper {
             : undefined,
         ),
       }));
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error("Error mapping functions:", error);
       throw error;
     }
