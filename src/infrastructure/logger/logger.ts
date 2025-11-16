@@ -79,13 +79,15 @@ export class Logger {
         ? path.join(workspaceFolder.uri.fsPath, ".codebuddy", "logs")
         : path.join(os.homedir(), ".codebuddy", "logs");
 
-      if (!fs.existsSync(baseDir)) {
-        fs.mkdirSync(baseDir, { recursive: true });
-      }
-
       const date = new Date().toISOString();
-      const safeDate = date.replace(/[:.]/g, "_");
+      const safeDate = date.replace(/[:.]/g, "-");
       Logger.config.filePath = path.join(baseDir, `codebuddy-${safeDate}.log`);
+    }
+    if (Logger.config.enableFile && Logger.config.filePath) {
+      const logDir = path.dirname(Logger.config.filePath);
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
       console.log(Logger.config.filePath);
     }
     Logger.telemetry = telemetry;
