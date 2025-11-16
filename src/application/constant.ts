@@ -460,7 +460,7 @@ export const QUESTION_TYPE_INSTRUCTIONS = new Map<
       "Identify key functions, classes, modules.",
       "Explain relevant frameworks/libraries.",
       "Highlight key design decisions and rationale.",
-      "If complex, include a Mermaid sequence diagram.", // We removed the giant example.
+      "A Mermaid sequence diagram.", // We removed the giant example.
     ],
   ],
   [
@@ -472,6 +472,7 @@ export const QUESTION_TYPE_INSTRUCTIONS = new Map<
       "Discuss scalability and maintainability.",
       "Reference config files and setup procedures.",
       "Detail inter-system communication methods.",
+      "A Mermaid sequence diagram.",
     ],
   ],
   [

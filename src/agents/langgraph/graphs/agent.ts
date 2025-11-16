@@ -32,14 +32,14 @@ export class langGraphAgent {
     private readonly graphBuilder: IGraphBuilder = new GraphBuilder(),
     private readonly logger: Logger = Logger.initialize("langGraphAgent", {
       minLevel: LogLevel.DEBUG,
-    })
+    }),
   ) {
     this.llmCall = this.llmCall.bind(this);
     this.shouldContinue = this.shouldContinue.bind(this);
     this.compiledGraph = this.graphBuilder.build(
       this.llmCall,
       this.shouldContinue,
-      this.toolNode
+      this.toolNode,
     );
 
     this.orchestrator = Orchestrator.getInstance();
@@ -62,7 +62,7 @@ export class langGraphAgent {
     if (this.conversationHistory.length > this.maxHistoryLength) {
       const systemMessage = this.conversationHistory[0];
       const recentMessages = this.conversationHistory.slice(
-        -this.maxHistoryLength
+        -this.maxHistoryLength,
       );
       this.conversationHistory = [systemMessage, ...recentMessages];
       Memory.set(`agent-state-${this.threadId}`, this.conversationHistory);
@@ -125,11 +125,11 @@ export class langGraphAgent {
       const stream: IterableReadableStream<any> =
         await this.compiledGraph.stream(
           { messages: this.conversationHistory },
-          config
+          config,
         );
       for await (const event of stream) {
         for (const [nodeName, update] of Object.entries(
-          event as Record<string, any>
+          event as Record<string, any>,
         )) {
           if (update?.messages) {
             this.conversationHistory.push(...update.messages);
