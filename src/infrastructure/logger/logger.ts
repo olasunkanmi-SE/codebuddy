@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { OutputManager } from "../../services/output-manager";
+import * as os from "os";
 
 // TODO Log data in MongoDB Atlas, take advantage of telemetery
 
@@ -74,18 +75,18 @@ export class Logger {
     Logger.config = { ...Logger.config, ...config };
     if (Logger.config.enableFile && !Logger.config.filePath) {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-      if (workspaceFolder) {
-        const logDir = path.join(
-          workspaceFolder.uri.fsPath,
-          ".codebuddy",
-          "logs",
-        );
-        if (!fs.existsSync(logDir)) {
-          fs.mkdirSync(logDir, { recursive: true });
-        }
-        const date = new Date().toISOString();
-        Logger.config.filePath = path.join(logDir, `codebuddy-${date}.log`);
+      const baseDir = workspaceFolder
+        ? path.join(workspaceFolder.uri.fsPath, ".codebuddy", "logs")
+        : path.join(os.homedir(), ".codebuddy", "logs");
+
+      if (!fs.existsSync(baseDir)) {
+        fs.mkdirSync(baseDir, { recursive: true });
       }
+
+      const date = new Date().toISOString();
+      const safeDate = date.replace(/[:.]/g, "_");
+      Logger.config.filePath = path.join(baseDir, `codebuddy-${safeDate}.log`);
+      console.log(Logger.config.filePath);
     }
     Logger.telemetry = telemetry;
     Logger.setTraceId(Logger.generateId());
@@ -140,6 +141,7 @@ export class Logger {
       fs.appendFileSync(Logger.config.filePath, logEntry);
     } catch (error: any) {
       console.error("Failed to write to log file:", error);
+      this.error("Log file write failed", { error: error.message });
     }
   }
 

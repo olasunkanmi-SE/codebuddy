@@ -50,7 +50,7 @@ export class Message {
       return { role, parts };
     }
     vscode.window.showErrorMessage(
-      "Model message must have either content or parts."
+      "Model message must have either content or parts.",
     );
     throw new Error("Model message must have either content or parts.");
   }
