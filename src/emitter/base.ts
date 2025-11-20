@@ -6,6 +6,9 @@ export class BaseEmitter<EventMap extends Record<string, IEventPayload>> {
   constructor() {
     this.logger = Logger.initialize("CodeCommandHandler", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
   private readonly emitters: Map<keyof EventMap, vscode.EventEmitter<any>> =

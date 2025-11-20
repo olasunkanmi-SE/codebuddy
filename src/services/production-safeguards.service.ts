@@ -91,7 +91,10 @@ export class ProductionSafeguards implements vscode.Disposable {
     serviceStatusChecker?: ServiceStatusChecker,
   ) {
     this.logger = Logger.initialize("ProductionSafeguards", {
-      minLevel: LogLevel.INFO,
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
 
     this.serviceStatusChecker = serviceStatusChecker;

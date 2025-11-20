@@ -30,6 +30,9 @@ export class GitActions {
     this.git = simpleGit(options);
     this.logger = Logger.initialize(GitActions.name, {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

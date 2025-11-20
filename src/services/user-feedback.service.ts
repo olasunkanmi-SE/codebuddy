@@ -36,7 +36,10 @@ export class UserFeedbackService implements vscode.Disposable {
 
   constructor(options: UserFeedbackOptions = {}) {
     this.logger = Logger.initialize("UserFeedbackService", {
-      minLevel: LogLevel.INFO,
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
 
     this.options = {

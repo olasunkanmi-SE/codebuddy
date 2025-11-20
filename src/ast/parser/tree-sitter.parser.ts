@@ -18,6 +18,9 @@ export class TreeSitterParser {
   ) {
     this.logger = Logger.initialize("TreeSitterParser", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.grammarLoader = GrammarLoader.getInstance(
       this.extensionPath,

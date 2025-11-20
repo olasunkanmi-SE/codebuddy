@@ -27,6 +27,9 @@ export class ContextRetriever {
     this.embeddingService = new EmbeddingService(embeddingApiKey);
     this.logger = Logger.initialize("ContextRetriever", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.webSearchService = WebSearchService.getInstance();
     this.orchestrator = Orchestrator.getInstance();

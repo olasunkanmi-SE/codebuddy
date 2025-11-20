@@ -16,6 +16,9 @@ export class FileManager implements IFileUploader {
     this.orchestrator = Orchestrator.getInstance();
     this.logger = Logger.initialize("FileManager", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.fileDir = path.join(this.context.extensionPath, this.fileDir);
     if (!fs.existsSync(this.fileDir)) {

@@ -91,6 +91,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.orchestrator = Orchestrator.getInstance();
     this.logger = Logger.initialize("BaseWebViewProvider", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.workspaceService = WorkspaceService.getInstance();
     this.agentService = AgentService.getInstance();

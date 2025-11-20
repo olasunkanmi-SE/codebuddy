@@ -43,6 +43,9 @@ export class DeepseekLLM
     this.orchestrator = Orchestrator.getInstance();
     this.logger = Logger.initialize("DeepseekLLM", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     CodeBuddyToolProvider.initialize();
     this.initializeDisposable();

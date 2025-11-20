@@ -16,6 +16,9 @@ export class WebViewEventsProvider {
     // Note: Use factory method for the logger
     this.logger = Logger.initialize("WebViewEventsProvider", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

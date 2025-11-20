@@ -24,6 +24,9 @@ export class InputValidator {
   private constructor() {
     this.logger = Logger.initialize("InputValidator", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

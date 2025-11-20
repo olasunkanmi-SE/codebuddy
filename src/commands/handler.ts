@@ -72,6 +72,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     this.xGrokModel = getConfigValue(grokModel);
     this.logger = Logger.initialize("CodeCommandHandler", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.orchestrator = Orchestrator.getInstance();
   }

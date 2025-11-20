@@ -13,6 +13,9 @@ export class VSCodeSecretStorage {
     this.context = context;
     this.logger = Logger.initialize("VSCodeSecretStorage", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.orchestrator = Orchestrator.getInstance();
   }

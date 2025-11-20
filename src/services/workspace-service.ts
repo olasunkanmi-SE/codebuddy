@@ -26,6 +26,9 @@ export class WorkspaceService implements IWorkspaceService {
   private constructor() {
     this.logger = Logger.initialize("WorkspaceService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.orchestrator = Orchestrator.getInstance();
   }

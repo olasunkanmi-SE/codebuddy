@@ -38,6 +38,9 @@ export class SqliteDatabaseService {
   private constructor() {
     this.logger = Logger.initialize("SqliteDatabaseService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

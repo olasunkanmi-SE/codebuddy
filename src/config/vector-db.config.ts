@@ -89,7 +89,10 @@ export class VectorDbConfigurationManager implements vscode.Disposable {
 
   constructor() {
     this.logger = Logger.initialize("VectorDbConfigurationManager", {
-      minLevel: LogLevel.INFO,
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
 
     this.setupConfigurationWatcher();

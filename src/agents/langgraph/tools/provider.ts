@@ -6,7 +6,12 @@ import { LangChainFileTool } from "./file";
 import { LangChainThinkTool } from "./think";
 import { LangChainWebTool } from "./web";
 
-const logger = Logger.initialize("ToolProvider", { minLevel: LogLevel.INFO });
+const logger = Logger.initialize("ToolProvider", {
+  minLevel: LogLevel.DEBUG,
+  enableConsole: true,
+  enableFile: true,
+  enableTelemetry: true,
+});
 
 interface IToolFactory {
   createTool(): StructuredTool<any>;

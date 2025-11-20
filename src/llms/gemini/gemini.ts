@@ -45,7 +45,12 @@ export class GeminiLLM
     this.orchestrator = Orchestrator.getInstance();
     CodeBuddyToolProvider.initialize();
     this.intializeDisposable();
-    this.logger = Logger.initialize("GeminiLLM", { minLevel: LogLevel.DEBUG });
+    this.logger = Logger.initialize("GeminiLLM", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
     this.groqLLM = GroqLLM.getInstance({
       apiKey: getAPIKeyAndModel("groq").apiKey,
       model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",

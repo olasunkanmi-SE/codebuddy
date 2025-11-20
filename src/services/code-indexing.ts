@@ -19,6 +19,9 @@ export class CodeIndexingService {
   constructor() {
     this.logger = Logger.initialize("CodeIndexingService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     const { apiKey, model } = getAPIKeyAndModel("gemini");
     this.embeddingService = new EmbeddingService(apiKey);

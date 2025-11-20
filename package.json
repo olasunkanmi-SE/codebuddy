@@ -342,6 +342,9 @@
     "@chroma-core/default-embed": "^0.1.8",
     "@google/genai": "^0.7.0",
     "@google/generative-ai": "^0.21.0",
+    "@langchain/core": "^0.3.79",
+    "@langchain/google-genai": "^0.2.18",
+    "@langchain/langgraph": "^0.4.9",
     "@mozilla/readability": "^0.4.1",
     "@types/fast-levenshtein": "^0.0.4",
     "@types/node-fetch": "^2.6.11",
@@ -349,6 +352,7 @@
     "@vscode/ripgrep": "^1.17.0",
     "apache-arrow": "18.1.0",
     "axios": "^1.7.9",
+    "deepagents": "^1.1.1",
     "dompurify": "^3.2.6",
     "dotenv": "^16.1.4",
     "fast-levenshtein": "^3.0.0",
@@ -365,10 +369,7 @@
     "simple-git": "^3.25.0",
     "sinon": "^17.0.1",
     "sql.js": "^1.13.0",
-    "web-tree-sitter": "^0.25.10",
-    "@langchain/core": "^0.3.79",
-    "@langchain/google-genai": "^0.2.18",
-    "@langchain/langgraph": "^0.4.9"
+    "web-tree-sitter": "^0.25.10"
   },
   "license": "MIT"
 }

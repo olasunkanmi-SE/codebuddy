@@ -28,6 +28,9 @@ export class FileUploadService implements vscode.Disposable {
     );
     this.logger = Logger.initialize("FileUploadService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

@@ -32,6 +32,9 @@ export class langGraphAgent {
     private readonly graphBuilder: IGraphBuilder = new GraphBuilder(),
     private readonly logger: Logger = Logger.initialize("langGraphAgent", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     }),
   ) {
     this.llmCall = this.llmCall.bind(this);

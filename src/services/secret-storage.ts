@@ -14,6 +14,9 @@ export class SecretStorageService implements vscode.Disposable {
     this.localStorage = context.secrets;
     this.logger = Logger.initialize("LocalStorageManager", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.orchestrator = Orchestrator.getInstance();
     this.registerDisposables();

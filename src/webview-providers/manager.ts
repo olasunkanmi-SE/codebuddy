@@ -42,6 +42,9 @@ export class WebViewProviderManager implements vscode.Disposable {
     // Don't register event listeners immediately - do it lazily
     this.logger = Logger.initialize("WebViewProviderManager", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

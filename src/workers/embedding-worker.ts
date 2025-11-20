@@ -28,6 +28,9 @@ export interface EmbeddingWorkerOptions {
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
+  enableConsole: true,
+  enableFile: true,
+  enableTelemetry: true,
 });
 
 // Worker thread code (runs when this file is executed as a worker)

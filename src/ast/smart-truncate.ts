@@ -37,6 +37,9 @@ export class LLMOutputTruncator {
   constructor() {
     this.logger = Logger.initialize("EnhancedPromptBuilderService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

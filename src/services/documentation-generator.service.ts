@@ -80,6 +80,9 @@ export class DocumentationGeneratorService {
   constructor() {
     this.logger = Logger.initialize("DocumentationGeneratorService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.codebaseService = CodebaseUnderstandingService.getInstance();
     this.workspaceService = WorkspaceService.getInstance();

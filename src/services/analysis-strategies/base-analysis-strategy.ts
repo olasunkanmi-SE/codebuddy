@@ -13,6 +13,9 @@ export abstract class BaseAnalysisStrategy implements IAnalysisStrategy {
   constructor(protected readonly strategyName: string) {
     this.logger = Logger.initialize(`${strategyName}Strategy`, {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

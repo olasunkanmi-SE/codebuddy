@@ -54,6 +54,9 @@ export class CodebaseUnderstandingService {
   private constructor() {
     this.logger = Logger.initialize("CodebaseUnderstandingService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.workspaceService = WorkspaceService.getInstance();
     this.cache = CodebaseAnalysisCache.getInstance();

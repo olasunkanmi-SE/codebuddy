@@ -48,6 +48,9 @@ export class EmbeddingService {
     this.genAI = new GoogleGenerativeAI(this.apiKey);
     this.logger = Logger.initialize("EmbeddingService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     // Always use Gemini models for consistent embedding space
     const embeddingModel = this.getEmbeddingModelFromConfig();

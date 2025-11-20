@@ -40,6 +40,9 @@ import { WebViewProviderManager } from "./webview-providers/manager";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
+  enableConsole: true,
+  enableFile: true,
+  enableTelemetry: true,
 });
 
 const {
