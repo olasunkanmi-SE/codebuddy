@@ -28,6 +28,7 @@
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
+import * as readline from "readline"; // Optimization: Import readline for efficient stream processing.
 import { spawnSync } from "child_process";
 
 import type {
@@ -35,7 +36,6 @@ import type {
     BackendFactory,
     FileInfo,
     GrepMatch,
-    FileData,
     WriteResult,
     EditResult,
 } from "deepagents";
@@ -67,31 +67,9 @@ class SimpleMutex {
     private _p: Promise<void> = Promise.resolve();
     async lock<T>(fn: () => Promise<T>): Promise<T> {
         const next = this._p.then(() => fn(), () => fn());
-        // ensure the queue continues regardless of fn outcome
         this._p = next.then(() => undefined, () => undefined);
         return next;
     }
-}
-
-/** Helper utilities */
-function isoNow(): string {
-    return new Date().toISOString();
-}
-function toLines(content: string): string[] {
-    return content.length === 0 ? [] : content.split(/\r?\n/);
-}
-function formatReadResponse(fileData: FileData, offset = 0, limit = 2000): string {
-    const lines = fileData.content;
-    if (offset >= lines.length) {
-        return `Error: Line offset ${offset} exceeds file length (${lines.length} lines)`;
-    }
-    const endIdx = Math.min(offset + limit, lines.length);
-    const out: string[] = [];
-    for (let i = offset; i < endIdx; i++) {
-        const line = (lines[i] ?? "").slice(0, 2000);
-        out.push(`${String(i + 1).padStart(6, " ")}\t${line}`);
-    }
-    return out.join("\n");
 }
 
 /** Convert basic glob pattern to RegExp (supports *, **, ?). */
@@ -106,7 +84,6 @@ function globToRegExp(pattern: string): RegExp {
 
 /**
  * Implementation of BackendProtocol that uses the host filesystem.
- * It intentionally treats the backend as "external" persistence (filesUpdate = null).
  */
 class VscodeFsBackend implements BackendProtocol {
     readonly rootDir: string;
@@ -138,20 +115,17 @@ class VscodeFsBackend implements BackendProtocol {
         this.maxGrepBuffer = params.maxGrepBuffer ?? 10 * 1024 * 1024;
         this.assistantId = params.assistantId;
 
-        // ensure base directory exists
         fs.mkdirSync(this.rootDir, { recursive: true });
         if (this.assistantId) {
             fs.mkdirSync(path.join(this.rootDir, String(this.assistantId)), { recursive: true });
         }
     }
 
-    /** Per-assistant base directory on disk. */
     private assistantBase(): string {
         if (!this.assistantId) return this.rootDir;
         return path.join(this.rootDir, String(this.assistantId));
     }
 
-    /** Map agent-visible path ("/a/b") to absolute disk path under assistantBase. */
     private resolveAgentPath(agentPath: string): string {
         let normalized = agentPath;
         if (!normalized.startsWith("/")) normalized = `/${normalized}`;
@@ -166,34 +140,35 @@ class VscodeFsBackend implements BackendProtocol {
         return abs;
     }
 
-    private async fileDataFromDisk(abs: string): Promise<FileData> {
-        const content = await fsp.readFile(abs, { encoding: "utf-8" });
-        const st = await fsp.stat(abs);
-        return {
-            content: toLines(content),
-            created_at: st.birthtime.toISOString(),
-            modified_at: st.mtime.toISOString(),
-        };
-    }
-
     async lsInfo(dir: string): Promise<FileInfo[]> {
         const absDir = this.resolveAgentPath(dir);
         try {
             const entries = await fsp.readdir(absDir, { withFileTypes: true });
-            const infos: FileInfo[] = [];
-            for (const e of entries) {
+
+            // Optimization: Use Promise.all to execute 'stat' calls concurrently.
+            // This significantly speeds up directory listing for directories with many files
+            // by parallelizing the I/O operations.
+            const infoPromises = entries.map(async (e): Promise<FileInfo | null> => {
                 const child = path.join(absDir, e.name);
-                const st = await fsp.stat(child);
-                const rel = `/${path.relative(this.rootDir, child).replace(/\\/g, "/")}`;
-                infos.push({
-                    path: e.isDirectory() ? `${rel.replace(/\/+$/, "")}/` : rel,
-                    is_dir: e.isDirectory(),
-                    size: e.isDirectory() ? undefined : st.size,
-                    modified_at: st.mtime.toISOString(),
-                });
-            }
-            infos.sort((a, b) => a.path.localeCompare(b.path));
-            return infos;
+                try {
+                    const st = await fsp.stat(child);
+                    const rel = `/${path.relative(this.rootDir, child).replace(/\\/g, "/")}`;
+                    return {
+                        path: e.isDirectory() ? `${rel.replace(/\/+$/, "")}/` : rel,
+                        is_dir: e.isDirectory(),
+                        size: e.isDirectory() ? undefined : st.size,
+                        modified_at: st.mtime.toISOString(),
+                    };
+                } catch (err) {
+                    console.warn(`[VscodeFsBackend] Could not stat ${child}: ${err}`);
+                    return null; // Handle cases where file is deleted during operation
+                }
+            });
+
+            const infos = await Promise.all(infoPromises);
+            // Filter out any null results from failed stats and sort
+            return infos.filter((info): info is FileInfo => info !== null)
+                .sort((a, b) => a.path.localeCompare(b.path));
         } catch (e: any) {
             if (e.code === "ENOENT") return [];
             throw e;
@@ -203,11 +178,36 @@ class VscodeFsBackend implements BackendProtocol {
     async read(filePath: string, offset = 0, limit = 2000): Promise<string> {
         try {
             const abs = this.resolveAgentPath(filePath);
-            const fd = await this.fileDataFromDisk(abs);
-            if (!fd.content || fd.content.length === 0) {
-                return "System reminder: File exists but has empty contents";
+
+            // Optimization: Use streams to read the file line-by-line. This avoids loading
+            // the entire file into memory, providing O(1) memory usage regardless of file size.
+            const fileStream = fs.createReadStream(abs, { encoding: "utf-8" });
+            const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+
+            const out: string[] = [];
+            let currentLine = 0;
+            let fileIsEmpty = true;
+
+            for await (const line of rl) {
+                fileIsEmpty = false;
+                if (currentLine >= offset) {
+                    if (out.length < limit) {
+                        const truncatedLine = line.slice(0, 2000);
+                        out.push(`${String(currentLine + 1).padStart(6, " ")}\t${truncatedLine}`);
+                    }
+                }
+                currentLine++;
+                if (out.length >= limit) {
+                    rl.close(); // Stop reading once the limit is reached
+                    fileStream.destroy();
+                    break;
+                }
             }
-            return formatReadResponse(fd, offset, limit);
+
+            if (fileIsEmpty) return "System reminder: File exists but has empty contents";
+            if (offset > 0 && out.length === 0) return `Error: Line offset ${offset} exceeds file length (${currentLine} lines)`;
+
+            return out.join("\n");
         } catch (e: any) {
             if (e && e.code === "ENOENT") return `Error: File '${filePath}' not found`;
             console.error(`[VscodeFsBackend] Unexpected error reading ${filePath}:`, e);
@@ -215,15 +215,7 @@ class VscodeFsBackend implements BackendProtocol {
         }
     }
 
-    /**
-     * grepRaw: uses ripgrep if available (prefer ripgrepSearch wrapper), otherwise JS fallback.
-     */
-    async grepRaw(
-        pattern: string,
-        basePath: string | null = "/",
-        glob: string | null = null,
-    ): Promise<GrepMatch[] | string> {
-        // validate regex
+    async grepRaw(pattern: string, basePath: string | null = "/", glob: string | null = null): Promise<GrepMatch[] | string> {
         let re: RegExp;
         try {
             re = new RegExp(pattern, "i");
@@ -233,89 +225,69 @@ class VscodeFsBackend implements BackendProtocol {
 
         const absBase = this.resolveAgentPath(basePath ?? "/");
 
-        // If configured to use ripgrep, prefer the provided JS wrapper (ripgrepSearch)
         if (this.useRipgrep) {
             if (this.ripgrepSearch) {
                 try {
-                    const stdout = await this.ripgrepSearch({
-                        pattern,
-                        cwd: absBase,
-                        glob,
-                        extraArgs: this.ripgrepArgs,
-                        maxBuffer: this.maxGrepBuffer,
-                    });
+                    const stdout = await this.ripgrepSearch({ pattern, cwd: absBase, glob, extraArgs: this.ripgrepArgs, maxBuffer: this.maxGrepBuffer });
                     return parseRipgrepStdout(stdout, this.rootDir);
-                } catch (err: any) {
-                    if (this.disableSpawnFallback) {
-                        return `Error: ripgrep invocation failed: ${err?.message ?? String(err)}`;
-                    }
-                    // otherwise fallthrough to other approaches
-                }
+                } catch (err: any) { if (this.disableSpawnFallback) return `Error: ripgrep invocation failed: ${err?.message ?? String(err)}`; }
             }
 
-            // If JS wrapper not provided, try spawning ripgrep executable (ripgrepExec or "rg")
             try {
                 const rgBin = this.ripgrepExec ?? "rg";
-                const args = [
-                    "-n",
-                    "-H",
-                    ...(this.ripgrepArgs ?? []),
-                    ...(glob ? ["-g", glob] : []),
-                    pattern,
-                    absBase,
-                ];
+                const args = ["-n", "-H", ...(this.ripgrepArgs ?? []), ...(glob ? ["-g", glob] : []), pattern, absBase];
                 const rg = spawnSync(rgBin, args, { encoding: "utf-8", maxBuffer: this.maxGrepBuffer });
                 if (!rg.error && (rg.status === 0 || rg.status === 1)) {
                     if (!rg.stdout) return [];
                     return parseRipgrepStdout(rg.stdout, this.rootDir);
-                } else {
-                    if (this.disableSpawnFallback) {
-                        const msg = rg.error ? rg.error.message : `rg exit ${rg.status}`;
-                        return `Error: ripgrep invocation failed: ${msg}`;
-                    }
-                    // else fallthrough to JS fallback
-                }
-            } catch {
-                if (this.disableSpawnFallback) return "Error: ripgrep not available";
-                // else continue to JS fallback
-            }
-        } else if (this.disableSpawnFallback) {
-            return "Error: ripgrep usage disabled by configuration";
-        }
+                } else { if (this.disableSpawnFallback) { const msg = rg.error ? rg.error.message : `rg exit ${rg.status}`; return `Error: ripgrep invocation failed: ${msg}`; } }
+            } catch { if (this.disableSpawnFallback) return "Error: ripgrep not available"; }
+        } else if (this.disableSpawnFallback) { return "Error: ripgrep usage disabled by configuration"; }
 
-        // JS fallback: walk and search. Constrain with glob if provided.
-        const matches: GrepMatch[] = [];
+        // --- JS Fallback: Optimized with parallel, streaming directory traversal ---
         const globRegex = glob ? globToRegExp(glob.startsWith("/") ? glob : `/${glob}`) : null;
 
-        async function walkAndSearch(dir: string, backend: VscodeFsBackend) {
-            const ents = await fsp.readdir(dir, { withFileTypes: true });
-            for (const e of ents) {
+        const walkAndSearch = async (dir: string): Promise<GrepMatch[]> => {
+            let entries: fs.Dirent[];
+            try {
+                entries = await fsp.readdir(dir, { withFileTypes: true });
+            } catch { return []; }
+
+            const promises = entries.map(async (e): Promise<GrepMatch[]> => {
                 const child = path.join(dir, e.name);
                 if (e.isDirectory()) {
-                    await walkAndSearch(child, backend);
-                } else {
-                    const relPosix = `/${path.relative(backend.rootDir, child).replace(/\\/g, "/")}`;
-                    if (globRegex && !globRegex.test(relPosix)) continue;
-                    try {
-                        const data = await fsp.readFile(child, { encoding: "utf-8" });
-                        const lines = toLines(data);
-                        for (let i = 0; i < lines.length; i++) {
-                            if (re.test(lines[i])) {
-                                matches.push({ path: relPosix, line: i + 1, text: lines[i] });
-                            }
-                        }
-                    } catch (err) {
-                        // skip unreadable files
-                        console.warn(`[VscodeFsBackend] Failed to read file ${child}: ${err}`);
-                        continue;
-                    }
+                    return walkAndSearch(child); // Recurse into subdirectories
                 }
-            }
-        }
+
+                const relPosix = `/${path.relative(this.rootDir, child).replace(/\\/g, "/")}`;
+                if (globRegex && !globRegex.test(relPosix)) return [];
+
+                // Optimization: Stream files to avoid high memory usage and process line-by-line.
+                const fileMatches: GrepMatch[] = [];
+                try {
+                    const fileStream = fs.createReadStream(child, { encoding: "utf-8" });
+                    fileStream.on('error', () => fileStream.destroy());
+                    const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+
+                    let lineNum = 0;
+                    for await (const line of rl) {
+                        lineNum++;
+                        if (re.test(line)) {
+                            fileMatches.push({ path: relPosix, line: lineNum, text: line });
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`[VscodeFsBackend] Failed to grep file ${child}: ${err}`);
+                }
+                return fileMatches;
+            });
+
+            const nestedMatches = await Promise.all(promises);
+            return ([] as GrepMatch[]).concat(...nestedMatches);
+        };
 
         try {
-            await walkAndSearch(absBase, this);
-            return matches;
+            return await walkAndSearch(absBase);
         } catch (err: any) {
             return `Error: ${err?.message ?? String(err)}`;
         }
@@ -324,25 +296,38 @@ class VscodeFsBackend implements BackendProtocol {
     async globInfo(pattern: string, basePath: string = "/"): Promise<FileInfo[]> {
         const absBase = this.resolveAgentPath(basePath);
         const regex = globToRegExp(pattern.startsWith("/") ? pattern : `/${pattern}`);
-        const files: FileInfo[] = [];
 
-        async function walk(dir: string, backend: VscodeFsBackend) {
-            const ents = await fsp.readdir(dir, { withFileTypes: true });
-            for (const e of ents) {
+        // Optimization: A parallel recursive walk that avoids shared state and processes
+        // directory entries concurrently, speeding up I/O-bound stat calls.
+        const walk = async (dir: string): Promise<FileInfo[]> => {
+            let entries: fs.Dirent[];
+            try {
+                entries = await fsp.readdir(dir, { withFileTypes: true });
+            } catch { return []; }
+
+            const promises = entries.map(async (e): Promise<FileInfo[]> => {
                 const child = path.join(dir, e.name);
                 if (e.isDirectory()) {
-                    await walk(child, backend);
-                } else {
-                    const rel = `/${path.relative(backend.rootDir, child).replace(/\\/g, "/")}`;
-                    if (!regex.test(rel)) continue;
-                    const st = await fsp.stat(child);
-                    files.push({ path: rel, is_dir: false, size: st.size, modified_at: st.mtime.toISOString() });
+                    return walk(child); // Recurse and return results
                 }
-            }
-        }
+
+                const rel = `/${path.relative(this.rootDir, child).replace(/\\/g, "/")}`;
+                if (!regex.test(rel)) return [];
+
+                try {
+                    const st = await fsp.stat(child);
+                    return [{ path: rel, is_dir: false, size: st.size, modified_at: st.mtime.toISOString() }];
+                } catch {
+                    return [];
+                }
+            });
+
+            const nestedResults = await Promise.all(promises);
+            return ([] as FileInfo[]).concat(...nestedResults);
+        };
 
         try {
-            await walk(absBase, this);
+            const files = await walk(absBase);
             files.sort((a, b) => a.path.localeCompare(b.path));
             return files;
         } catch {
@@ -366,6 +351,8 @@ class VscodeFsBackend implements BackendProtocol {
     }
 
     async edit(filePath: string, oldString: string, newString: string, replaceAll = false): Promise<EditResult> {
+        // Note: For extremely large files, a streaming approach would be more memory-efficient.
+        // This implementation reads the whole file, which is a pragmatic trade-off for typical source files.
         return this.mutex.lock(async () => {
             try {
                 const abs = this.resolveAgentPath(filePath);
@@ -389,9 +376,7 @@ class VscodeFsBackend implements BackendProtocol {
                     newContent = parts.join(newString);
                 } else {
                     const idx = current.indexOf(oldString);
-                    if (idx === -1) {
-                        return { path: filePath, filesUpdate: null, occurrences: 0 };
-                    }
+                    if (idx === -1) return { path: filePath, filesUpdate: null, occurrences: 0 };
                     occurrences = 1;
                     newContent = current.slice(0, idx) + newString + current.slice(idx + oldString.length);
                 }
@@ -412,7 +397,7 @@ function parseRipgrepStdout(stdout: string, rootDir: string): GrepMatch[] {
     const lines = String(stdout).trim().split("\n").filter(Boolean);
     const results: GrepMatch[] = [];
     for (const l of lines) {
-        // expected format: /abs/path:line:match (match may contain ":")
+        // Format: /abs/path:line:match. The lazy quantifier is safer for paths that might contain colons.
         const m = l.match(/^(.+?):(\d+):(.*)$/s);
         if (!m) continue;
         const absPath = m[1];
@@ -426,47 +411,26 @@ function parseRipgrepStdout(stdout: string, rootDir: string): GrepMatch[] {
 
 /**
  * Return a BackendFactory bound to the given options.
- * The factory will be called with StateAndStore; it uses stateAndStore.assistantId for scoping.
  */
 export function createVscodeFsBackendFactory(opts: VscodeFsBackendFactoryOptions): BackendFactory {
-    const {
-        rootDir,
-        useRipgrep = true,
-        disableSpawnFallback = false,
-        ripgrepArgs,
-        ripgrepExec,
-        ripgrepSearch,
-        maxGrepBuffer,
-    } = opts;
+    const { rootDir, ...rest } = opts;
 
-    // Pre-probe ripgrep binary availability only if ripgrepExec not provided and useRipgrep true.
     let probeRgAvailable = false;
-    if (useRipgrep && !ripgrepSearch) {
+    if (opts.useRipgrep !== false && !opts.ripgrepSearch) {
         try {
-            const probe = spawnSync(ripgrepExec ?? "rg", ["--version"], { encoding: "utf-8", maxBuffer: 1024 });
+            const probe = spawnSync(opts.ripgrepExec ?? "rg", ["--version"], { encoding: "utf-8", maxBuffer: 1024 });
             probeRgAvailable = !probe.error && probe.status === 0;
-        } catch {
-            probeRgAvailable = false;
-        }
+        } catch { probeRgAvailable = false; }
     }
 
     return function backendFactory(stateAndStore: StateAndStore): BackendProtocol {
         const assistantId = stateAndStore.assistantId;
-        // If ripgrepSearch (JS wrapper) provided, prefer it. Otherwise respect probe availability and ripgrepExec.
-        const backend = new VscodeFsBackend({
-            rootDir,
-            ripgrepArgs,
-            useRipgrep: useRipgrep,
-            disableSpawnFallback,
-            ripgrepExec,
-            ripgrepSearch,
-            maxGrepBuffer,
-            assistantId,
-        });
-        // If useRipgrep is true but we probed and rg isn't available and there is no ripgrepSearch wrapper,
-        // update backend.useRipgrep so the backend will fall back (or return error if disableSpawnFallback).
-        if (useRipgrep && !ripgrepSearch && !probeRgAvailable) {
-            backend["useRipgrep"] = false;
+        const useRipgrep = opts.useRipgrep !== false;
+
+        const backend = new VscodeFsBackend({ rootDir, ...rest, assistantId });
+
+        if (useRipgrep && !opts.ripgrepSearch && !probeRgAvailable) {
+            (backend as any).useRipgrep = false;
         }
         return backend;
     };
