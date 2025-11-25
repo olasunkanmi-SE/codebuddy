@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { IEventPayload } from "../emitter/interface";
-import { EventEmitter } from "../emitter/publisher";
+import { IEventPayload } from "./emitter/interface";
+import { EventEmitter } from "./emitter/publisher";
 
 export class Orchestrator extends EventEmitter implements vscode.Disposable {
   private static instance: Orchestrator;

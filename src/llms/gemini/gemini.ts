@@ -6,8 +6,8 @@ import {
 } from "@google/generative-ai";
 import { BaseMessage } from "@langchain/core/messages";
 import * as vscode from "vscode";
-import { langGraphAgent } from "../../agents/langgraph/graphs/agent";
-import { Orchestrator } from "../../agents/orchestrator";
+// import { langGraphAgent } from "../../agents/langgraph/graphs/agent";
+import { Orchestrator } from "../../orchestrator";
 import { COMMON } from "../../application/constant";
 import { Logger } from "../../infrastructure/logger/logger";
 import { Memory } from "../../memory/base";
@@ -21,8 +21,7 @@ import { Message } from "../message";
 
 export class GeminiLLM
   extends BaseLLM<GeminiLLMSnapShot>
-  implements vscode.Disposable
-{
+  implements vscode.Disposable {
   private readonly generativeAi: GoogleGenerativeAI;
   private response: EmbedContentResponse | GenerateContentResult | undefined;
   protected readonly orchestrator: Orchestrator;
@@ -174,33 +173,33 @@ export class GeminiLLM
     return JSON.stringify(content);
   }
 
-  async processUserQuery(userInput: string): Promise<any> {
-    const apiKey = getAPIKeyAndModel("gemini").apiKey;
-    const model = getAPIKeyAndModel("gemini").model;
-    const agent = langGraphAgent.create({ apiKey, model: model ?? "" });
-    const stream = await agent.runx(userInput);
-    for await (const update of stream) {
-      if (update?.update?.messages) {
-        const lastMessageContent = this.handleUserQuery(update.update.messages);
-        if (lastMessageContent) {
-          this.orchestrator.publish("onQuery", String(lastMessageContent));
-        }
-      }
-    }
-  }
+  // async processUserQuery(userInput: string): Promise<any> {
+  //   const apiKey = getAPIKeyAndModel("gemini").apiKey;
+  //   const model = getAPIKeyAndModel("gemini").model;
+  //   const agent = langGraphAgent.create({ apiKey, model: model ?? "" });
+  //   const stream = await agent.runx(userInput);
+  //   for await (const update of stream) {
+  //     if (update?.update?.messages) {
+  //       const lastMessageContent = this.handleUserQuery(update.update.messages);
+  //       if (lastMessageContent) {
+  //         this.orchestrator.publish("onQuery", String(lastMessageContent));
+  //       }
+  //     }
+  //   }
+  // }
 
-  async run(userQuery: string) {
-    try {
-      const traceId = generateUUID();
-      Logger.setTraceId(traceId);
-      this.userQuery = userQuery;
-      const result = await this.processUserQuery(userQuery);
-      return result;
-    } catch (error) {
-      console.error("Error occured will running the agent", error);
-      throw error;
-    }
-  }
+  // async run(userQuery: string) {
+  //   try {
+  //     const traceId = generateUUID();
+  //     Logger.setTraceId(traceId);
+  //     this.userQuery = userQuery;
+  //     const result = await this.processUserQuery(userQuery);
+  //     return result;
+  //   } catch (error) {
+  //     console.error("Error occured will running the agent", error);
+  //     throw error;
+  //   }
+  // }
 
   public createSnapShot(data?: any): GeminiLLMSnapShot {
     const snapshot: GeminiLLMSnapShot = {

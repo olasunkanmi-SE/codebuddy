@@ -189,6 +189,7 @@ export const getAPIKeyAndModel = (
     anthropicApiKey,
     geminiModel,
     anthropicModel,
+    tavilyApiKey,
   } = APP_CONFIG;
   let apiKey: string | undefined;
   let modelName: string | undefined;
@@ -207,6 +208,9 @@ export const getAPIKeyAndModel = (
     case "anthropic":
       apiKey = getConfigValue(anthropicApiKey);
       modelName = getConfigValue(anthropicModel);
+      break;
+    case "tavily":
+      apiKey = getConfigValue(tavilyApiKey);
       break;
     default:
       throw new Error(`Unsupported model: ${model}`);

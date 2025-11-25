@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import {
   IFileToolConfig,
   IFileToolResponse,
@@ -9,6 +9,10 @@ import { getAPIKeyAndModel, getGenerativeAiModel } from "./../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { LogLevel } from "./telemetry";
 import { WebSearchService } from "./web-search-service";
+import {
+  TavilySearchProvider,
+  SearchResponseFormatter,
+} from "../agents/tools/websearch";
 
 export class ContextRetriever {
   // private readonly codeRepository: CodeRepository;
@@ -18,6 +22,7 @@ export class ContextRetriever {
   private static instance: ContextRetriever;
   private readonly webSearchService: WebSearchService;
   protected readonly orchestrator: Orchestrator;
+  private readonly tavilySearch: TavilySearchProvider;
   constructor() {
     // this.codeRepository = CodeRepository.getInstance();
     // Always use Gemini for embeddings to ensure consistency
@@ -32,6 +37,7 @@ export class ContextRetriever {
       enableTelemetry: true,
     });
     this.webSearchService = WebSearchService.getInstance();
+    this.tavilySearch = TavilySearchProvider.getInstance();
     this.orchestrator = Orchestrator.getInstance();
   }
 
@@ -96,6 +102,21 @@ export class ContextRetriever {
     } catch (error: any) {
       this.logger.error("Error reading file:", error);
       throw error;
+    }
+  }
+
+  async travilySearch(query: string) {
+    const defaults = {
+      maxResults: 5,
+      includeRawContent: false,
+      timeout: 30000,
+    };
+    try {
+      const result = await this.tavilySearch.search(query, defaults);
+      return SearchResponseFormatter.format(result);
+    } catch (error: any) {
+      this.logger.error("[WebSearch] Execution Error:", error);
+      return `Error performing web search: ${error.message}`;
     }
   }
 }

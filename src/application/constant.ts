@@ -56,6 +56,7 @@ export const APP_CONFIG = {
   font: "font.family",
   chatview: "chatview.theme",
   chatviewFont: "chatview.font.size",
+  tavilyApiKey: "tavily.apiKey",
 };
 
 export enum generativeAiModels {

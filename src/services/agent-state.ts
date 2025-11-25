@@ -1,4 +1,4 @@
-import { AgentState } from "../agents/interface";
+import { AgentState } from "../agents/langgraph/interface";
 import { COMMON } from "../application/constant";
 import { GeminiLLMSnapShot } from "../llms/interface";
 import { FileStorage, IStorage } from "./file-storage";

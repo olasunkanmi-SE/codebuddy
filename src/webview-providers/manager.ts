@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import { generativeAiModels } from "../application/constant";
 import { IEventPayload } from "../emitter/interface";
 import { ChatHistoryManager } from "../services/chat-history-manager";

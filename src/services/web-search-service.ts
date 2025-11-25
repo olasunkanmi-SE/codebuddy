@@ -1,7 +1,7 @@
 import { Readability } from "@mozilla/readability";
 import axios from "axios";
 import { JSDOM } from "jsdom";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import { PRIORITY_URLS, WEB_SEARCH_CONFIG } from "../application/constant";
 import { Logger } from "../infrastructure/logger/logger";
 import { generateQueryString } from "../utils/utils";

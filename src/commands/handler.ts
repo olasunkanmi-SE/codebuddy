@@ -21,7 +21,7 @@ import {
 } from "../utils/utils";
 import { Memory } from "../memory/base";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import { architecturalRecommendationCommand } from "./architectural-recommendation";
 
 interface ICodeCommandHandler {

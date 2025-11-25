@@ -1,10 +1,16 @@
 import { Logger, LogLevel } from "../../../infrastructure/logger/logger";
 import { ContextRetriever } from "./../../../services/context-retriever";
 import { StructuredTool } from "@langchain/core/tools";
-import { FileTool, ThinkTool, WebTool } from "../../../tools/tools";
+import {
+  FileTool,
+  ThinkTool,
+  TravilySearchTool,
+  WebTool,
+} from "../../../tools/tools";
 import { LangChainFileTool } from "./file";
 import { LangChainThinkTool } from "./think";
 import { LangChainWebTool } from "./web";
+import { LangChainTravilySearchTool } from "./travily";
 
 const logger = Logger.initialize("ToolProvider", {
   minLevel: LogLevel.DEBUG,
@@ -24,10 +30,19 @@ class FileToolFactory implements IToolFactory {
   }
 }
 
+// class WebToolFactory implements IToolFactory {
+//   constructor(private contextRetriever: ContextRetriever) { }
+//   createTool(): StructuredTool<any> {
+//     return new LangChainWebTool(new WebTool(this.contextRetriever));
+//   }
+// }
+
 class WebToolFactory implements IToolFactory {
   constructor(private contextRetriever: ContextRetriever) {}
   createTool(): StructuredTool<any> {
-    return new LangChainWebTool(new WebTool(this.contextRetriever));
+    return new LangChainTravilySearchTool(
+      new TravilySearchTool(this.contextRetriever),
+    );
   }
 }
 
@@ -46,9 +61,9 @@ export class ToolProvider {
   private constructor() {
     this.contextRetriever ??= ContextRetriever.initialize();
     this.toolFactories = [
-      new FileToolFactory(this.contextRetriever),
+      // new FileToolFactory(this.contextRetriever),
       new WebToolFactory(this.contextRetriever),
-      new ThinkToolFactory(),
+      // new ThinkToolFactory(),
     ];
     this.tools = this.toolFactories.map(
       (factory): StructuredTool<any> => factory.createTool(),

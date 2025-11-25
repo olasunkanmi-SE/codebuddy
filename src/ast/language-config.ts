@@ -25,7 +25,7 @@ const logger = Logger.initialize("extension-main", {
 
 export const languageConfigs: Readonly<Record<string, ILanguageConfig>> = {
   javascript: {
-    grammarPath: "dist/grammars/tree-sitter-javascript.wasm",
+    grammarPath: "src/grammars/tree-sitter-javascript.wasm",
     languageIdMap: ["js", "jsx", "mjs", "cjs", "javascript"],
     queries: {
       functionDefinitions: `
@@ -38,7 +38,7 @@ export const languageConfigs: Readonly<Record<string, ILanguageConfig>> = {
     },
   },
   typescript: {
-    grammarPath: "dist/grammars/tree-sitter-tsx.wasm",
+    grammarPath: "src/grammars/tree-sitter-tsx.wasm",
     languageIdMap: ["ts", "tsx", "mts", "cts", "typescript"],
     queries: {
       functionDefinitions: `
@@ -51,7 +51,7 @@ export const languageConfigs: Readonly<Record<string, ILanguageConfig>> = {
     },
   },
   python: {
-    grammarPath: "dist/grammars/tree-sitter-python.wasm",
+    grammarPath: "src/grammars/tree-sitter-python.wasm",
     languageIdMap: ["py", "python"],
     queries: {
       functionDefinitions: `(function_definition name: (identifier) @name) @function.definition`,
@@ -60,7 +60,7 @@ export const languageConfigs: Readonly<Record<string, ILanguageConfig>> = {
     },
   },
   java: {
-    grammarPath: "dist/grammars/tree-sitter-java.wasm",
+    grammarPath: "src/grammars/tree-sitter-java.wasm",
     languageIdMap: ["java"],
     queries: {
       functionDefinitions: `(method_declaration name: (identifier) @name) @function.definition`,
@@ -69,7 +69,7 @@ export const languageConfigs: Readonly<Record<string, ILanguageConfig>> = {
     },
   },
   go: {
-    grammarPath: "dist/grammars/tree-sitter-go.wasm",
+    grammarPath: "src/grammars/tree-sitter-go.wasm",
     languageIdMap: ["go"],
     queries: {
       functionDefinitions: `(function_declaration name: (identifier) @name) @function.definition`,
@@ -77,7 +77,7 @@ export const languageConfigs: Readonly<Record<string, ILanguageConfig>> = {
     },
   },
   rust: {
-    grammarPath: "dist/grammars/tree-sitter-rust.wasm",
+    grammarPath: "src/grammars/tree-sitter-rust.wasm",
     languageIdMap: ["rs", "rust"],
     queries: {
       functionDefinitions: `(function_item name: (identifier) @name) @function.definition`,

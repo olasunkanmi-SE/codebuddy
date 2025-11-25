@@ -6,7 +6,7 @@ import { getAPIKeyAndModel } from "../utils/utils";
 import { LLMOutputSanitizer } from "../utils/llm-output-sanitizer";
 import { Logger } from "../infrastructure/logger/logger";
 import { LogLevel } from "../services/telemetry";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 
 let orchestrator = Orchestrator.getInstance();
 
@@ -234,41 +234,41 @@ function createContextFromAnalysis(analysis: any): string {
     `## Dependencies`,
     Object.keys(analysis.dependencies).length > 0
       ? Object.entries(analysis.dependencies)
-          .slice(0, 20) // Limit to avoid overwhelming the context
-          .map(([name, version]) => `- ${name}: ${version}`)
-          .join("\n")
+        .slice(0, 20) // Limit to avoid overwhelming the context
+        .map(([name, version]) => `- ${name}: ${version}`)
+        .join("\n")
       : "No dependencies found",
     ``,
     `## API Endpoints`,
     analysis.apiEndpoints.length > 0
       ? analysis.apiEndpoints
-          .slice(0, 15) // Limit endpoints
-          .map(
-            (endpoint: any) =>
-              `- ${endpoint.method} ${endpoint.path} (${endpoint.file})`,
-          )
-          .join("\n")
+        .slice(0, 15) // Limit endpoints
+        .map(
+          (endpoint: any) =>
+            `- ${endpoint.method} ${endpoint.path} (${endpoint.file})`,
+        )
+        .join("\n")
       : "No API endpoints detected",
     ``,
     `## Data Models`,
     analysis.dataModels.length > 0
       ? analysis.dataModels
-          .slice(0, 10) // Limit models
-          .map(
-            (model: any) => `- ${model.name} (${model.type}) - ${model.file}`,
-          )
-          .join("\n")
+        .slice(0, 10) // Limit models
+        .map(
+          (model: any) => `- ${model.name} (${model.type}) - ${model.file}`,
+        )
+        .join("\n")
       : "No data models detected",
     ``,
     `## File Structure`,
     analysis.files.length > 0
       ? analysis.files
-          .slice(0, 30) // Limit files shown
-          .map(
-            (file: string, index: number) =>
-              `[[${index + 1}]](${file}) ${file}`,
-          )
-          .join("\n")
+        .slice(0, 30) // Limit files shown
+        .map(
+          (file: string, index: number) =>
+            `[[${index + 1}]](${file}) ${file}`,
+        )
+        .join("\n")
       : "No files analyzed",
     ``,
     `## Language Distribution`,

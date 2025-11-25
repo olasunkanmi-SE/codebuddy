@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { Orchestrator } from "./agents/orchestrator";
+import { Orchestrator } from "./orchestrator";
 import {
   APP_CONFIG,
   CODEBUDDY_ACTIONS,
@@ -27,7 +27,6 @@ import { ReviewPR } from "./commands/review-pr";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
-import { FileUploadService } from "./services/file-upload";
 import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
 import { SqliteDatabaseService } from "./services/sqlite-database.service";
 import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
@@ -443,7 +442,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     logger.info(`Total commands registered: ${subscriptions.length}`);
 
-    // ⚡ FAST: Essential UI components only
+
     const quickFix = new CodeActionsProvider();
     quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
       { scheme: "file", language: "*" },
@@ -452,10 +451,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     agentEventEmmitter = new EventEmitter();
 
-    // Vector database commands are already registered in initializePhase4Orchestration
-    // No need to register them again here
 
-    // ⚡ DEFER: Initialize WebView providers lazily
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
     initializeWebViewProviders(context, selectedGenerativeAiModel);
     context.subscriptions.push(
@@ -463,9 +459,8 @@ export async function activate(context: vscode.ExtensionContext) {
       quickFixCodeAction,
       agentEventEmmitter,
       orchestrator,
-      // Note: providerManager is handled in initializeWebViewProviders
-      // secretStorageService,
     );
+
   } catch (error: any) {
     // Memory.clear();
     vscode.window.showErrorMessage(

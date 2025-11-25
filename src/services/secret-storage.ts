@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { APP_CONFIG } from "../application/constant";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import { IEventPayload } from "../emitter/interface";
 
 export class SecretStorageService implements vscode.Disposable {
@@ -136,7 +136,7 @@ export class SecretStorageService implements vscode.Disposable {
     const sensitiveValues = newValue ? "Configured" : "Not Configured";
     const logMessage =
       typeof newValue === "string" &&
-      (configKey.endsWith("apiKey") || configKey.endsWith("apiKeys"))
+        (configKey.endsWith("apiKey") || configKey.endsWith("apiKeys"))
         ? `${messagePrefix} ${sensitiveValues}`
         : `${messagePrefix} ${newValue}`;
     data[configKey] = newValue;

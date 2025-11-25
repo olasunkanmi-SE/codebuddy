@@ -1,6 +1,7 @@
 import { SchemaType } from "@google/generative-ai";
 import { IFileToolConfig } from "../application/interfaces/agent.interface";
 import { ContextRetriever } from "../services/context-retriever";
+import { z } from "zod";
 
 // class SearchTool {
 //   constructor(private readonly contextRetriever?: ContextRetriever) {}
@@ -56,6 +57,48 @@ export class WebTool {
         ],
         required: ["query"],
       },
+    };
+  }
+}
+
+export class TravilySearchTool {
+  constructor(private readonly contextRetriever?: ContextRetriever) {}
+
+  async execute(query: string) {
+    return await this.contextRetriever?.travilySearch(query);
+  }
+
+  SearchSchema = z.object({
+    query: z.string().min(1).describe("Search query"),
+    maxResults: z
+      .number()
+      .optional()
+      .default(5)
+      .describe("Maximum number of results"),
+    includeRawContent: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe("Include raw HTML content"),
+    timeout: z
+      .number()
+      .optional()
+      .default(30000)
+      .describe("Timeout in milliseconds"),
+  });
+
+  config() {
+    return {
+      name: "web_search",
+      description: `Search the web for current information, documentation, or solutions.
+          Use this when you need:
+          - Current events or real-time data
+          - External documentation
+          - Stack Overflow solutions
+          - API references
+
+          Returns formatted results with titles, URLs, and content snippets.`,
+      schema: this.SearchSchema,
     };
   }
 }

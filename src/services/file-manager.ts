@@ -3,7 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { IFileUploader } from "../application/interfaces";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 
 export class FileManager implements IFileUploader {
   private static instance: FileManager;

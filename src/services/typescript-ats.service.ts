@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as ts from "typescript";
 import * as vscode from "vscode";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import { FSPROPS } from "../application/constant";
 import {
   DeclarationFunctionNode,

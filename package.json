@@ -40,7 +40,7 @@
     "productivity"
   ],
   "homepage": "https://github.com/olasunkanmi-SE/codebuddy#readme",
-  "main": "./dist/extension.js",
+  "main": "./out/extension.js",
   "contributes": {
     "views": {
       "codeBuddy-view-container": [
@@ -177,6 +177,14 @@
             ],
             "default": "Gemini",
             "description": "Select Model"
+          },
+          "tavily.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null,
+            "markdownDescription": "Enter your [API Key](https://app.tavily.com/home) for Tavily."
           },
           "google.gemini.apiKeys": {
             "type": [
@@ -338,13 +346,14 @@
     "typescript": "^5.4.3"
   },
   "dependencies": {
+    "langchain": "^1.0.4",
+    "@langchain/anthropic": "^1.0.0",
+    "@langchain/core": "^1.0.0",
+    "@langchain/langgraph": "^1.0.0",
     "@anthropic-ai/sdk": "^0.52.0",
     "@chroma-core/default-embed": "^0.1.8",
     "@google/genai": "^0.7.0",
     "@google/generative-ai": "^0.21.0",
-    "@langchain/core": "^0.3.79",
-    "@langchain/google-genai": "^0.2.18",
-    "@langchain/langgraph": "^0.4.9",
     "@mozilla/readability": "^0.4.1",
     "@types/fast-levenshtein": "^0.0.4",
     "@types/node-fetch": "^2.6.11",

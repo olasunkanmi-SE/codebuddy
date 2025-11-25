@@ -107,13 +107,13 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         context = await this.getContext(metaData.context);
       }
       if (metaData?.mode === "Agent") {
-        this.orchestrator.publish("onThinking", "...thinking");
-        await this.gemini.run(
-          context
-            ? JSON.stringify(`${message} \n context: ${context}`)
-            : JSON.stringify(message),
-        );
-        return;
+        // this.orchestrator.publish("onThinking", "...thinking");
+        // await this.gemini.run(
+        //   context
+        //     ? JSON.stringify(`${message} \n context: ${context}`)
+        //     : JSON.stringify(message),
+        // );
+        // return;
       }
 
       const msg = userMessage?.length ? userMessage : message;

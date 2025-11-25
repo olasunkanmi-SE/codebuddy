@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import {
   FolderEntry,
   IContextInfo,
@@ -384,9 +384,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
 
               const messageAndSystemInstruction =
-                  await this.enhanceMessageWithCodebaseContext(
-                    sanitizedMessage,
-                  ),
+                await this.enhanceMessageWithCodebaseContext(
+                  sanitizedMessage,
+                ),
                 response = await this.generateResponse(
                   messageAndSystemInstruction,
                   message.metaData,
@@ -624,10 +624,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   async categorizeQuestion(userQuestion: string): Promise<
     | {
-        isCodebaseRelated: boolean;
-        categories: string[];
-        confidence: "high" | "medium" | "low";
-      }
+      isCodebaseRelated: boolean;
+      categories: string[];
+      confidence: "high" | "medium" | "low";
+    }
     | undefined
   > {
     const prompt = `You are an AI copilot expert in analyzing user questions to distinguish between codebase-specific queries and general knowledge questions. Given a user's question, determine if it is related to analyzing or querying details within a specific codebase (e.g., "how was authentication handled within this application" is codebase-related because it asks about implementation in a particular code context). If it's a general definition or non-code-specific question (e.g., "what is MCP, model context protocol" is not codebase-related because it's seeking a general explanation), classify it accordingly.

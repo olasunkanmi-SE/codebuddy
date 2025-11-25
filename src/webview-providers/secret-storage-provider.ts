@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { Logger } from "../infrastructure/logger/logger";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import { LogLevel } from "../services/telemetry";
 
 export class VSCodeSecretStorage {

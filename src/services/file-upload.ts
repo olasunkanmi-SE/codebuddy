@@ -9,7 +9,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { IEventPayload } from "../emitter/interface";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 
 export class FileUploadService implements vscode.Disposable {
   private readonly ai: GoogleGenAI;
