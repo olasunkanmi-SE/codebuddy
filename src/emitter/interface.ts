@@ -32,10 +32,10 @@ type AgentEventKeys =
   | "onUpdateUserPreferences"
   | "onGetUserPreferences"
   | "onUpdateThemePreferences"
-  | "onPlanStep"
-  | "onToolCall"
-  | "onContentDelta"
-  | "onComplete";
+  | "streamStart"
+  | "streamFlush"
+  | "streamEnd"
+  | "streamError"
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {

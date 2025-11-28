@@ -42,6 +42,10 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onContentDelta: vscode.Event<IEventPayload> =
     this.createEvent("onContentDelta");
   onComplete: vscode.Event<IEventPayload> = this.createEvent("onComplete");
+  streamStart: vscode.Event<IEventPayload> = this.createEvent("streamStart");
+  streamFlush: vscode.Event<IEventPayload> = this.createEvent("streamFlush");
+  streamEnd: vscode.Event<IEventPayload> = this.createEvent("streamEnd");
+  streamError: vscode.Event<IEventPayload> = this.createEvent("streamError");
 
   /**
    * Emits a generic event with specified status, message, and optional data.

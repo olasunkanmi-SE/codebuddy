@@ -39,19 +39,8 @@ export interface ICodeBuddyAgentConfig {
   enableSubAgents?: boolean;
   maxFileSizeMb?: number;
   enableHITL?: boolean;
-  /**
-   * Human-in-the-loop interrupt configuration
-   * Defines which tools require user approval before execution
-   *
-   * Example:
-   * ```typescript
-   * interruptOn: {
-   *   write_file: { allowedDecisions: ["approve", "edit", "reject"] },
-   *   edit_file: { allowedDecisions: ["approve", "edit", "reject"] }
-   * }
-   * ```
-   */
   interruptOn?: InterruptConfiguration;
+  streamOptions?: IStreamOptions
 }
 
 export interface ISubAgentConfig {
@@ -82,4 +71,73 @@ export interface IWebsearchConfig {
   maxResults?: number;
   includeRawContent?: boolean;
   timeout?: number;
+}
+
+export enum MessageRole {
+  USER = "user",
+  ASSISTANT = "assistant",
+  SYSTEM = "system",
+}
+
+
+export enum StreamEventType {
+  START = "streamStart",
+  END = "streamEnd",
+  CHUNK = "streamChunk",
+  TOOL_START = "toolStart",
+  TOOL_END = "toolEnd",
+  ERROR = "streamError",
+  METADATA = "streamMetadata"
+}
+
+export interface IStreamEvent {
+  type: StreamEventType;
+  content: string;
+  metadata?: IStreamMetadata;
+  accumulated?: string
+}
+
+interface IStreamMetadata {
+  node?: string;
+  toolName?: string;
+  timestamp?: number;
+  tokens?: number
+}
+
+export interface IStreamChunk {
+  id: string;
+  content: string;
+  type: StreamEventType
+  metadata?: IStreamMetadata
+}
+
+export interface IStreamMessage {
+  id: string;
+  role: MessageRole;
+  content: string;
+  timestamp: number
+  isStreaming: boolean
+  metadata?: Record<string, any>
+}
+
+export interface IVSCodeMessage {
+  type: string;
+  payload: any
+  requestId?: string
+}
+
+export interface IWebviewMessage {
+  id: string;
+  type: "user" | "bot"
+  content: string;
+  language?: string;
+  senderInitial?: string;
+  isStreaming?: boolean;
+  timestamp?: number
+}
+
+export interface IStreamOptions {
+  maxBufferSize: number
+  flushInterval: number
+  enableBackPressure: boolean
 }
