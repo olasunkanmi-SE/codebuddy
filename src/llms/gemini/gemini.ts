@@ -18,10 +18,12 @@ import { BaseLLM } from "../base";
 import { GroqLLM } from "../groq/groq";
 import { GeminiLLMSnapShot, ILlmConfig } from "../interface";
 import { Message } from "../message";
+import { createAdvancedDeveloperAgent } from "../../agents/developer/agent";
 
 export class GeminiLLM
   extends BaseLLM<GeminiLLMSnapShot>
-  implements vscode.Disposable {
+  implements vscode.Disposable
+{
   private readonly generativeAi: GoogleGenerativeAI;
   private response: EmbedContentResponse | GenerateContentResult | undefined;
   protected readonly orchestrator: Orchestrator;
@@ -171,6 +173,43 @@ export class GeminiLLM
     }
     this.logger.warn("Received unexpected message content type", { content });
     return JSON.stringify(content);
+  }
+
+  async *runx(userMessage: string) {
+    try {
+      const agent = await createAdvancedDeveloperAgent({});
+      const result = await agent.stream({
+        messages: [
+          {
+            role: "user",
+            content: userMessage,
+          },
+        ],
+      });
+      for await (const event of result) {
+        for (const [nodeName, update] of Object.entries(
+          event as Record<string, any>,
+        )) {
+          yield { node: nodeName, update };
+          this.logger.log(LogLevel.INFO, `Stream event from node: ${nodeName}`);
+        }
+      }
+    } catch (error: any) {
+      this.logger.error("Agent execution failed:", error);
+      throw error;
+    }
+  }
+
+  async processUserQuery(userInput: string): Promise<any> {
+    const stream = await this.runx(userInput);
+    for await (const update of stream) {
+      if (update?.update?.messages) {
+        const lastMessageContent = this.handleUserQuery(update.update.messages);
+        if (lastMessageContent) {
+          this.orchestrator.publish("onQuery", String(lastMessageContent));
+        }
+      }
+    }
   }
 
   // async processUserQuery(userInput: string): Promise<any> {

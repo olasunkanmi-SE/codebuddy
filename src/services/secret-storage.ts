@@ -136,7 +136,7 @@ export class SecretStorageService implements vscode.Disposable {
     const sensitiveValues = newValue ? "Configured" : "Not Configured";
     const logMessage =
       typeof newValue === "string" &&
-        (configKey.endsWith("apiKey") || configKey.endsWith("apiKeys"))
+      (configKey.endsWith("apiKey") || configKey.endsWith("apiKeys"))
         ? `${messagePrefix} ${sensitiveValues}`
         : `${messagePrefix} ${newValue}`;
     data[configKey] = newValue;

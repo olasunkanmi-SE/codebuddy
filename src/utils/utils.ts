@@ -235,3 +235,7 @@ export const generateId = (): string => {
 export const generateUUID = () => {
   return crypto.randomUUID();
 };
+
+export const isWebSearchConfigured = (): boolean => {
+  return Boolean(getAPIKeyAndModel("tavily").apiKey);
+};

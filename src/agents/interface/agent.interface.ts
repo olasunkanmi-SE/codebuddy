@@ -9,6 +9,24 @@ export enum AGENT_EDGES {
   CONTINUE = "Action",
 }
 
+/**
+ * Human-in-the-loop interrupt decision types
+ */
+export type InterruptDecision = "approve" | "edit" | "reject";
+
+/**
+ * Configuration for a specific tool interrupt
+ */
+export interface IToolInterruptConfig {
+  allowedDecisions: InterruptDecision[];
+}
+
+/**
+ * Interrupt configuration for human-in-the-loop approval
+ * Maps tool names to their interrupt configurations
+ */
+export type InterruptConfiguration = Record<string, IToolInterruptConfig>;
+
 export interface ICodeBuddyAgentConfig {
   model?: string;
   workspaceRoot?: string;
@@ -18,9 +36,22 @@ export interface ICodeBuddyAgentConfig {
   customSystemPrompt?: string;
   enableWebSearch?: boolean;
   checkPointer?: any;
-  enableSubAgent?: boolean;
+  enableSubAgents?: boolean;
   maxFileSizeMb?: number;
-  interruptOn?: Record<string, any>;
+  enableHITL?: boolean;
+  /**
+   * Human-in-the-loop interrupt configuration
+   * Defines which tools require user approval before execution
+   *
+   * Example:
+   * ```typescript
+   * interruptOn: {
+   *   write_file: { allowedDecisions: ["approve", "edit", "reject"] },
+   *   edit_file: { allowedDecisions: ["approve", "edit", "reject"] }
+   * }
+   * ```
+   */
+  interruptOn?: InterruptConfiguration;
 }
 
 export interface ISubAgentConfig {

@@ -442,7 +442,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
     logger.info(`Total commands registered: ${subscriptions.length}`);
 
-
     const quickFix = new CodeActionsProvider();
     quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
       { scheme: "file", language: "*" },
@@ -450,7 +449,6 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     agentEventEmmitter = new EventEmitter();
-
 
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
     initializeWebViewProviders(context, selectedGenerativeAiModel);
@@ -460,7 +458,6 @@ export async function activate(context: vscode.ExtensionContext) {
       agentEventEmmitter,
       orchestrator,
     );
-
   } catch (error: any) {
     // Memory.clear();
     vscode.window.showErrorMessage(

@@ -4,12 +4,14 @@ import { GeminiLLM } from "../llms/gemini/gemini";
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
 import { BaseWebViewProvider, LLMMessage } from "./base";
+import { CodebuddyAgentService } from "../agents/agentService";
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
   readonly model: GenerativeModel;
   readonly metaData?: Record<string, any>;
   private readonly gemini: GeminiLLM;
+  private readonly codeBuddyAgentService: CodebuddyAgentService;
 
   constructor(
     extensionUri: vscode.Uri,
@@ -24,6 +26,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       tools: [{ googleSearch: {} }],
     });
     this.model = this.gemini.getModel();
+    this.codeBuddyAgentService = CodebuddyAgentService.getInstance();
   }
 
   /**
@@ -107,13 +110,13 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         context = await this.getContext(metaData.context);
       }
       if (metaData?.mode === "Agent") {
-        // this.orchestrator.publish("onThinking", "...thinking");
-        // await this.gemini.run(
-        //   context
-        //     ? JSON.stringify(`${message} \n context: ${context}`)
-        //     : JSON.stringify(message),
-        // );
-        // return;
+        this.orchestrator.publish("onThinking", "...thinking");
+        await this.codeBuddyAgentService.processUserQuery(
+          context
+            ? JSON.stringify(`${message} \n context: ${context}`)
+            : JSON.stringify(message),
+        );
+        return;
       }
 
       const msg = userMessage?.length ? userMessage : message;

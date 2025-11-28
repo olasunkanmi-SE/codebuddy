@@ -31,7 +31,11 @@ type AgentEventKeys =
   | "onRefactoring"
   | "onUpdateUserPreferences"
   | "onGetUserPreferences"
-  | "onUpdateThemePreferences";
+  | "onUpdateThemePreferences"
+  | "onPlanStep"
+  | "onToolCall"
+  | "onContentDelta"
+  | "onComplete";
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {

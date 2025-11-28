@@ -89,7 +89,6 @@ export class TavilySearchProvider implements ISearchProvider {
   }
 }
 
-
 export class SearchResponseFormatter {
   static format(response: SearchResponse): string {
     const { answer, results, query } = response;

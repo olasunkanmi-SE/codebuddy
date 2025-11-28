@@ -22,7 +22,8 @@ interface DeepseekLLMSnapshot {
 
 export class DeepseekLLM
   extends BaseLLM<DeepseekLLMSnapshot>
-  implements vscode.Disposable {
+  implements vscode.Disposable
+{
   private readonly client: OpenAI;
   private response: any;
   protected readonly orchestrator: Orchestrator;
@@ -180,9 +181,9 @@ export class DeepseekLLM
           function_call:
             msg.parts && msg.parts[0] && msg.parts[0].functionCall
               ? {
-                name: msg.parts[0].functionCall.name,
-                arguments: JSON.stringify(msg.parts[0].functionCall.args),
-              }
+                  name: msg.parts[0].functionCall.name,
+                  arguments: JSON.stringify(msg.parts[0].functionCall.args),
+                }
               : undefined,
         })),
       ];
@@ -270,8 +271,8 @@ export class DeepseekLLM
 
           const currentCallSignatures = toolCalls
             ? toolCalls
-              .map((call: any) => `${call.name}:${JSON.stringify(call.args)}`)
-              .join(";")
+                .map((call: any) => `${call.name}:${JSON.stringify(call.args)}`)
+                .join(";")
             : "";
 
           if (
