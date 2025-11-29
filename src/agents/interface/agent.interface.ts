@@ -40,7 +40,7 @@ export interface ICodeBuddyAgentConfig {
   maxFileSizeMb?: number;
   enableHITL?: boolean;
   interruptOn?: InterruptConfiguration;
-  streamOptions?: IStreamOptions
+  streamOptions?: IStreamOptions;
 }
 
 export interface ISubAgentConfig {
@@ -79,7 +79,6 @@ export enum MessageRole {
   SYSTEM = "system",
 }
 
-
 export enum StreamEventType {
   START = "streamStart",
   END = "streamEnd",
@@ -87,57 +86,47 @@ export enum StreamEventType {
   TOOL_START = "toolStart",
   TOOL_END = "toolEnd",
   ERROR = "streamError",
-  METADATA = "streamMetadata"
+  METADATA = "streamMetadata",
 }
 
 export interface IStreamEvent {
   type: StreamEventType;
   content: string;
   metadata?: IStreamMetadata;
-  accumulated?: string
+  accumulated?: string;
 }
 
 interface IStreamMetadata {
   node?: string;
   toolName?: string;
   timestamp?: number;
-  tokens?: number
+  tokens?: number;
 }
 
 export interface IStreamChunk {
   id: string;
   content: string;
-  type: StreamEventType
-  metadata?: IStreamMetadata
+  type: StreamEventType;
+  metadata?: IStreamMetadata;
 }
 
 export interface IStreamMessage {
   id: string;
   role: MessageRole;
   content: string;
-  timestamp: number
-  isStreaming: boolean
-  metadata?: Record<string, any>
+  timestamp: number;
+  isStreaming: boolean;
+  metadata?: Record<string, any>;
 }
 
 export interface IVSCodeMessage {
   type: string;
-  payload: any
-  requestId?: string
-}
-
-export interface IWebviewMessage {
-  id: string;
-  type: "user" | "bot"
-  content: string;
-  language?: string;
-  senderInitial?: string;
-  isStreaming?: boolean;
-  timestamp?: number
+  payload: any;
+  requestId?: string;
 }
 
 export interface IStreamOptions {
-  maxBufferSize: number
-  flushInterval: number
-  enableBackPressure: boolean
+  maxBufferSize: number;
+  flushInterval: number;
+  enableBackPressure: boolean;
 }

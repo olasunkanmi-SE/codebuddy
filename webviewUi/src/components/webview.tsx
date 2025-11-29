@@ -1,36 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export interface Message {
-  type: "user" | "bot";
-  content: string;
-  language?: string;
-  alias?: string;
-}
-
-export interface ExtensionMessage {
-  type: string;
-  payload: any;
-}
-
 import { VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
-import { useCallback, useEffect, useRef, useState, useMemo } from "react"; // Use useCallback and useMemo
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { codeBuddyMode, faqItems, modelOptions, themeOptions } from "../constants/constant";
+import { IWebviewMessage, useStreamingChat } from "../hooks/useStreamingChat";
 import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
+import { FAQAccordion } from "./accordion";
 import AttachmentIcon from "./attachmentIcon";
 import { BotMessage } from "./botMessage";
-import { UserMessage } from "./personMessage";
-import { ModelDropdown } from "./select";
-import WorkspaceSelector from "./context";
-import TextInput from "./textInput";
-import ToggleButton from "./toggleButton";
-import Button from "./button";
-import { FAQAccordion } from "./accordion";
-import { SkeletonLoader } from "./skeletonLoader";
-import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 import ChatInput from "./ChatInput";
+import { CommandFeedbackLoader } from "./commandFeedbackLoader";
+import WorkspaceSelector from "./context";
+import { Extensions } from "./extensions";
+import { FutureFeatures } from "./futureFeatures";
+import { UserMessage } from "./personMessage";
+import { Settings } from "./settings";
+import { SkeletonLoader } from "./skeletonLoader";
+import { WelcomeScreen } from "./welcomeUI";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -46,10 +35,10 @@ const vsCode = (() => {
   };
 })();
 
-// Define a type for configuration data for better type safety
 interface ConfigData {
   username?: string;
   theme?: string;
+  enableStreaming?: boolean;
 }
 
 export const WebviewUI = () => {
@@ -57,8 +46,6 @@ export const WebviewUI = () => {
   const [selectedTheme, setSelectedTheme] = useState("tokyo night");
   const [selectedModel, setSelectedModel] = useState("Gemini");
   const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Ask");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isBotLoading, setIsBotLoading] = useState(false);
   const [commandAction, setCommandAction] = useState<string>("");
   const [commandDescription, setCommandDescription] = useState<string>("");
   const [isCommandExecuting, setIsCommandExecuting] = useState(false);
@@ -68,70 +55,89 @@ export const WebviewUI = () => {
   const [activeEditor, setActiveEditor] = useState("");
   const [username, setUsername] = useState("");
   const [darkMode, setDarkMode] = useState(false);
+  const [enableStreaming, setEnableStreaming] = useState(true);
 
   // Ref for username input element
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  // const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize streaming chat hook
+  const {
+    messages: streamedMessages,
+    isStreaming,
+    isLoading: isBotLoading,
+    sendMessage,
+    clearMessages,
+    setMessages,
+  } = useStreamingChat(vsCode, {
+    enableStreaming,
+    onLegacyMessage: (messages) => {
+      console.log("Legacy message received:", messages);
+    },
+  });
 
   // Memoize the chat CSS to prevent unnecessary re-renders
   const chatCss = useMemo(() => getChatCss(selectedTheme), [selectedTheme]);
 
-  // Use useCallback to prevent unnecessary re-renders of the message handler
-  const messageHandler = useCallback((event: any) => {
+  // Legacy message handler for non-streaming events
+  const legacyMessageHandler = useCallback((event: any) => {
     const message = event.data;
-    switch (message.type) {
-      case "bot-response":
-        // Use functional updates to ensure we're working with the most recent state
-        setMessages((prevMessages) => [
-          ...(prevMessages || []),
-          {
-            type: "bot",
-            content: message.message,
-            language: "Typescript",
-            alias: "O",
-          },
-        ]);
-        setIsBotLoading(false);
-        setIsCommandExecuting(false);
-        setCommandAction("");
-        setCommandDescription("");
-        break;
+
+    // Skip streaming-related messages as they're handled by the hook
+    if (message.command?.includes('stream') || message.type?.includes('stream')) {
+      return;
+    }
+
+    switch (message.type || message.command) {
       case "codebuddy-commands":
-        // Handle command feedback - show what action is being performed
         console.log("Command feedback received:", message.message);
         setIsCommandExecuting(true);
         if (typeof message.message === "object" && message.message.action && message.message.description) {
           setCommandAction(message.message.action);
           setCommandDescription(message.message.description);
         } else {
-          // Fallback for legacy string format
           setCommandAction(message.message || "Processing request");
           setCommandDescription("CodeBuddy is analyzing your code and generating a response...");
         }
         break;
+
       case "bootstrap":
         setFolders(message);
         break;
+
       case "chat-history":
         try {
-          // Parse the chat history efficiently using JSON.parse
           const parsedMessages = JSON.parse(message.message);
-          setMessages((prevMessages) => [...parsedMessages, ...(prevMessages || [])]);
+          const formattedMessages: IWebviewMessage[] = parsedMessages.map((msg: any) => ({
+            id: `history-${Date.now()}-${Math.random()}`,
+            type: msg.type,
+            content: msg.content,
+            language: msg.language,
+            alias: msg.alias,
+            timestamp: Date.now(),
+          }));
+          setMessages((prev: IWebviewMessage[]) => [...formattedMessages, ...prev]);
         } catch (error: any) {
-          console.log(error);
-          throw new Error(error.message);
+          console.error("Error parsing chat history:", error);
         }
         break;
+
       case "error":
         console.error("Extension error", message.payload);
-        setIsBotLoading(false);
+        setIsCommandExecuting(false);
         break;
+
       case "onActiveworkspaceUpdate":
         setActiveEditor(message.message ?? "");
         break;
+
       case "onConfigurationChange": {
         const data = JSON.parse(message.message);
-        return data;
+        if (data.enableStreaming !== undefined) {
+          setEnableStreaming(data.enableStreaming);
+        }
+        break;
       }
+
       case "onGetUserPreferences": {
         const data: ConfigData = JSON.parse(message.message);
         if (data.username) {
@@ -140,41 +146,54 @@ export const WebviewUI = () => {
         if (data.theme) {
           setSelectedTheme(data.theme);
         }
-        return data;
+        if (data.enableStreaming !== undefined) {
+          setEnableStreaming(data.enableStreaming);
+        }
+        break;
       }
+
       case "theme-settings":
-        // Handle theme settings from extension
         if (message.theme) {
           setSelectedTheme(message.theme);
         }
         break;
-      default:
-        console.warn("Unknown message type", message.type);
-    }
-  }, []);
 
-  // Update CSS whenever theme changes using useEffect
+      default:
+        // Ignore unknown message types
+        break;
+    }
+  }, [setMessages]);
+
+  // Update CSS whenever theme changes
   useEffect(() => {
-    // Update styles using dynamicCss utility
     updateStyles(chatCss);
   }, [chatCss]);
 
-  // Initialize event listener for messages from VS Code
+  // Initialize legacy event listener
   useEffect(() => {
-    window.addEventListener("message", messageHandler);
+    window.addEventListener("message", legacyMessageHandler);
     return () => {
-      window.removeEventListener("message", messageHandler);
+      window.removeEventListener("message", legacyMessageHandler);
     };
-  }, [messageHandler]); // Dependency array includes messageHandler
+  }, [legacyMessageHandler]);
 
-  // Separate effect for highlighting code blocks using highlightCodeBlocks utility
+  // Highlight code blocks when messages update
   useEffect(() => {
-    highlightCodeBlocks(hljsApi, messages);
-  }, [messages]);
+    highlightCodeBlocks(hljsApi, streamedMessages);
+  }, [streamedMessages]);
+
+  // Clear command execution state when streaming completes
+  useEffect(() => {
+    if (!isStreaming && !isBotLoading) {
+      setIsCommandExecuting(false);
+      setCommandAction("");
+      setCommandDescription("");
+    }
+  }, [isStreaming, isBotLoading]);
 
   const handleClearHistory = useCallback(() => {
-    setMessages([]);
-  }, []);
+    clearMessages();
+  }, [clearMessages]);
 
   const handleUserPreferences = useCallback(() => {
     vsCode.postMessage({
@@ -189,70 +208,26 @@ export const WebviewUI = () => {
     setSelectedContext(value);
   }, []);
 
-  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setUsername(e.target.value);
-  }, []);
+  // const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  //   setUsername(e.target.value);
+  // }, []);
 
   const handleToggle = useCallback((isActive: boolean) => {
     setDarkMode(isActive);
-    // Apply theme change logic here
     document.body.classList.toggle("dark-mode", isActive);
   }, []);
 
-  const handleModelChange = useCallback((e: any) => {
-    const newValue = e.target.value;
-    setSelectedModel(newValue);
-    vsCode.postMessage({
-      command: "update-model-event",
-      message: newValue,
-    });
-  }, []);
-
-  const handleCodeBuddyMode = useCallback((e: any) => {
-    const newValue = e.target.value;
-    setSelectedCodeBuddyMode(newValue);
-    vsCode.postMessage({
-      command: "codebuddy-model-change-event",
-      message: newValue,
-    });
-  }, []);
-
-  const handleThemeChange = useCallback((e: any) => {
-    const newValue = e.target.value;
-    setSelectedTheme(newValue);
-    // Optionally save theme preference to extension storage
-    vsCode.postMessage({
-      command: "theme-change-event",
-      message: newValue,
-    });
-  }, []);
-
-  // Use useCallback to prevent unnecessary re-renders of the handleSend function
   const handleSend = useCallback(
     (message: string) => {
       if (!message.trim()) return;
 
-      setMessages((previousMessages) => [
-        ...(previousMessages || []),
-        {
-          type: "user",
-          content: message,
-          alias: "O",
-        },
-      ]);
-
-      setIsBotLoading(true);
-
-      vsCode.postMessage({
-        command: "user-input",
-        message: message,
-        metaData: {
-          mode: selectedCodeBuddyMode,
-          context: selectedContext.split("@"),
-        },
+      sendMessage(message, {
+        mode: selectedCodeBuddyMode,
+        context: selectedContext.split("@"),
+        alias: "O",
       });
     },
-    [selectedCodeBuddyMode, selectedContext]
+    [sendMessage, selectedCodeBuddyMode, selectedContext]
   );
 
   const handleGetContext = useCallback(() => {
@@ -268,14 +243,23 @@ export const WebviewUI = () => {
   }, [selectedContext]);
 
   const memoizedMessages = useMemo(() => {
-    return messages.map((msg) =>
+    return streamedMessages.map((msg) =>
       msg.type === "bot" ? (
-        <BotMessage key={msg.content} content={msg.content} />
+        <BotMessage
+          key={msg.id}
+          content={msg.content}
+          language={msg.language}
+          isStreaming={msg.isStreaming}
+        />
       ) : (
-        <UserMessage key={msg.content} message={msg.content} alias={msg.alias} />
+        <UserMessage
+          key={msg.id}
+          message={msg.content}
+          alias={msg.alias}
+        />
       )
     );
-  }, [messages]);
+  }, [streamedMessages]);
 
   return (
     <div style={{ overflow: "hidden" }}>
@@ -287,72 +271,100 @@ export const WebviewUI = () => {
           SETTINGS
         </VSCodePanelTab>
         <VSCodePanelTab id="tab-3" onClick={() => setActiveTab("tab-3")}>
-          FAQ
+          EXTENSIONS
         </VSCodePanelTab>
         <VSCodePanelTab id="tab-4" onClick={() => setActiveTab("tab-4")}>
-          OTHERS
+          FAQ
         </VSCodePanelTab>
-
+        <VSCodePanelTab id="tab-5" onClick={() => setActiveTab("tab-5")}>
+          FUTURE
+        </VSCodePanelTab>
         <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
           <div className="chat-content">
             <div className="dropdown-container">
               <div>
-                {memoizedMessages}
-                {isCommandExecuting && (
-                  <CommandFeedbackLoader commandAction={commandAction} commandDescription={commandDescription} />
+                {/* Show welcome screen when there are no messages */}
+                {streamedMessages.length === 0 && !isBotLoading && !isCommandExecuting ? (
+                  <WelcomeScreen
+                    username={username}
+                    onGetStarted={() => {
+                      // Optional: Focus on the input or trigger a sample prompt
+                      console.log("User is ready to start!");
+                    }}
+                  />
+                ) : (
+                  <>
+                    {memoizedMessages}
+                    {isCommandExecuting && (
+                      <CommandFeedbackLoader
+                        commandAction={commandAction}
+                        commandDescription={commandDescription}
+                      />
+                    )}
+                    {isBotLoading && !isCommandExecuting && !isStreaming && <SkeletonLoader />}
+                  </>
                 )}
-                {isBotLoading && !isCommandExecuting && <SkeletonLoader />}
               </div>
             </div>
           </div>
         </VSCodePanelView>
 
         <VSCodePanelView id="view-2">
-          <div>
-            <div className="horizontal-stack-setting">
-              <span> Nickname </span>
-              <span>
-                <TextInput
-                  ref={nameInputRef}
-                  onChange={handleNameChange}
-                  value={username}
-                  className="text-input"
-                  maxLength={10}
-                  disabled={true}
-                />
-              </span>
-              <span style={{ marginLeft: "5px" }}>
-                <Button
-                  onClick={handleUserPreferences}
-                  initialText="save"
-                  clickedText="saving..."
-                  duration={2000}
-                  disabled={true}
-                ></Button>
-              </span>
-            </div>
-            <div className="horizontal-stack-setting">
-              {" "}
-              <span> Index Codebase </span>
-              <span>
-                {" "}
-                <ToggleButton label="" initialState={darkMode} onToggle={handleToggle} disabled={true} />
-              </span>
-            </div>
-          </div>
+          <Settings
+            username={username}
+            selectedTheme={selectedTheme}
+            selectedModel={selectedModel}
+            selectedCodeBuddyMode={selectedCodeBuddyMode}
+            enableStreaming={enableStreaming}
+            darkMode={darkMode}
+            themeOptions={themeOptions}
+            modelOptions={modelOptions}
+            codeBuddyMode={codeBuddyMode}
+            onUsernameChange={setUsername}
+            onThemeChange={(value) => {
+              setSelectedTheme(value);
+              vsCode.postMessage({ command: "theme-change-event", message: value });
+            }}
+            onModelChange={(value) => {
+              setSelectedModel(value);
+              vsCode.postMessage({ command: "update-model-event", message: value });
+            }}
+            onCodeBuddyModeChange={(value) => {
+              setSelectedCodeBuddyMode(value);
+              vsCode.postMessage({ command: "codebuddy-model-change-event", message: value });
+            }}
+            onStreamingChange={setEnableStreaming}
+            onDarkModeChange={handleToggle}
+            onClearHistory={handleClearHistory}
+            onSavePreferences={handleUserPreferences}
+          />
         </VSCodePanelView>
+
         <VSCodePanelView id="view-3">
+          <Extensions
+            onAddMCPServer={(server) => console.log('Add server:', server)}
+            onAddAgent={(agent) => console.log('Add agent:', agent)}
+          />
+        </VSCodePanelView>
+
+        <VSCodePanelView id="view-4">
           <div>
-            <FAQAccordion
-              items={faqItems.map((i) => ({
-                question: i.question,
-                answer: <div className="doc-content" dangerouslySetInnerHTML={{ __html: i.answer }} />,
-              }))}
-            />
+            <VSCodePanelView id="view-4">
+              <div>
+                <VSCodePanelView id="view-4">
+                  <div>
+                    <FAQAccordion items={faqItems} />
+                  </div>
+                </VSCodePanelView>
+              </div>
+            </VSCodePanelView>
           </div>
         </VSCodePanelView>
-        <VSCodePanelView id="view-4">In Dev </VSCodePanelView>
+        <VSCodePanelView id="view-5">
+          <FutureFeatures />
+        </VSCodePanelView>
       </VSCodePanels>
+
       <div
         className="business"
         style={{
@@ -389,24 +401,10 @@ export const WebviewUI = () => {
             </span>
           </div>
           <WorkspaceSelector activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
-          <ChatInput onSendMessage={handleSend} /> {/* Replace VSCodeTextArea with ChatInput */}
+          <ChatInput onSendMessage={handleSend} />
         </div>
         <div className="horizontal-stack">
           <AttachmentIcon onClick={handleGetContext} disabled={true} />
-          <ModelDropdown value={selectedModel} onChange={handleModelChange} options={modelOptions} id="model" />
-          <ModelDropdown
-            value={selectedCodeBuddyMode}
-            onChange={handleCodeBuddyMode}
-            options={codeBuddyMode}
-            id="cBuddymode"
-          />
-          <ModelDropdown value={selectedTheme} onChange={handleThemeChange} options={themeOptions} id="theme" />
-          <Button
-            onClick={handleClearHistory}
-            initialText="Clear history"
-            clickedText="Clearing..."
-            duration={2000}
-          ></Button>
         </div>
       </div>
     </div>

@@ -35,7 +35,7 @@ type AgentEventKeys =
   | "streamStart"
   | "streamFlush"
   | "streamEnd"
-  | "streamError"
+  | "streamError";
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {
