@@ -20,6 +20,7 @@ import { UserMessage } from "./personMessage";
 import { Settings } from "./settings";
 import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
+import { LocalModels } from "./local";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -279,6 +280,9 @@ export const WebviewUI = () => {
         <VSCodePanelTab id="tab-5" onClick={() => setActiveTab("tab-5")}>
           FUTURE
         </VSCodePanelTab>
+        <VSCodePanelTab id="tab-6" onClick={() => setActiveTab("tab-6")}>
+          LOCAL
+        </VSCodePanelTab>
         <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
           <div className="chat-content">
             <div className="dropdown-container">
@@ -362,6 +366,9 @@ export const WebviewUI = () => {
         </VSCodePanelView>
         <VSCodePanelView id="view-5">
           <FutureFeatures />
+        </VSCodePanelView>
+        <VSCodePanelView id="view-6">
+          <LocalModels />
         </VSCodePanelView>
       </VSCodePanels>
 

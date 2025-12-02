@@ -199,7 +199,8 @@ export class WebViewProviderManager implements vscode.Disposable {
   ): Promise<void> {
     // Initialize event listeners when first provider is created
     this.initializeEventListeners();
-    await this.switchProvider(modelName, apiKey, model, onload);
+    // Is this necessary? At the instantiation of the extension?
+    // await this.switchProvider(modelName, apiKey, model, onload);
   }
 
   private async handleModelChange(event: IEventPayload): Promise<void> {

@@ -204,19 +204,15 @@ export const useStreamingChat = (
       switch (messageType) {
         // Streaming commands
         case "streamStart":
-        case "stream-start":
           handleStreamStart(payload);
           break;
         case "streamChunk":
-        case "stream-chunk":
           handleStreamChunk(payload);
           break;
         case "streamEnd":
-        case "stream-end":
           handleStreamEnd(payload);
           break;
         case "streamError":
-        case "stream-error":
           handleStreamError(payload);
           break;
 

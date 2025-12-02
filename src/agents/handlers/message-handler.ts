@@ -10,6 +10,7 @@ export class MessageHandler {
     string,
     { threadId?: string }
   >();
+  static instance: MessageHandler;
 
   constructor(private readonly webview: vscode.Webview) {
     this.agentService = CodeBuddyAgentService.getInstance();
@@ -21,12 +22,18 @@ export class MessageHandler {
     });
   }
 
+  static getInstance(webview: vscode.Webview): MessageHandler {
+    return (MessageHandler.instance ??= new MessageHandler(webview));
+  }
+
   async handleUserMessage(message: string, metaData?: any) {
     const requestId = `request-${Date.now()}`;
     const threadId = metaData?.threadId;
-    this.activeRequests.set(requestId, { threadId });
+    this.activeRequests.set(requestId, {
+      threadId: threadId ?? `${threadId}-${Date.now()}`,
+    });
     try {
-      this.webview.postMessage({
+      await this.webview.postMessage({
         type: StreamEventType.START,
         payload: {
           requestId,
@@ -37,9 +44,9 @@ export class MessageHandler {
 
       await this.agentService.processUserQuery(
         message,
-        (chunk) => {
+        async (chunk) => {
           if (!this.activeRequests.has(requestId)) return;
-          this.webview.postMessage({
+          await this.webview.postMessage({
             type: StreamEventType.CHUNK,
             payload: {
               requestId,
@@ -50,9 +57,9 @@ export class MessageHandler {
             },
           });
         },
-        (finalContent) => {
+        async (finalContent) => {
           if (!this.activeRequests.has(requestId)) return;
-          this.webview.postMessage({
+          await this.webview.postMessage({
             type: StreamEventType.END,
             payload: {
               requestId,
@@ -63,9 +70,10 @@ export class MessageHandler {
           this.activeRequests.delete(requestId);
           this.logger.info(`Request ${requestId} completed`);
         },
-        (error) => {
+        async (error) => {
           if (!this.activeRequests.has(requestId)) return;
-          this.webview.postMessage({
+          // TODO: Publish instead of postMessage, then handle where the webview has been initialized. Example in the webview provider manager. src/webview-providers/manager.ts
+          await this.webview.postMessage({
             type: StreamEventType.ERROR,
             payload: {
               requestId,
@@ -80,7 +88,7 @@ export class MessageHandler {
       );
     } catch (error: any) {
       this.logger.error(`Request ${requestId} failed`, error);
-      this.webview.postMessage({
+      await this.webview.postMessage({
         type: StreamEventType.ERROR,
         payload: {
           requestId,
