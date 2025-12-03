@@ -62,6 +62,7 @@ export const useStreamingChat = (
   // Streaming handlers
   const handleStreamStart = useCallback(
     (payload: any) => {
+      console.log("payload", payload);
       if (!enableStreaming) return;
 
       const tempId = `temp-${payload.requestId || Date.now()}`;
@@ -195,29 +196,26 @@ export const useStreamingChat = (
   // Message event listener
   useEffect(() => {
     const messageHandler = (event: any) => {
+      console.log("event", event);
       const message = event.data;
-      const { command, type, ...payload } = message;
+      const { command, type } = message;
 
       // Handle both 'command' and 'type' for backward compatibility
       const messageType = command || type;
 
       switch (messageType) {
         // Streaming commands
-        case "streamStart":
-        case "stream-start":
-          handleStreamStart(payload);
+        case "onStreamStart":
+          handleStreamStart(message.payload);
           break;
-        case "streamChunk":
-        case "stream-chunk":
-          handleStreamChunk(payload);
+        case "onStreamChunk":
+          handleStreamChunk(message.payload);
           break;
-        case "streamEnd":
-        case "stream-end":
-          handleStreamEnd(payload);
+        case "onStreamEnd":
+          handleStreamEnd(message.payload);
           break;
-        case "streamError":
-        case "stream-error":
-          handleStreamError(payload);
+        case "onStreamError":
+          handleStreamError(message.payload);
           break;
 
         // Legacy non-streaming response

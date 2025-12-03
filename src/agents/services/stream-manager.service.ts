@@ -51,7 +51,7 @@ export class StreamManager {
     this.streamId = generateUUID();
     this.isStreaming = true;
     this.buffer = [];
-    this.orchestrator.publish("streamStart", {
+    this.orchestrator.publish("onStreamStart", {
       id: this.streamId,
       type: StreamEventType.START,
       content: "",
@@ -91,7 +91,7 @@ export class StreamManager {
     // added to the new empty buffer while the old one is being flushed.
     const chunksToFlush = this.buffer;
     this.buffer = [];
-    this.orchestrator.publish("streamFlush", chunksToFlush);
+    this.orchestrator.publish("onStreamFlush", chunksToFlush);
   }
 
   /**
@@ -153,7 +153,7 @@ export class StreamManager {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
     }
-    this.orchestrator.publish("streamEnd", {
+    this.orchestrator.publish("onStreamEnd", {
       id: this.streamId,
       type: StreamEventType.END,
       content: finalContent ?? "",
@@ -177,7 +177,7 @@ export class StreamManager {
       error,
       streamId: this.streamId,
     });
-    this.orchestrator.publish("streamError", {
+    this.orchestrator.publish("onStreamError", {
       id: this.streamId,
       type: StreamEventType.ERROR,
       content: error.message,

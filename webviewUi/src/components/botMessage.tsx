@@ -18,7 +18,7 @@ export const BotMessage: React.FC<BotMessageProps> = ({
   isStreaming = false 
 }) => {
   const sanitizedContent = DOMPurify.sanitize(content);
-  const action = "Researching...";
+  // const action = "Researching...";
   let parsedUrls: IParseURL[] = [];
   
   if (sanitizedContent.includes("favicon")) {
@@ -124,15 +124,15 @@ export const BotMessage: React.FC<BotMessageProps> = ({
   }
 
   // Show thinking state
-  if (content.includes("thinking")) {
-    return (
-      <div className="doc-content">
-        <span style={{ display: "flex", alignItems: "center" }}>
-          <small>{action}</small> <BotIcon isBlinking={true} />
-        </span>
-      </div>
-    );
-  }
+  // if (content.includes("thinking")) {
+  //   return (
+  //     <div className="doc-content">
+  //       <span style={{ display: "flex", alignItems: "center" }}>
+  //         <small>{action}</small> <BotIcon isBlinking={true} />
+  //       </span>
+  //     </div>
+  //   );
+  // }
 
   // Show normal message with streaming cursor if applicable
   return (

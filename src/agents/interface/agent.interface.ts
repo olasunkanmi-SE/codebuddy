@@ -80,12 +80,12 @@ export enum MessageRole {
 }
 
 export enum StreamEventType {
-  START = "streamStart",
-  END = "streamEnd",
-  CHUNK = "streamChunk",
+  START = "onStreamStart",
+  END = "onStreamEnd",
+  CHUNK = "onStreamChunk",
   TOOL_START = "toolStart",
   TOOL_END = "toolEnd",
-  ERROR = "streamError",
+  ERROR = "onStreamError",
   METADATA = "streamMetadata",
 }
 

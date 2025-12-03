@@ -71,25 +71,25 @@ export class CodeBuddyAgentService {
         for (const [nodeName, update] of Object.entries(
           event as Record<string, any>,
         )) {
-          if (nodeName === "__interrupt__") {
-            this.logger.log(LogLevel.INFO, "Auto-approving interrupt");
-            const interrupts = update as any[];
-            for (const interrupt of interrupts) {
-              if (interrupt?.value.id) {
-                result = await agent.stream(
-                  {
-                    command: {
-                      resume: {
-                        [interrupt.value.id]: "approve",
-                      },
-                    },
-                  },
-                  config,
-                );
-              }
-            }
-            continue;
-          }
+          // if (nodeName === "__interrupt__") {
+          //   this.logger.log(LogLevel.INFO, "Auto-approving interrupt");
+          //   const interrupts = update as any[];
+          //   for (const interrupt of interrupts) {
+          //     if (interrupt?.value.id) {
+          //       result = await agent.stream(
+          //         {
+          //           command: {
+          //             resume: {
+          //               [interrupt.value.id]: "approve",
+          //             },
+          //           },
+          //         },
+          //         config,
+          //       );
+          //     }
+          //   }
+          //   continue;
+          // }
           if (update?.messages && Array.isArray(update.messages)) {
             const lastMessage = update.messages[update.messages.length - 1];
             if (lastMessage?.content) {

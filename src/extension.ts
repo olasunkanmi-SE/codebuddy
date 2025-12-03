@@ -140,6 +140,8 @@ function initializeWebViewProviders(
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
+    initializeWebViewProviders(context, selectedGenerativeAiModel);
     Logger.sessionId = Logger.generateId();
 
     const databaseService: SqliteDatabaseService =
@@ -449,9 +451,6 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     agentEventEmmitter = new EventEmitter();
-
-    const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
-    initializeWebViewProviders(context, selectedGenerativeAiModel);
     context.subscriptions.push(
       ...subscriptions,
       quickFixCodeAction,

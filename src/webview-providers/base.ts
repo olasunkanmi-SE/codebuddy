@@ -29,6 +29,7 @@ import { getWebviewContent } from "../webview/chat";
 import { QuestionClassifierService } from "../services/question-classifier.service";
 import { GroqLLM } from "../llms/groq/groq";
 import { Role } from "../llms/message";
+import { MessageHandler } from "../agents/handlers/message-handler";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -72,6 +73,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   // Prompt enhancement service
   protected promptBuilderService: EnhancedPromptBuilderService;
   private readonly groqLLM: GroqLLM | null;
+  private readonly codeBuddyAgent: MessageHandler;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -131,6 +133,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.contextRetriever = new ContextRetriever();
 
     this.promptBuilderService = new EnhancedPromptBuilderService(context);
+    this.codeBuddyAgent = MessageHandler.getInstance();
   }
 
   registerDisposables() {
@@ -383,10 +386,23 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
               }
 
+              if (message.metaData?.mode === "Agent") {
+                let context: string | undefined;
+                if (message.metaData?.context.length > 0) {
+                  context = await this.getContext(message.metaData.context);
+                }
+                return await this.codeBuddyAgent.handleUserMessage(
+                  context
+                    ? JSON.stringify(`${message} \n context: ${context}`)
+                    : JSON.stringify(message),
+                );
+
+              }
+
               const messageAndSystemInstruction =
-                  await this.enhanceMessageWithCodebaseContext(
-                    sanitizedMessage,
-                  ),
+                await this.enhanceMessageWithCodebaseContext(
+                  sanitizedMessage,
+                ),
                 response = await this.generateResponse(
                   messageAndSystemInstruction,
                   message.metaData,
@@ -624,10 +640,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   async categorizeQuestion(userQuestion: string): Promise<
     | {
-        isCodebaseRelated: boolean;
-        categories: string[];
-        confidence: "high" | "medium" | "low";
-      }
+      isCodebaseRelated: boolean;
+      categories: string[];
+      confidence: "high" | "medium" | "low";
+    }
     | undefined
   > {
     const prompt = `You are an AI copilot expert in analyzing user questions to distinguish between codebase-specific queries and general knowledge questions. Given a user's question, determine if it is related to analyzing or querying details within a specific codebase (e.g., "how was authentication handled within this application" is codebase-related because it asks about implementation in a particular code context). If it's a general definition or non-code-specific question (e.g., "what is MCP, model context protocol" is not codebase-related because it's seeking a general explanation), classify it accordingly.

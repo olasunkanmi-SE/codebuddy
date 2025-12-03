@@ -1,17 +1,20 @@
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
+import { Orchestrator } from "../../orchestrator";
 import { StreamEventType } from "../interface/agent.interface";
 import { CodeBuddyAgentService } from "../services/codebuddy-agent.service";
 
 export class MessageHandler {
+  protected readonly orchestrator: Orchestrator;
   private agentService: CodeBuddyAgentService;
   private logger: Logger;
+  private static instance: MessageHandler;
   private activeRequests: Map<string, { threadId?: string }> = new Map<
     string,
     { threadId?: string }
   >();
 
-  constructor(private readonly webview: vscode.Webview) {
+  constructor() {
+    this.orchestrator = Orchestrator.getInstance();
     this.agentService = CodeBuddyAgentService.getInstance();
     this.logger = Logger.initialize("MessageHandler", {
       minLevel: LogLevel.DEBUG,
@@ -21,57 +24,51 @@ export class MessageHandler {
     });
   }
 
+  static getInstance() {
+    return (MessageHandler.instance ??= new MessageHandler());
+  }
+
   async handleUserMessage(message: string, metaData?: any) {
     const requestId = `request-${Date.now()}`;
     const threadId = metaData?.threadId;
     this.activeRequests.set(requestId, { threadId });
     try {
-      this.webview.postMessage({
-        type: StreamEventType.START,
-        payload: {
-          requestId,
-          threadId,
-          timestamp: Date.now(),
-        },
+      await this.orchestrator.publish(StreamEventType.START, {
+        requestId,
+        threadId,
+        metadata: { timestamp: Date.now() },
       });
 
       await this.agentService.processUserQuery(
         message,
-        (chunk) => {
+        async (chunk) => {
           if (!this.activeRequests.has(requestId)) return;
-          this.webview.postMessage({
-            type: StreamEventType.CHUNK,
-            payload: {
-              requestId,
-              content: chunk.content,
-              timestamp: Date.now(),
-              accumulated: chunk.accumulated,
-              metadata: chunk.metadata,
-            },
+          await this.orchestrator.publish(StreamEventType.CHUNK, {
+            requestId,
+            threadId,
+            content: chunk.content,
+            accumulated: chunk.accumulated,
+            metadata: { timestamp: Date.now() },
           });
         },
-        (finalContent) => {
+        async (finalContent) => {
           if (!this.activeRequests.has(requestId)) return;
-          this.webview.postMessage({
-            type: StreamEventType.END,
-            payload: {
-              requestId,
-              finalContent,
-              timestamp: Date.now(),
-            },
+          await this.orchestrator.publish(StreamEventType.END, {
+            requestId,
+            threadId,
+            content: finalContent,
+            metadata: { timestamp: Date.now() },
           });
           this.activeRequests.delete(requestId);
           this.logger.info(`Request ${requestId} completed`);
         },
-        (error) => {
+        async (error) => {
           if (!this.activeRequests.has(requestId)) return;
-          this.webview.postMessage({
-            type: StreamEventType.ERROR,
-            payload: {
-              requestId,
-              error: `Request ${requestId} failed`,
-              timestamp: Date.now(),
-            },
+          await this.orchestrator.publish(StreamEventType.ERROR, {
+            requestId,
+            threadId,
+            error: `Request ${requestId} failed`,
+            metadata: { timestamp: Date.now() },
           });
           this.activeRequests.delete(requestId);
           this.logger.error(`Request ${requestId} failed`, error);
@@ -80,13 +77,11 @@ export class MessageHandler {
       );
     } catch (error: any) {
       this.logger.error(`Request ${requestId} failed`, error);
-      this.webview.postMessage({
-        type: StreamEventType.ERROR,
-        payload: {
-          requestId,
-          error: `Request ${requestId} failed`,
-          timestamp: Date.now(),
-        },
+      await this.orchestrator.publish(StreamEventType.ERROR, {
+        requestId,
+        threadId,
+        error: `Request ${requestId} failed`,
+        metadata: { timestamp: Date.now() },
       });
       this.activeRequests.delete(requestId);
     }
