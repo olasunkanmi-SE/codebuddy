@@ -177,7 +177,7 @@ export class WebViewProviderManager implements vscode.Disposable {
         this.extensionContext.subscriptions.push(webviewProviderDisposable);
       }
 
-      this.orchestrator.publish(
+      await this.orchestrator.publish(
         "onModelChangeSuccess",
         JSON.stringify({
           success: true,
@@ -186,7 +186,7 @@ export class WebViewProviderManager implements vscode.Disposable {
       );
     } catch (error: any) {
       this.logger.error(`Error switching provider: ${error}`);
-      this.orchestrator.publish(
+      await this.orchestrator.publish(
         "onModelChangeSuccess",
         JSON.stringify({
           success: false,

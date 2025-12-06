@@ -51,6 +51,9 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
     this.createEvent("onStreamError");
   onStreamFlush: vscode.Event<IEventPayload> =
     this.createEvent("onStreamFlush");
+  onModelChangeSuccess: vscode.Event<IEventPayload> = this.createEvent(
+    "onModelChangeSuccess",
+  );
 
   /**
    * Emits a generic event with specified status, message, and optional data.

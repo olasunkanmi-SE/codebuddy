@@ -87,6 +87,10 @@ export const getConfigValue: GetConfigValueType<any> = <T>(
   return vscode.workspace.getConfiguration().get<T>(key);
 };
 
+export const setConfigValue = <T>(key: string, value: T) => {
+  vscode.workspace.getConfiguration().update(key, value);
+};
+
 export const vscodeErrorMessage = (error: string, metaData?: any) => {
   return vscode.window.showErrorMessage(error);
 };

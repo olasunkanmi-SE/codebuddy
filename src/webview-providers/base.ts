@@ -24,7 +24,7 @@ import { ProductionSafeguards } from "../services/production-safeguards.service"
 import { LogLevel } from "../services/telemetry";
 import { UserFeedbackService } from "../services/user-feedback.service";
 import { WorkspaceService } from "../services/workspace-service";
-import { formatText, getAPIKeyAndModel } from "../utils/utils";
+import { formatText, getAPIKeyAndModel, getConfigValue } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
 import { QuestionClassifierService } from "../services/question-classifier.service";
 import { GroqLLM } from "../llms/groq/groq";
@@ -223,9 +223,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           metadata: msg.metadata,
         }));
 
-        // Update the provider's chatHistory array (this should be overridden in child classes)
-        await this.updateProviderChatHistory(providerHistory);
-
         this.logger.debug(
           `Synchronized ${persistentHistory.length} chat messages from database`,
         );
@@ -239,18 +236,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       );
       // Don't throw - this is not critical for provider initialization
     }
-  }
-
-  /**
-   * Update the provider's specific chatHistory array
-   * Should be overridden by child classes to update their specific chatHistory type
-   */
-  protected updateProviderChatHistory(history: any[]): void {
-    // Base implementation - child classes should override this
-    // to update their specific chatHistory arrays
-    this.logger.debug(
-      "Base provider - no specific chat history array to update",
-    );
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
@@ -329,6 +314,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           switch (message.command) {
             case "user-input": {
               this.UserMessageCounter += 1;
+              const selectedGenerativeAiModel = getConfigValue(
+                "generativeAi.option",
+              );
+              console.log(selectedGenerativeAiModel);
 
               // Validate user input for security
               const validation = this.inputValidator.validateInput(
@@ -396,13 +385,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     ? JSON.stringify(`${message} \n context: ${context}`)
                     : JSON.stringify(message),
                 );
-
               }
 
               const messageAndSystemInstruction =
-                await this.enhanceMessageWithCodebaseContext(
-                  sanitizedMessage,
-                ),
+                  await this.enhanceMessageWithCodebaseContext(
+                    sanitizedMessage,
+                  ),
                 response = await this.generateResponse(
                   messageAndSystemInstruction,
                   message.metaData,
@@ -640,10 +628,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   async categorizeQuestion(userQuestion: string): Promise<
     | {
-      isCodebaseRelated: boolean;
-      categories: string[];
-      confidence: "high" | "medium" | "low";
-    }
+        isCodebaseRelated: boolean;
+        categories: string[];
+        confidence: "high" | "medium" | "low";
+      }
     | undefined
   > {
     const prompt = `You are an AI copilot expert in analyzing user questions to distinguish between codebase-specific queries and general knowledge questions. Given a user's question, determine if it is related to analyzing or querying details within a specific codebase (e.g., "how was authentication handled within this application" is codebase-related because it asks about implementation in a particular code context). If it's a general definition or non-code-specific question (e.g., "what is MCP, model context protocol" is not codebase-related because it's seeking a general explanation), classify it accordingly.

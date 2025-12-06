@@ -29,13 +29,18 @@ import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
 import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
 import { SqliteDatabaseService } from "./services/sqlite-database.service";
-import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
+import {
+  getAPIKeyAndModel,
+  getConfigValue,
+  setConfigValue,
+} from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
 import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
+import { DeveloperAgent } from "./agents/developer/agent";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -108,6 +113,13 @@ function initializeWebViewProviders(
       };
 
       const providerManager = WebViewProviderManager.getInstance(context);
+      let apiKeys = "";
+
+      for (const [key, value] of Object.entries(modelConfigurations)) {
+        if (getConfigValue(value.key) === "apiKey") {
+          apiKeys += `${key}, `;
+        }
+      }
 
       if (selectedGenerativeAiModel in modelConfigurations) {
         const modelConfig = modelConfigurations[selectedGenerativeAiModel];
@@ -126,6 +138,13 @@ function initializeWebViewProviders(
         );
       }
 
+      if (apiKeys.length > 0) {
+        vscode.window.showErrorMessage(
+          `${apiKeys} APIkeys are required \n
+              Check out the FAQ and SETTINGS section to configure your AI assistant`,
+        );
+      }
+
       // Store providerManager globally and add to subscriptions
       (globalThis as any).providerManager = providerManager;
       context.subscriptions.push(providerManager);
@@ -140,7 +159,9 @@ function initializeWebViewProviders(
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    new DeveloperAgent({});
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
+    setConfigValue("generativeAi.option", "Gemini");
     initializeWebViewProviders(context, selectedGenerativeAiModel);
     Logger.sessionId = Logger.generateId();
 

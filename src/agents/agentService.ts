@@ -1,4 +1,5 @@
 import { InMemoryStore, MemorySaver } from "@langchain/langgraph";
+import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
 import { createAdvancedDeveloperAgent } from "./developer/agent";
@@ -87,6 +88,21 @@ export class CodebuddyAgentService {
       }
     } catch (error: any) {
       this.logger.error("Agent execution failed:", error);
+      if (
+        error.message?.includes("token") ||
+        error.message?.includes("billing") ||
+        error.message?.includes("token usage") ||
+        error.message?.includes("billing issue") ||
+        error.message?.includes("quota") ||
+        error.message?.includes("authorization") ||
+        error.message?.includes("401") ||
+        error.message?.includes("403")
+      ) {
+        vscode.window.showErrorMessage(
+          `token usage or billing issues, kindly check your billing informationon your AI platform`,
+        );
+        throw new Error(`Authorization or billing error: ${error.message}`);
+      }
       throw error;
     }
   }

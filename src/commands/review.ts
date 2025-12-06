@@ -119,6 +119,8 @@ const posts = useMemo(() => loadPosts(), [dependency]);
 - [ ] Documentation updated
 - [ ] Code follows style guidelines
 
+### **Learning resources for identified gaps**
+
 **Focus**: Provide specific, actionable feedback with concrete examples and measurable improvements.`;
     return PROMPT;
   }

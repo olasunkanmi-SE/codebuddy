@@ -80,12 +80,21 @@ class SimpleMutex {
 
 /** Convert basic glob pattern to RegExp (supports *, **, ?). */
 function globToRegExp(pattern: string): RegExp {
-  const esc = pattern.replace(/[-/\\^$+?.()|[\]{}]/g, "\\$&");
-  const replaced = esc
-    .replace(/\\\*\\\*/g, ".*")
-    .replace(/\\\*/g, "[^/]*")
-    .replace(/\\\?/g, ".");
-  return new RegExp(`^${replaced}$`);
+  let normalized = pattern.replace(/^\/+|\/+$/g, "");
+
+  if (!normalized) {
+    return new RegExp("^.*$");
+  }
+
+  let escaped = normalized.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+
+  escaped = escaped
+    .replace(/\*\*/g, "§DOUBLESTAR§")
+    .replace(/\*/g, "[^/]*")
+    .replace(/§DOUBLESTAR§/g, ".*")
+    .replace(/\?/g, "[^/]");
+
+  return new RegExp(`^${escaped}$`);
 }
 
 /**

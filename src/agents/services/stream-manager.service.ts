@@ -47,13 +47,12 @@ export class StreamManager {
    * and schedules the first buffer flush.
    * @returns {string} The unique identifier for the newly started stream.
    */
-  startStream(): string {
+  async startStream(): Promise<string> {
     this.streamId = generateUUID();
     this.isStreaming = true;
     this.buffer = [];
-    this.orchestrator.publish("onStreamStart", {
+    await this.orchestrator.publish(StreamEventType.START, {
       id: this.streamId,
-      type: StreamEventType.START,
       content: "",
       metadata: { timestamp: Date.now() },
     });
@@ -145,7 +144,7 @@ export class StreamManager {
    * the timer, and publishes an end event.
    * @param {string} [finalContent] - Optional final message to include in the end event.
    */
-  endStream(finalContent?: string) {
+  async endStream(finalContent?: string): Promise<void> {
     // Ensure any lingering chunks are sent before closing the stream.
     this.flush();
 
@@ -153,7 +152,7 @@ export class StreamManager {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
     }
-    this.orchestrator.publish("onStreamEnd", {
+    await this.orchestrator.publish("onStreamEnd", {
       id: this.streamId,
       type: StreamEventType.END,
       content: finalContent ?? "",
@@ -168,7 +167,7 @@ export class StreamManager {
    * It flushes any pending data, publishes an error event, and then terminates the stream.
    * @param {Error} error - The error object to be reported.
    */
-  handleError(error: Error) {
+  async handleError(error: Error): Promise<void> {
     this.flush();
     const metadata: { timestamp: number; stack?: string; message?: string } = {
       timestamp: Date.now(),
@@ -177,13 +176,13 @@ export class StreamManager {
       error,
       streamId: this.streamId,
     });
-    this.orchestrator.publish("onStreamError", {
+    await this.orchestrator.publish("onStreamError", {
       id: this.streamId,
       type: StreamEventType.ERROR,
       content: error.message,
       metadata,
     });
-    this.endStream();
+    await this.endStream();
   }
 
   /**

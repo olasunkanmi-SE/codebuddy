@@ -52,6 +52,8 @@ export class CodeBuddyAgentService {
       enableBackPressure: true,
     });
     this.activeStreams.set(conversationId, streamManger);
+    const maxIterations = 50;
+    let iterationCount = 0;
     try {
       const agent = await this.getAgent();
       const streamId = streamManger.startStream();
@@ -61,6 +63,7 @@ export class CodeBuddyAgentService {
       );
       const config = {
         configurable: { thread_id: conversationId },
+        recursionLimit: 100,
       };
       let result = await agent.stream(
         { messages: [{ role: "user", content: userMessage }] },
@@ -68,28 +71,24 @@ export class CodeBuddyAgentService {
       );
       let accumulatedContent = "";
       for await (const event of result) {
+        iterationCount++;
+        if (iterationCount >= maxIterations) {
+          this.logger.log(
+            LogLevel.ERROR,
+            `Force stopping: exceeded ${maxIterations} iterations`,
+          );
+
+          yield {
+            type: StreamEventType.ERROR,
+            content:
+              "The agent exceeded maximum iterations. Please rephrase your question or try a simpler query.",
+            metadata: { threadId: conversationId, reason: "max_iterations" },
+          };
+          break;
+        }
         for (const [nodeName, update] of Object.entries(
           event as Record<string, any>,
         )) {
-          // if (nodeName === "__interrupt__") {
-          //   this.logger.log(LogLevel.INFO, "Auto-approving interrupt");
-          //   const interrupts = update as any[];
-          //   for (const interrupt of interrupts) {
-          //     if (interrupt?.value.id) {
-          //       result = await agent.stream(
-          //         {
-          //           command: {
-          //             resume: {
-          //               [interrupt.value.id]: "approve",
-          //             },
-          //           },
-          //         },
-          //         config,
-          //       );
-          //     }
-          //   }
-          //   continue;
-          // }
           if (update?.messages && Array.isArray(update.messages)) {
             const lastMessage = update.messages[update.messages.length - 1];
             if (lastMessage?.content) {

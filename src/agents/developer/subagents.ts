@@ -1,4 +1,5 @@
 import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatGroq } from "@langchain/groq";
 import { SubAgent } from "deepagents";
 import { StructuredTool } from "langchain";
 
@@ -7,7 +8,7 @@ import { StructuredTool } from "langchain";
  * Each subagent has a specific role and optimized prompting
  */
 export function createDeveloperSubagents(
-  model: ChatAnthropic,
+  model: ChatAnthropic | ChatGroq, // this should be either anthropic or groq or Gemini
   tools: StructuredTool[],
 ): SubAgent[] {
   return [

@@ -1,4 +1,6 @@
 import { ChatAnthropic } from "@langchain/anthropic";
+// import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatGroq } from "@langchain/groq";
 import { BaseStore } from "@langchain/langgraph";
 import { rgPath } from "@vscode/ripgrep";
 import { spawnSync } from "child_process";
@@ -11,6 +13,10 @@ import {
 } from "deepagents";
 import { StructuredTool } from "langchain";
 import * as vscode from "vscode";
+import { IEventPayload } from "../../emitter/interface";
+import { Logger, LogLevel } from "../../infrastructure/logger/logger";
+import { Memory } from "../../memory/base";
+import { Orchestrator } from "../../orchestrator";
 import { getAPIKeyAndModel } from "../../utils/utils";
 import { createVscodeFsBackendFactory } from "../backends/filesystem";
 import {
@@ -23,18 +29,70 @@ import { createDeveloperSubagents } from "./subagents";
 
 export class DeveloperAgent {
   private config: ICodeBuddyAgentConfig;
-  private model: ChatAnthropic;
+  private model: ChatAnthropic | ChatGroq | undefined;
   private tools: StructuredTool[];
+  private readonly logger: Logger;
+  private readonly disposables: vscode.Disposable[] = [];
+  protected readonly orchestrator: Orchestrator;
 
   constructor(config: ICodeBuddyAgentConfig = {}) {
+    this.orchestrator = Orchestrator.getInstance();
     this.config = config;
     ToolProvider.initialize();
     const providerTools = ToolProvider.getTools();
     this.tools = [...(config.additionalTools || []), ...providerTools];
-    this.model = new ChatAnthropic({
-      apiKey: getAPIKeyAndModel("anthropic").apiKey,
-      model: getAPIKeyAndModel("anthropic").model!,
+
+    this.logger = Logger.initialize("DeveloperAgent", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
+    this.disposables.push(
+      this.orchestrator.onModelChangeSuccess(this.handleModelChange.bind(this)),
+    );
+  }
+
+  private handleModelChange(event: IEventPayload) {
+    try {
+      if (!event.message) {
+        return;
+      }
+      const msg = JSON.parse(event.message);
+      const model = msg.modelName;
+      this.getAIConfigFromWebProvider(model);
+    } catch (error) {}
+  }
+
+  private getAIConfigFromWebProvider(model: string) {
+    const apiKeyAndModel = getAPIKeyAndModel(model.toLowerCase());
+    let currentModel: ChatAnthropic | ChatGroq | undefined;
+    switch (model.toLowerCase()) {
+      case "anthropic":
+        currentModel = new ChatAnthropic({
+          apiKey: apiKeyAndModel.apiKey,
+          model: apiKeyAndModel.model!,
+        });
+        break;
+      case "groq":
+        currentModel = new ChatGroq({
+          apiKey: apiKeyAndModel.apiKey,
+          model: apiKeyAndModel.model!,
+        });
+        break;
+      case "gemini":
+        // Temporary mesaure to prevent an error being throwned to the user
+        // The current genai package isnt compatible with langchain 1.0.0 package
+        currentModel = new ChatAnthropic({
+          apiKey: apiKeyAndModel.apiKey,
+          model: apiKeyAndModel.model!,
+        });
+        break;
+      default:
+        break;
+    }
+    this.model = currentModel;
+    Memory.set("agentModel", currentModel);
   }
 
   /**
@@ -133,6 +191,16 @@ export class DeveloperAgent {
    * Main entry point to build and return the agent runnable
    */
   public create() {
+    const cachedModel = Memory.get("agentModel");
+    if (!this.model && !cachedModel) {
+      this.logger.error("Error creating DeveloperAgent: No model found");
+      vscode.window.showWarningMessage(
+        "Please make sure that you have selected a valid model with correct API key in the settings.",
+      );
+      throw new Error("Error creating DeveloperAgent: No model found");
+    }
+
+    this.model = cachedModel as ChatAnthropic | ChatGroq;
     const { store, enableSubAgents = true, checkPointer } = this.config;
 
     const subagents = enableSubAgents
@@ -140,10 +208,7 @@ export class DeveloperAgent {
       : undefined;
 
     return createDeepAgent({
-      model: new ChatAnthropic({
-        apiKey: getAPIKeyAndModel("anthropic").apiKey,
-        model: getAPIKeyAndModel("anthropic").model!,
-      }),
+      model: this.model,
       tools: this.tools,
       systemPrompt: this.getSystemPrompt(),
       backend: this.getBackendFactory(),
