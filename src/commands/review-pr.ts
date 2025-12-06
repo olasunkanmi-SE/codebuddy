@@ -66,7 +66,7 @@ export class ReviewPR extends CodeCommandHandler {
       const allFiles = await vscode.workspace.findFiles(
         "**/*.{ts,js,tsx,jsx,json,md,py,java,cs,php}",
         "**/node_modules/**",
-        50 // Reduced from 100 to limit initial fetch
+        50, // Reduced from 100 to limit initial fetch
       );
 
       // Filter files based on last modified time more efficiently
@@ -85,11 +85,11 @@ export class ReviewPR extends CodeCommandHandler {
             } catch (error: any) {
               this.logger.error(
                 `Error getting file stat for ${fileUri.fsPath}:`,
-                error
+                error,
               );
             }
             return null;
-          })
+          }),
         );
 
         // Collect successful results
@@ -184,7 +184,7 @@ export class ReviewPR extends CodeCommandHandler {
 
       // Filter out the current branch from the options
       const availableBranches = branches.filter(
-        (b) => b !== currentBranch.current
+        (b) => b !== currentBranch.current,
       );
 
       // Try to detect common base branches and put them first
@@ -196,17 +196,17 @@ export class ReviewPR extends CodeCommandHandler {
         "staging",
       ];
       const priorityBranches = commonBaseBranches.filter((b) =>
-        availableBranches.includes(b)
+        availableBranches.includes(b),
       );
       const otherBranches = availableBranches.filter(
-        (b) => !commonBaseBranches.includes(b)
+        (b) => !commonBaseBranches.includes(b),
       );
 
       const sortedBranches = [...priorityBranches, ...otherBranches];
 
       if (sortedBranches.length === 0) {
         vscode.window.showWarningMessage(
-          "No other branches found to compare against"
+          "No other branches found to compare against",
         );
         return undefined;
       }
@@ -231,7 +231,7 @@ export class ReviewPR extends CodeCommandHandler {
     } catch (error: any) {
       this.logger.error("Error selecting target branch:", error);
       vscode.window.showErrorMessage(
-        `Failed to get available branches: ${error}`
+        `Failed to get available branches: ${error}`,
       );
       return undefined;
     }
@@ -250,7 +250,7 @@ export class ReviewPR extends CodeCommandHandler {
       const targetBranch = await this.selectTargetBranch();
       if (!targetBranch) {
         vscode.window.showInformationMessage(
-          "PR review cancelled - no target branch selected"
+          "PR review cancelled - no target branch selected",
         );
         throw new Error("No target branch selected for PR review");
       }
@@ -268,17 +268,17 @@ export class ReviewPR extends CodeCommandHandler {
         branchInfo = `${currentBranchInfo.current} → ${targetBranch}`;
 
         this.logger.info(
-          `PR review: comparing ${currentBranchInfo.current} against ${targetBranch}`
+          `PR review: comparing ${currentBranchInfo.current} against ${targetBranch}`,
         );
 
         // Show user confirmation of what's being reviewed
         vscode.window.showInformationMessage(
-          `🔍 Reviewing PR: ${currentBranchInfo.current} → ${targetBranch} (${modifiedFiles.length} files changed)`
+          `🔍 Reviewing PR: ${currentBranchInfo.current} → ${targetBranch} (${modifiedFiles.length} files changed)`,
         );
       } catch (gitError) {
         this.logger.info(
           "Git commands failed, falling back to VS Code git integration:",
-          gitError
+          gitError,
         );
 
         // Fallback to VS Code's git integration
@@ -288,7 +288,7 @@ export class ReviewPR extends CodeCommandHandler {
           if (changes.length > 0) {
             changedFiles = changes.map((change) => {
               const relativePath = vscode.workspace.asRelativePath(
-                change.resourceUri
+                change.resourceUri,
               );
               return `${relativePath} (${change.decorations?.tooltip || "modified"})`;
             });
@@ -301,7 +301,7 @@ export class ReviewPR extends CodeCommandHandler {
             const sampleFiles = changes.slice(0, 5); // Limit to first 5 files
             for (const change of sampleFiles) {
               const filePath = vscode.workspace.asRelativePath(
-                change.resourceUri
+                change.resourceUri,
               );
               const content = await this.getFileContent(filePath);
               const truncatedContent =
@@ -315,7 +315,7 @@ export class ReviewPR extends CodeCommandHandler {
         } catch (vscodeError) {
           this.logger.error(
             "Both git commands and VS Code git integration failed:",
-            vscodeError
+            vscodeError,
           );
 
           // Provide user-friendly error notification
@@ -324,12 +324,12 @@ export class ReviewPR extends CodeCommandHandler {
               `Failed to retrieve changes between current branch and ${targetBranch}. ` +
                 "Please ensure Git is properly configured and accessible. " +
                 "The review will proceed with recently modified files as a fallback.",
-              "View Output"
+              "View Output",
             )
             .then((selection) => {
               if (selection === "View Output") {
                 vscode.window.showInformationMessage(
-                  "Check the VS Code Developer Console (Help > Toggle Developer Tools) for detailed error information."
+                  "Check the VS Code Developer Console (Help > Toggle Developer Tools) for detailed error information.",
                 );
               }
             });
