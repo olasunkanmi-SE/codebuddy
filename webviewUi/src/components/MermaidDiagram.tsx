@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import mermaid from "mermaid";
 import styled, { keyframes } from "styled-components";
 
@@ -6,7 +6,7 @@ import styled, { keyframes } from "styled-components";
 mermaid.initialize({
   startOnLoad: false,
   theme: "dark",
-  securityLevel: "loose",
+  securityLevel: "strict",
   themeVariables: {
     primaryColor: "#7c3aed",
     primaryTextColor: "#e2e8f0",
@@ -39,7 +39,7 @@ mermaid.initialize({
     sequenceNumberColor: "#e2e8f0",
   },
   flowchart: {
-    htmlLabels: true,
+    htmlLabels: false,
     curve: "basis",
   },
   sequence: {
@@ -202,17 +202,13 @@ const CodeToggle = styled.button`
   }
 `;
 
-const RawCode = styled.pre`
+const RawCode = styled.div`
   margin-top: 12px;
-  padding: 16px;
-  background: rgba(20, 20, 35, 0.8);
-  border-radius: 8px;
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  overflow-x: auto;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #e2e8f0;
-  font-family: 'Fira Code', 'Consolas', monospace;
+  background: rgba(13, 16, 34, 0.92);
+  border-radius: 10px;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(124, 58, 237, 0.12);
 
   .keyword {
     color: #c792ea;
@@ -226,7 +222,123 @@ const RawCode = styled.pre`
   .text {
     color: #c3e88d;
   }
+  .comment {
+    color: #6ee7b7;
+  }
 `;
+
+const RawCodeMeta = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(76, 29, 149, 0.55) 0%, rgba(30, 64, 175, 0.35) 100%);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.25);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #c4b5fd;
+`;
+
+const RawCodeBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(55, 48, 163, 0.6);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #e0e7ff;
+`;
+
+const RawCodeContent = styled.div`
+  max-height: 360px;
+  overflow: auto;
+  padding: 14px 0;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  color: #e2e8f0;
+
+  .code-lines {
+    display: grid;
+    row-gap: 4px;
+    padding: 0 16px 8px 16px;
+  }
+
+  .code-line {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .code-line-number {
+    position: relative;
+    display: inline-flex;
+    justify-content: flex-end;
+    color: rgba(129, 140, 248, 0.9);
+    font-variant-numeric: tabular-nums;
+    padding-right: 12px;
+    border-right: 1px solid rgba(99, 102, 241, 0.2);
+  }
+
+  .code-line-text {
+    white-space: pre;
+    line-height: 1.5;
+  }
+`;
+
+const formatMermaidCode = (code: string): { html: string; lineCount: number } => {
+  const escapeHtml = (value: string): string =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const diagramKeywordPattern = /(flowchart|sequenceDiagram|classDiagram|stateDiagram(?:-v\d+)?|erDiagram|gantt|pie|journey|gitGraph|mindmap|timeline|sankey|block|architecture)/g;
+  const directivePattern = /(direction|TD|TB|BT|RL|LR|participant|actor|Note|loop|alt|else|end|opt|par|critical|break|state)/g;
+  const escapeRegex = (token: string) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const arrowTokens = ['--&gt;', '==&gt;', '&lt;--', '-o-&gt;', '-x-&gt;', '-.-&gt;', '--o', '--x', '--|', '|--', '|&gt;', '&lt;|', '===', '---', '=='];
+  const arrowPattern = new RegExp(`(${arrowTokens.map(escapeRegex).join('|')})`, 'g');
+  const startStopPattern = /\[\*\]/g;
+
+  const highlightLine = (line: string): string => {
+    const escaped = escapeHtml(line);
+
+    if (/^\s*%%/.test(line)) {
+      return `<span class="comment">${escaped}</span>`;
+    }
+
+    let highlighted = escaped;
+    highlighted = highlighted.replace(diagramKeywordPattern, '<span class="keyword">$1</span>');
+    highlighted = highlighted.replace(directivePattern, '<span class="keyword">$1</span>');
+    highlighted = highlighted.replace(arrowPattern, '<span class="arrow">$1</span>');
+    highlighted = highlighted.replace(startStopPattern, '<span class="arrow">$&</span>');
+    highlighted = highlighted.replace(/\b([A-Za-z][\w]*)\s*(?=\[|\{|\()/g, '<span class="node">$1</span>');
+    highlighted = highlighted.replace(/(\[[^\]]+\])/g, '<span class="text">$1</span>');
+
+    return highlighted;
+  };
+
+  const normalized = code.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n');
+  const htmlLines = lines.map((line, index) => {
+    const highlighted = highlightLine(line);
+    const display = highlighted.length ? highlighted : '&nbsp;';
+    const lineNumber = (index + 1).toString().padStart(3, ' ');
+    const safeNumber = lineNumber.replace(/ /g, '&nbsp;');
+    return `<div class="code-line"><span class="code-line-number">${safeNumber}</span><span class="code-line-text">${display}</span></div>`;
+  });
+
+  return {
+    html: `<div class="code-lines">${htmlLines.join('')}</div>`,
+    lineCount: lines.length,
+  };
+};
 
 export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -235,6 +347,20 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [showRawCode, setShowRawCode] = useState(false);
+  const formattedCode = useMemo(() => formatMermaidCode(chart), [chart]);
+  const lineSummary = `${formattedCode.lineCount} ${formattedCode.lineCount === 1 ? 'line' : 'lines'}`;
+
+  const renderRawCodePanel = () => (
+    <RawCode>
+      <RawCodeMeta>
+        <span>Mermaid Source</span>
+        <RawCodeBadge>{lineSummary}</RawCodeBadge>
+      </RawCodeMeta>
+      <RawCodeContent>
+        <div dangerouslySetInnerHTML={{ __html: formattedCode.html }} />
+      </RawCodeContent>
+    </RawCode>
+  );
 
   // Minimal sanitization - the code should now come through cleanly via base64
   const sanitizeMermaidCode = (code: string): string => {
@@ -302,16 +428,30 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
       seqFixed = seqFixed.replace(/Note\s+over\s+/gi, 'Note over ');
       seqFixed = seqFixed.replace(/Note\s+left\s+of\s+/gi, 'Note left of ');
       seqFixed = seqFixed.replace(/Note\s+right\s+of\s+/gi, 'Note right of ');
+      // Remove numbering accidentally appended to end statements
+      seqFixed = seqFixed.replace(/end\s*\d+/gi, 'end');
       if (seqFixed !== code) fixes.push(seqFixed);
     }
     
     // Fix 5: Fix flowchart specific issues
     if (code.includes('flowchart') || code.includes('graph')) {
-      // Fix arrow syntax issues
       let flowFixed = code
-        .replace(/-->\|([^|]+)\|>/g, '-->|$1|') // Remove extra > after label
-        .replace(/-+>/g, '-->') // Normalize arrows
-        .replace(/=+>/g, '==>'); // Normalize thick arrows
+        // Remove extra > after label arrows
+        .replace(/--\|([^|]+)\|>/g, '-->|$1|')
+        // Normalize arrows like -> or ---> to -->
+        .replace(/-+>/g, '-->')
+        // Normalize thick arrows like => or ===>
+        .replace(/=+>/g, '==>')
+        // Normalize reverse arrows like <- or <---
+        .replace(/<-+/g, '<--')
+        // Fix circle arrow shorthand -o> to -o->
+        .replace(/-o>/g, '-o->')
+        // Convert single hyphen edge definitions to proper arrows
+        .replace(/^(\s*[A-Za-z0-9_]+)\s*-\s+(\w+)/gm, '$1 --> $2')
+        .replace(/^(\s*[A-Za-z0-9_]+)\s*-\s+\|([^|]+)\|\s*(\w+)/gm, '$1 -->|$2| $3')
+        // Replace colon direction declarations like "graph: TD" with valid syntax
+        .replace(/^(graph|flowchart)\s*:\s*/gm, '$1 ');
+
       if (flowFixed !== code) fixes.push(flowFixed);
     }
     
@@ -328,7 +468,14 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
     const noHtml = code.replace(/<[^>]+>/g, '');
     if (noHtml !== code) fixes.push(noHtml);
     
-    // Fix 8: Combine multiple fixes
+    // Fix 8: Remove duplicated node identifiers appended after definitions (e.g., N[Label]N -->)
+    const removeDuplicateNodeIds = code.replace(/([A-Za-z0-9_]+)(\[[^\]]+\])\1/g, '$1$2');
+    if (removeDuplicateNodeIds !== code) fixes.push(removeDuplicateNodeIds);
+
+    const fixTrailingNodeAfterBracket = code.replace(/(\[[^\]]+\])[A-Za-z0-9_]+(\s*-->|\s*$)/g, '$1$2');
+    if (fixTrailingNodeAfterBracket !== code) fixes.push(fixTrailingNodeAfterBracket);
+
+    // Fix 9: Combine multiple fixes
     let combinedFix = code
       .replace(/(\w)\s*&\s*(\w)/g, '$1 and $2')
       .replace(/[""'']/g, '"')
@@ -346,7 +493,57 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
     combinedFix = combinedLines.join('\n');
     
     if (combinedFix !== code) fixes.push(combinedFix);
-    
+
+    // Fix 10: Replace semicolon separators with newlines for flowcharts/sequence diagrams
+    const semicolonSplit = code.replace(/;\s*/g, '\n');
+    if (semicolonSplit !== code) fixes.push(semicolonSplit);
+
+    // Fix 11: Remove numbered list prefixes (e.g., "1.", "2)") that break syntax
+    const numberStripped = code
+      .split('\n')
+      .map(line => line.replace(/^\s*\d+[\.)]\s*/, ''))
+      .join('\n');
+    if (numberStripped !== code) fixes.push(numberStripped);
+
+    // Fix 12: Ensure standalone end statements don't have trailing text
+    const cleanEndDigits = code.replace(/\bend\s*\d+\b/gi, 'end');
+    if (cleanEndDigits !== code) fixes.push(cleanEndDigits);
+
+    // Fix 13: Merge multiline node labels where bracketed text spilled onto the next line
+    // const mergedLabelLines = (() => {
+    //   const labelLines = code.split('\n');
+    //   const rebuilt: string[] = [];
+
+    //   for (const current of labelLines) {
+    //     if (rebuilt.length) {
+    //       const previous = rebuilt[rebuilt.length - 1];
+    //       const openSquare = (previous.match(/\[/g) || []).length;
+    //       const closeSquare = (previous.match(/\]/g) || []).length;
+    //       const openCurly = (previous.match(/\{/g) || []).length;
+    //       const closeCurly = (previous.match(/\}/g) || []).length;
+    //       const openParen = (previous.match(/\(/g) || []).length;
+    //       const closeParen = (previous.match(/\)/g) || []).length;
+
+    //       const hasUnclosedBracket = openSquare > closeSquare || openCurly > closeCurly || openParen > closeParen;
+    //       const trimmedCurrent = current.trim();
+    //       const looksLikeContinuation =
+    //         trimmedCurrent.length > 0 &&
+    //         !/^\s*[A-Za-z0-9_]+\s*[\[\{\(]/.test(current) &&
+    //         !/(-->|==>|<--|\|>|::|:::)/.test(current);
+
+    //       if (hasUnclosedBracket && looksLikeContinuation) {
+    //         rebuilt[rebuilt.length - 1] = `${previous.trimEnd()} ${trimmedCurrent}`;
+    //         continue;
+    //       }
+    //     }
+
+    //     rebuilt.push(current);
+    //   }
+
+    //   return rebuilt.join('\n');
+    // })();
+    // if (mergedLabelLines !== code) fixes.push(mergedLabelLines);
+
     // Remove duplicates and the original code
     return [...new Set(fixes)].filter(f => f !== code);
   };
@@ -414,24 +611,6 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
       console.error("Failed to copy:", err);
     }
   };
-
-  // Simple syntax highlighting for Mermaid code
-  const highlightMermaidCode = (code: string): string => {
-    return code
-      // Highlight diagram type keywords
-      .replace(/^(flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey|gitGraph|mindmap|timeline|sankey|block|architecture)/gm, 
-        '<span class="keyword">$1</span>')
-      // Highlight direction keywords
-      .replace(/\b(TD|TB|BT|RL|LR|participant|actor|Note|loop|alt|else|end|opt|par|critical|break)\b/g, 
-        '<span class="keyword">$1</span>')
-      // Highlight arrows
-      .replace(/(-->|--o|--x|-.->|-.-|==>|==|---|\|>|<\||--\||&gt;|&lt;)/g, 
-        '<span class="arrow">$1</span>')
-      // Highlight node IDs (before brackets)
-      .replace(/\b([A-Z][a-zA-Z0-9_]*)\s*[\[\{\(]/g, 
-        '<span class="node">$1</span>[');
-  };
-
   return (
     <DiagramContainer ref={containerRef}>
       <DiagramHeader>
@@ -462,9 +641,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
             <span>{showRawCode ? 'Hide' : 'Show'} Raw Diagram Code</span>
           </CodeToggle>
           
-          {showRawCode && (
-            <RawCode dangerouslySetInnerHTML={{ __html: highlightMermaidCode(chart) }} />
-          )}
+          {showRawCode && renderRawCodePanel()}
         </ErrorState>
       )}
       
@@ -478,9 +655,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
             <span>{showRawCode ? 'Hide' : 'Show'} Source Code</span>
           </CodeToggle>
           
-          {showRawCode && (
-            <RawCode dangerouslySetInnerHTML={{ __html: highlightMermaidCode(chart) }} />
-          )}
+          {showRawCode && renderRawCodePanel()}
         </>
       )}
     </DiagramContainer>
