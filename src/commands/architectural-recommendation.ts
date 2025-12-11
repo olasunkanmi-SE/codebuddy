@@ -6,7 +6,7 @@ import { getAPIKeyAndModel } from "../utils/utils";
 import { LLMOutputSanitizer } from "../utils/llm-output-sanitizer";
 import { Logger } from "../infrastructure/logger/logger";
 import { LogLevel } from "../services/telemetry";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 
 let orchestrator = Orchestrator.getInstance();
 
@@ -30,6 +30,9 @@ async function shouldRefreshAnalysis(summary: any): Promise<boolean> {
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
+  enableConsole: true,
+  enableFile: true,
+  enableTelemetry: true,
 });
 
 /**

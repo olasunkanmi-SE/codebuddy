@@ -85,6 +85,9 @@ export class ChatHistoryWorker {
     this.chatHistoryRepo = ChatHistoryRepository.getInstance();
     this.logger = Logger.initialize(ChatHistoryWorker.name, {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

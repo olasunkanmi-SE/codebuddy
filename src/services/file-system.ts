@@ -10,6 +10,9 @@ export class FileService {
   constructor() {
     this.logger = Logger.initialize("FileService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

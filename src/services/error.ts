@@ -49,6 +49,9 @@ export class RetryableOperation {
   ) {
     this.logger = Logger.initialize("RetryableOperation", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

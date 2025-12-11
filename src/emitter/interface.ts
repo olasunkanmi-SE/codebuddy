@@ -31,7 +31,12 @@ type AgentEventKeys =
   | "onRefactoring"
   | "onUpdateUserPreferences"
   | "onGetUserPreferences"
-  | "onUpdateThemePreferences";
+  | "onUpdateThemePreferences"
+  | "onStreamStart"
+  | "onStreamChunk"
+  | "onStreamEnd"
+  | "onStreamError"
+  | "onStreamFlush";
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {
@@ -39,4 +44,10 @@ export interface IEventPayload {
   message?: any;
   timestamp: string;
   data?: any;
+  requestId?: string;
+  threadId?: string;
+  content?: string;
+  accumulated?: string;
+  metadata?: Record<string, any>;
+  error?: string;
 }

@@ -3,7 +3,9 @@
     "module": "commonjs",
     "target": "ESNext",
     "outDir": "out",
-    "lib": ["ESNext"],
+    "lib": [
+      "ESNext"
+    ],
     "skipLibCheck": true,
     "sourceMap": true,
     "rootDir": "src",
@@ -15,5 +17,11 @@
     // "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
     // "noUnusedParameters": true,  /* Report errors on unused parameters. */
   },
-  "exclude": ["node_modules", ".vscode-test", "webviewUi", "docs", "src/test/**/*"]
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "webviewUi",
+    "docs",
+    "src/test/**/*"
+  ]
 }

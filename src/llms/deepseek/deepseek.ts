@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Orchestrator } from "../../agents/orchestrator";
+import { Orchestrator } from "../../orchestrator";
 import { COMMON } from "../../application/constant";
 import { Memory } from "../../memory/base";
 import { CodeBuddyToolProvider } from "../../tools/factory/tool";
@@ -43,6 +43,9 @@ export class DeepseekLLM
     this.orchestrator = Orchestrator.getInstance();
     this.logger = Logger.initialize("DeepseekLLM", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     CodeBuddyToolProvider.initialize();
     this.initializeDisposable();

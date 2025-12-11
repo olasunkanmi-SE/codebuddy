@@ -9,7 +9,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { IEventPayload } from "../emitter/interface";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 
 export class FileUploadService implements vscode.Disposable {
   private readonly ai: GoogleGenAI;
@@ -28,6 +28,9 @@ export class FileUploadService implements vscode.Disposable {
     );
     this.logger = Logger.initialize("FileUploadService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

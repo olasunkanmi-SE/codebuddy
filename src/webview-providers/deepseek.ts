@@ -23,6 +23,9 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.logger = Logger.initialize("DeepseekWebViewProvider", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.deepseekLLM = DeepseekLLM.getInstance({
       apiKey: this.apiKey,

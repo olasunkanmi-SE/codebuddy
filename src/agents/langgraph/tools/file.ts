@@ -9,7 +9,10 @@ export class LangChainFileTool extends StructuredTool<any> {
   constructor(private readonly toolInstance: FileTool) {
     super();
     this.logger = Logger.initialize("LangChainFileTool", {
-      minLevel: LogLevel.INFO,
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
   name = "analyze_file_for_question";

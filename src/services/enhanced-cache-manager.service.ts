@@ -68,7 +68,10 @@ export class EnhancedCacheManager implements vscode.Disposable {
 
   constructor(config: Partial<CacheConfig> = {}, performanceProfiler?: any) {
     this.logger = Logger.initialize("EnhancedCacheManager", {
-      minLevel: LogLevel.INFO,
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
 
     this.performanceProfiler = performanceProfiler;

@@ -44,6 +44,9 @@ export class EnhancedPromptBuilderService {
   constructor(context: vscode.ExtensionContext) {
     this.logger = Logger.initialize("EnhancedPromptBuilderService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     const { apiKey, model } = getAPIKeyAndModel("groq");
     const config = {

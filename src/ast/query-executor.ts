@@ -8,6 +8,9 @@ export class QueryExecutor {
   constructor() {
     this.logger = Logger.initialize("QueryExecutor", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

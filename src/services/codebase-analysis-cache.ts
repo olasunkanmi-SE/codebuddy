@@ -19,6 +19,9 @@ export class CodebaseAnalysisCache {
   private constructor() {
     this.logger = Logger.initialize("CodebaseAnalysisCache", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
 
     // Clean up expired entries every 10 minutes

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { IEventPayload } from "../emitter/interface";
-import { EventEmitter } from "../emitter/publisher";
+import { IEventPayload } from "./emitter/interface";
+import { EventEmitter } from "./emitter/publisher";
 
 export class Orchestrator extends EventEmitter implements vscode.Disposable {
   private static instance: Orchestrator;
@@ -31,9 +31,7 @@ export class Orchestrator extends EventEmitter implements vscode.Disposable {
     }
 
     this.disposables.push(
-      this.onStatusChange(this.handleStatus.bind(this)),
       this.onPromptGenerated(this.handlePromptGeneratedEvent.bind(this)),
-      // this.onError(this.handleError.bind(this)),
     );
     this.isInitialized = true;
   }
@@ -44,7 +42,12 @@ export class Orchestrator extends EventEmitter implements vscode.Disposable {
 
   public handlePromptGeneratedEvent(event: IEventPayload) {
     console.error(`Error: ${event.message})`);
-    this.publish("onResponse", event.message);
+    this.publish("onResponse", event.message ?? event);
+  }
+
+  public handleComplete(event: IEventPayload) {
+    console.log(`✅ Complete: ${JSON.stringify(event.message)}`);
+    // Can forward to webview or process further
   }
 
   public dispose(): void {

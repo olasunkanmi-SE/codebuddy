@@ -130,7 +130,10 @@ export class PerformanceProfiler implements vscode.Disposable {
 
   constructor(configManager?: VectorDbConfigurationManager) {
     this.logger = Logger.initialize("PerformanceProfiler", {
-      minLevel: LogLevel.INFO,
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
 
     this.configManager = configManager;

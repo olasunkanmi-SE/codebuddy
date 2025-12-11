@@ -9,7 +9,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { randomUUID } from "crypto";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 
 export class WorkspaceService implements IWorkspaceService {
   protected readonly orchestrator: Orchestrator;
@@ -26,6 +26,9 @@ export class WorkspaceService implements IWorkspaceService {
   private constructor() {
     this.logger = Logger.initialize("WorkspaceService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.orchestrator = Orchestrator.getInstance();
   }

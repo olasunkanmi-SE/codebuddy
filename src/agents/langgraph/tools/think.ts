@@ -13,7 +13,10 @@ export class LangChainThinkTool extends StructuredTool<any> {
   constructor(private readonly toolInstance: ThinkTool) {
     super();
     this.logger = Logger.initialize("LangChainThinkTool", {
-      minLevel: LogLevel.INFO,
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

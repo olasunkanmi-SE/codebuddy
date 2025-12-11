@@ -7,7 +7,12 @@ export class LangChainWebTool extends StructuredTool<any> {
   private readonly logger: Logger;
   constructor(private readonly toolInstance: WebTool) {
     super();
-    this.logger = Logger.initialize("GeminiLLM", { minLevel: LogLevel.INFO });
+    this.logger = Logger.initialize("GeminiLLM", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
   }
 
   name = "web_search";

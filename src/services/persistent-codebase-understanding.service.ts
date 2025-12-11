@@ -48,6 +48,9 @@ export class PersistentCodebaseUnderstandingService {
   private constructor() {
     this.logger = Logger.initialize("PersistentCodebaseUnderstandingService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.workspaceService = WorkspaceService.getInstance();
     this.databaseService = SqliteDatabaseService.getInstance();

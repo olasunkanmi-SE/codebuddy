@@ -21,7 +21,7 @@ import {
 } from "../utils/utils";
 import { Memory } from "../memory/base";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import { architecturalRecommendationCommand } from "./architectural-recommendation";
 
 interface ICodeCommandHandler {
@@ -72,6 +72,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     this.xGrokModel = getConfigValue(grokModel);
     this.logger = Logger.initialize("CodeCommandHandler", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.orchestrator = Orchestrator.getInstance();
   }

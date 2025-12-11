@@ -7,15 +7,20 @@ import { IParseURL, parseUrl } from "../utils/parseUrl";
 import UrlCardList from "./urlCardList";
 import { ThinkingComponent } from "./thinkingComponent";
 
-interface CodeBlockProps {
-  language?: string;
+interface BotMessageProps {
   content: string;
+  language?: string;
+  isStreaming?: boolean;
 }
 
-export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
+export const BotMessage: React.FC<BotMessageProps> = ({ 
+  content, 
+  isStreaming = false 
+}) => {
   const sanitizedContent = DOMPurify.sanitize(content);
-  const action = "Researching...";
+  // const action = "Researching...";
   let parsedUrls: IParseURL[] = [];
+  
   if (sanitizedContent.includes("favicon")) {
     parsedUrls = parseUrl(sanitizedContent);
   }
@@ -107,31 +112,64 @@ export const BotMessage: React.FC<CodeBlockProps> = ({ language, content }) => {
     }
   };
 
+  // Show streaming indicator
+  if (isStreaming && !content) {
+    return (
+      <div className="doc-content">
+        <span style={{ display: "flex", alignItems: "center" }}>
+          <small>Generating response...</small> <BotIcon isBlinking={true} />
+        </span>
+      </div>
+    );
+  }
+
+  // Show thinking state
+  // if (content.includes("thinking")) {
+  //   return (
+  //     <div className="doc-content">
+  //       <span style={{ display: "flex", alignItems: "center" }}>
+  //         <small>{action}</small> <BotIcon isBlinking={true} />
+  //       </span>
+  //     </div>
+  //   );
+  // }
+
+  // Show normal message with streaming cursor if applicable
   return (
-    <>
-      {content.includes("thinking") ? (
+    <div className="code-block">
+      <div className="code-header">
+        {/* <span className="language-label">{language}</span> */}
+        <div className="header-buttons">
+          {isStreaming && (
+            <span style={{ marginRight: "8px", fontSize: "12px", color: "#888" }}>
+              Streaming...
+            </span>
+          )}
+          <DownloadIcon onClick={handleCopyMarkdown} />
+        </div>
+      </div>
+      {parsedUrls.length > 0 ? (
         <div className="doc-content">
-          <span style={{ display: "flex", alignItems: "center" }}>
-            <small>{action}</small> <BotIcon isBlinking={true} />
-          </span>
+          <UrlCardList metadatas={parsedUrls} />
         </div>
       ) : (
-        <div className="code-block">
-          <div className="code-header">
-            <span className="language-label">{language}</span>
-            <div className="header-buttons">
-              <DownloadIcon onClick={handleCopyMarkdown} />
-            </div>
-          </div>
-          {parsedUrls.length > 0 ? (
-            <div className="doc-content">
-              <UrlCardList metadatas={parsedUrls} />
-            </div>
-          ) : (
-            <ThinkingComponent content={content} />
+        <div style={{ position: "relative" }}>
+          <ThinkingComponent content={content} />
+          {isStreaming && (
+            <span 
+              className="streaming-cursor"
+              style={{
+                display: "inline-block",
+                width: "8px",
+                height: "16px",
+                backgroundColor: "currentColor",
+                marginLeft: "2px",
+                animation: "blink 1s infinite",
+              }}
+            />
           )}
         </div>
       )}
-    </>
+    </div>
   );
 };

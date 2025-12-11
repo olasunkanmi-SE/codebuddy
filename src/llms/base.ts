@@ -8,7 +8,12 @@ export abstract class BaseLLM<T extends Record<string, any>>
 {
   protected logger: Logger;
   constructor(protected config: ILlmConfig) {
-    this.logger = Logger.initialize("BaseLLM", { minLevel: LogLevel.DEBUG });
+    this.logger = Logger.initialize("BaseLLM", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
     this.validateConfig();
   }
 

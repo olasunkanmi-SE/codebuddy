@@ -8,6 +8,7 @@ import {
 import Anthropic from "@anthropic-ai/sdk";
 import { Memory } from "../memory/base";
 import * as crypto from "crypto";
+import { Buffer } from "buffer";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -53,7 +54,28 @@ export const formatText = (text?: string): string => {
     let processedText = fixIncompleteMarkdown(text);
     processedText = fixUnmatchedBoldFormatting(processedText);
 
-    const md = markdownit();
+    // Extract mermaid blocks before markdown-it processing to keep syntax intact
+    processedText = processedText.replace(
+      /```mermaid\s*([\s\S]*?)```/g,
+      (_, codeBlock: string) => {
+        const trimmedCode = codeBlock.trim();
+        if (!trimmedCode) {
+          return "";
+        }
+
+        const encodedCode = Buffer.from(trimmedCode, "utf-8").toString(
+          "base64",
+        );
+        return `\n\n<div class="mermaid-container" data-mermaid="${encodedCode}"></div>\n\n`;
+      },
+    );
+
+    const md = markdownit({
+      html: true,
+      linkify: true,
+      breaks: true,
+    });
+
     return md.render(processedText);
   } catch (error: any) {
     // If markdown parsing fails, provide a more robust fallback
@@ -85,6 +107,10 @@ export const getConfigValue: GetConfigValueType<any> = <T>(
   key: string,
 ): T | undefined => {
   return vscode.workspace.getConfiguration().get<T>(key);
+};
+
+export const setConfigValue = <T>(key: string, value: T) => {
+  vscode.workspace.getConfiguration().update(key, value);
 };
 
 export const vscodeErrorMessage = (error: string, metaData?: any) => {
@@ -189,6 +215,7 @@ export const getAPIKeyAndModel = (
     anthropicApiKey,
     geminiModel,
     anthropicModel,
+    tavilyApiKey,
   } = APP_CONFIG;
   let apiKey: string | undefined;
   let modelName: string | undefined;
@@ -207,6 +234,9 @@ export const getAPIKeyAndModel = (
     case "anthropic":
       apiKey = getConfigValue(anthropicApiKey);
       modelName = getConfigValue(anthropicModel);
+      break;
+    case "tavily":
+      apiKey = getConfigValue(tavilyApiKey);
       break;
     default:
       throw new Error(`Unsupported model: ${model}`);
@@ -230,4 +260,8 @@ export const generateId = (): string => {
 
 export const generateUUID = () => {
   return crypto.randomUUID();
+};
+
+export const isWebSearchConfigured = (): boolean => {
+  return Boolean(getAPIKeyAndModel("tavily").apiKey);
 };

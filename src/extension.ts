@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { Orchestrator } from "./agents/orchestrator";
+import { Orchestrator } from "./orchestrator";
 import {
   APP_CONFIG,
   CODEBUDDY_ACTIONS,
@@ -23,23 +23,30 @@ import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
-import { ReviewPR } from "./commands/review-pr";
+import { ReviewPR } from "./commands/pr/review-pr";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
-import { FileUploadService } from "./services/file-upload";
 import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
 import { SqliteDatabaseService } from "./services/sqlite-database.service";
-import { getAPIKeyAndModel, getConfigValue } from "./utils/utils";
+import {
+  getAPIKeyAndModel,
+  getConfigValue,
+  setConfigValue,
+} from "./utils/utils";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
 import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
+import { DeveloperAgent } from "./agents/developer/agent";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
+  enableConsole: true,
+  enableFile: true,
+  enableTelemetry: true,
 });
 
 const {
@@ -106,6 +113,13 @@ function initializeWebViewProviders(
       };
 
       const providerManager = WebViewProviderManager.getInstance(context);
+      let apiKeys = "";
+
+      for (const [key, value] of Object.entries(modelConfigurations)) {
+        if (getConfigValue(value.key) === "apiKey") {
+          apiKeys += `${key}, `;
+        }
+      }
 
       if (selectedGenerativeAiModel in modelConfigurations) {
         const modelConfig = modelConfigurations[selectedGenerativeAiModel];
@@ -124,6 +138,13 @@ function initializeWebViewProviders(
         );
       }
 
+      if (apiKeys.length > 0) {
+        vscode.window.showErrorMessage(
+          `${apiKeys} APIkeys are required \n
+              Check out the FAQ and SETTINGS section to configure your AI assistant`,
+        );
+      }
+
       // Store providerManager globally and add to subscriptions
       (globalThis as any).providerManager = providerManager;
       context.subscriptions.push(providerManager);
@@ -138,6 +159,10 @@ function initializeWebViewProviders(
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    new DeveloperAgent({});
+    const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
+    setConfigValue("generativeAi.option", "Gemini");
+    initializeWebViewProviders(context, selectedGenerativeAiModel);
     Logger.sessionId = Logger.generateId();
 
     const databaseService: SqliteDatabaseService =
@@ -440,7 +465,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
     logger.info(`Total commands registered: ${subscriptions.length}`);
 
-    // ⚡ FAST: Essential UI components only
     const quickFix = new CodeActionsProvider();
     quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
       { scheme: "file", language: "*" },
@@ -448,20 +472,11 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     agentEventEmmitter = new EventEmitter();
-
-    // Vector database commands are already registered in initializePhase4Orchestration
-    // No need to register them again here
-
-    // ⚡ DEFER: Initialize WebView providers lazily
-    const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
-    initializeWebViewProviders(context, selectedGenerativeAiModel);
     context.subscriptions.push(
       ...subscriptions,
       quickFixCodeAction,
       agentEventEmmitter,
       orchestrator,
-      // Note: providerManager is handled in initializeWebViewProviders
-      // secretStorageService,
     );
   } catch (error: any) {
     // Memory.clear();

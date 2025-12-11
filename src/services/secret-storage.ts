@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { APP_CONFIG } from "../application/constant";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import { IEventPayload } from "../emitter/interface";
 
 export class SecretStorageService implements vscode.Disposable {
@@ -14,6 +14,9 @@ export class SecretStorageService implements vscode.Disposable {
     this.localStorage = context.secrets;
     this.logger = Logger.initialize("LocalStorageManager", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.orchestrator = Orchestrator.getInstance();
     this.registerDisposables();

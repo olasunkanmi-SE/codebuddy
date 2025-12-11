@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Orchestrator } from "../agents/orchestrator";
+import { Orchestrator } from "../orchestrator";
 import {
   FolderEntry,
   IContextInfo,
@@ -24,11 +24,12 @@ import { ProductionSafeguards } from "../services/production-safeguards.service"
 import { LogLevel } from "../services/telemetry";
 import { UserFeedbackService } from "../services/user-feedback.service";
 import { WorkspaceService } from "../services/workspace-service";
-import { formatText, getAPIKeyAndModel } from "../utils/utils";
+import { formatText, getAPIKeyAndModel, getConfigValue } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
 import { QuestionClassifierService } from "../services/question-classifier.service";
 import { GroqLLM } from "../llms/groq/groq";
 import { Role } from "../llms/message";
+import { MessageHandler } from "../agents/handlers/message-handler";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -72,6 +73,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   // Prompt enhancement service
   protected promptBuilderService: EnhancedPromptBuilderService;
   private readonly groqLLM: GroqLLM | null;
+  private readonly codeBuddyAgent: MessageHandler;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -91,6 +93,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.orchestrator = Orchestrator.getInstance();
     this.logger = Logger.initialize("BaseWebViewProvider", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.workspaceService = WorkspaceService.getInstance();
     this.agentService = AgentService.getInstance();
@@ -128,6 +133,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.contextRetriever = new ContextRetriever();
 
     this.promptBuilderService = new EnhancedPromptBuilderService(context);
+    this.codeBuddyAgent = MessageHandler.getInstance();
   }
 
   registerDisposables() {
@@ -217,9 +223,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           metadata: msg.metadata,
         }));
 
-        // Update the provider's chatHistory array (this should be overridden in child classes)
-        await this.updateProviderChatHistory(providerHistory);
-
         this.logger.debug(
           `Synchronized ${persistentHistory.length} chat messages from database`,
         );
@@ -233,18 +236,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       );
       // Don't throw - this is not critical for provider initialization
     }
-  }
-
-  /**
-   * Update the provider's specific chatHistory array
-   * Should be overridden by child classes to update their specific chatHistory type
-   */
-  protected updateProviderChatHistory(history: any[]): void {
-    // Base implementation - child classes should override this
-    // to update their specific chatHistory arrays
-    this.logger.debug(
-      "Base provider - no specific chat history array to update",
-    );
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
@@ -323,6 +314,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           switch (message.command) {
             case "user-input": {
               this.UserMessageCounter += 1;
+              const selectedGenerativeAiModel = getConfigValue(
+                "generativeAi.option",
+              );
+              console.log(selectedGenerativeAiModel);
 
               // Validate user input for security
               const validation = this.inputValidator.validateInput(
@@ -378,6 +373,18 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   // Optionally trigger manual pruning here
                   // await this.pruneHistoryManually("agentId", { maxMessages: 50, maxTokens: 8000 });
                 }
+              }
+
+              if (message.metaData?.mode === "Agent") {
+                let context: string | undefined;
+                if (message.metaData?.context.length > 0) {
+                  context = await this.getContext(message.metaData.context);
+                }
+                return await this.codeBuddyAgent.handleUserMessage(
+                  context
+                    ? JSON.stringify(`${message} \n context: ${context}`)
+                    : JSON.stringify(message),
+                );
               }
 
               const messageAndSystemInstruction =

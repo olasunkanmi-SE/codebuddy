@@ -23,6 +23,9 @@ export class CodeStructureMapper {
     this.code = code;
     this.logger = Logger.initialize("CodeStructureMapper", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

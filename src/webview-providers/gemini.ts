@@ -4,6 +4,8 @@ import { GeminiLLM } from "../llms/gemini/gemini";
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
 import { BaseWebViewProvider, LLMMessage } from "./base";
+import { CodebuddyAgentService } from "../agents/agentService";
+import { MessageHandler } from "../agents/handlers/message-handler";
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
@@ -105,15 +107,6 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       let context: string | undefined;
       if (metaData?.context.length > 0) {
         context = await this.getContext(metaData.context);
-      }
-      if (metaData?.mode === "Agent") {
-        this.orchestrator.publish("onThinking", "...thinking");
-        await this.gemini.run(
-          context
-            ? JSON.stringify(`${message} \n context: ${context}`)
-            : JSON.stringify(message),
-        );
-        return;
       }
 
       const msg = userMessage?.length ? userMessage : message;

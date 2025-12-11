@@ -8,6 +8,9 @@ export class CodeRepository implements ICodeRepository {
   private constructor() {
     this.logger = Logger.initialize("CodeRepository", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

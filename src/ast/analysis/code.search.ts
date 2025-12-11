@@ -11,6 +11,9 @@ export class CodeSearch {
   constructor(private readonly outputChannel: vscode.OutputChannel) {
     this.logger = Logger.initialize("QueryExecutor", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 

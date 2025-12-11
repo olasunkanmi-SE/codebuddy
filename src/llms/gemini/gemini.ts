@@ -6,8 +6,8 @@ import {
 } from "@google/generative-ai";
 import { BaseMessage } from "@langchain/core/messages";
 import * as vscode from "vscode";
-import { langGraphAgent } from "../../agents/langgraph/graphs/agent";
-import { Orchestrator } from "../../agents/orchestrator";
+// import { langGraphAgent } from "../../agents/langgraph/graphs/agent";
+import { Orchestrator } from "../../orchestrator";
 import { COMMON } from "../../application/constant";
 import { Logger } from "../../infrastructure/logger/logger";
 import { Memory } from "../../memory/base";
@@ -18,6 +18,7 @@ import { BaseLLM } from "../base";
 import { GroqLLM } from "../groq/groq";
 import { GeminiLLMSnapShot, ILlmConfig } from "../interface";
 import { Message } from "../message";
+import { createAdvancedDeveloperAgent } from "../../agents/developer/agent";
 
 export class GeminiLLM
   extends BaseLLM<GeminiLLMSnapShot>
@@ -45,7 +46,12 @@ export class GeminiLLM
     this.orchestrator = Orchestrator.getInstance();
     CodeBuddyToolProvider.initialize();
     this.intializeDisposable();
-    this.logger = Logger.initialize("GeminiLLM", { minLevel: LogLevel.DEBUG });
+    this.logger = Logger.initialize("GeminiLLM", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
     this.groqLLM = GroqLLM.getInstance({
       apiKey: getAPIKeyAndModel("groq").apiKey,
       model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",
@@ -169,11 +175,33 @@ export class GeminiLLM
     return JSON.stringify(content);
   }
 
+  async *runx(userMessage: string) {
+    try {
+      const agent = await createAdvancedDeveloperAgent({});
+      const result = await agent.stream({
+        messages: [
+          {
+            role: "user",
+            content: userMessage,
+          },
+        ],
+      });
+      for await (const event of result) {
+        for (const [nodeName, update] of Object.entries(
+          event as Record<string, any>,
+        )) {
+          yield { node: nodeName, update };
+          this.logger.log(LogLevel.INFO, `Stream event from node: ${nodeName}`);
+        }
+      }
+    } catch (error: any) {
+      this.logger.error("Agent execution failed:", error);
+      throw error;
+    }
+  }
+
   async processUserQuery(userInput: string): Promise<any> {
-    const apiKey = getAPIKeyAndModel("gemini").apiKey;
-    const model = getAPIKeyAndModel("gemini").model;
-    const agent = langGraphAgent.create({ apiKey, model: model ?? "" });
-    const stream = await agent.runx(userInput);
+    const stream = await this.runx(userInput);
     for await (const update of stream) {
       if (update?.update?.messages) {
         const lastMessageContent = this.handleUserQuery(update.update.messages);
@@ -184,18 +212,33 @@ export class GeminiLLM
     }
   }
 
-  async run(userQuery: string) {
-    try {
-      const traceId = generateUUID();
-      Logger.setTraceId(traceId);
-      this.userQuery = userQuery;
-      const result = await this.processUserQuery(userQuery);
-      return result;
-    } catch (error) {
-      console.error("Error occured will running the agent", error);
-      throw error;
-    }
-  }
+  // async processUserQuery(userInput: string): Promise<any> {
+  //   const apiKey = getAPIKeyAndModel("gemini").apiKey;
+  //   const model = getAPIKeyAndModel("gemini").model;
+  //   const agent = langGraphAgent.create({ apiKey, model: model ?? "" });
+  //   const stream = await agent.runx(userInput);
+  //   for await (const update of stream) {
+  //     if (update?.update?.messages) {
+  //       const lastMessageContent = this.handleUserQuery(update.update.messages);
+  //       if (lastMessageContent) {
+  //         this.orchestrator.publish("onQuery", String(lastMessageContent));
+  //       }
+  //     }
+  //   }
+  // }
+
+  // async run(userQuery: string) {
+  //   try {
+  //     const traceId = generateUUID();
+  //     Logger.setTraceId(traceId);
+  //     this.userQuery = userQuery;
+  //     const result = await this.processUserQuery(userQuery);
+  //     return result;
+  //   } catch (error) {
+  //     console.error("Error occured will running the agent", error);
+  //     throw error;
+  //   }
+  // }
 
   public createSnapShot(data?: any): GeminiLLMSnapShot {
     const snapshot: GeminiLLMSnapShot = {

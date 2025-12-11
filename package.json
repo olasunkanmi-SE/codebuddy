@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "CodeBuddy is a Visual Studio Code extension that enhances developer productivity through AI-powered code assistance. It provides intelligent code review, refactoring suggestions, optimization tips, and interactive chat capabilities powered by multiple AI models including Gemini, Groq, Anthropic, and Deepseek.",
-  "version": "3.7.3",
+  "version": "3.7.31",
   "engines": {
     "vscode": "^1.78.0"
   },
@@ -153,6 +153,59 @@
         "title": "CodeBuddy. Review Pull Request"
       }
     ],
+    "keybindings": [
+      {
+        "command": "CodeBuddy.commentCode",
+        "key": "ctrl+shift+j",
+        "mac": "cmd+shift+j",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.reviewCode",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.codeRefactor",
+        "key": "ctrl+shift+;",
+        "mac": "cmd+shift+;",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.codeOptimize",
+        "key": "ctrl+shift+0",
+        "mac": "cmd+shift+0",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.explain",
+        "key": "ctrl+shift+1",
+        "mac": "cmd+shift+1",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.generateCommitMessage",
+        "key": "ctrl+shift+2",
+        "mac": "cmd+shift+2"
+      },
+      {
+        "command": "CodeBuddy.inLineChat",
+        "key": "ctrl+shift+8",
+        "mac": "cmd+shift+8"
+      },
+      {
+        "command": "CodeBuddy.generateMermaidDiagram",
+        "key": "ctrl+shift+7",
+        "mac": "cmd+shift+7",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.codebaseAnalysis",
+        "key": "ctrl+shift+6",
+        "mac": "cmd+shift+6"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -178,12 +231,20 @@
             "default": "Gemini",
             "description": "Select Model"
           },
+          "tavily.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "apiKey",
+            "markdownDescription": "Enter your [API Key](https://app.tavily.com/home) for Tavily."
+          },
           "google.gemini.apiKeys": {
             "type": [
               "string",
               "null"
             ],
-            "default": null,
+            "default": "apiKey",
             "markdownDescription": "Enter your [API Key](https://aistudio.google.com/app/apikey) for Gemini."
           },
           "google.gemini.model": {
@@ -191,7 +252,7 @@
               "string",
               "null"
             ],
-            "default": "gemini-1.5-flash",
+            "default": "gemini-2.5-pro",
             "markdownDescription": "Provide the name of the model you want to use. Choose from the [base models](https://ai.google.dev/models/gemini) or your own [tuned model](https://ai.google.dev/docs/model_tuning_guidance)."
           },
           "groq.llama3.apiKey": {
@@ -199,7 +260,7 @@
               "string",
               "null"
             ],
-            "default": "llama-3.1-70b-versatile",
+            "default": "apiKey",
             "markdownDescription": "Enter your [API Key](https://console.groq.com/keys) Groq"
           },
           "groq.llama3.model": {
@@ -207,7 +268,7 @@
               "string",
               "null"
             ],
-            "default": null,
+            "default": "llama-3.1-70b-versatile",
             "markdownDescription": "Provide the name of the Groq model you want to use. Choose from the ..."
           },
           "anthropic.model": {
@@ -215,7 +276,7 @@
               "string",
               "null"
             ],
-            "default": null,
+            "default": "claude-sonnet-4-5",
             "markdownDescription": "Provide the name of the Anthropic model you want to use. Choose from the ..."
           },
           "anthropic.apiKey": {
@@ -223,24 +284,8 @@
               "string",
               "null"
             ],
-            "default": null,
+            "default": "apiKey",
             "markdownDescription": "Enter your [API Key](https://docs.anthropic.com/en/docs/about-claude/models) Anthropic"
-          },
-          "grok.model": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "default": null,
-            "markdownDescription": "Provide the name of the [Grok Model](https://console.x.ai/) you want to use."
-          },
-          "grok.apiKey": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "default": null,
-            "markdownDescription": "Enter your [Grok API Key](https://console.x.ai/)"
           },
           "deepseek.model": {
             "type": [
@@ -255,7 +300,7 @@
               "string",
               "null"
             ],
-            "default": null,
+            "default": "apiKey",
             "markdownDescription": "Enter your Deepseek API Key"
           },
           "font.family": {
@@ -342,6 +387,11 @@
     "@chroma-core/default-embed": "^0.1.8",
     "@google/genai": "^0.7.0",
     "@google/generative-ai": "^0.21.0",
+    "@langchain/anthropic": "^1.0.0",
+    "@langchain/core": "^1.0.0",
+    "@langchain/groq": "^1.0.2",
+    "@langchain/langgraph": "^1.0.0",
+    "@langchain/langgraph-checkpoint-sqlite": "^1.0.0",
     "@mozilla/readability": "^0.4.1",
     "@types/fast-levenshtein": "^0.0.4",
     "@types/node-fetch": "^2.6.11",
@@ -349,11 +399,13 @@
     "@vscode/ripgrep": "^1.17.0",
     "apache-arrow": "18.1.0",
     "axios": "^1.7.9",
+    "deepagents": "^1.1.1",
     "dompurify": "^3.2.6",
     "dotenv": "^16.1.4",
     "fast-levenshtein": "^3.0.0",
     "groq-sdk": "^0.22.0",
     "jsdom": "^26.0.0",
+    "langchain": "^1.0.4",
     "llama3-tokenizer-js": "^1.2.0",
     "lru-cache": "^11.2.2",
     "markdown-it": "^14.1.0",
@@ -365,10 +417,7 @@
     "simple-git": "^3.25.0",
     "sinon": "^17.0.1",
     "sql.js": "^1.13.0",
-    "web-tree-sitter": "^0.25.10",
-    "@langchain/core": "^0.3.79",
-    "@langchain/google-genai": "^0.2.18",
-    "@langchain/langgraph": "^0.4.9"
+    "web-tree-sitter": "^0.25.10"
   },
   "license": "MIT"
 }

@@ -1,15 +1,16 @@
 import * as vscode from "vscode";
-import { Orchestrator } from "../agents/orchestrator";
+import { StreamEventType } from "../agents/interface/agent.interface";
 import { generativeAiModels } from "../application/constant";
 import { IEventPayload } from "../emitter/interface";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { Orchestrator } from "../orchestrator";
 import { ChatHistoryManager } from "../services/chat-history-manager";
-import { getAPIKeyAndModel } from "../utils/utils";
+import { formatText, getAPIKeyAndModel } from "../utils/utils";
 import { AnthropicWebViewProvider } from "./anthropic";
 import { BaseWebViewProvider } from "./base";
 import { DeepseekWebViewProvider } from "./deepseek";
 import { GeminiWebViewProvider } from "./gemini";
 import { GroqWebViewProvider } from "./groq";
-import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export class WebViewProviderManager implements vscode.Disposable {
   private static instance: WebViewProviderManager;
@@ -39,9 +40,13 @@ export class WebViewProviderManager implements vscode.Disposable {
     this.orchestrator = Orchestrator.getInstance();
     this.chatHistoryManager = ChatHistoryManager.getInstance();
     this.registerProviders();
+    this.registerWebViewProvider();
     // Don't register event listeners immediately - do it lazily
     this.logger = Logger.initialize("WebViewProviderManager", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
   }
 
@@ -54,6 +59,10 @@ export class WebViewProviderManager implements vscode.Disposable {
     this.disposables.push(
       this.orchestrator.onModelChange(this.handleModelChange.bind(this)),
       this.orchestrator.onClearHistory(this.handleClearHistory.bind(this)),
+      this.orchestrator.onStreamStart(this.handleStreamStart.bind(this)),
+      this.orchestrator.onStreamChunk(this.handleStreamChunk.bind(this)),
+      this.orchestrator.onStreamEnd(this.handleStreamEnd.bind(this)),
+      this.orchestrator.onStreamError(this.handleStreamError.bind(this)),
     );
     this.isInitialized = true;
   }
@@ -168,7 +177,7 @@ export class WebViewProviderManager implements vscode.Disposable {
         this.extensionContext.subscriptions.push(webviewProviderDisposable);
       }
 
-      this.orchestrator.publish(
+      await this.orchestrator.publish(
         "onModelChangeSuccess",
         JSON.stringify({
           success: true,
@@ -177,7 +186,7 @@ export class WebViewProviderManager implements vscode.Disposable {
       );
     } catch (error: any) {
       this.logger.error(`Error switching provider: ${error}`);
-      this.orchestrator.publish(
+      await this.orchestrator.publish(
         "onModelChangeSuccess",
         JSON.stringify({
           success: false,
@@ -264,6 +273,66 @@ export class WebViewProviderManager implements vscode.Disposable {
 
   getCurrentProvider(): BaseWebViewProvider | undefined {
     return this.currentProvider;
+  }
+
+  private async handleStreamStart(event: IEventPayload) {
+    try {
+      if (this.webviewView?.webview) {
+        await this.webviewView.webview.postMessage({
+          type: StreamEventType.START,
+          payload: {
+            requestId: event.message.requestId,
+            threadId: event.message.threadId,
+            timestamp: Date.now(),
+          },
+        });
+      }
+    } catch (error: any) {
+      this.logger.error("Failed to send stream start:", error);
+      throw error;
+    }
+  }
+
+  private async handleStreamChunk(event: IEventPayload) {
+    if (this.webviewView?.webview) {
+      await this.webviewView.webview.postMessage({
+        type: StreamEventType.CHUNK,
+        payload: {
+          requestId: event.message.requestId,
+          content: event.message.content,
+          timestamp: Date.now(),
+          accumulated: formatText(event.message.accumulated),
+          metadata: event.message.metadata,
+        },
+      });
+    }
+  }
+
+  private async handleStreamEnd(event: IEventPayload) {
+    if (this.webviewView?.webview) {
+      await this.webviewView.webview.postMessage({
+        type: StreamEventType.END,
+        payload: {
+          requestId: event.message.requestId,
+          content: formatText(event.message.content),
+          timestamp: event.message.timestamp,
+        },
+      });
+    }
+  }
+
+  private async handleStreamError(event: IEventPayload) {
+    if (this.webviewView?.webview) {
+      await this.webviewView.webview.postMessage({
+        type: StreamEventType.END,
+        payload: {
+          requestId: event.message.requestId,
+          threadId: event.threadId,
+          timestamp: event.timestamp,
+          error: event.error,
+        },
+      });
+    }
   }
 
   dispose(): void {

@@ -13,7 +13,12 @@ export class HttpClient implements IHttpClient {
 
   private static instance: HttpClient;
   constructor() {
-    this.logger = Logger.initialize("HttpClient", { minLevel: LogLevel.DEBUG });
+    this.logger = Logger.initialize("HttpClient", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
   }
 
   static getInstance() {

@@ -18,6 +18,9 @@ export class QuestionClassifierService {
   constructor() {
     this.logger = Logger.initialize("QuestionClassifierService", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.config = this.loadConfig();
   }

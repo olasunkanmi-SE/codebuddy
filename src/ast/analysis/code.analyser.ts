@@ -23,6 +23,9 @@ export class CodeAnalyzer {
   ) {
     this.logger = Logger.initialize("QueryExecutor", {
       minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
     });
     this.lairExtractor = LairExtractor.getInstance();
     this.relevanceScorer = RelevanceScorer.getInstance();
