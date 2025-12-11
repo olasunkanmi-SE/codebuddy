@@ -81,13 +81,23 @@ export const WebviewUI = () => {
   // Legacy message handler for non-streaming events
   const legacyMessageHandler = useCallback((event: any) => {
     const message = event.data;
+    const messageType = message.command || message.type;
 
-    // Skip streaming-related messages as they're handled by the hook
+    // Handle stream end to clear command execution state
+    // (the actual message handling is done by useStreamingChat hook)
+    if (messageType === 'onStreamEnd' || messageType === 'onStreamError') {
+      setIsCommandExecuting(false);
+      setCommandAction("");
+      setCommandDescription("");
+      return;
+    }
+
+    // Skip other streaming-related messages as they're handled by the hook
     if (message.command?.includes('stream') || message.type?.includes('stream')) {
       return;
     }
 
-    switch (message.type || message.command) {
+    switch (messageType) {
       case "codebuddy-commands":
         console.log("Command feedback received:", message.message);
         setIsCommandExecuting(true);
@@ -124,6 +134,16 @@ export const WebviewUI = () => {
       case "error":
         console.error("Extension error", message.payload);
         setIsCommandExecuting(false);
+        setCommandAction("");
+        setCommandDescription("");
+        break;
+
+      case "bot-response":
+        // Clear command execution state when bot response is received
+        // The actual message handling is done by useStreamingChat hook
+        setIsCommandExecuting(false);
+        setCommandAction("");
+        setCommandDescription("");
         break;
 
       case "onActiveworkspaceUpdate":

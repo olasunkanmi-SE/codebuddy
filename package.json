@@ -156,8 +156,8 @@
     "keybindings": [
       {
         "command": "CodeBuddy.commentCode",
-        "key": "ctrl+shift+c",
-        "mac": "cmd+shift+c",
+        "key": "ctrl+shift+j",
+        "mac": "cmd+shift+j",
         "when": "editorHasSelection"
       },
       {
@@ -168,53 +168,42 @@
       },
       {
         "command": "CodeBuddy.codeRefactor",
-        "key": "ctrl+shift+f",
-        "mac": "cmd+shift+f",
+        "key": "ctrl+shift+;",
+        "mac": "cmd+shift+;",
         "when": "editorHasSelection"
       },
       {
         "command": "CodeBuddy.codeOptimize",
-        "key": "ctrl+shift+o",
-        "mac": "cmd+shift+o",
+        "key": "ctrl+shift+0",
+        "mac": "cmd+shift+0",
         "when": "editorHasSelection"
       },
       {
         "command": "CodeBuddy.explain",
-        "key": "ctrl+shift+e",
-        "mac": "cmd+shift+e",
+        "key": "ctrl+shift+1",
+        "mac": "cmd+shift+1",
         "when": "editorHasSelection"
       },
       {
         "command": "CodeBuddy.generateCommitMessage",
-        "key": "ctrl+shift+g",
-        "mac": "cmd+shift+g"
+        "key": "ctrl+shift+2",
+        "mac": "cmd+shift+2"
       },
       {
         "command": "CodeBuddy.inLineChat",
-        "key": "ctrl+shift+i",
-        "mac": "cmd+shift+i"
-      },
-      {
-        "command": "CodeBuddy.interviewMe",
-        "key": "ctrl+shift+m",
-        "mac": "cmd+shift+m",
-        "when": "editorHasSelection"
+        "key": "ctrl+shift+8",
+        "mac": "cmd+shift+8"
       },
       {
         "command": "CodeBuddy.generateMermaidDiagram",
-        "key": "ctrl+shift+d",
-        "mac": "cmd+shift+d",
+        "key": "ctrl+shift+7",
+        "mac": "cmd+shift+7",
         "when": "editorHasSelection"
       },
       {
         "command": "CodeBuddy.codebaseAnalysis",
-        "key": "ctrl+shift+a",
-        "mac": "cmd+shift+a"
-      },
-      {
-        "command": "CodeBuddy.reviewPR",
-        "key": "ctrl+shift+p",
-        "mac": "cmd+shift+p"
+        "key": "ctrl+shift+6",
+        "mac": "cmd+shift+6"
       }
     ],
     "viewsContainers": {

@@ -8,6 +8,7 @@ import {
 import Anthropic from "@anthropic-ai/sdk";
 import { Memory } from "../memory/base";
 import * as crypto from "crypto";
+import { Buffer } from "buffer";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -53,30 +54,29 @@ export const formatText = (text?: string): string => {
     let processedText = fixIncompleteMarkdown(text);
     processedText = fixUnmatchedBoldFormatting(processedText);
 
-    // CRITICAL: Extract mermaid code blocks BEFORE markdown conversion
-    // This preserves the exact whitespace and formatting
-    const mermaidBlocks: string[] = [];
-
-    // Extract ```mermaid ... ``` blocks and replace with the final HTML directly
-    // This avoids any placeholder issues with markdown-it
+    // Extract mermaid blocks before markdown-it processing to keep syntax intact
     processedText = processedText.replace(
       /```mermaid\s*([\s\S]*?)```/g,
-      (_, code) => {
-        const trimmedCode = code.trim();
-        // Encode the mermaid code as base64 to preserve all characters
-        const encodedCode = Buffer.from(trimmedCode).toString("base64");
-        // Return the final HTML element directly - markdown-it will pass through HTML
+      (_, codeBlock: string) => {
+        const trimmedCode = codeBlock.trim();
+        if (!trimmedCode) {
+          return "";
+        }
+
+        const encodedCode = Buffer.from(trimmedCode, "utf-8").toString(
+          "base64",
+        );
         return `\n\n<div class="mermaid-container" data-mermaid="${encodedCode}"></div>\n\n`;
       },
     );
 
-    // Convert the rest with markdown-it (it will pass through our HTML div unchanged)
     const md = markdownit({
-      html: true, // Enable HTML tags in source
+      html: true,
+      linkify: true,
+      breaks: true,
     });
-    const html = md.render(processedText);
 
-    return html;
+    return md.render(processedText);
   } catch (error: any) {
     // If markdown parsing fails, provide a more robust fallback
     console.warn(

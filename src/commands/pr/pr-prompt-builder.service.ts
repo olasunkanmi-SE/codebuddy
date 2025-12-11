@@ -72,6 +72,10 @@ return () => listeners.delete(event); // cleanup
 
 **Guidelines**: Be specific, show concrete examples, explain benefits, prioritize by impact.
 
+### **Mermaid SEQUENCE DIAGRAM for the overall flow**
+
+### **Learning resources for identified gaps**
+
 ## Code Content
 ${details.diffContent}
 

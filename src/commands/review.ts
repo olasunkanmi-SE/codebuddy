@@ -119,6 +119,10 @@ const posts = useMemo(() => loadPosts(), [dependency]);
 - [ ] Documentation updated
 - [ ] Code follows style guidelines
 
+**Guidelines**: Be specific, show concrete examples, explain benefits, prioritize by impact.
+
+### **Mermaid SEQUENCE DIAGRAM for the overall flow**
+
 ### **Learning resources for identified gaps**
 
 **Focus**: Provide specific, actionable feedback with concrete examples and measurable improvements.`;
