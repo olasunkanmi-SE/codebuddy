@@ -30,10 +30,10 @@ flowchart TB
             Commands["⚡ Commands<br/>(Actions)"]
             Orchestrator["🎯 Orchestrator<br/>(Event Publisher)"]
         end
-        
+
         subgraph AgentLayer["🤖 Agent Service Layer"]
             DeveloperAgent["🧠 Developer Agent<br/>(DeepAgents)"]
-            
+
             subgraph SubAgents["Specialized Sub-Agents"]
                 CodeAnalyzer["🔍 Code<br/>Analyzer"]
                 DocWriter["📝 Doc<br/>Writer"]
@@ -41,21 +41,21 @@ flowchart TB
                 FileOrganizer["📁 File<br/>Organizer"]
             end
         end
-        
+
         subgraph Tools["🔧 Tool Provider"]
             WebSearch["🌐 Web<br/>Search"]
             FileTool["📄 File<br/>Tool"]
             ThinkTool["💭 Think<br/>Tool"]
             TavilySearch["🔎 Tavily<br/>Search"]
         end
-        
+
         subgraph Backends["💾 Backend Systems"]
             Filesystem["📂 Filesystem<br/>(/workspace/)"]
             Store["🗄️ Store<br/>(/docs/)"]
             State["⚡ State<br/>(/ ephemeral)"]
         end
     end
-    
+
     subgraph External["☁️ External Services"]
         Gemini["Gemini"]
         Anthropic["Anthropic"]
@@ -63,14 +63,14 @@ flowchart TB
         Deepseek["Deepseek"]
         Tavily["Tavily API"]
     end
-    
+
     Webview --> DeveloperAgent
     Commands --> DeveloperAgent
     Orchestrator --> DeveloperAgent
-    
+
     DeveloperAgent --> SubAgents
     DeveloperAgent --> Tools
-    
+
     Tools --> Backends
     Tools --> External
 ```
@@ -90,11 +90,11 @@ The core of CodeBuddy is built on **DeepAgents** and **LangGraph**, providing:
 
 CodeBuddy uses a sophisticated three-tier storage system:
 
-| Path | Backend | Persistence | Purpose |
-|------|---------|-------------|---------|
-| `/workspace/` | Filesystem | Permanent | Real file operations on your codebase |
-| `/docs/` | Store | Cross-session | Long-term knowledge and documentation |
-| `/` (root) | State | Session only | Temporary scratch space |
+| Path          | Backend    | Persistence   | Purpose                               |
+| ------------- | ---------- | ------------- | ------------------------------------- |
+| `/workspace/` | Filesystem | Permanent     | Real file operations on your codebase |
+| `/docs/`      | Store      | Cross-session | Long-term knowledge and documentation |
+| `/` (root)    | State      | Session only  | Temporary scratch space               |
 
 ---
 
@@ -174,14 +174,14 @@ CodeBuddy uses a sophisticated three-tier storage system:
 
 ### Getting Your API Keys
 
-| Provider | Get API Key |
-|----------|-------------|
-| Gemini | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| Provider  | Get API Key                                                                 |
+| --------- | --------------------------------------------------------------------------- |
+| Gemini    | [Google AI Studio](https://aistudio.google.com/app/apikey)                  |
 | Anthropic | [Anthropic Console](https://docs.anthropic.com/en/docs/about-claude/models) |
-| Groq | [Groq Console](https://console.groq.com/keys) |
-| Deepseek | [Deepseek Platform](https://platform.deepseek.com/api_keys) |
-| XGrok | [X.AI Console](https://console.x.ai/) |
-| Tavily | [Tavily Dashboard](https://app.tavily.com/home) (for web search) |
+| Groq      | [Groq Console](https://console.groq.com/keys)                               |
+| Deepseek  | [Deepseek Platform](https://platform.deepseek.com/api_keys)                 |
+| XGrok     | [X.AI Console](https://console.x.ai/)                                       |
+| Tavily    | [Tavily Dashboard](https://app.tavily.com/home) (for web search)            |
 
 ---
 
@@ -191,35 +191,33 @@ CodeBuddy uses a sophisticated three-tier storage system:
 
 Right-click on selected code to access:
 
-| Feature | Description |
-|---------|-------------|
-| 💭 Add Comments | Intelligent code documentation |
-| 🔍 Review Code | Comprehensive code analysis |
-| 🔄 Refactor Code | Smart code improvements |
-| ⚡ Optimize Code | Performance enhancements |
-| 💬 Explain Code | Clear explanations |
-| 📝 Generate Commit | Smart Git commit messages |
-| 💫 Inline Chat | Context-aware discussions |
-| 📚 Interview Me | Technical interview prep |
-| 📊 Generate Diagram | Mermaid diagram creation |
-| 🏗️ Analyze Codebase | Deep architectural analysis |
-| 🔍 Review PR | Pull request review |
+| Feature             | Description                    |
+| ------------------- | ------------------------------ |
+| 💭 Add Comments     | Intelligent code documentation |
+| 🔍 Review Code      | Comprehensive code analysis    |
+| 🔄 Refactor Code    | Smart code improvements        |
+| ⚡ Optimize Code    | Performance enhancements       |
+| 💬 Explain Code     | Clear explanations             |
+| 📝 Generate Commit  | Smart Git commit messages      |
+| 💫 Inline Chat      | Context-aware discussions      |
+| 📚 Interview Me     | Technical interview prep       |
+| 📊 Generate Diagram | Mermaid diagram creation       |
+| 🏗️ Analyze Codebase | Deep architectural analysis    |
+| 🔍 Review PR        | Pull request review            |
 
 ### ⌨️ Keyboard Shortcuts
 
-| Command | Windows/Linux | macOS |
-|---------|---------------|-------|
-| Add Comment | `Ctrl+Shift+C` | `Cmd+Shift+C` |
-| Review Code | `Ctrl+Shift+R` | `Cmd+Shift+R` |
-| Refactor Code | `Ctrl+Shift+F` | `Cmd+Shift+F` |
-| Optimize Code | `Ctrl+Shift+O` | `Cmd+Shift+O` |
-| Explain Code | `Ctrl+Shift+E` | `Cmd+Shift+E` |
-| Generate Commit | `Ctrl+Shift+G` | `Cmd+Shift+G` |
-| Inline Chat | `Ctrl+Shift+I` | `Cmd+Shift+I` |
-| Interview Me | `Ctrl+Shift+M` | `Cmd+Shift+M` |
-| Generate Diagram | `Ctrl+Shift+D` | `Cmd+Shift+D` |
-| Analyze Codebase | `Ctrl+Shift+A` | `Cmd+Shift+A` |
-| Review PR | `Ctrl+Shift+P` | `Cmd+Shift+P` |
+| Command                       | Windows/Linux  | macOS         |
+| ----------------------------- | -------------- | ------------- |
+| Add Comment                   | `Ctrl+Shift+J` | `Cmd+Shift+J` |
+| Review Code                   | `Ctrl+Shift+R` | `Cmd+Shift+R` |
+| Refactor Code                 | `Ctrl+Shift+;` | `Cmd+Shift+;` |
+| Optimize Code                 | `Ctrl+Shift+O` | `Cmd+Shift+O` |
+| Explain Code                  | `Ctrl+Shift+1` | `Cmd+Shift+1` |
+| Generate Commit               | `Ctrl+Shift+2` | `Cmd+Shift+2` |
+| Inline Chat                   | `Ctrl+Shift+8` | `Cmd+Shift+8` |
+| Generate Architecture Diagram | `Ctrl+Shift+8` | `Cmd+Shift+8` |
+| Analyze Codebase              | `Ctrl+Shift+6` | `Cmd+Shift+6` |
 
 > **Note:** Customize shortcuts in VS Code's Keyboard Shortcuts settings (`Cmd+K Cmd+S` / `Ctrl+K Ctrl+S`)
 
@@ -323,13 +321,13 @@ codebuddy/
 
 ## 🔌 Supported AI Models
 
-| Provider | Models | Best For |
-|----------|--------|----------|
-| **Gemini** | gemini-2.5-pro, gemini-1.5-flash | General purpose, embeddings |
+| Provider      | Models                           | Best For                       |
+| ------------- | -------------------------------- | ------------------------------ |
+| **Gemini**    | gemini-2.5-pro, gemini-1.5-flash | General purpose, embeddings    |
 | **Anthropic** | claude-sonnet-4-5, claude-3-opus | Complex reasoning, code review |
-| **Groq** | llama-3.1-70b-versatile | Fast responses |
-| **Deepseek** | deepseek-chat | Cost-effective coding |
-| **XGrok** | grok-beta | Latest capabilities |
+| **Groq**      | llama-3.1-70b-versatile          | Fast responses                 |
+| **Deepseek**  | deepseek-chat                    | Cost-effective coding          |
+| **XGrok**     | grok-beta                        | Latest capabilities            |
 
 ---
 
@@ -364,21 +362,25 @@ codebuddy/
 ### Common Issues
 
 **❓ Agent not responding**
+
 - Verify API key is correct in settings
 - Check API quota/billing status
 - Try a different AI model
 
 **❓ Mermaid diagrams not rendering**
+
 - Diagrams auto-fix common syntax errors
 - Check console for specific parse errors
 - Try "Show Source Code" to see raw diagram
 
 **❓ PR Review not working**
+
 - Ensure you're in a Git repository
 - Check that you have multiple branches
 - Verify Git CLI is accessible
 
 **❓ Slow responses**
+
 - Try Groq for faster responses
 - Check internet connection
 - Clear cache with `CodeBuddy: Clear Cache`
