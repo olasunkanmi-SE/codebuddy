@@ -10,4 +10,5 @@
   "typescript.tsc.autoDetect": "off",
   "liveServer.settings.port": 5501,
   "editor.fontSize": 16,
+  "generativeAi.option": "Gemini",
 }
