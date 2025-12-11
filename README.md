@@ -73,13 +73,6 @@ flowchart TB
     
     Tools --> Backends
     Tools --> External
-    
-    style Extension fill:#1e1b4b,stroke:#7c3aed,color:#e2e8f0
-    style AgentLayer fill:#312e81,stroke:#8b5cf6,color:#e2e8f0
-    style SubAgents fill:#3730a3,stroke:#a78bfa,color:#e2e8f0
-    style Tools fill:#4c1d95,stroke:#8b5cf6,color:#e2e8f0
-    style Backends fill:#5b21b6,stroke:#a78bfa,color:#e2e8f0
-    style External fill:#6d28d9,stroke:#c4b5fd,color:#e2e8f0
 ```
 
 ### 🤖 Agentic System
