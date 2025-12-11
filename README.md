@@ -445,6 +445,7 @@ If CodeBuddy enhances your workflow:
 
 - ⭐ Star the repository
 - 📝 Leave a review on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
+- 📝 Leave a review on the [VS Code Marketplace](https://open-vsx.org/extension/fiatinnovations/ola-code-buddy)
 - 🐛 Report bugs or suggest features
 - 🤝 Contribute to the codebase
 - 💬 Share with fellow developers
