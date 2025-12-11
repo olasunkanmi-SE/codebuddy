@@ -13,6 +13,7 @@
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "dompurify": "^3.2.4",
     "highlight.js": "^11.11.0",
+    "mermaid": "^11.12.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "styled-components": "^6.1.19",

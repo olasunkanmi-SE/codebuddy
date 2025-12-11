@@ -1,11 +1,11 @@
 // src/commands/review-pr.ts
 import * as vscode from "vscode";
-import { CodeCommandHandler } from "./handler";
-import { GitActions } from "../services/git-actions";
-import { ChangeDetector } from "./pr/change-detector.service";
-import { formatText } from "../utils/utils";
-import { GitCliProvider } from "./pr/git-cli.provider";
-import { PRPromptBuilder } from "./pr/pr-prompt-builder.service";
+import { CodeCommandHandler } from "../handler";
+import { GitActions } from "../../services/git-actions";
+import { ChangeDetector } from "./change-detector.service";
+import { formatText } from "../../utils/utils";
+import { GitCliProvider } from "./git-cli.provider";
+import { PRPromptBuilder } from "./pr-prompt-builder.service";
 
 export class ReviewPR extends CodeCommandHandler {
   private readonly changeDetector: ChangeDetector;

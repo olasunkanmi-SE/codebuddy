@@ -153,6 +153,70 @@
         "title": "CodeBuddy. Review Pull Request"
       }
     ],
+    "keybindings": [
+      {
+        "command": "CodeBuddy.commentCode",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.reviewCode",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.codeRefactor",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.codeOptimize",
+        "key": "ctrl+shift+o",
+        "mac": "cmd+shift+o",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.explain",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.generateCommitMessage",
+        "key": "ctrl+shift+g",
+        "mac": "cmd+shift+g"
+      },
+      {
+        "command": "CodeBuddy.inLineChat",
+        "key": "ctrl+shift+i",
+        "mac": "cmd+shift+i"
+      },
+      {
+        "command": "CodeBuddy.interviewMe",
+        "key": "ctrl+shift+m",
+        "mac": "cmd+shift+m",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.generateMermaidDiagram",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "CodeBuddy.codebaseAnalysis",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      },
+      {
+        "command": "CodeBuddy.reviewPR",
+        "key": "ctrl+shift+p",
+        "mac": "cmd+shift+p"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {

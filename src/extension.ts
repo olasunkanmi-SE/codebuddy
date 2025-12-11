@@ -23,7 +23,7 @@ import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
-import { ReviewPR } from "./commands/review-pr";
+import { ReviewPR } from "./commands/pr/review-pr";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import DOMPurify from "dompurify";
 import styled, { keyframes } from "styled-components";
+import { MermaidDiagram } from "./MermaidDiagram";
 
 interface ThinkingComponentProps {
   content: string;
@@ -290,6 +291,7 @@ export const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ content })
   const [isExpanded, setIsExpanded] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string>("");
 
+  // Parse content to extract thinking blocks
   const parseContent = (rawContent: string) => {
     let decodedContent = rawContent;
     if (rawContent.includes("&lt;think&gt;")) {
@@ -314,10 +316,172 @@ export const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ content })
     };
   };
 
+  // Parse content to extract and render Mermaid diagrams
+  const parseMermaidContent = useMemo(() => {
+    return (htmlContent: string): React.ReactNode[] => {
+      const elements: React.ReactNode[] = [];
+      
+      // Check for new-style mermaid containers (base64 encoded, from formatText)
+      const hasNewStyleMermaid = htmlContent.includes('mermaid-container') && htmlContent.includes('data-mermaid');
+      
+      // Check for old-style mermaid code blocks (for backwards compatibility)
+      const hasOldStyleMermaid = 
+        htmlContent.includes('language-mermaid') || 
+        htmlContent.includes('```mermaid');
+      
+      if (!hasNewStyleMermaid && !hasOldStyleMermaid) {
+        // No mermaid content, return as regular HTML
+        return [<div key="content" className="doc-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent) }} />];
+      }
+      
+      // Pattern for new-style mermaid containers with base64-encoded data
+      // More flexible patterns to handle attribute order variations
+      const newStylePatterns = [
+        /<div[^>]*class="mermaid-container"[^>]*data-mermaid="([^"]+)"[^>]*>(?:<\/div>)?/gi,
+        /<div[^>]*data-mermaid="([^"]+)"[^>]*class="mermaid-container"[^>]*>(?:<\/div>)?/gi,
+      ];
+      
+      // Pattern for old-style code blocks (fallback)
+      const oldStylePatterns = [
+        /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/gi,
+        /```mermaid\n?([\s\S]*?)```/gi,
+      ];
+      
+      let lastIndex = 0;
+      
+      interface MermaidMatch {
+        fullMatch: string;
+        code: string;
+        startIndex: number;
+        endIndex: number;
+        isBase64: boolean;
+      }
+      
+      const mermaidMatches: MermaidMatch[] = [];
+      
+      // First, find new-style (base64) mermaid blocks
+      let match;
+      for (const newStylePattern of newStylePatterns) {
+        newStylePattern.lastIndex = 0;
+        while ((match = newStylePattern.exec(htmlContent)) !== null) {
+          try {
+            // Decode base64 to get the original mermaid code
+            const decodedCode = atob(match[1]);
+            mermaidMatches.push({
+              fullMatch: match[0],
+              code: decodedCode,
+              startIndex: match.index,
+              endIndex: match.index + match[0].length,
+              isBase64: true,
+            });
+          } catch (e) {
+            console.error('Failed to decode mermaid base64:', e);
+          }
+        }
+      }
+      
+      // If no new-style matches, try old-style patterns
+      if (mermaidMatches.length === 0) {
+        for (const pattern of oldStylePatterns) {
+          pattern.lastIndex = 0;
+          while ((match = pattern.exec(htmlContent)) !== null) {
+            let mermaidCode = match[1];
+            
+            // Decode HTML entities
+            mermaidCode = mermaidCode
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&amp;/g, '&')
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'")
+              .replace(/&nbsp;/g, ' ')
+              .replace(/<br\s*\/?>/gi, '\n')
+              .replace(/<[^>]+>/g, '')
+              .trim();
+            
+            mermaidMatches.push({
+              fullMatch: match[0],
+              code: mermaidCode,
+              startIndex: match.index,
+              endIndex: match.index + match[0].length,
+              isBase64: false,
+            });
+          }
+        }
+      }
+      
+      if (mermaidMatches.length === 0) {
+        // No mermaid matches found, return as regular HTML
+        return [<div key="content" className="doc-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent) }} />];
+      }
+      
+      // Sort matches by start index
+      mermaidMatches.sort((a, b) => a.startIndex - b.startIndex);
+      
+      // Remove overlapping matches (keep the first one)
+      const uniqueMatches: MermaidMatch[] = [];
+      for (const m of mermaidMatches) {
+        const overlaps = uniqueMatches.some(
+          (existing) => m.startIndex < existing.endIndex && m.endIndex > existing.startIndex
+        );
+        if (!overlaps) {
+          uniqueMatches.push(m);
+        }
+      }
+      
+      if (uniqueMatches.length === 0) {
+        // No mermaid content, return as regular HTML
+        return [<div key="content" className="doc-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent) }} />];
+      }
+      
+      // Process content with mermaid diagrams
+      for (const match of uniqueMatches) {
+        // Add content before this mermaid block
+        if (match.startIndex > lastIndex) {
+          const beforeContent = htmlContent.substring(lastIndex, match.startIndex);
+          if (beforeContent.trim()) {
+            elements.push(
+              <div 
+                key={`content-${lastIndex}`} 
+                className="doc-content" 
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(beforeContent) }} 
+              />
+            );
+          }
+        }
+        
+        // Add the mermaid diagram
+        elements.push(
+          <MermaidDiagram 
+            key={`mermaid-${match.startIndex}`} 
+            chart={match.code} 
+          />
+        );
+        
+        lastIndex = match.endIndex;
+      }
+      
+      // Add any remaining content after the last mermaid block
+      if (lastIndex < htmlContent.length) {
+        const afterContent = htmlContent.substring(lastIndex);
+        if (afterContent.trim()) {
+          elements.push(
+            <div 
+              key={`content-${lastIndex}`} 
+              className="doc-content" 
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(afterContent) }} 
+            />
+          );
+        }
+      }
+      
+      return elements;
+    };
+  }, []);
+
   const { thinkingContent, regularContent, hasThinking } = parseContent(content);
 
   const sanitizedThinkingContent = DOMPurify.sanitize(thinkingContent);
-  const sanitizedRegularContent = DOMPurify.sanitize(regularContent);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
@@ -335,8 +499,13 @@ export const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ content })
     }
   };
 
+  // Render regular content with Mermaid support
+  const renderedRegularContent = useMemo(() => {
+    return parseMermaidContent(regularContent);
+  }, [regularContent, parseMermaidContent]);
+
   if (!hasThinking) {
-    return <div className="doc-content" dangerouslySetInnerHTML={{ __html: sanitizedRegularContent }} />;
+    return <>{renderedRegularContent}</>;
   }
 
   return (
@@ -374,7 +543,7 @@ export const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ content })
         )}
       </ThinkingContainer>
 
-      {regularContent && <div className="doc-content" dangerouslySetInnerHTML={{ __html: sanitizedRegularContent }} />}
+      {regularContent && renderedRegularContent}
     </>
   );
 };
