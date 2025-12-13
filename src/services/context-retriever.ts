@@ -1,3 +1,5 @@
+import { rgPath } from "@vscode/ripgrep";
+import { spawnSync } from "child_process";
 import * as vscode from "vscode";
 import { Orchestrator } from "../orchestrator";
 import {
@@ -5,7 +7,7 @@ import {
   IFileToolResponse,
 } from "../application/interfaces/agent.interface";
 import { Logger } from "../infrastructure/logger/logger";
-import { getAPIKeyAndModel, getGenerativeAiModel } from "./../utils/utils";
+import { getAPIKeyAndModel } from "./../utils/utils";
 import { EmbeddingService } from "./embedding";
 import { LogLevel } from "./telemetry";
 import { WebSearchService } from "./web-search-service";
@@ -117,6 +119,230 @@ export class ContextRetriever {
     } catch (error: any) {
       this.logger.error("[WebSearch] Execution Error:", error);
       return `Error performing web search: ${error.message}`;
+    }
+  }
+
+  async grepWorkspace(params: {
+    pattern: string;
+    glob?: string;
+    caseSensitive?: boolean;
+    maxResults?: number;
+  }): Promise<string> {
+    const { pattern, glob, caseSensitive = false, maxResults = 200 } = params;
+
+    if (!pattern || !pattern.trim()) {
+      return "Error: Search pattern must not be empty.";
+    }
+
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      return "Error: No workspace folder is currently open.";
+    }
+
+    const cwd = workspaceFolder.uri.fsPath;
+    const args: string[] = ["-n", "--color", "never", "--no-heading"]; // Flatten output for parsing
+
+    if (!caseSensitive) {
+      args.push("-i");
+    }
+
+    if (glob) {
+      args.push("-g", glob);
+    }
+
+    args.push(pattern, ".");
+
+    this.logger.debug(
+      `[ContextRetriever] Running ripgrep with args: ${JSON.stringify(args)}`,
+    );
+
+    const result = spawnSync(rgPath, args, {
+      cwd,
+      encoding: "utf-8",
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    if (result.error) {
+      this.logger.error("[ContextRetriever] Ripgrep execution failed", {
+        error: result.error,
+      });
+      return `Error running ripgrep: ${result.error.message ?? String(result.error)}`;
+    }
+
+    if (result.status !== 0 && result.status !== 1) {
+      const stderr = result.stderr?.toString().trim();
+      this.logger.error("[ContextRetriever] Ripgrep returned non-zero status", {
+        status: result.status,
+        stderr,
+      });
+      return stderr || `Error: ripgrep exited with status ${result.status}`;
+    }
+
+    const lines = result.stdout
+      .toString()
+      .split(/\r?\n/)
+      .filter((line) => line.trim().length > 0);
+
+    if (!lines.length) {
+      return `No matches found for pattern "${pattern}".`;
+    }
+
+    const limited =
+      maxResults && maxResults > 0 ? lines.slice(0, maxResults) : lines;
+    const truncated = limited.length < lines.length;
+
+    let output = limited.join("\n");
+    if (truncated) {
+      output += `\n… (${lines.length - limited.length} more matches truncated)`;
+    }
+
+    return output;
+  }
+
+  async runTests(options: {
+    language?: string;
+    framework?: string;
+    command?: string;
+    args?: string[];
+    watch?: boolean;
+    testTarget?: string;
+    cwd?: string;
+  }): Promise<string> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const cwd = options.cwd || workspaceFolder?.uri.fsPath;
+
+    if (!cwd) {
+      return "Error: No workspace folder is currently open.";
+    }
+
+    const commandConfig = this.resolveTestCommand(options);
+
+    if (!commandConfig) {
+      return "Error: Unable to determine test command for the specified language or framework.";
+    }
+
+    const { command, args } = commandConfig;
+
+    this.logger.debug(
+      `[ContextRetriever] Running tests with command: ${command} ${args.join(" ")}`,
+    );
+
+    const result = spawnSync(command, args, {
+      cwd,
+      encoding: "utf-8",
+      maxBuffer: 20 * 1024 * 1024,
+      env: process.env,
+    });
+
+    if (result.error) {
+      this.logger.error("[ContextRetriever] Test execution failed", {
+        error: result.error,
+      });
+      return `Error running tests: ${result.error.message ?? String(result.error)}`;
+    }
+
+    const stderr = result.stderr?.toString().trim();
+    const stdout = result.stdout?.toString().trim();
+
+    if (result.status !== 0) {
+      this.logger.warn(
+        "[ContextRetriever] Test command exited with non-zero status",
+        {
+          status: result.status,
+          stderr,
+        },
+      );
+      return [stdout, stderr]
+        .filter((segment) => segment && segment.length > 0)
+        .join("\n\n");
+    }
+
+    return stdout || "Test command completed with no output.";
+  }
+
+  private resolveTestCommand(options: {
+    language?: string;
+    framework?: string;
+    command?: string;
+    args?: string[];
+    watch?: boolean;
+    testTarget?: string;
+  }): { command: string; args: string[] } | undefined {
+    if (options.command) {
+      return {
+        command: options.command,
+        args: options.args ?? [],
+      };
+    }
+
+    const normalizedLanguage = options.language?.toLowerCase();
+    const normalizedFramework = options.framework?.toLowerCase();
+    const target = options.testTarget ? options.testTarget.trim() : undefined;
+    const includeWatch = Boolean(options.watch);
+
+    const appendTarget = (baseArgs: string[]): string[] => {
+      if (!target) {
+        return baseArgs;
+      }
+      return [...baseArgs, target];
+    };
+
+    const NODE_ARGS = (script: string): { command: string; args: string[] } => {
+      const args: string[] = ["run", script];
+      if (includeWatch) {
+        args.push("--", "--watch");
+      }
+      return {
+        command: "npm",
+        args: target ? [...args, "--", target] : args,
+      };
+    };
+
+    switch (normalizedFramework ?? normalizedLanguage) {
+      case "jest":
+      case "vitest":
+      case "mocha":
+      case "ava":
+      case "cypress":
+      case "typescript":
+      case "javascript":
+      case "tsx":
+      case "jsx":
+        return NODE_ARGS("test");
+      case "python":
+      case "pytest":
+        if (includeWatch) {
+          return {
+            command: "ptw",
+            args: target ? [target] : [],
+          };
+        }
+        return {
+          command: "pytest",
+          args: target ? [target] : [],
+        };
+      case "go":
+        return {
+          command: "go",
+          args: target ? ["test", target] : ["test", "./..."],
+        };
+      case "rust":
+        return {
+          command: "cargo",
+          args: appendTarget(["test"]),
+        };
+      case "java":
+        return {
+          command: "mvn",
+          args: appendTarget(["test"]),
+        };
+      case "php":
+        return {
+          command: "vendor/bin/phpunit",
+          args: target ? [target] : [],
+        };
+      default:
+        return undefined;
     }
   }
 }

@@ -26,6 +26,7 @@ import {
 import { ToolProvider } from "../langgraph/tools/provider";
 import { DEVELOPER_SYSTEM_PROMPT } from "./prompts";
 import { createDeveloperSubagents } from "./subagents";
+import { MirroredDocsBackend } from "./mirrored-docs-backend";
 
 export class DeveloperAgent {
   private config: ICodeBuddyAgentConfig;
@@ -134,6 +135,7 @@ export class DeveloperAgent {
    */
   private getBackendFactory() {
     const vscodeFsBackend = this.createVscodeBackend();
+    const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
     const { assistantId, store: configStore } = this.config;
 
     return (stateAndStore: {
@@ -145,10 +147,11 @@ export class DeveloperAgent {
 
       // Mount Documentation/Store backend if store exists
       if (stateAndStore.store) {
-        routes["/docs/"] = new StoreBackend({
+        const storeBackend = new StoreBackend({
           ...stateAndStore,
           assistantId: assistantId || "developer-agent",
         });
+        routes["/docs/"] = new MirroredDocsBackend(storeBackend, workspaceUri);
       }
 
       // Mount Workspace backend

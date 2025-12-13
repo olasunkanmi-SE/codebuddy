@@ -103,6 +103,113 @@ export class TravilySearchTool {
   }
 }
 
+export class GrepTool {
+  constructor(private readonly contextRetriever?: ContextRetriever) {}
+
+  GrepSchema = z.object({
+    pattern: z
+      .string()
+      .min(1)
+      .describe(
+        "Search pattern (regex or plain text) to locate in the workspace.",
+      ),
+    glob: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("Optional glob to scope the search, for example **/*.ts."),
+    caseSensitive: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe("Treat the search as case sensitive when true."),
+    maxResults: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .default(200)
+      .describe("Maximum number of matches to return."),
+  });
+
+  async execute(params: {
+    pattern: string;
+    glob?: string;
+    caseSensitive?: boolean;
+    maxResults?: number;
+  }) {
+    return await this.contextRetriever?.grepWorkspace(params);
+  }
+
+  config() {
+    return {
+      name: "workspace_grep_search",
+      description:
+        "Search the current workspace using ripgrep. Use to locate references, symbols, or text snippets across the project.",
+      schema: this.GrepSchema,
+    } as const;
+  }
+}
+
+export class TestRunnerTool {
+  constructor(private readonly contextRetriever?: ContextRetriever) {}
+
+  RunTestsSchema = z.object({
+    language: z
+      .string()
+      .optional()
+      .describe("Primary language of the code under test (e.g., typescript)."),
+    framework: z
+      .string()
+      .optional()
+      .describe("Testing framework name when known (e.g., jest, pytest)."),
+    command: z
+      .string()
+      .optional()
+      .describe("Override command to execute instead of auto-detecting."),
+    args: z
+      .array(z.string())
+      .optional()
+      .describe("Explicit arguments for the provided command."),
+    watch: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe("Run the test command in watch mode when supported."),
+    testTarget: z
+      .string()
+      .optional()
+      .describe("Specific test file, suite, or package to execute."),
+    cwd: z
+      .string()
+      .optional()
+      .describe(
+        "Override working directory for the test run. Defaults to workspace root.",
+      ),
+  });
+
+  async execute(params: {
+    language?: string;
+    framework?: string;
+    command?: string;
+    args?: string[];
+    watch?: boolean;
+    testTarget?: string;
+    cwd?: string;
+  }) {
+    return await this.contextRetriever?.runTests(params);
+  }
+
+  config() {
+    return {
+      name: "run_workspace_tests",
+      description:
+        "Execute the project's automated tests. Automatically selects an appropriate test runner based on language or framework.",
+      schema: this.RunTestsSchema,
+    } as const;
+  }
+}
+
 export class FileTool {
   constructor(private readonly contextRetriever?: ContextRetriever) {}
 

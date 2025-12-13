@@ -11,6 +11,27 @@ export function createDeveloperSubagents(
   model: ChatAnthropic | ChatGroq, // this should be either anthropic or groq or Gemini
   tools: StructuredTool[],
 ): SubAgent[] {
+  const workspaceGrepTool = tools.find(
+    (tool) => tool.name === "workspace_grep_search",
+  );
+  const webSearchTool = tools.find((tool) => tool.name === "web_search");
+  const testRunnerTool = tools.find(
+    (tool) => tool.name === "run_workspace_tests",
+  );
+
+  const codeAnalyzerTools = workspaceGrepTool ? [workspaceGrepTool] : [];
+  const locatorTools = [workspaceGrepTool, webSearchTool].filter(
+    (tool): tool is StructuredTool => Boolean(tool),
+  );
+  const patternFinderTools = [workspaceGrepTool, webSearchTool].filter(
+    (tool): tool is StructuredTool => Boolean(tool),
+  );
+  const testingStrategistTools = [
+    testRunnerTool,
+    workspaceGrepTool,
+    webSearchTool,
+  ].filter((tool): tool is StructuredTool => Boolean(tool));
+
   return [
     {
       name: "code-analyzer",
@@ -28,7 +49,63 @@ export function createDeveloperSubagents(
 3. Consider edge cases and error handling
 4. Provide specific, actionable recommendations
 5. Save analysis results to /docs/code-reviews/ for future reference`,
-      tools: [],
+      tools: codeAnalyzerTools,
+      model,
+    },
+
+    {
+      name: "codebase-locator",
+      description:
+        "Specialist at quickly identifying relevant files, modules, and references across the repository.",
+      systemPrompt: `You excel at mapping questions to the exact places in the codebase that matter.
+- Locate files, functions, and modules tied to the user's request
+- Surface related tests, interfaces, and implementation details
+- Highlight ownership paths or documentation when available
+
+**Workflow**:
+1. Start with targeted grep searches to gather candidate files
+2. Summarize why each match is relevant
+3. Prioritize results that align with the question's domain or component
+4. Recommend next-read files for deeper analysis`,
+      tools: locatorTools,
+      model,
+    },
+
+    {
+      name: "codebase-pattern-finder",
+      description:
+        "Expert at discovering recurring implementation patterns, conventions, and architectural motifs in the repo.",
+      systemPrompt: `You analyze the codebase holistically to spot patterns and conventions.
+- Identify shared abstractions, helper utilities, and cross-cutting concerns
+- Compare multiple implementations to reveal common structure
+- Surface deviations or inconsistencies worth standardizing
+
+**Workflow**:
+1. Use grep to gather representative examples of the concept
+2. Group findings by pattern or variation
+3. Describe the prevalent approach and note any anomalies
+4. Suggest guidance or best practices for future contributions`,
+      tools: patternFinderTools,
+      model,
+    },
+
+    {
+      name: "testing-strategist",
+      description:
+        "Designs comprehensive test strategies, identifies coverage gaps, and runs the project's automated tests when needed.",
+      systemPrompt: `You specialize in testing strategy across multiple languages.
+- Diagnose missing unit, integration, or end-to-end coverage
+- Recommend language-appropriate test cases and scaffolding
+- Execute the workspace test suite and interpret results
+- Suggest follow-up actions when failures occur
+
+**Workflow**:
+1. Inspect the task scope and identify target language/framework using workspace context
+2. Locate relevant specs or fixtures via grep before proposing new tests
+3. Outline concrete test additions (names, assertions, setup) and highlight edge cases
+4. Invoke the test runner tool to validate the plan and summarize output
+5. Provide next steps for stabilizing or expanding coverage`,
+      tools: testingStrategistTools,
       model,
     },
 
