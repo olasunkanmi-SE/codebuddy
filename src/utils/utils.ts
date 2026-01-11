@@ -9,6 +9,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Memory } from "../memory/base";
 import * as crypto from "crypto";
 import { Buffer } from "buffer";
+import { spawn } from "child_process";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
