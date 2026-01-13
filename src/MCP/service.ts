@@ -10,6 +10,7 @@ import {
   MCPTool,
   MCPToolResult,
 } from "./types";
+import { Terminal } from "../utils/terminal";
 
 export class MCPService implements vscode.Disposable {
   private static instance: MCPService;
@@ -23,6 +24,7 @@ export class MCPService implements vscode.Disposable {
   private invocationCount = 0;
   private failureCount = 0;
   private readonly logger: Logger;
+  private readonly terminal = Terminal.getInstance();
 
   constructor() {
     this.logger = Logger.initialize("MCPService", {
@@ -246,23 +248,13 @@ export class MCPService implements vscode.Disposable {
     return servers;
   }
 
-  private checkDockerMCP(): Promise<boolean> {
-    return new Promise((resolve) => {
-      try {
-        const process = spawn("docker", ["mcp", "--help"], {
-          stdio: "pipe",
-        });
-        process.on("error", () => resolve(false));
-        process.on("exit", (code) => resolve(code === 0));
-
-        setTimeout(() => {
-          process.kill();
-          resolve(false);
-        }, 5000);
-      } catch {
-        resolve(false);
-      }
-    });
+  private async checkDockerMCP(): Promise<boolean> {
+    try {
+      return await this.terminal.checkDockerMCP();
+    } catch (error) {
+      this.logger.error("Failed to check Docker MCP availability:", error);
+      return false;
+    }
   }
 
   private async connectToServer(

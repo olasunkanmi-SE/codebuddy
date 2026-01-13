@@ -1,4 +1,4 @@
-import { StructuredTool } from "@langchain/core/tools";
+import { StructuredTool, Tool } from "@langchain/core/tools";
 import { Logger, LogLevel } from "../../../infrastructure/logger/logger";
 import { MCPService } from "../../../MCP/service";
 import { MCPTool } from "../../../MCP/types";
@@ -82,8 +82,17 @@ export class ToolProvider {
     this.loadMCPTools();
   }
 
-  public static initialize(): ToolProvider {
-    return (ToolProvider.instance ??= new ToolProvider());
+  public static async initialize(): Promise<ToolProvider> {
+    if (ToolProvider.instance) {
+      return ToolProvider.instance;
+    }
+    const provider = new ToolProvider();
+    await provider.loadMCPTools();
+    ToolProvider.instance = provider;
+    logger.info(
+      `ToolProvider initialized with ${provider.tools.length} total tools.`
+    );
+    return provider;
   }
 
   private async loadMCPTools(): Promise<void> {

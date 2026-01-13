@@ -40,6 +40,7 @@ export class Terminal {
   private executeCommand(
     command: AllowedCommand,
     args: string[],
+    options?: { timeout?: number }
   ): Promise<string> {
     if (!ALLOWED_COMMANDS.has(command)) {
       const errorMessage = `Security Alert: Execution of command "${command}" is disallowed.`;
@@ -52,13 +53,26 @@ export class Terminal {
     }
 
     this.logger.info(
-      `Executing whitelisted command: ${command} ${args.join(" ")}`,
+      `Executing whitelisted command: ${command} ${args.join(" ")}`
     );
     return new Promise((resolve, reject) => {
       const process = spawn(command, args, { stdio: "pipe" });
 
       let stdout = "";
       let stderr = "";
+
+      let timeOutHandle: NodeJS.Timeout | undefined;
+
+      if (options?.timeout) {
+        timeOutHandle = setTimeout(() => {
+          process.kill();
+          reject(
+            new Error(
+              `Command "${command} ${args.join(" ")}" timed out after ${options.timeout}ms`
+            )
+          );
+        }, options.timeout);
+      }
 
       process.stdout.on("data", (data) => {
         stdout += data.toString();
@@ -69,14 +83,16 @@ export class Terminal {
       });
 
       process.on("error", (err) => {
+        if (timeOutHandle) clearTimeout(timeOutHandle);
         this.logger.error(
           `Failed to start subprocess for command "${command}":`,
-          err,
+          err
         );
         reject(err);
       });
 
       process.on("close", (code) => {
+        if (timeOutHandle) clearTimeout(timeOutHandle);
         if (code === 0) {
           this.logger.info(`Command finished successfully.`);
           resolve(stdout);
@@ -97,6 +113,7 @@ export class Terminal {
     const allowedSequences = [
       ["mcp", "server", "ls", "--json"],
       ["mcp", "gateway", "run"],
+      ["mcp", "--help"],
     ];
 
     const isAllowed = allowedSequences.some((expectedArgs) => {
@@ -116,5 +133,13 @@ export class Terminal {
 
   get runMcpGateway(): Promise<string> {
     return this.executeCommand("docker", ["mcp", "gateway", "run"]);
+  }
+
+  checkDockerMCP(): Promise<boolean> {
+    return this.executeCommand("docker", ["mcp", "--help"], {
+      timeout: 5000,
+    })
+      .then(() => true)
+      .catch(() => false);
   }
 }

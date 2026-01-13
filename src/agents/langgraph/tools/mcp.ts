@@ -61,7 +61,7 @@ export class LangChainMCPTool extends StructuredTool<any> {
   }
 
   private convertJsonSchemaToZod(node: any): ZodTypeAny {
-    if (!node || typeof node === "object") {
+    if (!node) {
       return z.any();
     }
 
@@ -77,10 +77,15 @@ export class LangChainMCPTool extends StructuredTool<any> {
       case "boolean":
         return z.boolean().describe(description);
       case "array":
-        return z.array(this.convertJsonSchemaToZod(node.items) ?? {});
+        return z.array(
+          node.items ? this.convertJsonSchemaToZod(node.items) : z.any()
+        );
       case "object":
         return this.buildZodSchema(node);
       default:
+        this.logger.warn(
+          `Unknown or missing schema type: '${node.type}'. Defaulting to z.any().`
+        );
         return z.any().describe(description);
     }
   }
