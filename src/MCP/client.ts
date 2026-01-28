@@ -23,7 +23,7 @@ export class MCPClient {
 
   constructor(
     private readonly serverName: string,
-    private readonly config: MCPServerConfig
+    private readonly config: MCPServerConfig,
   ) {
     this.logger = Logger.initialize(`MCPClient:${serverName}`, {
       minLevel: LogLevel.DEBUG,
@@ -44,7 +44,7 @@ export class MCPClient {
             resources: {},
           },
         },
-      }
+      },
     );
   }
 
@@ -85,7 +85,7 @@ export class MCPClient {
       this.cleanup();
       this.logger.error(`Failed to connect to ${this.serverName}:`, error);
       throw new Error(
-        `MCP connection failed [${this.serverName}]: ${error.message}`
+        `MCP connection failed [${this.serverName}]: ${error.message}`,
       );
     }
   }
@@ -93,7 +93,7 @@ export class MCPClient {
   private async attemptReconnect(): Promise<void> {
     if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
       this.logger.error(
-        `Max reconnection attempts reached for ${this.serverName}`
+        `Max reconnection attempts reached for ${this.serverName}`,
       );
       return;
     }
@@ -102,7 +102,7 @@ export class MCPClient {
     const baseDelay = 1000 * Math.pow(2, this.reconnectAttempts - 1);
     const delay = Math.min(baseDelay, MAX_RECONNECT_DELAY_MS);
     this.logger.info(
-      `Reconnect attempt ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS} in ${delay}ms...`
+      `Reconnect attempt ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS} in ${delay}ms...`,
     );
     setTimeout(() => {
       this.connect().catch((error) => {
@@ -128,7 +128,7 @@ export class MCPClient {
       }));
       this.toolCacheExpiry = Date.now() + this.CACHE_TTL_MS;
       this.logger.info(
-        `Loaded ${this.toolCache.length} tools from ${this.serverName}`
+        `Loaded ${this.toolCache.length} tools from ${this.serverName}`,
       );
 
       return this.toolCache;

@@ -88,6 +88,10 @@ export interface MCPServiceStats {
   /** Total available tools */
   totalTools: number;
 
+  uniqueTools: number;
+
+  isGatewayMode: boolean;
+
   /** Tools by server */
   toolsByServer: Record<string, number>;
 

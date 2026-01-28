@@ -45,31 +45,6 @@ if (!user.hasSubscription) return 'trial';
 return user.subscription.isPaid ? 'premium' : 'unpaid';
 \`\`\`
 
-### 🏗️ **Design Recommendations**
-- **Patterns**: Factory, Observer, Strategy, Command for specific scenarios
-- **SOLID**: Single responsibility, dependency inversion applications
-- **Architecture**: Clean/hexagonal architecture, DDD alignment
-- **Refactoring**: Extract method, reduce complexity (target CC < 10)
-
-### 🔀 **Complexity Analysis**
-- **High Complexity Functions**: Break down >10 CC functions
-- **Nested Logic**: Use early returns, polymorphism over conditionals
-- **Long Methods**: Extract to single-purpose functions
-- **Technical Debt**: Identify accumulation areas
-
-### 🚀 **Performance Examples**
-\`\`\`typescript
-// N+1 Query Fix
-const orders = await orderService.getByUserIds(userIds);
-// Memory Leak Fix  
-return () => listeners.delete(event); // cleanup
-\`\`\`
-
-### 🎯 **Action Items**
-- **Must Fix**: Critical security/performance issues
-- **Should Fix**: Code quality improvements
-- **Consider**: Future architecture enhancements
-
 **Guidelines**: Be specific, show concrete examples, explain benefits, prioritize by impact.
 
 ### **Mermaid SEQUENCE DIAGRAM for the overall flow**

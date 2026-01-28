@@ -10,7 +10,6 @@ import {
   MCPTool,
   MCPToolResult,
 } from "./types";
-import { Terminal } from "../utils/terminal";
 
 export class MCPService implements vscode.Disposable {
   private static instance: MCPService;
@@ -19,12 +18,12 @@ export class MCPService implements vscode.Disposable {
   private serverConfigs: MCPServersConfig = {};
   private toolsLoadedPerServer = new Map<string, boolean>();
 
-  private toolsByName = new Map<string, MCPTool>();
+  // Tool storage: support multiple tools with same name
+  private toolsByName = new Map<string, MCPTool[]>();
   private toolsByServer = new Map<string, MCPTool[]>();
   private invocationCount = 0;
   private failureCount = 0;
   private readonly logger: Logger;
-  private readonly terminal = Terminal.getInstance();
 
   constructor() {
     this.logger = Logger.initialize("MCPService", {
@@ -43,20 +42,20 @@ export class MCPService implements vscode.Disposable {
   async initialize(): Promise<void> {
     this.logger.info("Initializing MCP service...");
 
+    const config = this.loadConfiguration();
+    this.serverConfigs = config;
+    this.initialized = true;
+
     const hasDocker = await this.checkDockerMCP();
     if (!hasDocker) {
       this.logger.warn("Docker MCP not available - MCP features disabled");
       vscode.window.showErrorMessage(
-        "Docker MCP not available. Install Docker Desktop 27.0.0+"
+        "Docker MCP not available. Install Docker Desktop 27.0.0+",
       );
       throw new Error(
-        "Docker MCP not available. Install Docker Desktop 27.0.0+"
+        "Docker MCP not available. Install Docker Desktop 27.0.0+",
       );
     }
-
-    const config = this.loadConfiguration();
-    this.serverConfigs = config;
-    this.initialized = true;
 
     if (Object.keys(config).length === 0) {
       this.logger.info("No MCP Server configured");
@@ -64,10 +63,27 @@ export class MCPService implements vscode.Disposable {
     }
 
     const enabledServers = Object.entries(config).filter(
-      ([_, serverConfig]) => serverConfig.enabled
+      ([_, serverConfig]) => serverConfig.enabled,
     ).length;
-    this.logger.info(
-      `MCP initialization complete: ${enabledServers} servers available for on-demand connection`
+
+    if (this.isGatewayMode()) {
+      this.logger.info(
+        "MCP initialization complete: Docker Gateway mode - unified catalog with 200+ tools available on-demand",
+      );
+    } else {
+      this.logger.info(
+        `MCP initialization complete: ${enabledServers} servers available for on-demand connection`,
+      );
+    }
+  }
+
+  /**
+   * Check if running in Docker Gateway mode (single unified catalog)
+   */
+  private isGatewayMode(): boolean {
+    return (
+      Object.keys(this.serverConfigs).length === 1 &&
+      this.serverConfigs["docker-gateway"]?.enabled === true
     );
   }
 
@@ -91,7 +107,7 @@ export class MCPService implements vscode.Disposable {
     await this.connectToServer(serverName, config);
   }
 
-  async ensureToolsLoaded(serverName: string) {
+  async ensureToolsLoaded(serverName: string): Promise<void> {
     if (this.toolsLoadedPerServer.get(serverName)) {
       return;
     }
@@ -104,11 +120,37 @@ export class MCPService implements vscode.Disposable {
 
     try {
       const tools = await client.getTools();
-      const toolsEntries = tools.map((tool) => [tool.name, tool] as const);
-      toolsEntries.forEach(([name, tool]) => this.toolsByName.set(name, tool));
+
+      // Store tools by server
       this.toolsByServer.set(serverName, tools);
+
+      // Store tools by name (supporting multiple tools with same name)
+      for (const tool of tools) {
+        const existing = this.toolsByName.get(tool.name) ?? [];
+        existing.push(tool);
+        this.toolsByName.set(tool.name, existing);
+      }
+
       this.toolsLoadedPerServer.set(serverName, true);
-      this.logger.info(`Loaded ${tools.length} tools from ${serverName}`);
+
+      if (this.isGatewayMode()) {
+        this.logger.info(
+          `Loaded ${tools.length} tools from Docker Gateway (unified catalog)`,
+        );
+      } else {
+        this.logger.info(`Loaded ${tools.length} tools from ${serverName}`);
+      }
+
+      // Log any name collisions
+      const collisions = Array.from(this.toolsByName.entries())
+        .filter(([_, tools]) => tools.length > 1)
+        .map(([name, tools]) => `${name} (${tools.length} servers)`);
+
+      if (collisions.length > 0) {
+        this.logger.debug(
+          `Tool name collisions detected: ${collisions.join(", ")}`,
+        );
+      }
     } catch (error) {
       this.logger.error(`Failed to load tools from ${serverName}:`, error);
       throw error;
@@ -117,29 +159,49 @@ export class MCPService implements vscode.Disposable {
 
   async refreshTools(serverName?: string): Promise<void> {
     if (serverName) {
-      this.toolsLoadedPerServer.set(serverName, false);
-      const toolsToRemove = this.toolsByServer.get(serverName) ?? [];
-      for (const tool of toolsToRemove) {
-        this.toolsByName.delete(tool.name);
+      // Refresh single server
+      this.logger.info(`Refreshing tools from ${serverName}...`);
+
+      this.toolsLoadedPerServer.delete(serverName);
+
+      // Remove tools from this server
+      const tools = this.toolsByServer.get(serverName) ?? [];
+      for (const tool of tools) {
+        const existing = this.toolsByName.get(tool.name) ?? [];
+        const filtered = existing.filter((t) => t.serverName !== serverName);
+        if (filtered.length === 0) {
+          this.toolsByName.delete(tool.name);
+        } else {
+          this.toolsByName.set(tool.name, filtered);
+        }
       }
       this.toolsByServer.delete(serverName);
 
-      await this.ensureServerConnected(serverName);
+      // Reload tools
+      await this.ensureToolsLoaded(serverName);
     } else {
+      // Refresh all servers
+      this.logger.info("Refreshing all tools...");
+
       this.toolsByName.clear();
       this.toolsByServer.clear();
       this.toolsLoadedPerServer.clear();
 
-      const loadedPromises = Array.from(this.clients.keys()).map((name) =>
-        this.ensureServerConnected(name).catch((error) => {
-          this.logger.error(`Failed to load tools from ${name}:`, error);
-        })
+      // Only reload servers that are currently connected
+      const connectedServers = Array.from(this.clients.keys());
+      const results = await Promise.allSettled(
+        connectedServers.map((name) => this.ensureToolsLoaded(name)),
       );
 
-      await Promise.all(loadedPromises);
+      const failures = results.filter((r) => r.status === "rejected");
+      if (failures.length > 0) {
+        this.logger.warn(
+          `Failed to reload tools from ${failures.length} server(s)`,
+        );
+      }
 
       this.logger.info(
-        `Loaded ${this.toolsByName.size} total tools from all servers`
+        `Loaded ${this.getUniqueToolCount()} unique tools from ${connectedServers.length} server(s)`,
       );
     }
   }
@@ -149,22 +211,33 @@ export class MCPService implements vscode.Disposable {
   }
 
   async getAllTools(): Promise<MCPTool[]> {
-    if (!this.initialized) {
-      throw new Error("MCP service not initialized");
+    if (this.isGatewayMode()) {
+      // Gateway mode: load from single unified source
+      if (!this.toolsLoadedPerServer.get("docker-gateway")) {
+        await this.ensureToolsLoaded("docker-gateway");
+      }
+    } else {
+      // Multi-server mode: load from each enabled server
+      const loadPromises = Object.entries(this.serverConfigs)
+        .filter(([_, config]) => config.enabled)
+        .filter(([serverName]) => !this.toolsLoadedPerServer.get(serverName))
+        .map(([serverName]) =>
+          this.ensureToolsLoaded(serverName).catch((error) => {
+            this.logger.error(
+              `Failed to load tools from ${serverName}:`,
+              error,
+            );
+          }),
+        );
+
+      await Promise.all(loadPromises);
     }
-    const loadedPromises = Object.entries(this.serverConfigs)
-      .filter(([_, config]) => config.enabled)
-      .filter(([serverName]) => !this.toolsLoadedPerServer.get(serverName))
-      .map(([serverName]) =>
-        this.ensureToolsLoaded(serverName).catch((error) => {
-          this.logger.error(`Failed to load tools from ${serverName}:`, error);
-        })
-      );
-    await Promise.all(loadedPromises);
-    return Array.from(this.toolsByName.values());
+
+    // Return all tools (flattened from the multi-value map)
+    return Array.from(this.toolsByName.values()).flat();
   }
 
-  async getToolsFromServer(serverName: string) {
+  async getToolsFromServer(serverName: string): Promise<MCPTool[]> {
     if (!this.initialized) {
       throw new Error("MCP service not initialized");
     }
@@ -173,35 +246,73 @@ export class MCPService implements vscode.Disposable {
     return this.toolsByServer.get(serverName) ?? [];
   }
 
-  async callTool(toolName: string, args: any): Promise<MCPToolResult> {
+  /**
+   * Call a tool by name. If multiple servers provide the same tool,
+   * tries the first one. You can specify serverName.toolName to be explicit.
+   */
+  async callTool(
+    toolName: string,
+    args: any,
+    preferredServer?: string,
+  ): Promise<MCPToolResult> {
     if (!this.initialized) {
       throw new Error("MCP service not initialized");
     }
     this.invocationCount++;
 
-    let tool = this.toolsByName.get(toolName);
-    if (!tool) {
-      this.logger.debug(
-        `Tool "${toolName}" not in cache, searching servers...`
-      );
+    // Support serverName.toolName syntax
+    let server = preferredServer;
+    let name = toolName;
+    if (toolName.includes(".")) {
+      const parts = toolName.split(".", 2);
+      server = parts[0];
+      name = parts[1];
+    }
+
+    let tools = this.toolsByName.get(name);
+
+    // If tool not in cache, try loading all tools
+    if (!tools || tools.length === 0) {
+      this.logger.debug(`Tool "${name}" not in cache, loading all tools...`);
 
       await this.getAllTools();
-      tool = this.toolsByName.get(toolName);
+      tools = this.toolsByName.get(name);
 
-      if (!tool) {
+      if (!tools || tools.length === 0) {
         this.failureCount++;
-        throw new Error(`Server "${toolName}" not connected`);
+        throw new Error(`Tool "${name}" not found in any connected server`);
       }
     }
 
+    // Filter by preferred server if specified
+    const candidateTools = server
+      ? tools.filter((t) => t.serverName === server)
+      : tools;
+
+    if (candidateTools.length === 0) {
+      this.failureCount++;
+      throw new Error(`Tool "${name}" not found on server "${server}"`);
+    }
+
+    // Log warning if multiple tools match and no preference specified
+    if (!server && candidateTools.length > 1) {
+      this.logger.debug(
+        `Multiple servers provide "${name}": ${candidateTools
+          .map((t) => t.serverName)
+          .join(", ")}. Using ${candidateTools[0].serverName}`,
+      );
+    }
+
+    const tool = candidateTools[0];
     const client = this.clients.get(tool.serverName);
+
     if (!client || !client.isConnected) {
       this.failureCount++;
       throw new Error(`Server "${tool.serverName}" not connected`);
     }
 
     try {
-      const result = await client?.callTool(toolName, args);
+      const result = await client.callTool(name, args);
       if (result.isError) {
         this.failureCount++;
       }
@@ -215,24 +326,37 @@ export class MCPService implements vscode.Disposable {
   getStat(): MCPServiceStats {
     return {
       connectedServers: Array.from(this.clients.values()).filter(
-        (c) => c.isConnected
+        (c) => c.isConnected,
       ).length,
-      totalTools: this.toolsByName.size,
+      totalTools: this.getAllToolsSync().length,
+      uniqueTools: this.getUniqueToolCount(),
       toolsByServer: Object.fromEntries(
         Array.from(this.toolsByServer.entries()).map(([name, tools]) => [
           name,
           tools.length,
-        ])
+        ]),
       ),
       totalInvocations: this.invocationCount,
       failedInvocations: this.failureCount,
+      isGatewayMode: this.isGatewayMode(),
       lastRefresh: Date.now(),
     };
+  }
+
+  private getUniqueToolCount(): number {
+    return this.toolsByName.size;
+  }
+
+  private getAllToolsSync(): MCPTool[] {
+    return Array.from(this.toolsByName.values()).flat();
   }
 
   private loadConfiguration(): MCPServersConfig {
     const servers = getConfigValue("mcp.servers");
     if (!servers || Object.keys(servers).length === 0) {
+      this.logger.info(
+        "No custom MCP configuration found, using Docker Gateway default",
+      );
       return {
         "docker-gateway": {
           command: "docker",
@@ -243,40 +367,78 @@ export class MCPService implements vscode.Disposable {
       };
     }
     this.logger.info(
-      `Found ${Object.keys(servers).length} configured MCP Servers`
+      `Found ${Object.keys(servers).length} configured MCP Server(s)`,
     );
     return servers;
   }
 
-  private async checkDockerMCP(): Promise<boolean> {
-    try {
-      return await this.terminal.checkDockerMCP();
-    } catch (error) {
-      this.logger.error("Failed to check Docker MCP availability:", error);
-      return false;
-    }
+  private checkDockerMCP(): Promise<boolean> {
+    return new Promise((resolve) => {
+      try {
+        const process = spawn("docker", ["mcp", "--help"], {
+          stdio: "pipe",
+        });
+        process.on("error", () => resolve(false));
+        process.on("exit", (code) => resolve(code === 0));
+
+        setTimeout(() => {
+          process.kill();
+          resolve(false);
+        }, 5000);
+      } catch {
+        resolve(false);
+      }
+    });
   }
 
+  /**
+   * Connect to a server with retry logic for resilience
+   */
   private async connectToServer(
     serverName: string,
-    serverConfig: MCPServerConfig
-  ) {
-    try {
-      const client = new MCPClient(serverName, serverConfig);
-      await client.connect();
-      this.logger.info(`Connected to Server: ${serverName}`);
-      this.clients.set(serverName, client);
-    } catch (error: any) {
-      this.logger.error(`Failed to connect to ${serverName}`, error);
-      throw error;
+    serverConfig: MCPServerConfig,
+    maxRetries = 3,
+  ): Promise<void> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const client = new MCPClient(serverName, serverConfig);
+        await client.connect();
+
+        this.clients.set(serverName, client);
+
+        if (this.isGatewayMode()) {
+          this.logger.info(
+            `Connected to Docker Gateway - unified MCP catalog ready`,
+          );
+        } else {
+          this.logger.info(`Connected to Server: ${serverName}`);
+        }
+        return;
+      } catch (error: any) {
+        const isLastAttempt = attempt === maxRetries - 1;
+
+        if (isLastAttempt) {
+          this.logger.error(
+            `Failed to connect to ${serverName} after ${maxRetries} attempts`,
+            error,
+          );
+          throw error;
+        }
+
+        const waitTime = 1000 * (attempt + 1);
+        this.logger.warn(
+          `Connection attempt ${attempt + 1} failed for ${serverName}, retrying in ${waitTime}ms...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
     }
   }
 
   getToolCount(): number {
-    return this.toolsByName.size;
+    return this.getAllToolsSync().length;
   }
 
-  async dispose() {
+  async dispose(): Promise<void> {
     this.logger.info("Disposing MCP servers");
     const disconnectPromises = Array.from(this.clients.values()).map((client) =>
       client
@@ -284,9 +446,9 @@ export class MCPService implements vscode.Disposable {
         .catch((error) =>
           this.logger.error(
             `Error disconnecting ${client.getServerName()}`,
-            error
-          )
-        )
+            error,
+          ),
+        ),
     );
     await Promise.all(disconnectPromises);
     this.clients.clear();
@@ -299,7 +461,7 @@ export class MCPService implements vscode.Disposable {
     this.logger.info("MCP service disposed");
   }
 
-  async reload() {
+  async reload(): Promise<void> {
     this.logger.info("Reloading MCP Configurations....");
     await this.dispose();
     await this.initialize();

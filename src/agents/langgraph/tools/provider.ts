@@ -38,7 +38,7 @@ class WebToolFactory implements IToolFactory {
   constructor(private contextRetriever: ContextRetriever) {}
   createTool(): StructuredTool<any> {
     return new LangChainTravilySearchTool(
-      new TravilySearchTool(this.contextRetriever)
+      new TravilySearchTool(this.contextRetriever),
     );
   }
 }
@@ -52,7 +52,7 @@ class ThinkToolFactory implements IToolFactory {
 class MCPToolFactory implements IToolFactory {
   constructor(
     private readonly mcpService: MCPService,
-    private readonly toolDef: MCPTool
+    private readonly toolDef: MCPTool,
   ) {}
   createTool(): StructuredTool<any> {
     return new LangChainMCPTool(this.mcpService, this.toolDef);
@@ -76,30 +76,20 @@ export class ToolProvider {
       // new ThinkToolFactory(),
     ];
     this.tools = this.toolFactories.map(
-      (factory): StructuredTool<any> => factory.createTool()
+      (factory): StructuredTool<any> => factory.createTool(),
     );
     logger.info(`ToolProvider initialized with ${this.tools.length} tools.`);
     this.loadMCPTools();
   }
 
-  public static async initialize(): Promise<ToolProvider> {
-    if (ToolProvider.instance) {
-      return ToolProvider.instance;
+  public static initialize(): ToolProvider {
+    if (!ToolProvider.instance) {
+      ToolProvider.instance = new ToolProvider();
     }
-    const provider = new ToolProvider();
-    await provider.loadMCPTools();
-    ToolProvider.instance = provider;
-    logger.info(
-      `ToolProvider initialized with ${provider.tools.length} total tools.`
-    );
-    return provider;
+    return ToolProvider.instance;
   }
 
   private async loadMCPTools(): Promise<void> {
-    if (this.mcpInitialized) {
-      return;
-    }
-
     try {
       logger.info("Initializing MCP service for tool discovery");
       const mcpTools = await this.mcpService.getAllTools();
@@ -113,7 +103,7 @@ export class ToolProvider {
     } catch (error: any) {
       logger.warn(
         "MCP tools unavailable, continuing without them:",
-        error.message
+        error.message,
       );
     }
   }

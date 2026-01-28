@@ -12,7 +12,7 @@ export class LangChainMCPTool extends StructuredTool<any> {
 
   constructor(
     private readonly mcpService: MCPService,
-    private readonly tool: MCPTool
+    private readonly tool: MCPTool,
   ) {
     super();
     this.name = tool.name;
@@ -78,13 +78,13 @@ export class LangChainMCPTool extends StructuredTool<any> {
         return z.boolean().describe(description);
       case "array":
         return z.array(
-          node.items ? this.convertJsonSchemaToZod(node.items) : z.any()
+          node.items ? this.convertJsonSchemaToZod(node.items) : z.any(),
         );
       case "object":
         return this.buildZodSchema(node);
       default:
         this.logger.warn(
-          `Unknown or missing schema type: '${node.type}'. Defaulting to z.any().`
+          `Unknown or missing schema type: '${node.type}'. Defaulting to z.any().`,
         );
         return z.any().describe(description);
     }

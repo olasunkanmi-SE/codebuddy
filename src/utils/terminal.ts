@@ -40,7 +40,7 @@ export class Terminal {
   private executeCommand(
     command: AllowedCommand,
     args: string[],
-    options?: { timeout?: number }
+    options?: { timeout?: number },
   ): Promise<string> {
     if (!ALLOWED_COMMANDS.has(command)) {
       const errorMessage = `Security Alert: Execution of command "${command}" is disallowed.`;
@@ -53,7 +53,7 @@ export class Terminal {
     }
 
     this.logger.info(
-      `Executing whitelisted command: ${command} ${args.join(" ")}`
+      `Executing whitelisted command: ${command} ${args.join(" ")}`,
     );
     return new Promise((resolve, reject) => {
       const process = spawn(command, args, { stdio: "pipe" });
@@ -68,8 +68,8 @@ export class Terminal {
           process.kill();
           reject(
             new Error(
-              `Command "${command} ${args.join(" ")}" timed out after ${options.timeout}ms`
-            )
+              `Command "${command} ${args.join(" ")}" timed out after ${options.timeout}ms`,
+            ),
           );
         }, options.timeout);
       }
@@ -86,7 +86,7 @@ export class Terminal {
         if (timeOutHandle) clearTimeout(timeOutHandle);
         this.logger.error(
           `Failed to start subprocess for command "${command}":`,
-          err
+          err,
         );
         reject(err);
       });
