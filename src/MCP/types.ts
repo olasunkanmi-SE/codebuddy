@@ -21,6 +21,11 @@ export interface MCPServerConfig {
 
   /** Enable/disable this server */
   enabled?: boolean;
+  /** Transport type to use when connecting: 'stdio' (spawn) or 'sse' (remote) */
+  transport?: "stdio" | "sse";
+
+  /** If using network transport (sse), the gateway URL to connect to */
+  url?: string;
 }
 
 export type MCPServersConfig = Record<string, MCPServerConfig>;

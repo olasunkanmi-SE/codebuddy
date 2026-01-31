@@ -382,7 +382,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
                 return await this.codeBuddyAgent.handleUserMessage(
                   context
-                    ? JSON.stringify(`${message} \n context: ${context}`)
+                    ? JSON.stringify(`${message} \n context: ${context ?? ""}`)
                     : JSON.stringify(message),
                 );
               }

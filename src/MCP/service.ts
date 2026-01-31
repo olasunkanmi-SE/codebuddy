@@ -90,7 +90,7 @@ export class MCPService implements vscode.Disposable {
   async ensureServerConnected(serverName: string): Promise<void> {
     if (this.clients.has(serverName)) {
       const client = this.clients.get(serverName);
-      if (client?.isConnected) {
+      if (client && client.isConnected && client.isConnected()) {
         return;
       }
     }
@@ -306,7 +306,7 @@ export class MCPService implements vscode.Disposable {
     const tool = candidateTools[0];
     const client = this.clients.get(tool.serverName);
 
-    if (!client || !client.isConnected) {
+    if (!client || !client.isConnected || !client.isConnected()) {
       this.failureCount++;
       throw new Error(`Server "${tool.serverName}" not connected`);
     }
@@ -326,7 +326,7 @@ export class MCPService implements vscode.Disposable {
   getStat(): MCPServiceStats {
     return {
       connectedServers: Array.from(this.clients.values()).filter(
-        (c) => c.isConnected,
+        (c) => c.isConnected && c.isConnected(),
       ).length,
       totalTools: this.getAllToolsSync().length,
       uniqueTools: this.getUniqueToolCount(),

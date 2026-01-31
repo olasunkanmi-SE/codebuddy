@@ -41,7 +41,22 @@ export class LangChainMCPTool extends StructuredTool<any> {
       return result.content.map((c) => c.text ?? JSON.stringify(c)).join(`\n`);
     } catch (error) {
       this.logger.error(`MCP tool ${this.tool.name} failed:`, error);
-      throw error;
+      try {
+        const available = await this.mcpService.getAllTools();
+        const names = available.map((t) => t.name).sort();
+        const msg = `Tool "${this.tool.name}" failed: ${String(
+          (error as any)?.message ?? error,
+        )}. Available MCP tools: ${names.join(", ")}`;
+        this.logger.debug(`MCP available tools: ${names.join(", ")}`);
+        throw new Error(msg);
+      } catch (innerErr) {
+        // If fetching available tools also fails, throw original error
+        this.logger.debug(
+          "Failed to fetch available MCP tools:",
+          innerErr as any,
+        );
+        throw error;
+      }
     }
   }
 

@@ -58,24 +58,87 @@ export class MCPClient {
     this.state = MCPClientState.CONNECTING;
     this.logger.info(`Connecting to MCP server: ${this.serverName}`);
     try {
-      this.transport = new StdioClientTransport({
-        command: this.config.command,
-        args: this.config.args,
-        env: { ...this.config.env },
-      });
+      // Choose transport based on server config. Prefer network (SSE) transport when configured.
+      if (
+        (this.config as any).transport === "sse" &&
+        (this.config as any).url
+      ) {
+        try {
+          // Dynamically import SSE transport from SDK if available
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const {
+            SseClientTransport,
+          } = require("@modelcontextprotocol/sdk/client/sse.js");
+          this.transport = new SseClientTransport({
+            url: (this.config as any).url,
+          });
+          this.logger.info(
+            `Using SSE transport to ${(this.config as any).url} for ${this.serverName}`,
+          );
+        } catch (err) {
+          this.logger.warn(
+            `SSE transport not available in SDK, falling back to stdio for ${this.serverName}`,
+          );
+          this.transport = new StdioClientTransport({
+            command: this.config.command,
+            args: this.config.args,
+            env: { ...this.config.env },
+          });
+        }
+      } else {
+        this.transport = new StdioClientTransport({
+          command: this.config.command,
+          args: this.config.args,
+          env: { ...this.config.env },
+        });
+      }
 
-      this.transport.onerror = (error) => {
-        this.logger.error(`Transport error [${this.serverName}]:`, error);
-        this.state = MCPClientState.ERROR;
-        this.attemptReconnect();
-      };
+      // Try to capture any underlying spawned process from the transport implementation
+      try {
+        // Some transports expose the child process under different names
+        // (process, child, proc). Try common properties safely.
+        const anyTransport = this.transport as any;
+        this.process =
+          anyTransport.process ??
+          anyTransport.child ??
+          anyTransport.proc ??
+          null;
+        if (this.process) {
+          this.logger.debug(
+            `Captured transport child process for ${this.serverName}: pid=${this.process.pid}`,
+          );
+        }
+      } catch (err) {
+        this.logger.debug(
+          "Unable to capture transport child process",
+          err as any,
+        );
+      }
 
-      this.transport.onclose = () => {
-        this.logger.warn(`Transport closed [${this.serverName}]`);
-        this.state = MCPClientState.DISCONNECTED;
-        this.attemptReconnect();
-      };
+      if (this.transport) {
+        this.transport.onerror = (error) => {
+          this.logger.error(`Transport error [${this.serverName}]:`, error);
+          this.state = MCPClientState.ERROR;
+          this.attemptReconnect();
+        };
 
+        this.transport.onclose = (code?: number, reason?: any) => {
+          this.logger.warn(
+            `Transport closed [${this.serverName}] code=${code} reason=${String(reason)}`,
+          );
+          this.state = MCPClientState.DISCONNECTED;
+          this.attemptReconnect();
+        };
+      } else {
+        this.logger.warn(
+          `Transport is null for ${this.serverName}, cannot attach error/close handlers`,
+        );
+      }
+
+      if (!this.transport) {
+        this.logger.error(`No transport available for ${this.serverName}`);
+        throw new Error(`Transport not initialized for ${this.serverName}`);
+      }
       await this.client.connect(this.transport);
       this.state = MCPClientState.CONNECTED;
       this.reconnectAttempts = 0;
@@ -115,7 +178,6 @@ export class MCPClient {
     if (this.toolCache && Date.now() < this.toolCacheExpiry) {
       return this.toolCache;
     }
-
     await this.connect();
     try {
       const response = await this.client.listTools();
@@ -132,8 +194,34 @@ export class MCPClient {
       );
 
       return this.toolCache;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to list tools from ${this.serverName}:`, error);
+      // If the failure appears to be a connection closure, attempt a reconnect and retry once
+      const msg = String(error?.message ?? "").toLowerCase();
+      if (
+        msg.includes("connection closed") ||
+        msg.includes("transport closed") ||
+        error?.code === -32000
+      ) {
+        this.logger.info(
+          "Detected closed connection while listing tools, attempting reconnect and retry...",
+        );
+        try {
+          await this.connect();
+          const retryResp = await this.client.listTools();
+          this.toolCache = retryResp.tools.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema as any,
+            serverName: this.serverName,
+            metadata: {},
+          }));
+          this.toolCacheExpiry = Date.now() + this.CACHE_TTL_MS;
+          return this.toolCache;
+        } catch (retryErr) {
+          this.logger.error("Retry to list tools failed:", retryErr);
+        }
+      }
       throw error;
     }
   }
@@ -142,49 +230,99 @@ export class MCPClient {
     await this.connect();
     const startTime = Date.now();
 
-    try {
-      this.logger.debug(`Calling tool: ${toolName}`, { args });
-      const result = (await this.client.callTool({
-        name: toolName,
-        arguments: args,
-      })) as any;
+    // Attempt the call, if it fails due to closed connection try one reconnect+retry.
+    let attempts = 0;
+    const maxAttempts = 2;
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        this.logger.debug(`Calling tool: ${toolName} (attempt ${attempts})`, {
+          args,
+        });
+        const result = (await this.client.callTool({
+          name: toolName,
+          arguments: args,
+        })) as any;
 
-      const duration = Date.now() - startTime;
-
-      this.logger.info(`Tool call succeeded: ${toolName} (${duration}ms)`);
-      return {
-        content: result.content,
-        isError: result.isError,
-        metadata: {
-          duration,
-          serverName: this.serverName,
-          toolName,
-        },
-      };
-    } catch (error: any) {
-      const duration = Date.now() - startTime;
-
-      this.logger.error(`Tool call failed: ${toolName} (${duration}ms)`, error);
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error calling ${toolName}: ${error.message}`,
+        const duration = Date.now() - startTime;
+        this.logger.info(
+          `Tool call succeeded: ${toolName} (${duration}ms) attempts=${attempts}`,
+        );
+        return {
+          content: result.content,
+          isError: result.isError,
+          metadata: {
+            duration,
+            serverName: this.serverName,
+            toolName,
           },
-        ],
-        isError: true,
-        metadata: {
-          duration,
-          serverName: this.serverName,
-          toolName,
-        },
-      };
+        };
+      } catch (error: any) {
+        const duration = Date.now() - startTime;
+        this.logger.error(
+          `Tool call failed: ${toolName} (${duration}ms) attempt=${attempts}`,
+          error,
+        );
+
+        const msg = String(error?.message ?? "").toLowerCase();
+        const isConnectionClosed =
+          msg.includes("connection closed") ||
+          msg.includes("transport closed") ||
+          error?.code === -32000;
+
+        if (isConnectionClosed && attempts < maxAttempts) {
+          this.logger.info(
+            `Connection closed detected during tool call ${toolName}, reconnecting and retrying (attempt ${attempts + 1})`,
+          );
+          try {
+            await this.connect();
+            continue; // retry
+          } catch (reconnectErr) {
+            this.logger.error(
+              "Reconnect during tool call retry failed:",
+              reconnectErr,
+            );
+            break;
+          }
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error calling ${toolName}: ${error.message}`,
+            },
+          ],
+          isError: true,
+          metadata: {
+            duration,
+            serverName: this.serverName,
+            toolName,
+          },
+        };
+      }
     }
+
+    // Fallback error if loop exits unexpectedly
+    const dur = Date.now() - startTime;
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error calling ${toolName}: connection failed after ${maxAttempts} attempts`,
+        },
+      ],
+      isError: true,
+      metadata: {
+        duration: dur,
+        serverName: this.serverName,
+        toolName,
+      },
+    };
   }
 
   async disconnect(): Promise<void> {
-    if ((this.state = MCPClientState.DISCONNECTED)) return;
+    if (this.state === MCPClientState.DISCONNECTED) return;
     this.logger.info(`Disconnecting from ${this.serverName}...`);
     try {
       this.client.close();
@@ -199,10 +337,18 @@ export class MCPClient {
   private cleanup(): void {
     if (this.process && !this.process.killed) {
       const killTimeout = setTimeout(() => {
-        (this.process?.kill("SIGTERM"), 5000);
-      });
+        try {
+          this.process?.kill("SIGTERM");
+        } catch (e) {
+          this.logger.debug("Error killing transport process:", e as any);
+        }
+      }, 5000);
       this.process.on("exit", () => clearTimeout(killTimeout));
-      this.process.kill("SIGTERM");
+      try {
+        this.process.kill("SIGTERM");
+      } catch (e) {
+        this.logger.debug("Error sending SIGTERM to process:", e as any);
+      }
     }
 
     this.transport = null;

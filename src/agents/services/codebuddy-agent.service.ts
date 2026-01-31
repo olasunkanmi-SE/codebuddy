@@ -92,7 +92,9 @@ export class CodeBuddyAgentService {
           if (update?.messages && Array.isArray(update.messages)) {
             const lastMessage = update.messages[update.messages.length - 1];
             if (lastMessage?.content) {
-              const newContent = String(lastMessage.content);
+              const newContent = this.normalizeMessageContent(
+                lastMessage.content,
+              );
               const delta = newContent.slice(accumulatedContent.length);
               if (delta) {
                 accumulatedContent = newContent;
@@ -153,6 +155,39 @@ export class CodeBuddyAgentService {
     } finally {
       this.activeStreams.delete(conversationId);
     }
+  }
+
+  // Convert various message content shapes into plain text.
+  // Handles: string, array of content blocks, single object with `text` or `content`.
+  // Falls back to JSON.stringify for unknown objects.
+  private normalizeMessageContent(content: any): string {
+    if (content == null) return "";
+    if (typeof content === "string") return content;
+
+    // Array of blocks (e.g., [{type:'text', text: '...'}, ...])
+    if (Array.isArray(content)) {
+      return content
+        .map((item) => {
+          if (item == null) return "";
+          if (typeof item === "string") return item;
+          if (typeof item === "object") {
+            if (typeof item.text === "string") return item.text;
+            if (typeof item.content === "string") return item.content;
+            // Some tool outputs use nested arrays/objects
+            return JSON.stringify(item);
+          }
+          return String(item);
+        })
+        .join("");
+    }
+
+    if (typeof content === "object") {
+      if (typeof content.text === "string") return content.text;
+      if (typeof content.content === "string") return content.content;
+      return JSON.stringify(content);
+    }
+
+    return String(content);
   }
 
   async processUserQuery(
