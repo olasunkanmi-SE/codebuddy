@@ -18,6 +18,7 @@ import { IEventPayload } from "../../emitter/interface";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { Memory } from "../../memory/base";
 import { Orchestrator } from "../../orchestrator";
+import { ProjectRulesService } from "../../services/project-rules.service";
 import { getAPIKeyAndModel } from "../../utils/utils";
 import { createVscodeFsBackendFactory } from "../backends/filesystem";
 import {
@@ -176,9 +177,21 @@ export class DeveloperAgent {
    */
   private getSystemPrompt(): string {
     const { customSystemPrompt } = this.config;
-    return customSystemPrompt
-      ? `${DEVELOPER_SYSTEM_PROMPT}\n\n## 📋 Additional Instructions:\n${customSystemPrompt}`
-      : DEVELOPER_SYSTEM_PROMPT;
+    const projectRules = ProjectRulesService.getInstance().getRules();
+
+    let prompt = DEVELOPER_SYSTEM_PROMPT;
+
+    // Add project rules if available
+    if (projectRules) {
+      prompt += `\n\n## 📋 Project Rules (always follow):\n${projectRules}`;
+    }
+
+    // Add custom system prompt if provided
+    if (customSystemPrompt) {
+      prompt += `\n\n## 📋 Additional Instructions:\n${customSystemPrompt}`;
+    }
+
+    return prompt;
   }
 
   /**
