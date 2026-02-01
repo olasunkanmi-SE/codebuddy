@@ -14,7 +14,7 @@ import { AgentActivityFeed } from "./AgentActivityFeed";
 import AttachmentIcon from "./attachmentIcon";
 import ChatInput from "./ChatInput";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
-import WorkspaceSelector from "./context";
+import FileMention from "./FileMention";
 import { Extensions } from "./extensions";
 import { FutureFeatures } from "./futureFeatures";
 import MessageRenderer from "./MessageRenderer";
@@ -258,6 +258,11 @@ export const WebviewUI = () => {
       window.removeEventListener("message", legacyMessageHandler);
     };
   }, [legacyMessageHandler]);
+
+  // Signal to extension that webview is ready to receive messages
+  useEffect(() => {
+    vsCode.postMessage({ command: "webview-ready" });
+  }, []);
 
   // Highlight code blocks when messages update
   useEffect(() => {
@@ -596,7 +601,7 @@ export const WebviewUI = () => {
               <small className="attachment-icon">{activeEditor}</small>
             </span>
           </div>
-          <WorkspaceSelector activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
+          <FileMention activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
           {pendingApproval && (
             <div
               style={{
