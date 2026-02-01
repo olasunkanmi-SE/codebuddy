@@ -11,8 +11,8 @@ import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/chat";
 
-// Define interfaces for Deepseek responses
-interface DeepseekLLMSnapshot {
+// Define interfaces for GLM responses
+interface GLMLLMSnapshot {
   response?: any;
   lastQuery?: string;
   lastCall?: any;
@@ -20,15 +20,15 @@ interface DeepseekLLMSnapshot {
   chatHistory?: any[];
 }
 
-export class DeepseekLLM
-  extends BaseLLM<DeepseekLLMSnapshot>
+export class GLMLLM
+  extends BaseLLM<GLMLLMSnapshot>
   implements vscode.Disposable
 {
   private readonly client: OpenAI;
   private response: any;
   protected readonly orchestrator: Orchestrator;
   private readonly disposables: vscode.Disposable[] = [];
-  private static instance: DeepseekLLM | undefined;
+  private static instance: GLMLLM | undefined;
   private lastFunctionCalls: Set<string> = new Set();
   private readonly timeOutMs: number = 30000;
 
@@ -37,11 +37,11 @@ export class DeepseekLLM
     this.config = config;
     this.client = new OpenAI({
       apiKey: this.config.apiKey,
-      baseURL: config.baseUrl || "https://api.deepseek.com/v1",
+      baseURL: config.baseUrl || "https://open.bigmodel.cn/api/paas/v4",
     });
     this.response = undefined;
     this.orchestrator = Orchestrator.getInstance();
-    this.logger = Logger.initialize("DeepseekLLM", {
+    this.logger = Logger.initialize("GLMLLM", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
       enableFile: true,
@@ -61,27 +61,23 @@ export class DeepseekLLM
 
   private handleConfigurationChange() {
     // Reset client when configuration changes
-    // this.client;
   }
 
-  static getInstance(config: ILlmConfig): DeepseekLLM {
-    if (!DeepseekLLM.instance) {
-      DeepseekLLM.instance = new DeepseekLLM(config);
+  static getInstance(config: ILlmConfig): GLMLLM {
+    if (!GLMLLM.instance) {
+      GLMLLM.instance = new GLMLLM(config);
     } else {
-      DeepseekLLM.instance.updateConfig(config);
+      GLMLLM.instance.updateConfig(config);
     }
-    return DeepseekLLM.instance;
+    return GLMLLM.instance;
   }
 
   public updateConfig(config: ILlmConfig) {
     this.config = config;
-    // We might want to re-initialize the client if API key or Base URL changes,
-    // but the OpenAI client is read-only.
-    // However, since we use `this.config.model` in generateText, updating `this.config` is enough for model switching.
   }
 
   getEmbeddingModel(): string {
-    return this.config.additionalConfig?.embeddingModel || "deepseek-embed";
+    return this.config.additionalConfig?.embeddingModel || "embedding-2";
   }
 
   public async generateEmbeddings(text: string): Promise<number[]> {
@@ -134,7 +130,6 @@ export class DeepseekLLM
   }
 
   public getModel(): any {
-    // Return the client for use in other methods
     return this.client;
   }
 
@@ -161,11 +156,9 @@ export class DeepseekLLM
         undefined,
         true,
       );
-      // Note this prompt should be for system instruction only.
       const prompt = createPrompt(userInput);
-      const contents = Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY) || [];
+      const contents = Memory.get(COMMON.GLM_CHAT_HISTORY) || [];
 
-      // Format messages for Deepseek API
       const messages = [
         {
           role: "system",
@@ -238,7 +231,6 @@ export class DeepseekLLM
   }
 
   calculateDynamicCallLimit(userQuery: string): number {
-    // Dynamic limit based on token usage, query length, and complexity
     const baseLimit = 5;
     const queryLength = userQuery.length;
     const complexityFactor = Math.min(1 + Math.floor(queryLength / 100), 3);
@@ -251,7 +243,7 @@ export class DeepseekLLM
     let callCount = 0;
 
     try {
-      const snapShot = Memory.get("DEEPSEEK_SNAPSHOT") as DeepseekLLMSnapshot;
+      const snapShot = Memory.get("GLM_SNAPSHOT") as GLMLLMSnapshot;
       if (snapShot) {
         this.loadSnapShot(snapShot);
       }
@@ -268,7 +260,7 @@ export class DeepseekLLM
         const result = (await Promise.race([
           responsePromise,
           timeoutPromise,
-        ])) as DeepseekLLMSnapshot;
+        ])) as GLMLLMSnapshot;
 
         this.response = result;
 
@@ -343,7 +335,7 @@ export class DeepseekLLM
                   lastResult: functionResult,
                 });
 
-                Memory.set("DEEPSEEK_SNAPSHOT", snapShot);
+                Memory.set("GLM_SNAPSHOT", snapShot);
                 callCount++;
               } catch (error: any) {
                 this.logger.error("Error processing function call", error);
@@ -378,13 +370,9 @@ export class DeepseekLLM
         throw new Error("No final result generated after function calls");
       }
 
-      // Clean up the memory
-      const snapshot = Memory.get("DEEPSEEK_SNAPSHOT");
+      const snapshot = Memory.get("GLM_SNAPSHOT");
       if (snapshot?.length > 0) {
-        Memory.removeItems(
-          "DEEPSEEK_SNAPSHOT",
-          Memory.get("DEEPSEEK_SNAPSHOT").length,
-        );
+        Memory.removeItems("GLM_SNAPSHOT", Memory.get("GLM_SNAPSHOT").length);
       }
 
       return finalResult;
@@ -457,8 +445,8 @@ export class DeepseekLLM
     chat?: any,
     isInitialQuery: boolean = false,
   ): Promise<any[]> {
-    let chatHistory: any = Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY) || [];
-    Memory.removeItems(COMMON.DEEPSEEK_CHAT_HISTORY);
+    let chatHistory: any = Memory.get(COMMON.GLM_CHAT_HISTORY) || [];
+    Memory.removeItems(COMMON.GLM_CHAT_HISTORY);
 
     if (!isInitialQuery && chatHistory.length === 0) {
       throw new Error("No chat history available for non-initial query");
@@ -472,7 +460,6 @@ export class DeepseekLLM
     chatHistory.push(userMessage);
 
     if (!isInitialQuery && functionCall && functionResponse) {
-      // Add function call as assistant message
       chatHistory.push(
         Message.of({
           role: "assistant",
@@ -488,7 +475,6 @@ export class DeepseekLLM
         }),
       );
 
-      // Add function result as user message
       chatHistory.push(
         Message.of({
           role: "user",
@@ -501,27 +487,27 @@ export class DeepseekLLM
       chatHistory = chatHistory.slice(-50);
     }
 
-    Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, chatHistory);
+    Memory.set(COMMON.GLM_CHAT_HISTORY, chatHistory);
     return chatHistory;
   }
 
-  public createSnapShot(data?: any): DeepseekLLMSnapshot {
+  public createSnapShot(data?: any): GLMLLMSnapshot {
     return {
       response: this.response,
       lastQuery: data?.lastQuery,
       lastCall: data?.lastCall,
       lastResult: data?.lastResult,
-      chatHistory: Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY),
+      chatHistory: Memory.get(COMMON.GLM_CHAT_HISTORY),
     };
   }
 
-  public loadSnapShot(snapshot: DeepseekLLMSnapshot): void {
+  public loadSnapShot(snapshot: GLMLLMSnapshot): void {
     if (snapshot) {
       this.response = snapshot.response;
     }
 
     if (snapshot.chatHistory) {
-      Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, snapshot.chatHistory);
+      Memory.set(COMMON.GLM_CHAT_HISTORY, snapshot.chatHistory);
     }
 
     if (snapshot.lastQuery) {
@@ -531,7 +517,7 @@ export class DeepseekLLM
 
   public dispose(): void {
     this.disposables.forEach((d) => d.dispose());
-    Memory.delete(COMMON.DEEPSEEK_CHAT_HISTORY);
-    Memory.delete("DEEPSEEK_SNAPSHOT");
+    Memory.delete(COMMON.GLM_CHAT_HISTORY);
+    Memory.delete("GLM_SNAPSHOT");
   }
 }

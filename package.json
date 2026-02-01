@@ -226,7 +226,10 @@
               "Groq",
               "Anthropic",
               "XGrok",
-              "Deepseek"
+              "Deepseek",
+              "OpenAI",
+              "Qwen",
+              "GLM"
             ],
             "default": "Gemini",
             "description": "Select Model"
@@ -293,7 +296,7 @@
               "null"
             ],
             "default": "deepseek-chat",
-            "markdownDescription": "Provide the name of the Deepseek model you want to use."
+            "markdownDescription": "Provide the name of the Deepseek model you want to use (e.g., deepseek-chat (V3), deepseek-reasoner (R1))."
           },
           "deepseek.apiKey": {
             "type": [
@@ -302,6 +305,54 @@
             ],
             "default": "apiKey",
             "markdownDescription": "Enter your Deepseek API Key"
+          },
+          "qwen.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "qwen-max",
+            "markdownDescription": "Provide the name of the Qwen model you want to use (e.g., qwen-max, qwen-plus, qwen3-coder-plus, qwen3-coder-max)."
+          },
+          "qwen.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "apiKey",
+            "markdownDescription": "Enter your Qwen (DashScope) API Key"
+          },
+          "glm.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "glm-4",
+            "markdownDescription": "Provide the name of the GLM model you want to use (e.g., glm-4, glm-4-plus, glm-4v)."
+          },
+          "glm.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "apiKey",
+            "markdownDescription": "Enter your GLM (Zhipu AI) API Key"
+          },
+          "openai.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "gpt-4o",
+            "markdownDescription": "Provide the name of the OpenAI model you want to use."
+          },
+          "openai.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "apiKey",
+            "markdownDescription": "Enter your OpenAI API Key"
           },
           "font.family": {
             "type": "string",

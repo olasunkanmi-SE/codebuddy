@@ -11,6 +11,9 @@ import { BaseWebViewProvider } from "./base";
 import { DeepseekWebViewProvider } from "./deepseek";
 import { GeminiWebViewProvider } from "./gemini";
 import { GroqWebViewProvider } from "./groq";
+import { OpenAIWebViewProvider } from "./openai";
+import { QwenWebViewProvider } from "./qwen";
+import { GLMWebViewProvider } from "./glm";
 
 export class WebViewProviderManager implements vscode.Disposable {
   private static instance: WebViewProviderManager;
@@ -148,6 +151,9 @@ export class WebViewProviderManager implements vscode.Disposable {
       generativeAiModels.DEEPSEEK,
       DeepseekWebViewProvider,
     );
+    this.providerRegistry.set(generativeAiModels.OPENAI, OpenAIWebViewProvider);
+    this.providerRegistry.set(generativeAiModels.QWEN, QwenWebViewProvider);
+    this.providerRegistry.set(generativeAiModels.GLM, GLMWebViewProvider);
   }
 
   registerWebViewProvider(): vscode.Disposable | undefined {

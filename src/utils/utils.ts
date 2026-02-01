@@ -6,6 +6,7 @@ import {
   generativeAiModels,
 } from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { Memory } from "../memory/base";
 import * as crypto from "crypto";
 import { Buffer } from "buffer";
@@ -137,6 +138,15 @@ export const resetChatHistory = (model: string) => {
     case generativeAiModels.GROQ:
       Memory.set(COMMON.GROQ_CHAT_HISTORY, []);
       break;
+    case generativeAiModels.OPENAI:
+      Memory.set(COMMON.OPENAI_CHAT_HISTORY, []);
+      break;
+    case generativeAiModels.QWEN:
+      Memory.set(COMMON.QWEN_CHAT_HISTORY, []);
+      break;
+    case generativeAiModels.GLM:
+      Memory.set(COMMON.GLM_CHAT_HISTORY, []);
+      break;
     default:
       break;
   }
@@ -154,6 +164,12 @@ export const createAnthropicClient = (apiKey: string, baseURL?: string) => {
     });
   }
   return new Anthropic({
+    apiKey,
+  });
+};
+
+export const createOpenAIClient = (apiKey: string) => {
+  return new OpenAI({
     apiKey,
   });
 };
@@ -217,6 +233,12 @@ export const getAPIKeyAndModel = (
     geminiModel,
     anthropicModel,
     tavilyApiKey,
+    openaiApiKey,
+    openaiModel,
+    qwenApiKey,
+    qwenModel,
+    glmApiKey,
+    glmModel,
   } = APP_CONFIG;
   let apiKey: string | undefined;
   let modelName: string | undefined;
@@ -238,6 +260,22 @@ export const getAPIKeyAndModel = (
       break;
     case "tavily":
       apiKey = getConfigValue(tavilyApiKey);
+      break;
+    case "openai":
+      apiKey = getConfigValue(openaiApiKey);
+      modelName = getConfigValue(openaiModel);
+      break;
+    case "qwen":
+      apiKey = getConfigValue(qwenApiKey);
+      modelName = getConfigValue(qwenModel);
+      break;
+    case "glm":
+      apiKey = getConfigValue(glmApiKey);
+      modelName = getConfigValue(glmModel);
+      break;
+    case "deepseek":
+      apiKey = getConfigValue(APP_CONFIG.deepseekApiKey);
+      modelName = getConfigValue(APP_CONFIG.deepseekModel);
       break;
     default:
       throw new Error(`Unsupported model: ${model}`);
