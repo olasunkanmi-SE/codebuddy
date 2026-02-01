@@ -50,9 +50,9 @@ export class ChatHistoryManager {
 
   // Default pruning configuration
   private readonly defaultPruningConfig: IPruningConfig = {
-    maxMessages: 3, // Keep last 5 messages
-    maxTokens: 8000, // Keep messages within 8K tokens
-    maxAgeHours: 24, // Keep messages from last 24 hours
+    maxMessages: 50, // Keep last 50 messages (increased from 3)
+    maxTokens: 32000, // Keep messages within 32K tokens (increased from 8K)
+    maxAgeHours: 720, // Keep messages from last 30 days
     preserveSystemMessages: true,
   };
 
@@ -96,6 +96,14 @@ export class ChatHistoryManager {
     }
 
     return finalHistory;
+  }
+
+  async saveSummary(key: string, summary: string): Promise<void> {
+    await this.agentService.saveChatSummary(key, summary);
+  }
+
+  async getSummary(key: string): Promise<string | null> {
+    return await this.agentService.getChatSummary(key);
   }
 
   async clearHistory(key: string): Promise<void> {
@@ -241,11 +249,11 @@ export class ChatHistoryManager {
     // 1. Remove messages older than maxAgeHours
     prunedHistory = this.pruneByAge(prunedHistory, config);
 
-    // // 2. Limit by message count (keep most recent)
-    // prunedHistory = this.pruneByMessageCount(prunedHistory, config);
+    // 2. Limit by message count (keep most recent)
+    prunedHistory = this.pruneByMessageCount(prunedHistory, config);
 
-    // // 3. Limit by token count (remove oldest messages first)
-    // prunedHistory = this.pruneByTokenCount(prunedHistory, config);
+    // 3. Limit by token count (remove oldest messages first)
+    prunedHistory = this.pruneByTokenCount(prunedHistory, config);
 
     return prunedHistory;
   }
@@ -255,7 +263,7 @@ export class ChatHistoryManager {
       return history;
     }
 
-    const cutoffTime = Date.now() - config.maxAgeHours * 60 * 60 * 5000;
+    const cutoffTime = Date.now() - config.maxAgeHours * 60 * 60 * 1000;
     return history.filter((msg) => {
       const timestamp = msg.timestamp || 0;
       return (

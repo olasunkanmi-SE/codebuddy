@@ -59,6 +59,7 @@ export class LocalWebViewProvider extends BaseWebViewProvider {
         Message.of({
           role: msg.role === "user" ? "user" : "assistant",
           content: msg.content,
+          parts: msg.parts,
         }),
       );
 
@@ -141,6 +142,7 @@ export class LocalWebViewProvider extends BaseWebViewProvider {
         this.chatHistory,
         6000,
         systemInstruction,
+        "agentId",
       );
 
       const messages: Message[] = history.map((h) =>
@@ -220,6 +222,7 @@ export class LocalWebViewProvider extends BaseWebViewProvider {
         this.chatHistory,
         6000,
         systemInstruction,
+        "agentId",
       );
 
       // Use the LLM instance to chat

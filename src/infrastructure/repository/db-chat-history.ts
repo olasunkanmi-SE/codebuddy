@@ -22,7 +22,7 @@ export class ChatHistoryRepository {
    */
   public get(agentId: string): any[] {
     try {
-      const results = this.dbService.executeSql(
+      const results = this.dbService.executeSqlAll(
         "SELECT * FROM chat_history WHERE agent_id = ? ORDER BY timestamp ASC",
         [agentId],
       );
@@ -46,6 +46,9 @@ export class ChatHistoryRepository {
    */
   public set(agentId: string, history: any[]): void {
     try {
+      // Clear existing history first to avoid duplication
+      this.clear(agentId);
+
       // Insert new history
       const insertStmt = `
         INSERT INTO chat_history (agent_id, message_content, message_type, session_id, metadata)
@@ -53,7 +56,7 @@ export class ChatHistoryRepository {
       `;
 
       for (const message of history) {
-        this.dbService.executeSql(insertStmt, [
+        this.dbService.executeSqlCommand(insertStmt, [
           agentId,
           message.content || "",
           message.type || "message",
@@ -84,7 +87,7 @@ export class ChatHistoryRepository {
         VALUES (?, ?, ?, ?, ?)
       `;
 
-      this.dbService.executeSql(insertStmt, [
+      this.dbService.executeSqlCommand(insertStmt, [
         agentId,
         message.content,
         message.type,
@@ -97,13 +100,49 @@ export class ChatHistoryRepository {
   }
 
   /**
+   * Save chat summary for a specific agent
+   */
+  public saveSummary(agentId: string, summary: string): void {
+    try {
+      const insertStmt = `
+        INSERT INTO chat_summaries (agent_id, summary)
+        VALUES (?, ?)
+      `;
+      this.dbService.executeSqlCommand(insertStmt, [agentId, summary]);
+    } catch (error: any) {
+      console.warn(`Failed to save summary for agent ${agentId}:`, error);
+    }
+  }
+
+  /**
+   * Get the latest chat summary for a specific agent
+   */
+  public getSummary(agentId: string): string | null {
+    try {
+      const results = this.dbService.executeSqlAll(
+        "SELECT summary FROM chat_summaries WHERE agent_id = ? ORDER BY timestamp DESC LIMIT 1",
+        [agentId],
+      );
+
+      if (results.length > 0) {
+        return results[0].summary;
+      }
+      return null;
+    } catch (error: any) {
+      console.warn(`Failed to get summary for agent ${agentId}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Clear chat history for a specific agent
    */
   public clear(agentId: string): void {
     try {
-      this.dbService.executeSql("DELETE FROM chat_history WHERE agent_id = ?", [
-        agentId,
-      ]);
+      this.dbService.executeSqlCommand(
+        "DELETE FROM chat_history WHERE agent_id = ?",
+        [agentId],
+      );
     } catch (error: any) {
       console.warn(`Failed to clear chat history for agent ${agentId}:`, error);
     }
@@ -114,7 +153,7 @@ export class ChatHistoryRepository {
    */
   public clearAll(): void {
     try {
-      this.dbService.executeSql("DELETE FROM chat_history");
+      this.dbService.executeSqlCommand("DELETE FROM chat_history");
     } catch (error: any) {
       console.warn("Failed to clear all chat history:", error);
     }
@@ -125,7 +164,7 @@ export class ChatHistoryRepository {
    */
   public getRecent(agentId: string, limit = 50): any[] {
     try {
-      const results = this.dbService.executeSql(
+      const results = this.dbService.executeSqlAll(
         "SELECT * FROM chat_history WHERE agent_id = ? ORDER BY timestamp DESC LIMIT ?",
         [agentId, limit],
       );
@@ -156,7 +195,7 @@ export class ChatHistoryRepository {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
-      this.dbService.executeSql(
+      this.dbService.executeSqlCommand(
         "DELETE FROM chat_history WHERE timestamp < ?",
         [cutoffDate.toISOString()],
       );

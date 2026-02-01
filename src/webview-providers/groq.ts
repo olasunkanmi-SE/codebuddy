@@ -33,6 +33,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         Message.of({
           role: msg.role === "user" ? "user" : "assistant",
           content: msg.content,
+          parts: msg.parts,
         }),
       );
 
@@ -136,12 +137,16 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         this.chatHistory,
         6000,
         systemInstruction,
+        "agentId",
       );
 
       const chatCompletionStream = await this.model.chat.completions.create({
         messages: [
           { role: "system", content: systemInstruction ?? "" },
-          ...history,
+          ...history.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
         ],
         model: this.generativeAiModel,
         temperature,
@@ -235,6 +240,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         this.chatHistory,
         6000,
         systemInstruction,
+        "agentId",
       );
 
       const chatCompletionStream = await this.model.chat.completions.create({

@@ -29,6 +29,7 @@ export class OpenAIWebViewProvider extends BaseWebViewProvider {
         Message.of({
           role: msg.role === "user" ? "user" : "assistant",
           content: msg.content,
+          parts: msg.parts,
         }),
       );
 
@@ -114,30 +115,23 @@ export class OpenAIWebViewProvider extends BaseWebViewProvider {
         this.chatHistory,
         6000,
         systemInstruction,
+        "agentId",
       );
 
-      // Convert history to OpenAI format
-      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-        {
-          role: "system",
-          content: systemInstruction?.length
-            ? systemInstruction
-            : "You are an helpful assistant",
-        },
-        ...history.map((h) => ({
-          role: h.role as "user" | "assistant" | "system",
-          content: h.content,
-        })),
-      ];
-
-      const stream = await this.model.chat.completions.create({
-        messages: messages,
+      const chatCompletionStream = await this.model.chat.completions.create({
+        messages: [
+          { role: "system", content: systemInstruction ?? "" },
+          ...history.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+        ],
         model: this.generativeAiModel,
         max_tokens,
         stream: true,
       });
 
-      for await (const chunk of stream) {
+      for await (const chunk of chatCompletionStream) {
         const content = chunk.choices[0]?.delta?.content || "";
         if (content) {
           yield content;
@@ -209,6 +203,7 @@ export class OpenAIWebViewProvider extends BaseWebViewProvider {
         this.chatHistory,
         6000,
         systemInstruction,
+        "agentId",
       );
 
       // Convert history to OpenAI format
