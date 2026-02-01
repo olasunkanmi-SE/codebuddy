@@ -25,6 +25,12 @@ export class MCPService implements vscode.Disposable {
   private failureCount = 0;
   private readonly logger: Logger;
 
+  // Phase 1 & 2: Lazy initialization and idle shutdown
+  private dockerChecked = false;
+  private dockerAvailable = false;
+  private idleTimer: NodeJS.Timeout | null = null;
+  private readonly IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
   constructor() {
     this.logger = Logger.initialize("MCPService", {
       minLevel: LogLevel.INFO,
@@ -40,23 +46,13 @@ export class MCPService implements vscode.Disposable {
   }
 
   async initialize(): Promise<void> {
-    this.logger.info("Initializing MCP service...");
+    this.logger.info("Initializing MCP service (lazy mode)...");
 
     const config = this.loadConfiguration();
     this.serverConfigs = config;
     this.initialized = true;
 
-    const hasDocker = await this.checkDockerMCP();
-    if (!hasDocker) {
-      this.logger.warn("Docker MCP not available - MCP features disabled");
-      vscode.window.showErrorMessage(
-        "Docker MCP not available. Install Docker Desktop 27.0.0+",
-      );
-      throw new Error(
-        "Docker MCP not available. Install Docker Desktop 27.0.0+",
-      );
-    }
-
+    // Phase 1: Don't check Docker or connect eagerly - defer until first use
     if (Object.keys(config).length === 0) {
       this.logger.info("No MCP Server configured");
       return;
@@ -68,12 +64,111 @@ export class MCPService implements vscode.Disposable {
 
     if (this.isGatewayMode()) {
       this.logger.info(
-        "MCP initialization complete: Docker Gateway mode - unified catalog with 200+ tools available on-demand",
+        "MCP initialization complete: Docker Gateway mode - tools available on-demand (lazy start)",
       );
     } else {
       this.logger.info(
         `MCP initialization complete: ${enabledServers} servers available for on-demand connection`,
       );
+    }
+  }
+
+  /**
+   * Phase 1: Check Docker availability lazily (only when needed)
+   */
+  private async ensureDockerAvailable(): Promise<boolean> {
+    if (this.dockerChecked) {
+      return this.dockerAvailable;
+    }
+
+    this.logger.info("Checking Docker MCP availability (lazy check)...");
+    this.dockerAvailable = await this.checkDockerMCP();
+    this.dockerChecked = true;
+
+    if (!this.dockerAvailable) {
+      this.logger.warn(
+        "Docker MCP not available - MCP features will be disabled",
+      );
+    }
+
+    return this.dockerAvailable;
+  }
+
+  /**
+   * Phase 1: Ensure gateway is connected (lazy start)
+   */
+  private async ensureGatewayConnected(): Promise<void> {
+    if (!this.isGatewayMode()) {
+      return;
+    }
+
+    const client = this.clients.get("docker-gateway");
+    if (client && client.isConnected()) {
+      return;
+    }
+
+    // Check Docker availability first
+    const dockerOk = await this.ensureDockerAvailable();
+    if (!dockerOk) {
+      throw new Error(
+        "Docker MCP not available. Install Docker Desktop 27.0.0+ to use MCP tools.",
+      );
+    }
+
+    this.logger.info("Starting Docker MCP Gateway on-demand...");
+    await this.ensureServerConnected("docker-gateway");
+  }
+
+  /**
+   * Phase 2: Reset idle timer after activity
+   */
+  private resetIdleTimer(): void {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+    }
+
+    this.idleTimer = setTimeout(async () => {
+      this.logger.info(
+        `MCP Gateway idle for ${this.IDLE_TIMEOUT_MS / 1000}s, shutting down to save resources...`,
+      );
+      await this.shutdownIdleGateway();
+    }, this.IDLE_TIMEOUT_MS);
+  }
+
+  /**
+   * Phase 2: Shutdown gateway when idle
+   */
+  private async shutdownIdleGateway(): Promise<void> {
+    if (!this.isGatewayMode()) {
+      return;
+    }
+
+    const client = this.clients.get("docker-gateway");
+    if (client) {
+      try {
+        await client.disconnect();
+        this.clients.delete("docker-gateway");
+        this.toolsLoadedPerServer.delete("docker-gateway");
+
+        // Clear tool caches for this server
+        const serverTools = this.toolsByServer.get("docker-gateway") ?? [];
+        for (const tool of serverTools) {
+          const existing = this.toolsByName.get(tool.name) ?? [];
+          const filtered = existing.filter(
+            (t) => t.serverName !== "docker-gateway",
+          );
+          if (filtered.length === 0) {
+            this.toolsByName.delete(tool.name);
+          } else {
+            this.toolsByName.set(tool.name, filtered);
+          }
+        }
+        this.toolsByServer.delete("docker-gateway");
+
+        this.logger.info("Docker MCP Gateway shutdown complete (idle timeout)");
+      } catch (error) {
+        this.logger.error("Error during idle gateway shutdown:", error);
+      }
     }
   }
 
@@ -211,6 +306,12 @@ export class MCPService implements vscode.Disposable {
   }
 
   async getAllTools(): Promise<MCPTool[]> {
+    // Phase 1: Ensure gateway is connected (lazy start)
+    await this.ensureGatewayConnected();
+
+    // Phase 2: Reset idle timer when loading tools
+    this.resetIdleTimer();
+
     if (this.isGatewayMode()) {
       // Gateway mode: load from single unified source
       if (!this.toolsLoadedPerServer.get("docker-gateway")) {
@@ -258,6 +359,13 @@ export class MCPService implements vscode.Disposable {
     if (!this.initialized) {
       throw new Error("MCP service not initialized");
     }
+
+    // Phase 1: Ensure gateway is connected (lazy start)
+    await this.ensureGatewayConnected();
+
+    // Phase 2: Reset idle timer on every tool call
+    this.resetIdleTimer();
+
     this.invocationCount++;
 
     // Support serverName.toolName syntax
@@ -440,6 +548,13 @@ export class MCPService implements vscode.Disposable {
 
   async dispose(): Promise<void> {
     this.logger.info("Disposing MCP servers");
+
+    // Phase 2: Clear idle timer
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+
     const disconnectPromises = Array.from(this.clients.values()).map((client) =>
       client
         .disconnect()
@@ -457,6 +572,8 @@ export class MCPService implements vscode.Disposable {
     this.toolsByServer.clear();
     this.toolsLoadedPerServer.clear();
     this.initialized = false;
+    this.dockerChecked = false;
+    this.dockerAvailable = false;
 
     this.logger.info("MCP service disposed");
   }

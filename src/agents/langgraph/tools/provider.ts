@@ -59,6 +59,52 @@ class MCPToolFactory implements IToolFactory {
   }
 }
 
+/**
+ * Phase 4: Tool role mapping for subagent specialization
+ * Maps subagent roles to relevant tool name patterns
+ * '*' means all tools (for generalist agents like debugger)
+ */
+const TOOL_ROLE_MAPPING: Record<string, string[]> = {
+  "code-analyzer": [
+    "analyze",
+    "lint",
+    "security",
+    "complexity",
+    "quality",
+    "ast",
+    "parse",
+    "check",
+    "scan",
+    "review",
+    "travily",
+    "search",
+  ],
+  "doc-writer": [
+    "search",
+    "read",
+    "generate",
+    "doc",
+    "api",
+    "reference",
+    "travily",
+    "web",
+  ],
+  debugger: ["*"], // Debugger gets ALL tools
+  "file-organizer": [
+    "file",
+    "directory",
+    "list",
+    "read",
+    "write",
+    "move",
+    "rename",
+    "delete",
+    "structure",
+    "organize",
+    "search",
+  ],
+};
+
 export class ToolProvider {
   private tools: StructuredTool<any>[] = [];
   private static instance: ToolProvider | null = null;
@@ -78,8 +124,13 @@ export class ToolProvider {
     this.tools = this.toolFactories.map(
       (factory): StructuredTool<any> => factory.createTool(),
     );
-    logger.info(`ToolProvider initialized with ${this.tools.length} tools.`);
-    this.loadMCPTools();
+    logger.info(
+      `ToolProvider initialized with ${this.tools.length} core tools.`,
+    );
+
+    // Phase 1: Load MCP tools lazily (non-blocking)
+    // Don't await - let it load in background without blocking extension startup
+    this.loadMCPToolsLazy();
   }
 
   public static initialize(): ToolProvider {
@@ -87,6 +138,19 @@ export class ToolProvider {
       ToolProvider.instance = new ToolProvider();
     }
     return ToolProvider.instance;
+  }
+
+  /**
+   * Phase 1: Non-blocking MCP tool loading
+   * Loads MCP tools in background without blocking extension startup
+   */
+  private loadMCPToolsLazy(): void {
+    // Fire and forget - don't await
+    this.loadMCPTools().catch((error: any) => {
+      logger.info(
+        `MCP tools will be loaded on-demand: ${error.message || "Docker gateway not yet started"}`,
+      );
+    });
   }
 
   private async loadMCPTools(): Promise<void> {
@@ -115,6 +179,61 @@ export class ToolProvider {
     }
     return ToolProvider.instance.tools;
   }
+
+  /**
+   * Phase 4: Get tools filtered by subagent role
+   * Returns only tools relevant to the specified role
+   * @param role - The subagent role (e.g., 'code-analyzer', 'debugger')
+   * @returns Filtered tools for the role, or all tools if role unknown
+   */
+  public static getToolsForRole(role: string): StructuredTool[] {
+    if (!ToolProvider.instance) {
+      logger.error("Attempted to get tools before initialization.");
+      throw new Error("ToolProvider must be initialized before getting tools.");
+    }
+
+    const allowedPatterns = TOOL_ROLE_MAPPING[role];
+
+    // Unknown role or no mapping - return all tools
+    if (!allowedPatterns) {
+      logger.debug(`No tool mapping for role "${role}", returning all tools`);
+      return ToolProvider.instance.tools;
+    }
+
+    // '*' means all tools (for generalist roles like debugger)
+    if (allowedPatterns.includes("*")) {
+      logger.debug(
+        `Role "${role}" has access to all ${ToolProvider.instance.tools.length} tools`,
+      );
+      return ToolProvider.instance.tools;
+    }
+
+    // Filter tools by matching name patterns
+    const filteredTools = ToolProvider.instance.tools.filter((tool) => {
+      const toolNameLower = tool.name.toLowerCase();
+      return allowedPatterns.some((pattern) =>
+        toolNameLower.includes(pattern.toLowerCase()),
+      );
+    });
+
+    logger.debug(
+      `Role "${role}" filtered to ${filteredTools.length}/${ToolProvider.instance.tools.length} tools: ${filteredTools.map((t) => t.name).join(", ")}`,
+    );
+
+    // Always return at least the core tools (non-MCP) even if no patterns match
+    if (filteredTools.length === 0) {
+      const coreTools = ToolProvider.instance.tools.filter(
+        (t) => !(t instanceof LangChainMCPTool),
+      );
+      logger.debug(
+        `No MCP tools matched for "${role}", returning ${coreTools.length} core tools`,
+      );
+      return coreTools;
+    }
+
+    return filteredTools;
+  }
+
   // Method to add more tools at runtime - Open/Closed Principle
   public addTool(toolFactory: IToolFactory): void {
     const newTool = toolFactory.createTool();
