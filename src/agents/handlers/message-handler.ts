@@ -32,6 +32,7 @@ export class MessageHandler {
     const requestId = `request-${Date.now()}`;
     const threadId = metaData?.threadId;
     this.activeRequests.set(requestId, { threadId });
+
     try {
       await this.orchestrator.publish(StreamEventType.START, {
         requestId,
@@ -39,48 +40,101 @@ export class MessageHandler {
         metadata: { timestamp: Date.now() },
       });
 
-      await this.agentService.processUserQuery(
+      // Process stream and forward all events to orchestrator
+      for await (const event of this.agentService.streamResponse(
         message,
-        async (chunk) => {
-          if (!this.activeRequests.has(requestId)) return;
-          await this.orchestrator.publish(StreamEventType.CHUNK, {
-            requestId,
-            threadId,
-            content: chunk.content,
-            accumulated: chunk.accumulated,
-            metadata: { timestamp: Date.now() },
-          });
-        },
-        async (finalContent) => {
-          if (!this.activeRequests.has(requestId)) return;
-          await this.orchestrator.publish(StreamEventType.END, {
-            requestId,
-            threadId,
-            content: finalContent,
-            metadata: { timestamp: Date.now() },
-          });
-          this.activeRequests.delete(requestId);
-          this.logger.info(`Request ${requestId} completed`);
-        },
-        async (error) => {
-          if (!this.activeRequests.has(requestId)) return;
-          await this.orchestrator.publish(StreamEventType.ERROR, {
-            requestId,
-            threadId,
-            error: `Request ${requestId} failed`,
-            metadata: { timestamp: Date.now() },
-          });
-          this.activeRequests.delete(requestId);
-          this.logger.error(`Request ${requestId} failed`, error);
-        },
         threadId,
-      );
+      )) {
+        if (!this.activeRequests.has(requestId)) break;
+
+        // Forward event to orchestrator based on type
+        switch (event.type) {
+          case StreamEventType.PLANNING:
+            await this.orchestrator.publish(StreamEventType.PLANNING, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+
+          case StreamEventType.TOOL_START:
+            await this.orchestrator.publish(StreamEventType.TOOL_START, {
+              requestId,
+              threadId,
+              ...JSON.parse(event.content),
+              metadata: event.metadata,
+            });
+            this.logger.debug(`Tool started: ${event.metadata?.toolName}`);
+            break;
+
+          case StreamEventType.TOOL_END:
+            await this.orchestrator.publish(StreamEventType.TOOL_END, {
+              requestId,
+              threadId,
+              ...JSON.parse(event.content),
+              metadata: event.metadata,
+            });
+            this.logger.debug(`Tool ended: ${event.metadata?.toolName}`);
+            break;
+
+          case StreamEventType.TOOL_PROGRESS:
+            await this.orchestrator.publish(StreamEventType.TOOL_PROGRESS, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+
+          case StreamEventType.SUMMARIZING:
+            await this.orchestrator.publish(StreamEventType.SUMMARIZING, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+
+          case StreamEventType.CHUNK:
+            await this.orchestrator.publish(StreamEventType.CHUNK, {
+              requestId,
+              threadId,
+              content: event.content,
+              accumulated: event.accumulated,
+              metadata: event.metadata,
+            });
+            break;
+
+          case StreamEventType.END:
+            await this.orchestrator.publish(StreamEventType.END, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            this.activeRequests.delete(requestId);
+            this.logger.info(`Request ${requestId} completed`);
+            break;
+
+          case StreamEventType.ERROR:
+            await this.orchestrator.publish(StreamEventType.ERROR, {
+              requestId,
+              threadId,
+              error: event.content,
+              metadata: event.metadata,
+            });
+            this.activeRequests.delete(requestId);
+            this.logger.error(`Request ${requestId} failed: ${event.content}`);
+            break;
+        }
+      }
     } catch (error: any) {
       this.logger.error(`Request ${requestId} failed`, error);
       await this.orchestrator.publish(StreamEventType.ERROR, {
         requestId,
         threadId,
-        error: `Request ${requestId} failed`,
+        error: `Request ${requestId} failed: ${error.message}`,
         metadata: { timestamp: Date.now() },
       });
       this.activeRequests.delete(requestId);

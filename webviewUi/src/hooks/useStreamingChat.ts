@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityItem } from "../components/AgentActivityFeed";
 
 export interface IWebviewMessage {
   id: string;
@@ -9,12 +10,26 @@ export interface IWebviewMessage {
   senderInitial?: string;
   isStreaming?: boolean;
   timestamp?: number;
+  activities?: ActivityItem[];
 }
 
 interface UseStreamingChatOptions {
   enableStreaming?: boolean;
   onLegacyMessage?: (messages: IWebviewMessage[]) => void;
 }
+
+// Stream event types matching backend
+const StreamEventType = {
+  START: "onStreamStart",
+  END: "onStreamEnd",
+  CHUNK: "onStreamChunk",
+  TOOL_START: "onToolStart",
+  TOOL_END: "onToolEnd",
+  TOOL_PROGRESS: "onToolProgress",
+  PLANNING: "onPlanning",
+  SUMMARIZING: "onSummarizing",
+  ERROR: "onStreamError",
+} as const;
 
 export const useStreamingChat = (
   vscodeApi: any,
@@ -28,15 +43,27 @@ export const useStreamingChat = (
   const [streamingMessage, setStreamingMessage] =
     useState<IWebviewMessage | null>(null);
   const [isLegacyLoading, setIsLegacyLoading] = useState(false);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
 
   const currentRequestIdRef = useRef<string | null>(null);
 
   // Combine completed and streaming messages
   const streamedMessages = useMemo(() => {
-    return streamingMessage
+    const messages = streamingMessage
       ? [...completedMessages, streamingMessage]
       : completedMessages;
-  }, [completedMessages, streamingMessage]);
+
+    // Attach current activities to the last bot message
+    if (messages.length > 0 && activities.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.type === "bot") {
+        return messages.map((msg, idx) =>
+          idx === messages.length - 1 ? { ...msg, activities } : msg,
+        );
+      }
+    }
+    return messages;
+  }, [completedMessages, streamingMessage, activities]);
 
   // Add a message directly (for legacy or manual additions)
   const addMessage = useCallback(
@@ -56,18 +83,20 @@ export const useStreamingChat = (
   const clearMessages = useCallback(() => {
     setCompletedMessages([]);
     setStreamingMessage(null);
+    setActivities([]);
     currentRequestIdRef.current = null;
   }, []);
 
   // Streaming handlers
   const handleStreamStart = useCallback(
     (payload: any) => {
-      console.log("payload", payload);
+      console.log("Stream start payload:", payload);
       if (!enableStreaming) return;
 
       const tempId = `temp-${payload.requestId || Date.now()}`;
       currentRequestIdRef.current = payload.requestId;
       setIsLegacyLoading(false);
+      setActivities([]); // Clear activities for new stream
       setStreamingMessage({
         id: tempId,
         type: "bot",
@@ -109,6 +138,7 @@ export const useStreamingChat = (
           id: `bot-${Date.now()}`,
           isStreaming: false,
           content: finalContent,
+          activities: [...activities], // Include activities in final message
         };
         setCompletedMessages((prevCompleted) => [
           ...prevCompleted,
@@ -117,9 +147,14 @@ export const useStreamingChat = (
         return null;
       });
 
+      // Clear activities after a delay to allow user to see the final state
+      setTimeout(() => {
+        setActivities([]);
+      }, 2000);
+
       currentRequestIdRef.current = null;
     },
-    [enableStreaming],
+    [enableStreaming, activities],
   );
 
   const handleStreamError = useCallback(
@@ -127,13 +162,26 @@ export const useStreamingChat = (
       if (!enableStreaming) return;
       if (payload.requestId !== currentRequestIdRef.current) return;
 
+      // Mark all active activities as failed
+      setActivities((prev) =>
+        prev.map((a) =>
+          a.status === "active" ? { ...a, status: "failed" as const } : a,
+        ),
+      );
+
+      const errorContent =
+        payload.error || "An error occurred during streaming";
+
+      // Always create an error message, even if no streaming message exists
       setStreamingMessage((prev) => {
-        if (!prev) return null;
         const errorMessage: IWebviewMessage = {
-          ...prev,
           id: `error-${Date.now()}`,
+          type: "bot",
           isStreaming: false,
-          content: payload.error || "An error occurred during streaming",
+          content: errorContent,
+          timestamp: Date.now(),
+          language: prev?.language || "text",
+          alias: prev?.alias || "O",
         };
         setCompletedMessages((prevCompleted) => [
           ...prevCompleted,
@@ -142,11 +190,109 @@ export const useStreamingChat = (
         return null;
       });
 
+      // Clear activities after showing error
+      setTimeout(() => {
+        setActivities([]);
+      }, 3000);
+
       currentRequestIdRef.current = null;
       setIsLegacyLoading(false);
     },
     [enableStreaming],
   );
+
+  // Tool activity handlers
+  const handleToolStart = useCallback((payload: any) => {
+    const activity: ActivityItem = {
+      id: payload.toolId || `activity-${Date.now()}`,
+      type: "tool_start",
+      toolName: payload.toolName,
+      description: payload.description || `Running ${payload.toolName}...`,
+      status: "active",
+      timestamp: Date.now(),
+    };
+    setActivities((prev) => [...prev, activity]);
+  }, []);
+
+  const handleToolEnd = useCallback((payload: any) => {
+    setActivities((prev) =>
+      prev.map((activity) =>
+        (activity.toolName === payload.toolName ||
+          activity.id === payload.toolId) &&
+        activity.status === "active"
+          ? {
+              ...activity,
+              status: payload.status === "failed" ? "failed" : "completed",
+              result: payload.result,
+              duration: payload.duration,
+            }
+          : activity,
+      ),
+    );
+  }, []);
+
+  const handleToolProgress = useCallback((payload: any) => {
+    setActivities((prev) =>
+      prev.map((activity) =>
+        activity.toolName === payload.toolName && activity.status === "active"
+          ? {
+              ...activity,
+              description: payload.message || activity.description,
+            }
+          : activity,
+      ),
+    );
+  }, []);
+
+  const handlePlanning = useCallback((payload: any) => {
+    const activity: ActivityItem = {
+      id: `planning-${Date.now()}`,
+      type: "planning",
+      toolName: "planning",
+      description: payload.content || "Analyzing your request...",
+      status: "active",
+      timestamp: Date.now(),
+    };
+    setActivities((prev) => {
+      // Replace existing planning activity or add new
+      const filtered = prev.filter((a) => a.type !== "planning");
+      return [...filtered, activity];
+    });
+
+    // Mark planning as complete after a brief delay
+    setTimeout(() => {
+      setActivities((prev) =>
+        prev.map((a) =>
+          a.type === "planning" && a.status === "active"
+            ? { ...a, status: "completed" as const }
+            : a,
+        ),
+      );
+    }, 1500);
+  }, []);
+
+  const handleSummarizing = useCallback((payload: any) => {
+    const activity: ActivityItem = {
+      id: `summarizing-${Date.now()}`,
+      type: "summarizing",
+      toolName: "summarizing",
+      description: payload.content || "Preparing response...",
+      status: "active",
+      timestamp: Date.now(),
+    };
+    setActivities((prev) => [...prev, activity]);
+
+    // Mark as complete shortly after
+    setTimeout(() => {
+      setActivities((prev) =>
+        prev.map((a) =>
+          a.type === "summarizing" && a.status === "active"
+            ? { ...a, status: "completed" as const }
+            : a,
+        ),
+      );
+    }, 1000);
+  }, []);
 
   // Legacy bot response handler
   const handleLegacyBotResponse = useCallback(
@@ -196,7 +342,7 @@ export const useStreamingChat = (
   // Message event listener
   useEffect(() => {
     const messageHandler = (event: any) => {
-      console.log("event", event);
+      console.log("Received message event:", event.data);
       const message = event.data;
       const { command, type } = message;
 
@@ -205,17 +351,34 @@ export const useStreamingChat = (
 
       switch (messageType) {
         // Streaming commands
-        case "onStreamStart":
+        case StreamEventType.START:
           handleStreamStart(message.payload);
           break;
-        case "onStreamChunk":
+        case StreamEventType.CHUNK:
           handleStreamChunk(message.payload);
           break;
-        case "onStreamEnd":
+        case StreamEventType.END:
           handleStreamEnd(message.payload);
           break;
-        case "onStreamError":
+        case StreamEventType.ERROR:
           handleStreamError(message.payload);
+          break;
+
+        // Tool activity events
+        case StreamEventType.TOOL_START:
+          handleToolStart(message.payload);
+          break;
+        case StreamEventType.TOOL_END:
+          handleToolEnd(message.payload);
+          break;
+        case StreamEventType.TOOL_PROGRESS:
+          handleToolProgress(message.payload);
+          break;
+        case StreamEventType.PLANNING:
+          handlePlanning(message.payload);
+          break;
+        case StreamEventType.SUMMARIZING:
+          handleSummarizing(message.payload);
           break;
 
         // Legacy non-streaming response
@@ -240,11 +403,17 @@ export const useStreamingChat = (
     handleStreamChunk,
     handleStreamEnd,
     handleStreamError,
+    handleToolStart,
+    handleToolEnd,
+    handleToolProgress,
+    handlePlanning,
+    handleSummarizing,
     handleLegacyBotResponse,
   ]);
 
   return {
     messages: streamedMessages,
+    activities,
     isStreaming: !!streamingMessage,
     isLoading: isLegacyLoading || !!streamingMessage,
     sendMessage,

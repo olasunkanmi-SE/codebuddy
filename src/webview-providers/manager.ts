@@ -63,6 +63,12 @@ export class WebViewProviderManager implements vscode.Disposable {
       this.orchestrator.onStreamChunk(this.handleStreamChunk.bind(this)),
       this.orchestrator.onStreamEnd(this.handleStreamEnd.bind(this)),
       this.orchestrator.onStreamError(this.handleStreamError.bind(this)),
+      // Tool activity events for real-time feedback
+      this.orchestrator.onToolStart(this.handleToolStart.bind(this)),
+      this.orchestrator.onToolEnd(this.handleToolEnd.bind(this)),
+      this.orchestrator.onToolProgress(this.handleToolProgress.bind(this)),
+      this.orchestrator.onPlanning(this.handlePlanning.bind(this)),
+      this.orchestrator.onSummarizing(this.handleSummarizing.bind(this)),
     );
     this.isInitialized = true;
   }
@@ -324,12 +330,103 @@ export class WebViewProviderManager implements vscode.Disposable {
   private async handleStreamError(event: IEventPayload) {
     if (this.webviewView?.webview) {
       await this.webviewView.webview.postMessage({
-        type: StreamEventType.END,
+        type: StreamEventType.ERROR,
         payload: {
-          requestId: event.message.requestId,
-          threadId: event.threadId,
-          timestamp: event.timestamp,
-          error: event.error,
+          requestId: event.message?.requestId,
+          threadId: event.message?.threadId,
+          timestamp: Date.now(),
+          error: event.message?.error || event.error || "An error occurred",
+        },
+      });
+    }
+  }
+
+  private async handleToolStart(event: IEventPayload) {
+    if (this.webviewView?.webview) {
+      try {
+        const toolData =
+          typeof event.message === "string"
+            ? JSON.parse(event.message)
+            : event.message;
+        await this.webviewView.webview.postMessage({
+          type: StreamEventType.TOOL_START,
+          payload: {
+            requestId: event.message?.requestId,
+            toolId: toolData.id || event.metadata?.toolId,
+            toolName: toolData.toolName || event.metadata?.toolName,
+            description: toolData.description,
+            status: toolData.status || "running",
+            timestamp: Date.now(),
+          },
+        });
+      } catch (error: any) {
+        this.logger.error("Failed to send tool start:", error);
+      }
+    }
+  }
+
+  private async handleToolEnd(event: IEventPayload) {
+    if (this.webviewView?.webview) {
+      try {
+        const toolData =
+          typeof event.message === "string"
+            ? JSON.parse(event.message)
+            : event.message;
+        await this.webviewView.webview.postMessage({
+          type: StreamEventType.TOOL_END,
+          payload: {
+            requestId: event.message?.requestId,
+            toolId: toolData.id || event.metadata?.toolId,
+            toolName: toolData.toolName || event.metadata?.toolName,
+            status: toolData.status || "completed",
+            result: toolData.result,
+            duration: event.metadata?.duration,
+            timestamp: Date.now(),
+          },
+        });
+      } catch (error: any) {
+        this.logger.error("Failed to send tool end:", error);
+      }
+    }
+  }
+
+  private async handleToolProgress(event: IEventPayload) {
+    if (this.webviewView?.webview) {
+      await this.webviewView.webview.postMessage({
+        type: StreamEventType.TOOL_PROGRESS,
+        payload: {
+          requestId: event.message?.requestId,
+          toolName: event.message?.toolName,
+          status: event.message?.status,
+          message: event.message?.message,
+          progress: event.message?.progress,
+          timestamp: Date.now(),
+        },
+      });
+    }
+  }
+
+  private async handlePlanning(event: IEventPayload) {
+    if (this.webviewView?.webview) {
+      await this.webviewView.webview.postMessage({
+        type: StreamEventType.PLANNING,
+        payload: {
+          requestId: event.message?.requestId,
+          content: event.message?.content || event.message,
+          timestamp: Date.now(),
+        },
+      });
+    }
+  }
+
+  private async handleSummarizing(event: IEventPayload) {
+    if (this.webviewView?.webview) {
+      await this.webviewView.webview.postMessage({
+        type: StreamEventType.SUMMARIZING,
+        payload: {
+          requestId: event.message?.requestId,
+          content: event.message?.content || event.message,
+          timestamp: Date.now(),
         },
       });
     }

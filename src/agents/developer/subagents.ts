@@ -5,6 +5,19 @@ import { StructuredTool } from "langchain";
 import { ToolProvider } from "../langgraph/tools/provider";
 
 /**
+ * Creates a unique list of tools by name to avoid duplicates
+ */
+function uniqueTools(tools: StructuredTool[]): StructuredTool[] {
+  const map = new Map<string, StructuredTool>();
+  for (const tool of tools) {
+    if (!map.has(tool.name)) {
+      map.set(tool.name, tool);
+    }
+  }
+  return Array.from(map.values());
+}
+
+/**
  * Create specialized subagents for the Developer Agent
  * Each subagent has a specific role and optimized prompting
  *
@@ -15,6 +28,14 @@ export function createDeveloperSubagents(
   model: ChatAnthropic | ChatGroq, // this should be either anthropic or groq or Gemini
   tools: StructuredTool[],
 ): SubAgent[] {
+  // Extract MCP tools from the provided tools list to ensure they are available
+  // We identify them by checking properties common to MCP tools or by class name/description
+  const mcpTools = tools.filter(
+    (t) =>
+      t.constructor.name === "LangChainMCPTool" ||
+      (t.description && t.description.includes("MCP tool")),
+  );
+
   return [
     {
       name: "code-analyzer",
@@ -35,7 +56,10 @@ Use MCP tools like analyze_code, lint_code, security_scan when available.
 3. Consider edge cases and error handling
 4. Provide specific, actionable recommendations
 5. Save analysis results to /docs/code-reviews/ for future reference`,
-      tools: ToolProvider.getToolsForRole("code-analyzer"), // Phase 4: Role-specific tools
+      tools: uniqueTools([
+        ...ToolProvider.getToolsForRole("code-analyzer"),
+        ...mcpTools,
+      ]), // Phase 4: Role-specific tools + MCP
       model,
     },
 
@@ -60,7 +84,10 @@ Use them to gather context before writing documentation.
 - Add tables of contents for long documents
 - Link to related documentation
 - Include version information where relevant`,
-      tools: ToolProvider.getToolsForRole("doc-writer"), // Phase 4: Role-specific tools
+      tools: uniqueTools([
+        ...ToolProvider.getToolsForRole("doc-writer"),
+        ...mcpTools,
+      ]), // Phase 4: Role-specific tools + MCP
       model,
     },
 
@@ -83,7 +110,10 @@ Use MCP tools extensively for comprehensive debugging.
 3. Search web for solutions if needed
 4. Test potential fixes
 5. Document the solution in /docs/troubleshooting/`,
-      tools: ToolProvider.getToolsForRole("debugger"), // Phase 4: All tools (debugger is generalist)
+      tools: uniqueTools([
+        ...ToolProvider.getToolsForRole("debugger"),
+        ...mcpTools,
+      ]), // Phase 4: All tools (debugger is generalist)
       model,
     },
 
@@ -106,7 +136,10 @@ Use them to explore and manipulate the project structure.
 3. Plan the new structure
 4. Execute moves carefully, checking dependencies
 5. Update any affected import paths`,
-      tools: ToolProvider.getToolsForRole("file-organizer"), // Phase 4: Role-specific tools
+      tools: uniqueTools([
+        ...ToolProvider.getToolsForRole("file-organizer"),
+        ...mcpTools,
+      ]), // Phase 4: Role-specific tools + MCP
       model,
     },
   ];

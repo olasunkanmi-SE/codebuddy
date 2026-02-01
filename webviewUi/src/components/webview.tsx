@@ -9,13 +9,14 @@ import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
 import { FAQAccordion } from "./accordion";
+import { AgentActivityFeed } from "./AgentActivityFeed";
 import AttachmentIcon from "./attachmentIcon";
-import { BotMessage } from "./botMessage";
 import ChatInput from "./ChatInput";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 import WorkspaceSelector from "./context";
 import { Extensions } from "./extensions";
 import { FutureFeatures } from "./futureFeatures";
+import MessageRenderer from "./MessageRenderer";
 import { UserMessage } from "./personMessage";
 import { Settings } from "./settings";
 import { SkeletonLoader } from "./skeletonLoader";
@@ -63,6 +64,7 @@ export const WebviewUI = () => {
   // Initialize streaming chat hook
   const {
     messages: streamedMessages,
+    activities,
     isStreaming,
     isLoading: isBotLoading,
     sendMessage,
@@ -265,7 +267,7 @@ export const WebviewUI = () => {
   const memoizedMessages = useMemo(() => {
     return streamedMessages.map((msg) =>
       msg.type === "bot" ? (
-        <BotMessage
+        <MessageRenderer
           key={msg.id}
           content={msg.content}
           language={msg.language}
@@ -315,13 +317,21 @@ export const WebviewUI = () => {
                 ) : (
                   <>
                     {memoizedMessages}
+                    {/* Show activity feed when agent is working */}
+                    {(isStreaming || isBotLoading) && activities.length > 0 && (
+                      <AgentActivityFeed
+                        activities={activities}
+                        isActive={isStreaming || isBotLoading}
+                      />
+                    )}
                     {isCommandExecuting && (
                       <CommandFeedbackLoader
                         commandAction={commandAction}
                         commandDescription={commandDescription}
                       />
                     )}
-                    {isBotLoading && !isCommandExecuting && !isStreaming && <SkeletonLoader />}
+                    {/* Show skeleton only if no activities are being tracked */}
+                    {isBotLoading && !isCommandExecuting && !isStreaming && activities.length === 0 && <SkeletonLoader />}
                   </>
                 )}
               </div>

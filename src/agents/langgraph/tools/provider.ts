@@ -112,6 +112,8 @@ export class ToolProvider {
   private toolFactories: IToolFactory[];
   private readonly mcpService: MCPService;
   private mcpInitialized = false;
+  private mcpLoadAttempted = false; // Track if load was attempted (separate from success)
+  private mcpLoadPromise: Promise<void> | null = null;
 
   private constructor() {
     this.contextRetriever ??= ContextRetriever.initialize();
@@ -145,8 +147,8 @@ export class ToolProvider {
    * Loads MCP tools in background without blocking extension startup
    */
   private loadMCPToolsLazy(): void {
-    // Fire and forget - don't await
-    this.loadMCPTools().catch((error: any) => {
+    // Store the promise so we can await it later if needed
+    this.mcpLoadPromise = this.loadMCPTools().catch((error: any) => {
       logger.info(
         `MCP tools will be loaded on-demand: ${error.message || "Docker gateway not yet started"}`,
       );
@@ -156,20 +158,102 @@ export class ToolProvider {
   private async loadMCPTools(): Promise<void> {
     try {
       logger.info("Initializing MCP service for tool discovery");
+      logger.debug("loadMCPTools called");
+
       const mcpTools = await this.mcpService.getAllTools();
+      logger.debug(`getAllTools returned ${mcpTools.length} tools`);
       logger.info(`Discovered ${mcpTools.length} MCP tools`);
+
+      if (mcpTools.length === 0) {
+        logger.warn(
+          "No MCP tools discovered. Check that your MCP server is running and accessible. " +
+            "For SSE: ensure the server is running at the configured URL. " +
+            "For Docker: run 'docker mcp gateway run' or check Docker Desktop MCP is enabled.",
+        );
+        this.mcpLoadAttempted = true;
+        return; // Don't set mcpInitialized, allow retry
+      }
+
       mcpTools.forEach((tool) => {
         const factory = new MCPToolFactory(this.mcpService, tool);
         this.addTool(factory);
+        logger.debug(`Added MCP tool: ${tool.name}`);
       });
+
       this.mcpInitialized = true;
-      logger.info(`MCP integration complete: ${mcpTools.length} tools added`);
-    } catch (error: any) {
-      logger.warn(
-        "MCP tools unavailable, continuing without them:",
-        error.message,
+      this.mcpLoadAttempted = true;
+      logger.debug(`MCP tools successfully loaded: ${mcpTools.length} tools`);
+      logger.info(
+        `MCP integration complete: ${mcpTools.length} tools added. Total tools: ${this.tools.length}`,
       );
+    } catch (error: any) {
+      logger.debug(`loadMCPTools error: ${error.message}`);
+      logger.error(
+        `MCP tools unavailable: ${error.message}. ` +
+          `The agent will continue with core tools only (${this.tools.length} available).`,
+      );
+      // Mark as attempted but NOT initialized - allows retry
+      this.mcpLoadAttempted = true;
     }
+  }
+
+  /**
+   * Ensure MCP tools are loaded before returning tools
+   * This is used when the caller needs to guarantee MCP tools are available
+   */
+  public static async ensureMCPToolsLoaded(): Promise<void> {
+    if (!ToolProvider.instance) {
+      ToolProvider.initialize();
+    }
+
+    const instance = ToolProvider.instance!;
+    logger.debug(
+      `ensureMCPToolsLoaded: initialized=${instance.mcpInitialized}, attempted=${instance.mcpLoadAttempted}`,
+    );
+
+    // If already successfully loaded, return immediately
+    if (instance.mcpInitialized) {
+      logger.debug(
+        `MCP already initialized with ${instance.tools.length} tools`,
+      );
+      return;
+    }
+
+    // Wait for the initial load attempt to complete
+    if (instance.mcpLoadPromise) {
+      logger.debug("Waiting for mcpLoadPromise...");
+      await instance.mcpLoadPromise;
+    }
+
+    // If not initialized yet (either failed or returned 0 tools), retry
+    if (!instance.mcpInitialized) {
+      logger.debug("Retrying MCP tool loading (attempt after lazy load)...");
+      logger.info("Retrying MCP tool loading...");
+      await instance.loadMCPTools();
+    }
+
+    logger.debug(
+      `ensureMCPToolsLoaded complete: ${instance.tools.length} total tools available`,
+    );
+  }
+
+  /**
+   * Get tools asynchronously, ensuring MCP tools are loaded first
+   * Use this when you need to guarantee all tools are available
+   */
+  public static async getToolsAsync(): Promise<StructuredTool[]> {
+    await ToolProvider.ensureMCPToolsLoaded();
+    return ToolProvider.getTools();
+  }
+
+  /**
+   * Get tools for a role asynchronously, ensuring MCP tools are loaded first
+   */
+  public static async getToolsForRoleAsync(
+    role: string,
+  ): Promise<StructuredTool[]> {
+    await ToolProvider.ensureMCPToolsLoaded();
+    return ToolProvider.getToolsForRole(role);
   }
 
   public static getTools(): StructuredTool[] {

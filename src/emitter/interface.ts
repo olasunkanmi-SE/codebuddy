@@ -36,7 +36,12 @@ type AgentEventKeys =
   | "onStreamChunk"
   | "onStreamEnd"
   | "onStreamError"
-  | "onStreamFlush";
+  | "onStreamFlush"
+  | "onToolStart"
+  | "onToolEnd"
+  | "onToolProgress"
+  | "onPlanning"
+  | "onSummarizing";
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {

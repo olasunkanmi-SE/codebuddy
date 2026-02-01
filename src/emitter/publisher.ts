@@ -55,6 +55,15 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
     "onModelChangeSuccess",
   );
 
+  // Tool activity events for real-time feedback
+  onToolStart: vscode.Event<IEventPayload> = this.createEvent("onToolStart");
+  onToolEnd: vscode.Event<IEventPayload> = this.createEvent("onToolEnd");
+  onToolProgress: vscode.Event<IEventPayload> =
+    this.createEvent("onToolProgress");
+  onPlanning: vscode.Event<IEventPayload> = this.createEvent("onPlanning");
+  onSummarizing: vscode.Event<IEventPayload> =
+    this.createEvent("onSummarizing");
+
   /**
    * Emits a generic event with specified status, message, and optional data.
    *

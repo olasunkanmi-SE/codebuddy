@@ -58,39 +58,58 @@ export class MCPClient {
     this.state = MCPClientState.CONNECTING;
     this.logger.info(`Connecting to MCP server: ${this.serverName}`);
     try {
-      // Choose transport based on server config. Prefer network (SSE) transport when configured.
-      if (
-        (this.config as any).transport === "sse" &&
-        (this.config as any).url
-      ) {
+      // Choose transport based on server config
+      const configAny = this.config as any;
+      const isSSE = configAny.transport === "sse" && configAny.url;
+
+      if (isSSE) {
         try {
-          // Dynamically import SSE transport from SDK if available
+          // Dynamically import SSE transport from SDK
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const {
-            SseClientTransport,
+            SSEClientTransport,
           } = require("@modelcontextprotocol/sdk/client/sse.js");
-          this.transport = new SseClientTransport({
-            url: (this.config as any).url,
-          });
+          const url = new URL(configAny.url);
+          this.transport = new SSEClientTransport(url);
           this.logger.info(
-            `Using SSE transport to ${(this.config as any).url} for ${this.serverName}`,
+            `Using SSE transport to ${configAny.url} for ${this.serverName}`,
           );
-        } catch (err) {
-          this.logger.warn(
-            `SSE transport not available in SDK, falling back to stdio for ${this.serverName}`,
+        } catch (err: any) {
+          // Don't fall back to stdio if SSE was explicitly requested
+          this.state = MCPClientState.ERROR;
+          throw new Error(
+            `SSE transport requested but not available: ${err.message}. ` +
+              `Make sure @modelcontextprotocol/sdk is up to date and SSE server is running at ${configAny.url}`,
           );
-          this.transport = new StdioClientTransport({
-            command: this.config.command,
-            args: this.config.args,
-            env: { ...this.config.env },
-          });
         }
-      } else {
+      } else if (this.config.command) {
+        // Stdio transport (subprocess)
+        // IMPORTANT: Merge with process.env to preserve PATH and other critical vars
+        // Filter out undefined values to satisfy type requirements
+        const mergedEnv: Record<string, string> = {};
+        for (const [key, value] of Object.entries(process.env)) {
+          if (value !== undefined) {
+            mergedEnv[key] = value;
+          }
+        }
+        if (this.config.env) {
+          Object.assign(mergedEnv, this.config.env);
+        }
+
         this.transport = new StdioClientTransport({
           command: this.config.command,
           args: this.config.args,
-          env: { ...this.config.env },
+          env: mergedEnv,
         });
+        this.logger.info(
+          `Using stdio transport for ${this.serverName}: ${this.config.command} ${(this.config.args || []).join(" ")}`,
+        );
+      } else {
+        this.state = MCPClientState.ERROR;
+        throw new Error(
+          `Invalid MCP server config for ${this.serverName}: ` +
+            `Either set transport='sse' with url, or provide command for stdio`,
+        );
       }
 
       // Try to capture any underlying spawned process from the transport implementation

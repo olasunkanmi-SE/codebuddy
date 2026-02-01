@@ -39,8 +39,8 @@ export class DeveloperAgent {
     this.orchestrator = Orchestrator.getInstance();
     this.config = config;
     ToolProvider.initialize();
-    const providerTools = ToolProvider.getTools();
-    this.tools = [...(config.additionalTools || []), ...providerTools];
+    // Tools will be loaded asynchronously in create()
+    this.tools = config.additionalTools || [];
 
     this.logger = Logger.initialize("DeveloperAgent", {
       minLevel: LogLevel.DEBUG,
@@ -190,7 +190,7 @@ export class DeveloperAgent {
   /**
    * Main entry point to build and return the agent runnable
    */
-  public create() {
+  public async create() {
     const cachedModel = Memory.get("agentModel");
     if (!this.model && !cachedModel) {
       this.logger.error("Error creating DeveloperAgent: No model found");
@@ -202,6 +202,14 @@ export class DeveloperAgent {
 
     this.model = cachedModel as ChatAnthropic | ChatGroq;
     const { store, enableSubAgents = true, checkPointer } = this.config;
+
+    // Ensure MCP tools are loaded before creating the agent
+    this.logger.info("Ensuring MCP tools are loaded...");
+    const providerTools = await ToolProvider.getToolsAsync();
+    this.tools = [...(this.config.additionalTools || []), ...providerTools];
+    this.logger.info(
+      `Agent initialized with ${this.tools.length} tools (including MCP)`,
+    );
 
     const subagents = enableSubAgents
       ? createDeveloperSubagents(this.model, this.tools)
@@ -223,7 +231,7 @@ export class DeveloperAgent {
   /**
    * Static factory for the "Advanced" configuration
    */
-  public static createAdvanced(config: ICodeBuddyAgentConfig = {}) {
+  public static async createAdvanced(config: ICodeBuddyAgentConfig = {}) {
     const agent = new DeveloperAgent({
       enableWebSearch: true,
       enableSubAgents: true,
@@ -237,11 +245,11 @@ export class DeveloperAgent {
  * Legacy wrapper to maintain backward compatibility if needed,
  * or for simple functional usage.
  */
-export function createDeveloperAgent(config: ICodeBuddyAgentConfig = {}) {
+export async function createDeveloperAgent(config: ICodeBuddyAgentConfig = {}) {
   return new DeveloperAgent(config).create();
 }
 
-export function createAdvancedDeveloperAgent(
+export async function createAdvancedDeveloperAgent(
   config: ICodeBuddyAgentConfig = {},
 ) {
   return DeveloperAgent.createAdvanced(config);
