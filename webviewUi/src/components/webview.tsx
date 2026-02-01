@@ -3,6 +3,7 @@
 import { VSCodeButton, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import styled from "styled-components";
 import { codeBuddyMode, faqItems, modelOptions, themeOptions } from "../constants/constant";
 import { IWebviewMessage, useStreamingChat } from "../hooks/useStreamingChat";
 import { getChatCss } from "../themes/chat_css";
@@ -19,8 +20,37 @@ import { FutureFeatures } from "./futureFeatures";
 import MessageRenderer from "./MessageRenderer";
 import { UserMessage } from "./personMessage";
 import { Settings } from "./settings";
+import { SettingsPanel, SettingsGearIcon, SettingsValues, SettingsOptions, SettingsHandlers, DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS, CustomRule, SubagentConfig } from "./settings/index";
 import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
+
+// Styled components for settings toggle
+const SettingsToggleButton = styled.button`
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -58,6 +88,12 @@ export const WebviewUI = () => {
   const [username, setUsername] = useState("");
   const [darkMode, setDarkMode] = useState(false);
   const [enableStreaming, setEnableStreaming] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  // Rules & Subagents state
+  const [customRules, setCustomRules] = useState<CustomRule[]>([]);
+  const [customSystemPrompt, setCustomSystemPrompt] = useState("");
+  const [subagents, setSubagents] = useState<SubagentConfig[]>(DEFAULT_SUBAGENTS);
 
   // Ref for username input element
   // const nameInputRef = useRef<HTMLInputElement>(null);
@@ -182,6 +218,28 @@ export const WebviewUI = () => {
         }
         break;
 
+      case "rules-data":
+        // Handle rules and subagents data from extension
+        if (message.data) {
+          if (message.data.rules) {
+            setCustomRules(message.data.rules);
+          }
+          if (message.data.systemPrompt !== undefined) {
+            setCustomSystemPrompt(message.data.systemPrompt);
+          }
+          if (message.data.subagents) {
+            setSubagents(message.data.subagents);
+          }
+        }
+        break;
+
+      case "rule-added":
+        // Handle single rule added
+        if (message.data?.rule) {
+          setCustomRules(prev => [...prev, message.data.rule]);
+        }
+        break;
+
       default:
         // Ignore unknown message types
         break;
@@ -290,8 +348,109 @@ export const WebviewUI = () => {
     );
   }, [streamedMessages]);
 
+  // Settings context values for the new settings panel
+  const settingsValues = useMemo<SettingsValues>(() => ({
+    theme: selectedTheme,
+    language: 'en',
+    keymap: 'default',
+    nickname: username,
+    codeBuddyMode: selectedCodeBuddyMode,
+    enableStreaming: enableStreaming,
+    selectedModel: selectedModel,
+    username: username,
+    accountType: 'Free',
+    customRules: customRules,
+    customSystemPrompt: customSystemPrompt,
+    subagents: subagents,
+  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, selectedModel, customRules, customSystemPrompt, subagents]);
+
+  const settingsOptions = useMemo<SettingsOptions>(() => ({
+    themeOptions: themeOptions,
+    modelOptions: modelOptions,
+    codeBuddyModeOptions: codeBuddyMode,
+    keymapOptions: DEFAULT_KEYMAP_OPTIONS,
+    languageOptions: DEFAULT_LANGUAGE_OPTIONS,
+  }), []);
+
+  const settingsHandlers = useMemo<SettingsHandlers>(() => ({
+    onThemeChange: (value: string) => {
+      setSelectedTheme(value);
+      vsCode.postMessage({ command: "theme-change-event", message: value });
+    },
+    onLanguageChange: (_value: string) => {
+      // Coming soon - language change
+    },
+    onKeymapChange: (_value: string) => {
+      // Coming soon - keymap change
+    },
+    onNicknameChange: (value: string) => {
+      setUsername(value);
+    },
+    onCodeBuddyModeChange: (value: string) => {
+      setSelectedCodeBuddyMode(value);
+      vsCode.postMessage({ command: "codebuddy-model-change-event", message: value });
+    },
+    onStreamingChange: (enabled: boolean) => {
+      setEnableStreaming(enabled);
+    },
+    onModelChange: (value: string) => {
+      setSelectedModel(value);
+      vsCode.postMessage({ command: "update-model-event", message: value });
+    },
+    onUsernameChange: (value: string) => {
+      setUsername(value);
+    },
+    postMessage: (message: { command: string; message?: any }) => {
+      vsCode.postMessage(message);
+    },
+    // Rules & Subagents handlers
+    onAddRule: (rule) => {
+      const newRule: CustomRule = {
+        ...rule,
+        id: `rule-${Date.now()}`,
+        createdAt: Date.now(),
+      };
+      setCustomRules(prev => [...prev, newRule]);
+    },
+    onUpdateRule: (id, updates) => {
+      setCustomRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+    },
+    onDeleteRule: (id) => {
+      setCustomRules(prev => prev.filter(r => r.id !== id));
+    },
+    onToggleRule: (id, enabled) => {
+      setCustomRules(prev => prev.map(r => r.id === id ? { ...r, enabled } : r));
+    },
+    onUpdateSystemPrompt: (prompt) => {
+      setCustomSystemPrompt(prompt);
+    },
+    onToggleSubagent: (id, enabled) => {
+      setSubagents(prev => prev.map(s => s.id === id ? { ...s, enabled } : s));
+    },
+  }), []);
+
   return (
     <div style={{ overflow: "hidden", width: "100%" }}>
+      {/* Settings Toggle Button */}
+      <SettingsToggleButton
+        onClick={() => setIsSettingsOpen(true)}
+        aria-label="Open settings"
+        title="Settings"
+      >
+        <SettingsGearIcon size={18} />
+      </SettingsToggleButton>
+
+      {/* Settings Panel */}
+      <SettingsPanel
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        username={username || 'CodeBuddy User'}
+        accountType="Free"
+        settingsValues={settingsValues}
+        settingsOptions={settingsOptions}
+        settingsHandlers={settingsHandlers}
+      />
+
       <VSCodePanels className="vscodePanels" activeid={activeTab}>
         <VSCodePanelTab id="tab-1" onClick={() => setActiveTab("tab-1")}>
           CHAT

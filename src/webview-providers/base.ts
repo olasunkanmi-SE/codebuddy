@@ -31,6 +31,8 @@ import { GroqLLM } from "../llms/groq/groq";
 import { Role } from "../llms/message";
 import { MessageHandler } from "../agents/handlers/message-handler";
 import { CodeBuddyAgentService } from "../agents/services/codebuddy-agent.service";
+import { MCPService } from "../MCP/service";
+import { MCPClientState } from "../MCP/types";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -459,6 +461,534 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   theme: message.message,
                 },
               );
+              break;
+
+            case "open-codebuddy-settings":
+              // Open VS Code settings filtered to CodeBuddy settings
+              this.logger.info("Opening CodeBuddy settings...");
+              vscode.commands.executeCommand(
+                "workbench.action.openSettings",
+                "@ext:fiatinnovations.ola-code-buddy",
+              );
+              break;
+
+            // MCP Settings Commands
+            case "mcp-get-servers":
+              try {
+                this.logger.info("Fetching MCP servers data...");
+                const mcpService = MCPService.getInstance();
+                const stats = mcpService.getStat();
+                const allTools = await mcpService.getAllTools();
+
+                // Get server configurations
+                const serverConfigs = getConfigValue("mcp.servers") || {};
+
+                // Build servers data with tools
+                const servers = Object.entries(serverConfigs).map(
+                  ([id, config]: [string, any]) => {
+                    const serverTools = allTools.filter(
+                      (t) => t.serverName === id,
+                    );
+                    const client = mcpService.getClient(id);
+
+                    // Determine status
+                    let status:
+                      | "connected"
+                      | "disconnected"
+                      | "connecting"
+                      | "error" = "disconnected";
+                    if (client) {
+                      const clientState =
+                        client.getState?.() || MCPClientState.DISCONNECTED;
+                      if (clientState === MCPClientState.CONNECTED)
+                        status = "connected";
+                      else if (clientState === MCPClientState.CONNECTING)
+                        status = "connecting";
+                      else if (clientState === MCPClientState.ERROR)
+                        status = "error";
+                    }
+
+                    // Get disabled tools from config
+                    const disabledTools =
+                      getConfigValue(`mcp.disabledTools.${id}`) || [];
+
+                    return {
+                      id,
+                      name: id
+                        .replace(/-/g, " ")
+                        .replace(/\b\w/g, (c) => c.toUpperCase()),
+                      description: config.description || `MCP Server: ${id}`,
+                      status,
+                      enabled: config.enabled !== false,
+                      toolCount: serverTools.length,
+                      tools: serverTools.map((t) => ({
+                        name: t.name,
+                        description: t.description,
+                        serverName: t.serverName,
+                        enabled: !disabledTools.includes(t.name),
+                      })),
+                    };
+                  },
+                );
+
+                // If no custom config, show docker-gateway
+                if (
+                  Object.keys(serverConfigs).length === 0 &&
+                  stats.isGatewayMode
+                ) {
+                  const gatewayTools = allTools.filter(
+                    (t) => t.serverName === "docker-gateway",
+                  );
+                  const disabledTools =
+                    getConfigValue("mcp.disabledTools.docker-gateway") || [];
+                  servers.push({
+                    id: "docker-gateway",
+                    name: "Docker MCP Gateway",
+                    description: "Docker MCP Gateway (unified catalog)",
+                    status:
+                      stats.connectedServers > 0 ? "connected" : "disconnected",
+                    enabled: true,
+                    toolCount: gatewayTools.length,
+                    tools: gatewayTools.map((t) => ({
+                      name: t.name,
+                      description: t.description,
+                      serverName: t.serverName,
+                      enabled: !disabledTools.includes(t.name),
+                    })),
+                  });
+                }
+
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-servers-data",
+                  data: { servers },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to fetch MCP servers:", error);
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-servers-data",
+                  data: { servers: [], error: error.message },
+                });
+              }
+              break;
+
+            case "mcp-toggle-server":
+              try {
+                const { serverName, enabled } = message.message || {};
+                this.logger.info(
+                  `Toggling MCP server ${serverName}: ${enabled}`,
+                );
+
+                // Update the server config
+                const currentServers = getConfigValue("mcp.servers") || {};
+                if (currentServers[serverName]) {
+                  currentServers[serverName].enabled = enabled;
+                  await vscode.workspace
+                    .getConfiguration("ola-code-buddy")
+                    .update(
+                      "mcp.servers",
+                      currentServers,
+                      vscode.ConfigurationTarget.Global,
+                    );
+                }
+
+                // Notify UI of the change
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-server-updated",
+                  data: { serverName, enabled },
+                });
+
+                // Reload MCP service if needed
+                if (!enabled) {
+                  const mcpService = MCPService.getInstance();
+                  const client = mcpService.getClient(serverName);
+                  if (client) {
+                    await client.disconnect();
+                  }
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to toggle MCP server:", error);
+              }
+              break;
+
+            case "mcp-toggle-tool":
+              try {
+                const { serverName, toolName, enabled } = message.message || {};
+                this.logger.info(
+                  `Toggling MCP tool ${serverName}.${toolName}: ${enabled}`,
+                );
+
+                // Get current disabled tools for this server
+                const disabledToolsKey = `mcp.disabledTools.${serverName}`;
+                let disabledTools: string[] =
+                  getConfigValue(disabledToolsKey) || [];
+
+                if (enabled) {
+                  // Remove from disabled list
+                  disabledTools = disabledTools.filter((t) => t !== toolName);
+                } else {
+                  // Add to disabled list
+                  if (!disabledTools.includes(toolName)) {
+                    disabledTools.push(toolName);
+                  }
+                }
+
+                // Update config
+                await vscode.workspace
+                  .getConfiguration("ola-code-buddy")
+                  .update(
+                    disabledToolsKey,
+                    disabledTools,
+                    vscode.ConfigurationTarget.Global,
+                  );
+
+                // Notify UI
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-tool-updated",
+                  data: { serverName, toolName, enabled },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to toggle MCP tool:", error);
+              }
+              break;
+
+            case "mcp-refresh-tools":
+              try {
+                this.logger.info("Refreshing MCP tools...");
+                const mcpService = MCPService.getInstance();
+                await mcpService.refreshTools();
+
+                // Re-fetch and send updated data
+                const stats = mcpService.getStat();
+                const allTools = await mcpService.getAllTools();
+                const serverConfigs = getConfigValue("mcp.servers") || {};
+
+                const servers = Object.entries(serverConfigs).map(
+                  ([id, config]: [string, any]) => {
+                    const serverTools = allTools.filter(
+                      (t) => t.serverName === id,
+                    );
+                    const client = mcpService.getClient(id);
+
+                    let status:
+                      | "connected"
+                      | "disconnected"
+                      | "connecting"
+                      | "error" = "disconnected";
+                    if (client) {
+                      const clientState =
+                        client.getState?.() || MCPClientState.DISCONNECTED;
+                      if (clientState === MCPClientState.CONNECTED)
+                        status = "connected";
+                      else if (clientState === MCPClientState.CONNECTING)
+                        status = "connecting";
+                      else if (clientState === MCPClientState.ERROR)
+                        status = "error";
+                    }
+
+                    const disabledTools =
+                      getConfigValue(`mcp.disabledTools.${id}`) || [];
+
+                    return {
+                      id,
+                      name: id
+                        .replace(/-/g, " ")
+                        .replace(/\b\w/g, (c) => c.toUpperCase()),
+                      description: config.description || `MCP Server: ${id}`,
+                      status,
+                      enabled: config.enabled !== false,
+                      toolCount: serverTools.length,
+                      tools: serverTools.map((t) => ({
+                        name: t.name,
+                        description: t.description,
+                        serverName: t.serverName,
+                        enabled: !disabledTools.includes(t.name),
+                      })),
+                    };
+                  },
+                );
+
+                // Docker gateway fallback
+                if (
+                  Object.keys(serverConfigs).length === 0 &&
+                  stats.isGatewayMode
+                ) {
+                  const gatewayTools = allTools.filter(
+                    (t) => t.serverName === "docker-gateway",
+                  );
+                  const disabledTools =
+                    getConfigValue("mcp.disabledTools.docker-gateway") || [];
+                  servers.push({
+                    id: "docker-gateway",
+                    name: "Docker MCP Gateway",
+                    description: "Docker MCP Gateway (unified catalog)",
+                    status:
+                      stats.connectedServers > 0 ? "connected" : "disconnected",
+                    enabled: true,
+                    toolCount: gatewayTools.length,
+                    tools: gatewayTools.map((t) => ({
+                      name: t.name,
+                      description: t.description,
+                      serverName: t.serverName,
+                      enabled: !disabledTools.includes(t.name),
+                    })),
+                  });
+                }
+
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-servers-data",
+                  data: { servers },
+                });
+
+                vscode.window.showInformationMessage(
+                  `MCP tools refreshed: ${allTools.length} tools available`,
+                );
+              } catch (error: any) {
+                this.logger.error("Failed to refresh MCP tools:", error);
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-servers-data",
+                  data: { servers: [], error: error.message },
+                });
+              }
+              break;
+
+            case "open-mcp-settings":
+              // Open VS Code settings filtered to MCP settings
+              this.logger.info("Opening MCP settings...");
+              vscode.commands.executeCommand(
+                "workbench.action.openSettings",
+                "@ext:fiatinnovations.ola-code-buddy mcp",
+              );
+              break;
+
+            // Rules & Subagents Commands
+            case "rules-get-all":
+              try {
+                const rules = getConfigValue("rules.customRules") || [];
+                const systemPrompt =
+                  getConfigValue("rules.customSystemPrompt") || "";
+                const subagentConfig = getConfigValue("rules.subagents") || {};
+
+                // Default subagents
+                const defaultSubagents = [
+                  {
+                    id: "code-analyzer",
+                    name: "Code Analyzer",
+                    description:
+                      "Deep code analysis, security scanning, and architecture review",
+                    enabled: true,
+                    toolPatterns: [
+                      "analyze",
+                      "lint",
+                      "security",
+                      "complexity",
+                      "quality",
+                      "ast",
+                      "parse",
+                      "check",
+                      "scan",
+                      "review",
+                    ],
+                  },
+                  {
+                    id: "doc-writer",
+                    name: "Documentation Writer",
+                    description:
+                      "Generate comprehensive documentation and API references",
+                    enabled: true,
+                    toolPatterns: [
+                      "search",
+                      "read",
+                      "generate",
+                      "doc",
+                      "api",
+                      "reference",
+                      "web",
+                    ],
+                  },
+                  {
+                    id: "debugger",
+                    name: "Debugger",
+                    description:
+                      "Find and fix bugs with access to all available tools",
+                    enabled: true,
+                    toolPatterns: ["*"],
+                  },
+                  {
+                    id: "file-organizer",
+                    name: "File Organizer",
+                    description:
+                      "Restructure and organize project files and directories",
+                    enabled: true,
+                    toolPatterns: [
+                      "file",
+                      "directory",
+                      "list",
+                      "read",
+                      "write",
+                      "move",
+                      "rename",
+                      "delete",
+                      "structure",
+                      "organize",
+                    ],
+                  },
+                ];
+
+                // Merge saved config with defaults
+                const subagents = defaultSubagents.map((s) => ({
+                  ...s,
+                  enabled: subagentConfig[s.id]?.enabled ?? s.enabled,
+                }));
+
+                this.currentWebView?.webview.postMessage({
+                  command: "rules-data",
+                  data: { rules, systemPrompt, subagents },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to fetch rules:", error);
+              }
+              break;
+
+            case "rules-add":
+              try {
+                const newRule = message.message;
+                if (newRule) {
+                  const rules = getConfigValue("rules.customRules") || [];
+                  const ruleWithId = {
+                    ...newRule,
+                    id: `rule-${Date.now()}`,
+                    createdAt: Date.now(),
+                  };
+                  rules.push(ruleWithId);
+                  await vscode.workspace
+                    .getConfiguration("ola-code-buddy")
+                    .update(
+                      "rules.customRules",
+                      rules,
+                      vscode.ConfigurationTarget.Global,
+                    );
+
+                  this.logger.info(`Added custom rule: ${ruleWithId.name}`);
+                  this.currentWebView?.webview.postMessage({
+                    command: "rule-added",
+                    data: { rule: ruleWithId },
+                  });
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to add rule:", error);
+              }
+              break;
+
+            case "rules-update":
+              try {
+                const { id, updates } = message.message || {};
+                if (id) {
+                  const rules = getConfigValue("rules.customRules") || [];
+                  const index = rules.findIndex((r: any) => r.id === id);
+                  if (index !== -1) {
+                    rules[index] = { ...rules[index], ...updates };
+                    await vscode.workspace
+                      .getConfiguration("ola-code-buddy")
+                      .update(
+                        "rules.customRules",
+                        rules,
+                        vscode.ConfigurationTarget.Global,
+                      );
+
+                    this.logger.info(`Updated rule: ${id}`);
+                  }
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to update rule:", error);
+              }
+              break;
+
+            case "rules-delete":
+              try {
+                const { id } = message.message || {};
+                if (id) {
+                  const rules = getConfigValue("rules.customRules") || [];
+                  const filteredRules = rules.filter((r: any) => r.id !== id);
+                  await vscode.workspace
+                    .getConfiguration("ola-code-buddy")
+                    .update(
+                      "rules.customRules",
+                      filteredRules,
+                      vscode.ConfigurationTarget.Global,
+                    );
+
+                  this.logger.info(`Deleted rule: ${id}`);
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to delete rule:", error);
+              }
+              break;
+
+            case "rules-toggle":
+              try {
+                const { id, enabled } = message.message || {};
+                if (id !== undefined) {
+                  const rules = getConfigValue("rules.customRules") || [];
+                  const index = rules.findIndex((r: any) => r.id === id);
+                  if (index !== -1) {
+                    rules[index].enabled = enabled;
+                    await vscode.workspace
+                      .getConfiguration("ola-code-buddy")
+                      .update(
+                        "rules.customRules",
+                        rules,
+                        vscode.ConfigurationTarget.Global,
+                      );
+
+                    this.logger.info(`Toggled rule ${id}: ${enabled}`);
+                  }
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to toggle rule:", error);
+              }
+              break;
+
+            case "subagents-get-all":
+              // Handled by rules-get-all
+              break;
+
+            case "subagents-toggle":
+              try {
+                const { id, enabled } = message.message || {};
+                if (id) {
+                  const subagentConfig =
+                    getConfigValue("rules.subagents") || {};
+                  subagentConfig[id] = { ...subagentConfig[id], enabled };
+                  await vscode.workspace
+                    .getConfiguration("ola-code-buddy")
+                    .update(
+                      "rules.subagents",
+                      subagentConfig,
+                      vscode.ConfigurationTarget.Global,
+                    );
+
+                  this.logger.info(`Toggled subagent ${id}: ${enabled}`);
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to toggle subagent:", error);
+              }
+              break;
+
+            case "system-prompt-update":
+              try {
+                const { prompt } = message.message || {};
+                await vscode.workspace
+                  .getConfiguration("ola-code-buddy")
+                  .update(
+                    "rules.customSystemPrompt",
+                    prompt || "",
+                    vscode.ConfigurationTarget.Global,
+                  );
+
+                this.logger.info("Updated custom system prompt");
+              } catch (error: any) {
+                this.logger.error("Failed to update system prompt:", error);
+              }
               break;
 
             // Phase 5: Performance & Production Commands
