@@ -19,9 +19,12 @@ import { QwenWebViewProvider } from "../webview-providers/qwen";
 import { GLMWebViewProvider } from "../webview-providers/glm";
 import { QwenLLM } from "../llms/qwen/qwen";
 import { GLMLLM } from "../llms/glm/glm";
+import { WebViewProviderManager } from "../webview-providers/manager";
 import {
   createAnthropicClient,
   createOpenAIClient,
+  formatText,
+  generateUUID,
   getConfigValue,
   getLatestChatHistory,
   getXGroKBaseURL,
@@ -721,67 +724,70 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       // Send command feedback immediately at the start
       await this.sendCommandFeedback(action || this.action);
 
-      let prompt: string | undefined;
-      const response = (await this.generateResponse(
-        prompt ?? message,
-      )) as string;
-      if (!response) {
+      this.logger.info(this.action);
+      let prompt;
+      const selectedCode = this.getSelectedWindowArea();
+      if (!message && !selectedCode) {
+        vscode.window.showErrorMessage("select a piece of code.");
+        return;
+      }
+
+      if (message && selectedCode) {
+        prompt = await this.createPrompt(`${message} \n ${selectedCode}`);
+      } else {
+        message
+          ? (prompt = await this.createPrompt(message))
+          : (prompt = await this.createPrompt(selectedCode));
+      }
+
+      if (!prompt) {
         vscode.window.showErrorMessage("model not reponding, try again later");
         return;
       }
-      const formattedResponse = this.formatResponse(response);
-      if (!formattedResponse) {
-        vscode.window.showErrorMessage("model not reponding, try again later");
+
+      const providerManager = WebViewProviderManager.getInstance(this.context);
+      const provider = providerManager.getCurrentProvider();
+
+      if (!provider) {
+        vscode.window.showErrorMessage("Provider not initialized");
         return;
       }
-      switch (this.generativeAi) {
-        case generativeAiModels.GROQ:
-          await GroqWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
+
+      const requestId = generateUUID();
+      await provider.currentWebView?.webview.postMessage({
+        type: "onStreamStart",
+        payload: { requestId },
+      });
+
+      let fullResponse = "";
+      try {
+        for await (const chunk of provider.streamResponse(prompt)) {
+          fullResponse += chunk;
+          await provider.currentWebView?.webview.postMessage({
+            type: "onStreamChunk",
+            payload: { requestId, content: chunk },
           });
-          break;
-        case generativeAiModels.GEMINI:
-          await GeminiWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
-          });
-          break;
-        case generativeAiModels.DEEPSEEK:
-          await DeepseekWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
-          });
-          break;
-        case generativeAiModels.ANTHROPIC:
-        case generativeAiModels.GROK:
-          await AnthropicWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
-          });
-          break;
-        case generativeAiModels.OPENAI:
-          await OpenAIWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
-          });
-          break;
-        case generativeAiModels.QWEN:
-          await QwenWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
-          });
-          break;
-        case generativeAiModels.GLM:
-          await GLMWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
-          });
-          break;
-        default:
-          this.logger.error("Unknown generative AI", "");
-          break;
+        }
+      } catch (error: any) {
+        this.logger.error("Error during streaming", error);
+        await provider.currentWebView?.webview.postMessage({
+          type: "onStreamError",
+          payload: { requestId, error: error.message },
+        });
+        return;
       }
+
+      const formattedResponse = this.formatResponse(fullResponse);
+
+      await provider.currentWebView?.webview.postMessage({
+        type: "onStreamEnd",
+        payload: { requestId, content: formattedResponse },
+      });
+
+      await provider.currentWebView?.webview.postMessage({
+        type: "bot-response",
+        message: formattedResponse,
+      });
     } catch (error: any) {
       this.logger.error(
         "Error while passing model response to the webview",

@@ -24,7 +24,12 @@ import { ProductionSafeguards } from "../services/production-safeguards.service"
 import { LogLevel } from "../services/telemetry";
 import { UserFeedbackService } from "../services/user-feedback.service";
 import { WorkspaceService } from "../services/workspace-service";
-import { formatText, getAPIKeyAndModel, getConfigValue } from "../utils/utils";
+import {
+  formatText,
+  getAPIKeyAndModel,
+  getConfigValue,
+  generateUUID,
+} from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
 import { QuestionClassifierService } from "../services/question-classifier.service";
 import { GroqLLM } from "../llms/groq/groq";
@@ -172,6 +177,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         this.handleThemePreferences.bind(this),
       ),
     );
+  }
+
+  async *streamResponse(
+    message: LLMMessage,
+    metaData?: any,
+  ): AsyncGenerator<string, void, unknown> {
+    const response = await this.generateResponse(message, metaData);
+    if (response) {
+      yield response;
+    }
   }
 
   async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
@@ -396,36 +411,61 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
 
               const messageAndSystemInstruction =
-                  await this.enhanceMessageWithCodebaseContext(
-                    sanitizedMessage,
-                  ),
-                response = await this.generateResponse(
+                await this.enhanceMessageWithCodebaseContext(sanitizedMessage);
+
+              const requestId = generateUUID();
+
+              // Send Stream Start
+              await this.currentWebView?.webview.postMessage({
+                type: "onStreamStart",
+                payload: { requestId },
+              });
+
+              let fullResponse = "";
+              try {
+                for await (const chunk of this.streamResponse(
                   messageAndSystemInstruction,
                   message.metaData,
-                );
-              if (this.UserMessageCounter === 1) {
-                await this.publishWorkSpace();
+                )) {
+                  fullResponse += chunk;
+                  await this.currentWebView?.webview.postMessage({
+                    type: "onStreamChunk",
+                    payload: { requestId, content: chunk },
+                  });
+                }
+              } catch (error: any) {
+                this.logger.error("Error during streaming", error);
+                await this.currentWebView?.webview.postMessage({
+                  type: "onStreamError",
+                  payload: { requestId, error: error.message },
+                });
+                return; // Stop processing
               }
-              if (response) {
+
+              if (fullResponse) {
                 this.logger.info(
-                  `[DEBUG] Response from generateResponse: ${response.length} characters`,
+                  `[DEBUG] Response from streamResponse: ${fullResponse.length} characters`,
                 );
-                const formattedResponse = formatText(response);
+                const formattedResponse = formatText(fullResponse);
                 this.logger.info(
                   `[DEBUG] Formatted response: ${formattedResponse.length} characters`,
                 );
-                this.logger.info(
-                  `[DEBUG] Formatted response: ${formattedResponse}`,
-                );
-                this.logger.info(
-                  `[DEBUG] Original response ends with: "${response.slice(-100)}"`,
-                );
 
+                // Send Bot Response (Legacy/History update) - Ignored by UI if streaming is active
                 await this.sendResponse(formattedResponse, "bot");
+
+                // Send Stream End
+                await this.currentWebView?.webview.postMessage({
+                  type: "onStreamEnd",
+                  payload: { requestId, content: formattedResponse },
+                });
               } else {
                 this.logger.info(
-                  `[DEBUG] No response received from generateResponse`,
+                  `[DEBUG] No response received from streamResponse`,
                 );
+              }
+              if (this.UserMessageCounter === 1) {
+                await this.publishWorkSpace();
               }
               break;
             }

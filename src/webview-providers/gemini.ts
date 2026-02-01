@@ -83,6 +83,89 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     }
   }
 
+  async *streamResponse(
+    message: LLMMessage,
+    metaData?: any,
+  ): AsyncGenerator<string, void, unknown> {
+    let systemInstruction = "";
+    let userMessage = "";
+
+    if (typeof message === "object") {
+      systemInstruction = message.systemInstruction;
+      userMessage = message.userMessage;
+    }
+
+    this.chatHistory = Memory.has("chatHistory")
+      ? Memory.get("chatHistory")
+      : [];
+
+    try {
+      if (this.chatHistory.length) {
+        this.updateProviderChatHistory(this.chatHistory);
+      }
+
+      let context: string | undefined;
+      if (metaData?.context.length > 0) {
+        context = await this.getContext(metaData.context);
+      }
+
+      const msg = userMessage?.length ? userMessage : message;
+      const messageWithContext = `${msg} \n context: ${context ?? ""}`;
+
+      const currentMessage = Message.of({
+        role: "user",
+        parts: [{ text: messageWithContext }],
+      });
+
+      this.chatHistory = [...this.chatHistory, currentMessage];
+      Memory.set("chatHistory", this.chatHistory);
+
+      const history = await this.pruneChatHistoryWithSummary(
+        this.chatHistory,
+        6000,
+        systemInstruction,
+      );
+
+      const chat = this.model.startChat({
+        history,
+        systemInstruction: {
+          role: "System",
+          parts: [{ text: systemInstruction }],
+        },
+      });
+
+      const result = await chat.sendMessageStream(userMessage ?? message);
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        if (chunkText) {
+          yield chunkText;
+        }
+      }
+    } catch (error: any) {
+      if (
+        this.chatHistory?.length &&
+        this.chatHistory[this.chatHistory.length - 1].role === "user"
+      ) {
+        this.chatHistory.pop();
+      }
+
+      Memory.set("chatHistory", this.chatHistory);
+      this.logger.error(`[DEBUG] Error in streamResponse:`, error.stack);
+
+      if (error.status === "401") {
+        vscode.window.showErrorMessage(
+          "Invalid API key. Please update your API key",
+        );
+        this.logger.error("Invalid API key. Please update your API key", error);
+      }
+      if (error.status === "503") {
+        vscode.window.showErrorMessage("Rate limiting error, try again later");
+      }
+      this.logger.error("Error generating gemini response", error.stack);
+      throw error;
+    }
+  }
+
   async generateResponse(
     message: LLMMessage,
     metaData?: any,

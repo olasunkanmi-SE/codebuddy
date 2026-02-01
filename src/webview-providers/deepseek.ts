@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { BaseWebViewProvider } from "./base";
+import { BaseWebViewProvider, LLMMessage } from "./base";
 import { COMMON } from "../application/constant";
 import { Memory } from "../memory/base";
 import { IMessageInput, Message } from "../llms/message";
@@ -96,6 +96,70 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
       this.logger.error("Error sending response", error);
       Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, []);
       this.logger.error(error);
+    }
+  }
+
+  async *streamResponse(
+    message: LLMMessage,
+    metaData?: any,
+  ): AsyncGenerator<string, void, unknown> {
+    if (metaData) {
+      const msgStr =
+        typeof message === "object" ? message.userMessage : message;
+      const response = await this.generateResponse(msgStr, metaData);
+      if (response) {
+        yield response;
+      }
+      return;
+    }
+
+    let systemInstruction = "";
+    let userMessage = "";
+
+    if (typeof message === "object") {
+      systemInstruction = message.systemInstruction;
+      userMessage = message.userMessage;
+    }
+
+    const chatHistory = Memory.has(COMMON.DEEPSEEK_CHAT_HISTORY)
+      ? Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY)
+      : [];
+
+    const msg = userMessage?.length ? userMessage : message;
+
+    const messages = [
+      {
+        role: "system",
+        content: systemInstruction || "You are a helpful assistant.",
+      },
+      ...chatHistory.map((m: any) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      {
+        role: "user",
+        content: msg,
+      },
+    ];
+
+    try {
+      const stream = await this.client.chat.completions.create({
+        model: this.generativeAiModel,
+        messages: messages,
+        stream: true,
+        temperature: 0.1,
+        max_tokens: 5024,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          yield content;
+        }
+      }
+    } catch (error: any) {
+      this.logger.error("Error generating deepseek response", error);
+      throw error;
     }
   }
 

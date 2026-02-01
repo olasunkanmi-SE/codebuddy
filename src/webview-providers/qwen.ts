@@ -79,6 +79,98 @@ export class QwenWebViewProvider extends BaseWebViewProvider {
     }
   }
 
+  async *streamResponse(
+    message: LLMMessage,
+    metaData?: any,
+  ): AsyncGenerator<string, void, unknown> {
+    if (metaData) {
+      const msgStr =
+        typeof message === "object" ? message.userMessage : message;
+      const response = await this.generateResponse(msgStr, metaData);
+      if (response) {
+        yield response;
+      }
+      return;
+    }
+
+    try {
+      let systemInstruction = "";
+      let userMessage = "";
+
+      if (typeof message === "object") {
+        systemInstruction = message.systemInstruction;
+        userMessage = message.userMessage;
+      } else {
+        userMessage = message;
+      }
+
+      this.chatHistory = Memory.has(COMMON.QWEN_CHAT_HISTORY)
+        ? Memory.get(COMMON.QWEN_CHAT_HISTORY)
+        : [];
+
+      if (this.chatHistory?.length > 0) {
+        this.updateProviderChatHistory(this.chatHistory);
+      }
+
+      const { max_tokens, temperature, top_p, stop } = GROQ_CONFIG;
+
+      const currentMessage = Message.of({
+        role: "user",
+        content: userMessage,
+      });
+
+      this.chatHistory = [...this.chatHistory, currentMessage];
+
+      Memory.set(COMMON.QWEN_CHAT_HISTORY, this.chatHistory);
+
+      const history = await this.pruneChatHistoryWithSummary(
+        this.chatHistory,
+        6000,
+        systemInstruction,
+      );
+
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        {
+          role: "system",
+          content: systemInstruction?.length
+            ? systemInstruction
+            : "You are an helpful assistant",
+        },
+        ...history.map((h) => ({
+          role: h.role as "user" | "assistant" | "system",
+          content: h.content,
+        })),
+      ];
+
+      const chatCompletionStream = await this.model.chat.completions.create({
+        messages: messages,
+        model: this.generativeAiModel,
+        temperature,
+        top_p,
+        stream: true,
+        stop,
+        max_tokens,
+      });
+
+      for await (const chunk of chatCompletionStream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          yield content;
+        }
+      }
+    } catch (error: any) {
+      this.logger.error("Error generating Qwen stream response", error);
+      if (
+        this.chatHistory?.length &&
+        this.chatHistory[this.chatHistory.length - 1].role === "user"
+      ) {
+        this.chatHistory.pop();
+      }
+      Memory.set(COMMON.QWEN_CHAT_HISTORY, this.chatHistory);
+      throw error;
+    }
+  }
+
   async generateResponse(
     message: LLMMessage,
     metaData?: any,

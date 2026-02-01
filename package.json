@@ -40,7 +40,7 @@
     "productivity"
   ],
   "homepage": "https://github.com/olasunkanmi-SE/codebuddy#readme",
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "views": {
       "codeBuddy-view-container": [

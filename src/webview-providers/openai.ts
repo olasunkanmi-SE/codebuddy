@@ -71,6 +71,101 @@ export class OpenAIWebViewProvider extends BaseWebViewProvider {
     }
   }
 
+  async *streamResponse(
+    message: LLMMessage,
+    metaData?: any,
+  ): AsyncGenerator<string, void, unknown> {
+    let systemInstruction = "";
+    let userMessage = "";
+
+    if (typeof message === "object") {
+      systemInstruction = message.systemInstruction;
+      userMessage = message.userMessage;
+    }
+
+    this.chatHistory = Memory.has("chatHistory")
+      ? Memory.get("chatHistory")
+      : [];
+
+    try {
+      if (this.chatHistory?.length > 0) {
+        this.updateProviderChatHistory(this.chatHistory);
+      }
+      let context: string | undefined;
+      if (metaData?.context.length > 0) {
+        context = await this.getContext(metaData.context);
+      }
+      const { max_tokens } = GROQ_CONFIG;
+
+      const msg = userMessage?.length ? userMessage : message;
+
+      const messageWithContext = `${msg} \n context: ${context ?? ""}`;
+
+      const currentMessage = Message.of({
+        role: "user",
+        content: messageWithContext,
+      });
+
+      this.chatHistory = [...this.chatHistory, currentMessage];
+
+      Memory.set("chatHistory", this.chatHistory);
+
+      const history = await this.pruneChatHistoryWithSummary(
+        this.chatHistory,
+        6000,
+        systemInstruction,
+      );
+
+      // Convert history to OpenAI format
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        {
+          role: "system",
+          content: systemInstruction?.length
+            ? systemInstruction
+            : "You are an helpful assistant",
+        },
+        ...history.map((h) => ({
+          role: h.role as "user" | "assistant" | "system",
+          content: h.content,
+        })),
+      ];
+
+      const stream = await this.model.chat.completions.create({
+        messages: messages,
+        model: this.generativeAiModel,
+        max_tokens,
+        stream: true,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          yield content;
+        }
+      }
+    } catch (error: any) {
+      if (
+        this.chatHistory?.length &&
+        this.chatHistory[this.chatHistory.length - 1].role === "user"
+      ) {
+        this.chatHistory.pop();
+      }
+
+      Memory.set("chatHistory", this.chatHistory);
+      if (error.status === 401) {
+        vscode.window.showErrorMessage(
+          "Invalid API key. Please update your API key",
+        );
+        this.logger.error("Invalid API key. Please update your API key", error);
+      }
+      if (error.status === 429) {
+        vscode.window.showErrorMessage("Rate limiting error, try again later");
+      }
+      this.logger.error("Error generating OpenAI response", error.stack);
+      throw error;
+    }
+  }
+
   async generateResponse(
     message: LLMMessage,
     metaData?: any,
