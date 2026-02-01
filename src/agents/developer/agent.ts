@@ -170,15 +170,12 @@ export class DeveloperAgent {
 
   /**
    * Configures Human-in-the-loop interrupts
-   * By default, file write and edit operations require user approval
+   * Only delete operations require user approval - writes and edits proceed automatically
    */
   private getInterruptConfiguration(): InterruptConfiguration {
     const defaultInterruptOn: InterruptConfiguration = {
-      write_file: {
-        allowedDecisions: ["approve", "edit", "reject"],
-      },
-      edit_file: {
-        allowedDecisions: ["approve", "edit", "reject"],
+      delete_file: {
+        allowedDecisions: ["approve", "reject"],
       },
     };
 
@@ -215,6 +212,11 @@ export class DeveloperAgent {
       ? createDeveloperSubagents(this.model, this.tools)
       : undefined;
 
+    const interruptConfig =
+      this.config.enableHITL === false
+        ? undefined
+        : this.getInterruptConfiguration();
+
     return createDeepAgent({
       model: this.model,
       tools: this.tools,
@@ -224,7 +226,7 @@ export class DeveloperAgent {
       checkpointer: checkPointer,
       name: "DeveloperAgent",
       subagents,
-      interruptOn: {}, // FIX: Use the interrupt configuration
+      interruptOn: interruptConfig,
     });
   }
 

@@ -61,16 +61,65 @@ export class WebViewProviderManager implements vscode.Disposable {
       this.orchestrator.onClearHistory(this.handleClearHistory.bind(this)),
       this.orchestrator.onStreamStart(this.handleStreamStart.bind(this)),
       this.orchestrator.onStreamChunk(this.handleStreamChunk.bind(this)),
+      // Fallback: also consume buffered flush events so chunks still reach the UI
+      this.orchestrator.onStreamFlush(this.handleStreamFlush.bind(this)),
       this.orchestrator.onStreamEnd(this.handleStreamEnd.bind(this)),
       this.orchestrator.onStreamError(this.handleStreamError.bind(this)),
+      this.orchestrator.onStreamMetadata(this.handleStreamMetadata.bind(this)),
       // Tool activity events for real-time feedback
       this.orchestrator.onToolStart(this.handleToolStart.bind(this)),
       this.orchestrator.onToolEnd(this.handleToolEnd.bind(this)),
       this.orchestrator.onToolProgress(this.handleToolProgress.bind(this)),
       this.orchestrator.onPlanning(this.handlePlanning.bind(this)),
       this.orchestrator.onSummarizing(this.handleSummarizing.bind(this)),
+      // New detailed activity event handlers
+      this.orchestrator.onDecision(
+        this.handleActivityEvent.bind(this, StreamEventType.DECISION),
+      ),
+      this.orchestrator.onReading(
+        this.handleActivityEvent.bind(this, StreamEventType.READING),
+      ),
+      this.orchestrator.onSearching(
+        this.handleActivityEvent.bind(this, StreamEventType.SEARCHING),
+      ),
+      this.orchestrator.onReviewing(
+        this.handleActivityEvent.bind(this, StreamEventType.REVIEWING),
+      ),
+      this.orchestrator.onAnalyzing(
+        this.handleActivityEvent.bind(this, StreamEventType.ANALYZING),
+      ),
+      this.orchestrator.onExecuting(
+        this.handleActivityEvent.bind(this, StreamEventType.EXECUTING),
+      ),
+      this.orchestrator.onWorking(
+        this.handleActivityEvent.bind(this, StreamEventType.WORKING),
+      ),
     );
     this.isInitialized = true;
+  }
+
+  // Handle buffered flush events emitted by StreamManager as a safety net
+  private async handleStreamFlush(event: IEventPayload) {
+    if (!this.webviewView?.webview) return;
+
+    try {
+      const chunks: any[] = Array.isArray(event.message) ? event.message : [];
+
+      for (const chunk of chunks) {
+        await this.webviewView.webview.postMessage({
+          type: StreamEventType.CHUNK,
+          payload: {
+            requestId: chunk.id,
+            content: chunk.content,
+            accumulated: undefined,
+            metadata: chunk.metadata,
+            timestamp: chunk.metadata?.timestamp ?? Date.now(),
+          },
+        });
+      }
+    } catch (error: any) {
+      this.logger.error("Failed to handle stream flush:", error);
+    }
   }
 
   public static getInstance(
@@ -284,10 +333,11 @@ export class WebViewProviderManager implements vscode.Disposable {
   private async handleStreamStart(event: IEventPayload) {
     try {
       if (this.webviewView?.webview) {
+        const requestId = event.message?.requestId ?? event.message?.id;
         await this.webviewView.webview.postMessage({
           type: StreamEventType.START,
           payload: {
-            requestId: event.message.requestId,
+            requestId,
             threadId: event.message.threadId,
             timestamp: Date.now(),
           },
@@ -316,10 +366,11 @@ export class WebViewProviderManager implements vscode.Disposable {
 
   private async handleStreamEnd(event: IEventPayload) {
     if (this.webviewView?.webview) {
+      const requestId = event.message?.requestId ?? event.message?.id;
       await this.webviewView.webview.postMessage({
         type: StreamEventType.END,
         payload: {
-          requestId: event.message.requestId,
+          requestId,
           content: formatText(event.message.content),
           timestamp: event.message.timestamp,
         },
@@ -329,10 +380,11 @@ export class WebViewProviderManager implements vscode.Disposable {
 
   private async handleStreamError(event: IEventPayload) {
     if (this.webviewView?.webview) {
+      const requestId = event.message?.requestId ?? event.message?.id;
       await this.webviewView.webview.postMessage({
         type: StreamEventType.ERROR,
         payload: {
-          requestId: event.message?.requestId,
+          requestId,
           threadId: event.message?.threadId,
           timestamp: Date.now(),
           error: event.message?.error || event.error || "An error occurred",
@@ -341,27 +393,61 @@ export class WebViewProviderManager implements vscode.Disposable {
     }
   }
 
+  private async handleStreamMetadata(event: IEventPayload) {
+    if (this.webviewView?.webview) {
+      await this.webviewView.webview.postMessage({
+        type: StreamEventType.METADATA,
+        payload: {
+          requestId: event.message?.requestId,
+          threadId: event.message?.threadId,
+          status: event.message?.status,
+          toolName: event.message?.toolName,
+          description: event.message?.description,
+          content: event.message?.content,
+          timestamp: Date.now(),
+        },
+      });
+    }
+  }
+
   private async handleToolStart(event: IEventPayload) {
+    this.logger.debug(
+      "handleToolStart received:",
+      JSON.stringify(event, null, 2),
+    );
     if (this.webviewView?.webview) {
       try {
         const toolData =
           typeof event.message === "string"
             ? JSON.parse(event.message)
             : event.message;
+        const requestId =
+          toolData?.requestId ??
+          event.message?.requestId ??
+          event.metadata?.requestId ??
+          event.message?.id;
+        const payload = {
+          requestId,
+          toolId: toolData.id || event.metadata?.toolId,
+          toolName: toolData.toolName || event.metadata?.toolName,
+          description: toolData.description,
+          args: toolData.args,
+          status: toolData.status || "running",
+          timestamp: Date.now(),
+        };
+        this.logger.debug(
+          "Sending TOOL_START to webview:",
+          JSON.stringify(payload),
+        );
         await this.webviewView.webview.postMessage({
           type: StreamEventType.TOOL_START,
-          payload: {
-            requestId: event.message?.requestId,
-            toolId: toolData.id || event.metadata?.toolId,
-            toolName: toolData.toolName || event.metadata?.toolName,
-            description: toolData.description,
-            status: toolData.status || "running",
-            timestamp: Date.now(),
-          },
+          payload,
         });
       } catch (error: any) {
         this.logger.error("Failed to send tool start:", error);
       }
+    } else {
+      this.logger.warn("handleToolStart: webview not available");
     }
   }
 
@@ -372,10 +458,15 @@ export class WebViewProviderManager implements vscode.Disposable {
           typeof event.message === "string"
             ? JSON.parse(event.message)
             : event.message;
+        const requestId =
+          toolData?.requestId ??
+          event.message?.requestId ??
+          event.metadata?.requestId ??
+          event.message?.id;
         await this.webviewView.webview.postMessage({
           type: StreamEventType.TOOL_END,
           payload: {
-            requestId: event.message?.requestId,
+            requestId,
             toolId: toolData.id || event.metadata?.toolId,
             toolName: toolData.toolName || event.metadata?.toolName,
             status: toolData.status || "completed",
@@ -426,6 +517,28 @@ export class WebViewProviderManager implements vscode.Disposable {
         payload: {
           requestId: event.message?.requestId,
           content: event.message?.content || event.message,
+          timestamp: Date.now(),
+        },
+      });
+    }
+  }
+
+  /**
+   * Generic handler for activity events (DECISION, READING, SEARCHING, etc.)
+   * This provides a unified way to send detailed activity updates to the webview
+   */
+  private async handleActivityEvent(
+    eventType: StreamEventType,
+    event: IEventPayload,
+  ) {
+    if (this.webviewView?.webview) {
+      await this.webviewView.webview.postMessage({
+        type: eventType,
+        payload: {
+          requestId: event.message?.requestId,
+          threadId: event.message?.threadId,
+          content: event.message?.content || event.message,
+          metadata: event.message?.metadata || event.metadata,
           timestamp: Date.now(),
         },
       });

@@ -34,6 +34,7 @@ export class MessageHandler {
     this.activeRequests.set(requestId, { threadId });
 
     try {
+      // Tag stream start with requestId/threadId so the webview can associate subsequent chunks
       await this.orchestrator.publish(StreamEventType.START, {
         requestId,
         threadId,
@@ -44,8 +45,13 @@ export class MessageHandler {
       for await (const event of this.agentService.streamResponse(
         message,
         threadId,
+        undefined,
+        requestId,
       )) {
         if (!this.activeRequests.has(requestId)) break;
+
+        // DEBUG: Log all events received from stream
+        this.logger.debug(`[MESSAGE_HANDLER] Event received: ${event.type}`);
 
         // Forward event to orchestrator based on type
         switch (event.type) {
@@ -58,12 +64,21 @@ export class MessageHandler {
             });
             break;
 
+          case StreamEventType.METADATA:
+            await this.orchestrator.publish(StreamEventType.METADATA, {
+              requestId,
+              threadId,
+              ...event.metadata,
+              content: event.content,
+            });
+            break;
+
           case StreamEventType.TOOL_START:
             await this.orchestrator.publish(StreamEventType.TOOL_START, {
               requestId,
               threadId,
               ...JSON.parse(event.content),
-              metadata: event.metadata,
+              metadata: { ...event.metadata, requestId, threadId },
             });
             this.logger.debug(`Tool started: ${event.metadata?.toolName}`);
             break;
@@ -73,7 +88,7 @@ export class MessageHandler {
               requestId,
               threadId,
               ...JSON.parse(event.content),
-              metadata: event.metadata,
+              metadata: { ...event.metadata, requestId, threadId },
             });
             this.logger.debug(`Tool ended: ${event.metadata?.toolName}`);
             break;
@@ -83,12 +98,77 @@ export class MessageHandler {
               requestId,
               threadId,
               content: event.content,
-              metadata: event.metadata,
+              metadata: { ...event.metadata, requestId, threadId },
             });
             break;
 
           case StreamEventType.SUMMARIZING:
             await this.orchestrator.publish(StreamEventType.SUMMARIZING, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+
+          // New detailed activity events
+          case StreamEventType.DECISION:
+            await this.orchestrator.publish(StreamEventType.DECISION, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            this.logger.debug(`Decision: ${event.content}`);
+            break;
+
+          case StreamEventType.READING:
+            await this.orchestrator.publish(StreamEventType.READING, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+
+          case StreamEventType.SEARCHING:
+            await this.orchestrator.publish(StreamEventType.SEARCHING, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+
+          case StreamEventType.REVIEWING:
+            await this.orchestrator.publish(StreamEventType.REVIEWING, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+
+          case StreamEventType.ANALYZING:
+            await this.orchestrator.publish(StreamEventType.ANALYZING, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+
+          case StreamEventType.EXECUTING:
+            await this.orchestrator.publish(StreamEventType.EXECUTING, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+
+          case StreamEventType.WORKING:
+            await this.orchestrator.publish(StreamEventType.WORKING, {
               requestId,
               threadId,
               content: event.content,

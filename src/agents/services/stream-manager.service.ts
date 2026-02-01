@@ -47,8 +47,9 @@ export class StreamManager {
    * and schedules the first buffer flush.
    * @returns {string} The unique identifier for the newly started stream.
    */
-  async startStream(): Promise<string> {
-    this.streamId = generateUUID();
+  async startStream(preferredId?: string): Promise<string> {
+    // Use caller-supplied id to keep request correlation consistent across layers
+    this.streamId = preferredId ?? generateUUID();
     this.isStreaming = true;
     this.buffer = [];
     await this.orchestrator.publish(StreamEventType.START, {

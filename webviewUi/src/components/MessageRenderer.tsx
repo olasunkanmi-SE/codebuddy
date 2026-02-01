@@ -4,6 +4,47 @@ import SearchResultCard from "./SearchResultCard";
 import CodeAnalysisCard from "./CodeAnalysisCard";
 import ErrorCard from "./ErrorCard";
 
+/**
+ * Filters out JSON tool/command metadata that shouldn't be displayed to users
+ */
+function filterToolMetadata(text: string): string {
+  if (!text) return "";
+
+  let cleaned = text;
+
+  // Remove command/message JSON objects: {"command":"...", "message":"..."}
+  cleaned = cleaned.replace(
+    /\{"command"\s*:\s*"[^"]*"\s*,\s*"message"\s*:\s*"[^"]*"[^}]*\}/g,
+    ""
+  );
+
+  // Remove tool_call objects: {"name":"...", "args":{...}, "type":"tool_call"...}
+  cleaned = cleaned.replace(
+    /\{"name"\s*:\s*"[^"]+"\s*,\s*"args"\s*:\s*\{[^}]*\}[^}]*\}/g,
+    ""
+  );
+
+  // Remove tool_use objects
+  cleaned = cleaned.replace(
+    /\{"type"\s*:\s*"tool_use"[^}]*\}/g,
+    ""
+  );
+
+  // Remove objects with toolu_ IDs (Anthropic tool call IDs)
+  cleaned = cleaned.replace(
+    /\{[^}]*"id"\s*:\s*"toolu_[^}]+\}/g,
+    ""
+  );
+
+  // Remove partial tool-related JSON at the end
+  cleaned = cleaned.replace(/\{"(command|name|type)"\s*:\s*"[^"]*"[\s\S]*$/g, "");
+
+  // Clean up multiple newlines
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
+
+  return cleaned.trim();
+}
+
 interface Source {
   title: string;
   url?: string;
@@ -168,25 +209,33 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
   language,
   isStreaming = false,
 }) => {
+  // Filter out any tool metadata that shouldn't be displayed
+  const cleanedContent = useMemo(() => filterToolMetadata(content), [content]);
+
   const parsedContent = useMemo(() => {
     // Don't try to parse while still streaming
     if (isStreaming) return null;
-    return parseStructuredContent(content);
-  }, [content, isStreaming]);
+    return parseStructuredContent(cleanedContent);
+  }, [cleanedContent, isStreaming]);
 
   const isError = useMemo(() => {
     if (isStreaming) return false;
-    return isErrorMessage(content);
-  }, [content, isStreaming]);
+    return isErrorMessage(cleanedContent);
+  }, [cleanedContent, isStreaming]);
+
+  // Don't render empty messages after filtering
+  if (!cleanedContent && !isStreaming) {
+    return null;
+  }
 
   // While streaming, always show the standard bot message
   if (isStreaming) {
-    return <BotMessage content={content} language={language} isStreaming={true} />;
+    return <BotMessage content={cleanedContent} language={language} isStreaming={true} />;
   }
 
   // Render error messages with ErrorCard
   if (isError) {
-    return <ErrorCard message={content} />;
+    return <ErrorCard message={cleanedContent} />;
   }
 
   // Render structured content with appropriate cards
@@ -217,7 +266,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
   }
 
   // Default: render as standard bot message with markdown
-  return <BotMessage content={content} language={language} isStreaming={false} />;
+  return <BotMessage content={cleanedContent} language={language} isStreaming={false} />;
 };
 
 export default MessageRenderer;

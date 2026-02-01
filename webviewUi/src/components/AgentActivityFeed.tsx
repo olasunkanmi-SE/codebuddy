@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import styled, { keyframes } from "styled-components";
 
 export interface ActivityItem {
@@ -9,7 +9,15 @@ export interface ActivityItem {
     | "thinking"
     | "planning"
     | "summarizing"
-    | "progress";
+    | "progress"
+    // New detailed activity types
+    | "decision"
+    | "reading"
+    | "searching"
+    | "reviewing"
+    | "analyzing"
+    | "executing"
+    | "working";
   toolName?: string;
   description: string;
   status: "active" | "completed" | "failed";
@@ -31,138 +39,162 @@ const pulse = keyframes`
   50% { opacity: 0.5; }
 `;
 
-const slideIn = keyframes`
-  from {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 `;
 
 const Container = styled.div`
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 14px;
-  margin: 8px 0;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 12px 0;
 `;
 
-const Header = styled.div`
+const MainStatus = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+`;
+
+const Spinner = styled.div`
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: ${spin} 0.8s linear infinite;
+`;
+
+const DoneIcon = styled.div`
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 10px;
+`;
+
+const StatusText = styled.div`
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+`;
+
+const ToggleButton = styled.button<{ $expanded: boolean }>`
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  svg {
+    width: 12px;
+    height: 12px;
+    transform: ${(props) => (props.$expanded ? "rotate(180deg)" : "rotate(0)")};
+    transition: transform 0.15s ease;
+  }
+`;
+
+const DetailsContainer = styled.div<{ $expanded: boolean }>`
+  max-height: ${(props) => (props.$expanded ? "300px" : "0")};
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+  margin-top: ${(props) => (props.$expanded ? "10px" : "0")};
+`;
+
+const DetailsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+`;
+
+const DetailItem = styled.div<{ $status: string }>`
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  font-size: 11px;
 `;
 
-const HeaderIcon = styled.span`
+const DetailDot = styled.div<{ $active: boolean }>`
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #3b82f6;
-`;
-
-const HeaderTitle = styled.span`
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.5);
-`;
-
-const ActivityList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const ActivityItemContainer = styled.div<{ $status: string }>`
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  border-left: 2px solid
-    ${(props) =>
-      props.$status === "active"
-        ? "#3b82f6"
-        : props.$status === "completed"
-          ? "#22c55e"
-          : "#ef4444"};
-  animation: ${slideIn} 0.2s ease-out;
-`;
-
-const StatusIndicator = styled.div<{ $active: boolean }>`
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-top: 5px;
-  flex-shrink: 0;
   background: ${(props) => (props.$active ? "#3b82f6" : "#22c55e")};
-  box-shadow: ${(props) =>
-    props.$active ? "0 0 8px rgba(59, 130, 246, 0.6)" : "none"};
-  animation: ${(props) => (props.$active ? pulse : "none")} 1.5s ease-in-out
-    infinite;
+  animation: ${(props) => (props.$active ? pulse : "none")} 1s ease-in-out infinite;
 `;
 
-const ActivityContent = styled.div`
+const DetailText = styled.span`
+  color: rgba(255, 255, 255, 0.7);
   flex: 1;
-  min-width: 0;
-`;
-
-const ActivityHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-  gap: 8px;
-`;
-
-const ToolName = styled.span`
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-`;
-
-
-
-const TimeStamp = styled.span`
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 `;
 
-const Description = styled.p`
-  margin: 0;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.4;
+const DetailTime = styled.span`
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10px;
 `;
 
-const ResultSummary = styled.div`
-  margin-top: 8px;
-  padding: 8px 10px;
-  background: rgba(34, 197, 94, 0.08);
-  border-radius: 4px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+const DecisionBadge = styled.div`
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 8px;
+`;
+
+const DecisionLabel = styled.div`
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(139, 92, 246, 0.8);
+  margin-bottom: 8px;
+`;
+
+const ToolChips = styled.div`
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
 `;
 
-const Duration = styled.span`
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
-  margin-left: auto;
+const ToolChip = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+`;
+
+const ChipCount = styled.span`
+  color: rgba(139, 92, 246, 0.9);
+  font-weight: 600;
 `;
 
 const TOOL_INFO: Record<string, { displayName: string }> = {
@@ -175,6 +207,18 @@ const TOOL_INFO: Record<string, { displayName: string }> = {
   search_codebase: { displayName: "Search Codebase" },
   planning: { displayName: "Planning" },
   summarizing: { displayName: "Summarizing" },
+  decision: { displayName: "Decision" },
+  reading: { displayName: "Reading" },
+  searching: { displayName: "Searching" },
+  reviewing: { displayName: "Reviewing" },
+  analyzing: { displayName: "Analyzing" },
+  executing: { displayName: "Executing" },
+  working: { displayName: "Working" },
+  git_diff: { displayName: "Git Diff" },
+  git_log: { displayName: "Git Log" },
+  git_branch: { displayName: "Git Branch" },
+  run_command: { displayName: "Terminal" },
+  command: { displayName: "Terminal" },
   default: { displayName: "Tool" },
 };
 
@@ -182,68 +226,117 @@ export const AgentActivityFeed: React.FC<AgentActivityFeedProps> = ({
   activities,
   isActive,
 }) => {
-  const getToolInfo = (
-    toolName: string,
-  ): { displayName: string } => {
+  const [expanded, setExpanded] = useState(false);
+
+  const getToolInfo = (toolName: string): { displayName: string } => {
     return TOOL_INFO[toolName] || TOOL_INFO.default;
   };
 
   const formatTime = (timestamp: number): string => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
-    if (seconds < 5) return "just now";
-    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 5) return "now";
+    if (seconds < 60) return `${seconds}s`;
     const minutes = Math.floor(seconds / 60);
-    return `${minutes}m ago`;
-  };
-
-  const formatDuration = (ms: number): string => {
-    if (ms < 1000) return `${ms}ms`;
-    const seconds = (ms / 1000).toFixed(1);
-    return `${seconds}s`;
+    return `${minutes}m`;
   };
 
   if (activities.length === 0) {
     return null;
   }
 
+  // Get the current/latest activity for main status
+  const latestActivity = activities[activities.length - 1];
+  const latestInfo = getToolInfo(latestActivity?.toolName || latestActivity?.type);
+  
+  // Find decision activities to show prominently
+  const decisions = activities.filter((a) => a.type === "decision");
+  const latestDecision = decisions[decisions.length - 1];
+  
+  // Parse decision description into tool chips
+  // Format: "Using: Web Search (x2), File Reader (x4)"
+  const parseDecisionToChips = (description: string): { name: string; count?: number }[] => {
+    // Remove "Using: " or "Decided to use: " prefix
+    const toolsPart = description.replace(/^(Using:|Decided to use:)\s*/i, "");
+    if (!toolsPart) return [];
+    
+    return toolsPart.split(", ").map((item) => {
+      const match = item.match(/^(.+?)\s*\(x(\d+)\)$/);
+      if (match) {
+        return { name: match[1].trim(), count: parseInt(match[2], 10) };
+      }
+      return { name: item.trim() };
+    });
+  };
+
+  const decisionChips = latestDecision ? parseDecisionToChips(latestDecision.description) : [];
+  
+  // Count completed items
+  const completedCount = activities.filter((a) => a.status === "completed").length;
+
+  // Get main status text
+  const getMainStatus = () => {
+    if (!isActive && completedCount === activities.length) {
+      return `Completed ${completedCount} ${completedCount === 1 ? "action" : "actions"}`;
+    }
+    if (latestActivity) {
+      return `${latestInfo.displayName}: ${latestActivity.description}`;
+    }
+    return "Working...";
+  };
+
   return (
     <Container>
-      <Header>
-        <HeaderIcon />
-        <HeaderTitle>
-          {isActive ? "Working" : "Complete"}
-        </HeaderTitle>
-      </Header>
-      <ActivityList>
-        {activities.map((activity) => {
-          const toolInfo = getToolInfo(activity.toolName || activity.type);
-          return (
-            <ActivityItemContainer key={activity.id} $status={activity.status}>
-              <StatusIndicator $active={activity.status === "active"} />
-              <ActivityContent>
-                <ActivityHeader>
-                  <ToolName>
-                    {toolInfo.displayName}
-                  </ToolName>
-                  <TimeStamp>{formatTime(activity.timestamp)}</TimeStamp>
-                </ActivityHeader>
-                <Description>{activity.description}</Description>
-                {activity.result?.summary && activity.status === "completed" && (
-                  <ResultSummary>
-                    {activity.result.summary}
-                    {activity.result.itemCount !== undefined && (
-                      <span>({activity.result.itemCount} items)</span>
-                    )}
-                    {activity.duration && (
-                      <Duration>{formatDuration(activity.duration)}</Duration>
-                    )}
-                  </ResultSummary>
-                )}
-              </ActivityContent>
-            </ActivityItemContainer>
-          );
-        })}
-      </ActivityList>
+      <MainStatus>
+        {isActive ? (
+          <Spinner />
+        ) : (
+          <DoneIcon>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" width="10" height="10">
+              <polyline points="20,6 9,17 4,12" />
+            </svg>
+          </DoneIcon>
+        )}
+        <StatusText>{getMainStatus()}</StatusText>
+        {activities.length > 1 && (
+          <ToggleButton $expanded={expanded} onClick={() => setExpanded(!expanded)}>
+            {activities.length} {activities.length === 1 ? "step" : "steps"}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="6,9 12,15 18,9" />
+            </svg>
+          </ToggleButton>
+        )}
+      </MainStatus>
+
+      {decisionChips.length > 0 && (
+        <DecisionBadge>
+          <DecisionLabel>Tools in use</DecisionLabel>
+          <ToolChips>
+            {decisionChips.map((chip, idx) => (
+              <ToolChip key={idx}>
+                {chip.name}
+                {chip.count && chip.count > 1 && <ChipCount>x{chip.count}</ChipCount>}
+              </ToolChip>
+            ))}
+          </ToolChips>
+        </DecisionBadge>
+      )}
+
+      <DetailsContainer $expanded={expanded}>
+        <DetailsList>
+          {activities.map((activity) => {
+            const toolInfo = getToolInfo(activity.toolName || activity.type);
+            return (
+              <DetailItem key={activity.id} $status={activity.status}>
+                <DetailDot $active={activity.status === "active"} />
+                <DetailText>
+                  {toolInfo.displayName}: {activity.description}
+                </DetailText>
+                <DetailTime>{formatTime(activity.timestamp)}</DetailTime>
+              </DetailItem>
+            );
+          })}
+        </DetailsList>
+      </DetailsContainer>
     </Container>
   );
 };

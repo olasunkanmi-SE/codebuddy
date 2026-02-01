@@ -51,6 +51,8 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
     this.createEvent("onStreamError");
   onStreamFlush: vscode.Event<IEventPayload> =
     this.createEvent("onStreamFlush");
+  onStreamMetadata: vscode.Event<IEventPayload> =
+    this.createEvent("streamMetadata");
   onModelChangeSuccess: vscode.Event<IEventPayload> = this.createEvent(
     "onModelChangeSuccess",
   );
@@ -63,6 +65,15 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onPlanning: vscode.Event<IEventPayload> = this.createEvent("onPlanning");
   onSummarizing: vscode.Event<IEventPayload> =
     this.createEvent("onSummarizing");
+
+  // New detailed activity events for streaming every decision/action
+  onDecision: vscode.Event<IEventPayload> = this.createEvent("onDecision");
+  onReading: vscode.Event<IEventPayload> = this.createEvent("onReading");
+  onSearching: vscode.Event<IEventPayload> = this.createEvent("onSearching");
+  onReviewing: vscode.Event<IEventPayload> = this.createEvent("onReviewing");
+  onAnalyzing: vscode.Event<IEventPayload> = this.createEvent("onAnalyzing");
+  onExecuting: vscode.Event<IEventPayload> = this.createEvent("onExecuting");
+  onWorking: vscode.Event<IEventPayload> = this.createEvent("onWorking");
 
   /**
    * Emits a generic event with specified status, message, and optional data.

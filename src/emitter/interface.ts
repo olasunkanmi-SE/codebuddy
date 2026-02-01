@@ -37,11 +37,19 @@ type AgentEventKeys =
   | "onStreamEnd"
   | "onStreamError"
   | "onStreamFlush"
+  | "streamMetadata"
   | "onToolStart"
   | "onToolEnd"
   | "onToolProgress"
   | "onPlanning"
-  | "onSummarizing";
+  | "onSummarizing"
+  // New detailed activity events
+  | "onDecision"
+  | "onReading"
+  | "onSearching"
+  | "onAnalyzing"
+  | "onExecuting"
+  | "onWorking";
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {

@@ -91,6 +91,14 @@ export enum StreamEventType {
   SUMMARIZING = "onSummarizing",
   ERROR = "onStreamError",
   METADATA = "streamMetadata",
+  // New activity types for detailed streaming
+  DECISION = "onDecision",
+  READING = "onReading",
+  SEARCHING = "onSearching",
+  REVIEWING = "onReviewing",
+  ANALYZING = "onAnalyzing",
+  EXECUTING = "onExecuting",
+  WORKING = "onWorking",
 }
 
 export interface IToolActivity {

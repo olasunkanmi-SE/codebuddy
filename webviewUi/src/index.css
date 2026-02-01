@@ -1,39 +1,43 @@
 :root {
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
-  line-height: 1.5;
+  font-family: "Inter", "JetBrains Mono", "Geist", "SF Pro Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.6;
   font-weight: 400;
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.9);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #16161e;
+  background-color: #0f1117;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.08), transparent 35%),
+    radial-gradient(circle at 80% 0%, rgba(16, 185, 129, 0.08), transparent 30%),
+    #0f1117;
 }
 
 
 
 .container {
   width: 100%;
-  padding: 20px;
+  padding: 12px 0;
   box-sizing: border-box;
-  max-width: 1000px;
+  max-width: 1100px;
   display: flex;
   flex-direction: column;
-  border-radius: 10px;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  margin-top: 0px;
+  margin: 0 auto;
+  gap: 12px;
 }
 
 
 .dropdown-container {
-  overflow-y: scroll;
-  padding: 10px;
+  overflow-y: visible;
+  padding: 8px 4px 0;
   max-width: 100%;
   font-size: 14px;
-  margin-left: -6px;
+  margin-left: 0;
 }
 
 .currenFile {
@@ -331,11 +335,15 @@ code {
 }
 
 .doc-content {
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
-  color: var(--vscode-editor-foreground);
-  padding: 16px;
+  font-family: "Inter", "JetBrains Mono", "Geist", "SF Pro Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: rgba(240, 241, 245, 0.92);
+  padding: 6px 0 18px;
   text-align: left;
   overflow-x: auto;
+  max-width: 920px;
+  margin: 0 auto;
+  font-size: 15px;
+  line-height: 1.7;
 }
 
 /* Inline code styling (e.g., <code> within <p>) */
@@ -351,14 +359,12 @@ code {
 
 /* Code block styling (e.g., <pre><code>) */
 .doc-content pre {
-  background-color: #1A1B24;
-  /* Dark background like VS Code */
+  background-color: #1a1b24;
   padding: 16px;
-  border-radius: 6px;
+  border-radius: 10px;
   margin: 12px 0;
   overflow-x: auto;
-  /* Handle long lines */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
 .doc-content pre code {
