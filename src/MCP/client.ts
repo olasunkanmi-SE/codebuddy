@@ -65,9 +65,8 @@ export class MCPClient {
       if (isSSE) {
         try {
           // Dynamically import SSE transport from SDK
-          const { SSEClientTransport } = await import(
-            "@modelcontextprotocol/sdk/client/sse.js"
-          );
+          const { SSEClientTransport } =
+            await import("@modelcontextprotocol/sdk/client/sse.js");
           const url = new URL(configAny.url);
           this.transport = new SSEClientTransport(url);
           this.logger.info(

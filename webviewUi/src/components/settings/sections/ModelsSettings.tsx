@@ -152,8 +152,14 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({ searchQuery: _se
            setPullingModels(prev => prev.filter(m => m !== message.model));
            if (message.success) {
              setPulledModels(prev => [...prev, message.model]);
+             // Clear any previous error for this model
+             setModelErrors(prev => {
+                const next = { ...prev };
+                delete next[message.model];
+                return next;
+             });
            } else {
-             setModelErrors(prev => ({ ...prev, [message.model]: 'Failed to pull model' }));
+             setModelErrors(prev => ({ ...prev, [message.model]: message.error || 'Failed to pull model' }));
            }
            break;
         case 'docker-model-deleted':
@@ -224,8 +230,25 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({ searchQuery: _se
   };
 
   const isModelPulled = (modelValue: string) => {
-    // Check if modelValue matches any pulled model name (loose matching for tags)
-    return pulledModels.some(m => m.includes(modelValue) || modelValue.includes(m));
+    // Strip 'ai/' prefix for comparison since Docker returns model names without it
+    const normalizedModelValue = modelValue.replace(/^ai\//, '');
+    return pulledModels.some(m => {
+      const normalizedPulled = m.replace(/^ai\//, '');
+      // Check if names match (ignoring ai/ prefix and allowing partial matches)
+      return normalizedPulled === normalizedModelValue || 
+             normalizedPulled.includes(normalizedModelValue) || 
+             normalizedModelValue.includes(normalizedPulled);
+    });
+  };
+
+  // Normalize active model for comparison
+  const isModelActive = (modelValue: string) => {
+    if (!activeLocalModel) return false;
+    const normalizedModelValue = modelValue.replace(/^ai\//, '');
+    const normalizedActive = activeLocalModel.replace(/^ai\//, '');
+    return normalizedModelValue === normalizedActive ||
+           normalizedModelValue.includes(normalizedActive) ||
+           normalizedActive.includes(normalizedModelValue);
   };
 
   return (
@@ -343,7 +366,7 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({ searchQuery: _se
               {PREDEFINED_LOCAL_MODELS.map((model) => {
                   const isPulled = isModelPulled(model.value);
                   const isPulling = pullingModels.includes(model.value);
-                  const isActive = !!(activeLocalModel === model.value || (activeLocalModel && (model.value.includes(activeLocalModel) || activeLocalModel.includes(model.value))));
+                  const isActive = isModelActive(model.value);
                   const isSetting = settingModel === model.value;
                   
                   return (
@@ -390,13 +413,14 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({ searchQuery: _se
           </div>
       )}
 
+        {/* Always show Docker Model Runner models when available */}
         {dockerRunnerEnabled && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
                 {PREDEFINED_LOCAL_MODELS.map((model) => {
                     const isPulled = isModelPulled(model.value);
                     const isPulling = pullingModels.includes(model.value);
                     const isDeleting = deletingModels.includes(model.value);
-                    const isActive = !!(activeLocalModel === model.value || (activeLocalModel && (model.value.includes(activeLocalModel) || activeLocalModel.includes(model.value))));
+                    const isActive = isModelActive(model.value);
                     const isSetting = settingModel === model.value;
                     
                     return (

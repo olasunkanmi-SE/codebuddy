@@ -30,22 +30,22 @@ export const themeOptions = [
 
 export const PREDEFINED_LOCAL_MODELS = [
   {
-    value: "ai/llama3.2:3b",
+    value: "ai/llama3.2",
     label: "Llama 3.2 (3B)",
     description: "Efficient general purpose model",
   },
   {
-    value: "ai/gemma:2b",
-    label: "Gemma (2B)",
+    value: "ai/gemma3",
+    label: "Gemma 3 (4B)",
     description: "Google's lightweight open model",
   },
   {
-    value: "ai/qwen2.5:3b",
-    label: "Qwen 2.5 (3B)",
-    description: "Strong coding capabilities",
+    value: "ai/qwen2.5",
+    label: "Qwen 2.5 (7B)",
+    description: "Strong general purpose model",
   },
   {
-    value: "ai/mistral:7b",
+    value: "ai/mistral",
     label: "Mistral (7B)",
     description: "High performance general model",
   },

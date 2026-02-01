@@ -37,7 +37,7 @@ export class LocalWebViewProvider extends BaseWebViewProvider {
           this.llm.updateConfig({
             apiKey: apiKey || "not-needed",
             baseUrl: baseUrl,
-            model: model || "llama3",
+            model: model || "llama3.2",
           });
           this.logger.debug(`LocalLLM config updated: ${model}`);
         }

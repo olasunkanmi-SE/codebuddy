@@ -521,14 +521,21 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "docker-pull-model":
               try {
                 const service = DockerModelService.getInstance();
-                const success = await service.pullModel(message.message);
+                const result = await service.pullModel(message.message);
                 await this.currentWebView?.webview.postMessage({
                   type: "docker-model-pulled",
                   model: message.message,
-                  success,
+                  success: result.success,
+                  error: result.error,
                 });
               } catch (error) {
                 this.logger.error("Failed to pull Docker model", error);
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-pulled",
+                  model: message.message,
+                  success: false,
+                  error: error instanceof Error ? error.message : String(error),
+                });
               }
               break;
 
@@ -549,11 +556,33 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
             case "docker-use-model":
               try {
-                // Update local.model setting
                 const config = vscode.workspace.getConfiguration("local");
+
+                // Determine if this is a Docker Model Runner model (ai/...) or Ollama model
+                const isDockerModelRunner = message.message.startsWith("ai/");
+
+                // For Docker Model Runner, use port 12434 and strip "ai/" prefix
+                // For Ollama, use port 11434
+                const baseUrl = isDockerModelRunner
+                  ? "http://localhost:12434/engines/llama.cpp/v1"
+                  : "http://localhost:11434/v1";
+
+                // Strip "ai/" prefix for model name when using Docker Model Runner
+                const modelName = isDockerModelRunner
+                  ? message.message.replace(/^ai\//, "")
+                  : message.message;
+
+                // Update local.model setting
                 await config.update(
                   "model",
-                  message.message,
+                  modelName,
+                  vscode.ConfigurationTarget.Global,
+                );
+
+                // Update baseUrl for Docker Model Runner
+                await config.update(
+                  "baseUrl",
+                  baseUrl,
                   vscode.ConfigurationTarget.Global,
                 );
 
@@ -564,6 +593,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   "option",
                   "Local",
                   vscode.ConfigurationTarget.Global,
+                );
+
+                this.logger.info(
+                  `Local model configured: ${modelName} at ${baseUrl}`,
                 );
 
                 await this.currentWebView?.webview.postMessage({

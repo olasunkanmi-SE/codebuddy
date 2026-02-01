@@ -34,6 +34,7 @@ import {
   getConfigValue,
   setConfigValue,
 } from "./utils/utils";
+import { Terminal } from "./utils/terminal";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
 import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
@@ -192,6 +193,10 @@ function initializeWebViewProviders(
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    // Initialize Terminal with extension path early for Docker Compose support
+    const terminal = Terminal.getInstance();
+    terminal.setExtensionPath(context.extensionPath);
+
     new DeveloperAgent({});
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
     setConfigValue("generativeAi.option", "Gemini");

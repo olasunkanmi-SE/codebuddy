@@ -14,6 +14,8 @@ const ALLOWED_COMMANDS: Readonly<Set<AllowedCommand>> = new Set([
 export class Terminal {
   private readonly logger: Logger;
   private static instance: Terminal;
+  private extensionPath: string = "";
+
   constructor() {
     this.logger = Logger.initialize(Terminal.name, {
       minLevel: LogLevel.DEBUG,
@@ -28,6 +30,18 @@ export class Terminal {
       Terminal.instance = new Terminal();
     }
     return Terminal.instance;
+  }
+
+  /**
+   * Sets the extension path for locating docker-compose.yml and other resources
+   */
+  setExtensionPath(path: string): void {
+    this.extensionPath = path;
+    this.logger.info(`Terminal extension path set to: ${path}`);
+  }
+
+  getExtensionPath(): string {
+    return this.extensionPath;
   }
 
   /**
@@ -121,6 +135,24 @@ export class Terminal {
       ["compose", "up", "-d"],
       ["exec", "ollama", "ollama", "list"],
     ];
+
+    // Check for 'docker compose -f <path> up -d' pattern
+    if (
+      args.length === 5 &&
+      args[0] === "compose" &&
+      args[1] === "-f" &&
+      args[3] === "up" &&
+      args[4] === "-d"
+    ) {
+      // Validate that args[2] is a valid file path (ends with docker-compose.yml or .yaml)
+      const composePath = args[2];
+      if (
+        composePath.endsWith("docker-compose.yml") ||
+        composePath.endsWith("docker-compose.yaml")
+      ) {
+        return;
+      }
+    }
 
     const isAllowed = allowedSequences.some((expectedArgs) => {
       if (args.length !== expectedArgs.length) return false;
@@ -244,6 +276,24 @@ export class Terminal {
   }
 
   async runDockerComposeUp(): Promise<string> {
+    if (this.extensionPath) {
+      const composePath = require("path").join(
+        this.extensionPath,
+        "docker-compose.yml",
+      );
+      this.logger.info(`Running docker compose with file: ${composePath}`);
+      return this.executeCommand("docker", [
+        "compose",
+        "-f",
+        composePath,
+        "up",
+        "-d",
+      ]);
+    }
+    // Fallback to default behavior if no extension path set
+    this.logger.warn(
+      "Extension path not set, using default docker compose location",
+    );
     return this.executeCommand("docker", ["compose", "up", "-d"]);
   }
 

@@ -157,14 +157,19 @@ export class DockerModelService implements vscode.Disposable {
     return [...runnerModels, ...ollamaModels];
   }
 
-  async pullModel(modelName: string): Promise<boolean> {
+  async pullModel(
+    modelName: string,
+  ): Promise<{ success: boolean; error?: string }> {
     this.logger.info(`Pulling model: ${modelName}`);
     try {
       await this.terminal.pullDockerModel(modelName);
-      return true;
+      return { success: true };
     } catch (e) {
       this.logger.error(`Failed to pull model ${modelName}`, e);
-      return false;
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
   }
 
