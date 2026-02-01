@@ -1,13 +1,13 @@
 import { FAQItem } from "../components/accordion";
 
 export const modelOptions = [
-  { value: "Gemini", label: "Gemini" },
-  { value: "Anthropic", label: "Anthropic" },
-  { value: "Groq", label: "Groq" },
+  { value: "Gemini", label: "Google Gemini" },
+  { value: "Anthropic", label: "Anthropic Claude" },
+  { value: "Groq", label: "Groq (Llama)" },
   { value: "Deepseek", label: "Deepseek" },
   { value: "OpenAI", label: "OpenAI" },
-  { value: "Qwen", label: "Qwen" },
-  { value: "GLM", label: "GLM" },
+  { value: "Qwen", label: "Alibaba Qwen" },
+  { value: "GLM", label: "Zhipu GLM" },
 ];
 
 export const codeBuddyMode = [
@@ -32,7 +32,7 @@ export const faqItems: FAQItem[] = [
     question: "HOW DO I SET UP CODEBUDDY?",
     answer: `<p>Setting up CodeBuddy is simple:</p>
       <ol>
-          <li>Obtain API keys for one of the supported LLMs: Gemini, Anthropic, or Groq</li>
+          <li>Obtain API keys for one of the supported LLMs: Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, or Groq</li>
           <li>Open VS Code settings (File > Preferences > Settings)</li>
           <li>Search for "CodeBuddy" in the settings search bar</li>
           <li>Select your preferred AI model from the dropdown</li>
@@ -46,13 +46,11 @@ export const faqItems: FAQItem[] = [
     answer: `<p>For optimal performance with CodeBuddy, we recommend:</p>
         <ul>
             <li><strong>Gemini:</strong> Gemini-2.0-flash or higher versions provide excellent results</li>
-            <li><strong>Groq:</strong> We recommend either:
-                <ul>
-                    <li>The latest Meta Llama models available through Groq</li>
-                    <li>Any DeepSeek models provided by Groq</li>
-                </ul>
-            </li>
-            <li><strong>Anthropic:</strong> Claude models work well for complex coding tasks</li>
+            <li><strong>Deepseek:</strong> DeepSeek-V3 or R1 models are highly capable for coding tasks</li>
+            <li><strong>Anthropic:</strong> Claude 3.5 Sonnet is excellent for complex architectural reasoning</li>
+            <li><strong>OpenAI:</strong> GPT-4o offers robust general-purpose coding assistance</li>
+            <li><strong>Qwen:</strong> Qwen 2.5 Coder is a strong open-weight contender</li>
+            <li><strong>Groq:</strong> Offers ultra-fast inference with Llama models</li>
         </ul>
         <p>The best model may depend on your specific use case and coding preferences.</p>`,
   },
@@ -60,11 +58,12 @@ export const faqItems: FAQItem[] = [
     question: "HOW DO I USE THE AGENT MODE?",
     answer: `<p>To use CodeBuddy's Agent Mode:</p>
       <ol>
-          <li>First ensure you've selected "Gemini" as your model in the settings</li>
-          <li>Gemini is currently the only LLM with full agent functionality support</li>
+          <li>Ensure you've selected a model in the settings</li>
+          <li>Most supported models (Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq) support agent functionality</li>
           <li>Open the CodeBuddy sidebar in VS Code</li>
+          <li>Select "Agent" mode from the mode switcher</li>
       </ol>
-      <p>Note: Agent Mode is exclusively available with the Gemini model for now</p>`,
+      <p>Agent Mode allows CodeBuddy to use tools like file reading, writing, and web search to help you with your tasks.</p>`,
   },
   {
     question: "WHAT ARE THE CODEBUDDY AGENT CAPABILITIES?",

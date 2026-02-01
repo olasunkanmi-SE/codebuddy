@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import styled from 'styled-components';
+import { useSettings } from '../SettingsContext';
 import {
   SettingsSection,
   SectionTitle,
@@ -17,14 +18,6 @@ import {
 interface ModelsSettingsProps {
   searchQuery: string;
 }
-
-const modelOptions = [
-  { value: 'Gemini', label: 'Google Gemini' },
-  { value: 'Anthropic', label: 'Anthropic Claude' },
-  { value: 'Groq', label: 'Groq (Llama)' },
-  { value: 'Deepseek', label: 'Deepseek' },
-  { value: 'Grok', label: 'xAI Grok' },
-];
 
 const ModelCard = styled(Card)`
   display: flex;
@@ -82,13 +75,10 @@ const StatValue = styled.span`
 `;
 
 export const ModelsSettings: React.FC<ModelsSettingsProps> = ({ searchQuery: _searchQuery }) => {
-  const [selectedModel, setSelectedModel] = useState('Gemini');
-
-  const handleModelChange = (value: string) => {
-    setSelectedModel(value);
-    const vsCode = (window as any).acquireVsCodeApi?.() || { postMessage: () => {} };
-    vsCode.postMessage({ command: 'update-model-event', message: value });
-  };
+  const { values, options, handlers } = useSettings();
+  const { selectedModel } = values;
+  const { modelOptions } = options;
+  const { onModelChange } = handlers;
 
   return (
     <>
@@ -103,7 +93,7 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({ searchQuery: _se
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Select value={selectedModel} onChange={(e) => handleModelChange(e.target.value)}>
+            <Select value={selectedModel} onChange={(e) => onModelChange(e.target.value)}>
               {modelOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}

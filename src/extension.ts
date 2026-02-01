@@ -39,6 +39,9 @@ import { CodeActionsProvider } from "./webview-providers/code-actions";
 import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
+import { OpenAIWebViewProvider } from "./webview-providers/openai";
+import { QwenWebViewProvider } from "./webview-providers/qwen";
+import { GLMWebViewProvider } from "./webview-providers/glm";
 import { WebViewProviderManager } from "./webview-providers/manager";
 import { DeveloperAgent } from "./agents/developer/agent";
 import { AgentRunningGuardService } from "./services/agent-running-guard.service";
@@ -61,6 +64,12 @@ const {
   grokModel,
   deepseekApiKey,
   deepseekModel,
+  openaiApiKey,
+  openaiModel,
+  qwenApiKey,
+  qwenModel,
+  glmApiKey,
+  glmModel,
 } = APP_CONFIG;
 
 let quickFixCodeAction: vscode.Disposable;
@@ -110,6 +119,21 @@ function initializeWebViewProviders(
           key: deepseekApiKey,
           model: deepseekModel,
           webviewProviderClass: DeepseekWebViewProvider,
+        },
+        [generativeAiModels.OPENAI]: {
+          key: openaiApiKey,
+          model: openaiModel,
+          webviewProviderClass: OpenAIWebViewProvider,
+        },
+        [generativeAiModels.QWEN]: {
+          key: qwenApiKey,
+          model: qwenModel,
+          webviewProviderClass: QwenWebViewProvider,
+        },
+        [generativeAiModels.GLM]: {
+          key: glmApiKey,
+          model: glmModel,
+          webviewProviderClass: GLMWebViewProvider,
         },
       };
 
