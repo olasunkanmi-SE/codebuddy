@@ -1,260 +1,188 @@
-# CodeBuddy: AI-Powered Agentic Coding Assistant
+# CodeBuddy
+
+An AI-powered coding assistant for Visual Studio Code featuring agentic architecture, multi-model support, local model integration, and intelligent codebase understanding.
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/fiatinnovations.ola-code-buddy)](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
 [![Downloads](https://img.shields.io/visual-studio-marketplace/d/fiatinnovations.ola-code-buddy)](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
 [![Rating](https://img.shields.io/visual-studio-marketplace/r/fiatinnovations.ola-code-buddy)](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
 
-**CodeBuddy** is an advanced AI-powered VS Code extension featuring an **agentic architecture** with specialized sub-agents, tool orchestration, and multi-model support. It transforms your development workflow with intelligent code assistance, autonomous task execution, and deep codebase understanding.
+---
 
-## ✨ What's New in v3.7.x
+## Overview
 
-🤖 **Agentic Architecture** - DeepAgents-powered autonomous developer agent with specialized sub-agents  
-🧠 **LangGraph Integration** - Sophisticated multi-agent orchestration with stateful workflows  
-🔧 **Tool Orchestration** - Web search, file operations, and think tools for complex reasoning  
-📊 **Mermaid Diagram Rendering** - Visual diagram rendering with auto-fix for LLM syntax errors  
-🔍 **PR Review System** - Intelligent pull request analysis with change detection  
-📚 **Persistent Codebase Understanding** - SQLite-backed analysis caching across sessions  
-⚡ **Streaming Responses** - Real-time token streaming for responsive interactions
+CodeBuddy is a Visual Studio Code extension that integrates advanced AI capabilities directly into your development workflow. It provides intelligent code assistance through an agentic architecture that can autonomously plan, execute, and verify multi-step tasks while maintaining context awareness across your entire codebase.
+
+The extension supports nine AI providers including cloud-based models (Gemini, Anthropic Claude, OpenAI, Groq, DeepSeek, Qwen, GLM) and local models via Ollama, giving developers flexibility in choosing the right model for their privacy and performance requirements.
 
 ---
 
-## 🏗️ Architecture Overview
+## Key Features
 
-CodeBuddy employs a sophisticated **multi-agent architecture** built on modern AI orchestration patterns:
+### Agentic Architecture
 
-```mermaid
-flowchart TB
-    subgraph Extension["🧩 CodeBuddy Extension"]
-        subgraph UI["User Interface Layer"]
-            Webview["💬 Webview<br/>(React UI)"]
-            Commands["⚡ Commands<br/>(Actions)"]
-            Orchestrator["🎯 Orchestrator<br/>(Event Publisher)"]
-        end
+CodeBuddy employs a multi-agent system built on DeepAgents and LangGraph:
 
-        subgraph AgentLayer["🤖 Agent Service Layer"]
-            DeveloperAgent["🧠 Developer Agent<br/>(DeepAgents)"]
+- **Developer Agent**: Primary orchestrating agent with tool access and decision-making capabilities
+- **Specialized Sub-Agents**: Code Analyzer, Documentation Writer, Debugger, and File Organizer
+- **Tool Integration**: Web search, file operations, and structured reasoning tools
+- **Human-in-the-Loop**: Configurable approval workflows for file modifications
 
-            subgraph SubAgents["Specialized Sub-Agents"]
-                CodeAnalyzer["🔍 Code<br/>Analyzer"]
-                DocWriter["📝 Doc<br/>Writer"]
-                Debugger["🐛 Debugger"]
-                FileOrganizer["📁 File<br/>Organizer"]
-            end
-        end
+### Dual Operating Modes
 
-        subgraph Tools["🔧 Tool Provider"]
-            WebSearch["🌐 Web<br/>Search"]
-            FileTool["📄 File<br/>Tool"]
-            ThinkTool["💭 Think<br/>Tool"]
-            TavilySearch["🔎 Tavily<br/>Search"]
-        end
+- **Agent Mode**: Autonomous task execution with tool usage and multi-step planning
+- **Ask Mode**: Direct question-answering with intelligent context gathering
 
-        subgraph Backends["💾 Backend Systems"]
-            Filesystem["📂 Filesystem<br/>(/workspace/)"]
-            Store["🗄️ Store<br/>(/docs/)"]
-            State["⚡ State<br/>(/ ephemeral)"]
-        end
-    end
+### Smart Context Selection
 
-    subgraph External["☁️ External Services"]
-        Gemini["Gemini"]
-        Anthropic["Anthropic"]
-        Groq["Groq"]
-        Deepseek["Deepseek"]
-        Tavily["Tavily API"]
-    end
+- Token budget-aware context retrieval based on model limits (4K for local, 20K-50K for cloud models)
+- Automatic active file inclusion in conversation context
+- File mentions via `@filename` syntax with fuzzy search for explicit context selection
+- Relevance scoring for code snippet prioritization
 
-    Webview --> DeveloperAgent
-    Commands --> DeveloperAgent
-    Orchestrator --> DeveloperAgent
+### Project Rules
 
-    DeveloperAgent --> SubAgents
-    DeveloperAgent --> Tools
+Persistent configuration via `.codebuddy/rules.md` that travels with your repository:
 
-    Tools --> Backends
-    Tools --> External
-```
+- Define coding conventions, architectural guidelines, and project-specific instructions
+- Rules are automatically injected into all AI prompts
+- Merge file-based rules with settings-based custom prompts
+- Token budget management with configurable limits
+- Commands: Open Project Rules (Cmd+Shift+9), Initialize Project Rules, Reload Project Rules
 
-### 🤖 Agentic System
+### Local Model Support
 
-The core of CodeBuddy is built on **DeepAgents** and **LangGraph**, providing:
+Full support for locally-hosted models through Ollama:
 
-- **Developer Agent**: Main orchestrating agent with access to tools and sub-agents
-- **Specialized Sub-Agents**:
-  - **Code Analyzer**: Deep code review, architecture analysis, bug detection
-  - **Doc Writer**: Comprehensive documentation generation
-  - **Debugger**: Error investigation with web search for solutions
-  - **File Organizer**: Project structure refactoring and organization
+- Privacy-first: Code never leaves your machine
+- Offline capability
+- Pre-configured support for Qwen 2.5 Coder, Llama 3.2, DeepSeek Coder, CodeLlama
+- Docker Compose integration for containerized deployment
+- Settings UI for model management (pull, delete, configure)
 
-### 🗄️ Hybrid Storage Architecture
+### Code Intelligence
 
-CodeBuddy uses a sophisticated three-tier storage system:
+- **Review**: Security analysis, best practice evaluation, performance assessment
+- **Refactoring**: Context-aware code restructuring suggestions
+- **Optimization**: Performance improvement recommendations
+- **Documentation**: Automated comment and documentation generation
+- **Explanation**: Technical breakdowns of complex code segments
 
-| Path          | Backend    | Persistence   | Purpose                               |
-| ------------- | ---------- | ------------- | ------------------------------------- |
-| `/workspace/` | Filesystem | Permanent     | Real file operations on your codebase |
-| `/docs/`      | Store      | Cross-session | Long-term knowledge and documentation |
-| `/` (root)    | State      | Session only  | Temporary scratch space               |
+### Pull Request Review
+
+- Branch comparison with multi-provider fallback
+- Comprehensive change analysis
+- Security and performance evaluation
+- Git CLI integration for accurate diffs
+
+### Documentation Generation
+
+- README file generation
+- API endpoint documentation
+- Architecture diagram creation (Mermaid)
+- Component and module documentation
+
+### Mermaid Diagram Support
+
+- Automatic rendering within chat interface
+- Syntax auto-correction for common LLM output errors
+- Dark theme styling
+- Collapsible source code view
 
 ---
 
-## 🎯 Core Features
+## Supported AI Models
 
-### 🧠 AI-Powered Developer Agent
-
-- **Autonomous Task Execution**: Agent can plan, execute, and verify multi-step tasks
-- **Tool Usage**: Web search, file analysis, and structured thinking capabilities
-- **Sub-Agent Delegation**: Complex tasks are delegated to specialized agents
-- **Human-in-the-Loop**: Optional approval for file write/edit operations
-
-### 💬 Interactive Chat Interface
-
-- **Modern React UI**: Beautiful, responsive chat with syntax highlighting
-- **Real-time Streaming**: Token-by-token response streaming
-- **Mermaid Diagrams**: Visual diagram rendering with auto-fix for syntax errors
-- **File Upload**: Support for PDF, DOCX, CSV, JSON, TXT analysis
-- **Customizable Themes**: Multiple themes to match your preferences
-
-### 🔍 Code Intelligence
-
-- **Code Review**: Comprehensive analysis of code quality, security, and best practices
-- **Refactoring**: Context-aware code improvements and restructuring
-- **Optimization**: AI-driven performance enhancement suggestions
-- **Explanation**: Clear explanations of complex code logic
-- **Comment Generation**: Intelligent documentation for your code
-
-### 📊 Mermaid Diagram Support
-
-- **Visual Rendering**: Automatic detection and rendering of Mermaid diagrams
-- **Dark Theme**: Beautiful purple-accented dark theme matching VS Code
-- **Auto-Fix**: Intelligent repair of common LLM syntax errors:
-  - `&` symbol conversion to `and`
-  - Smart quote normalization
-  - Bracket balancing
-  - Sequence/flowchart-specific fixes
-- **Copy & Collapsible Source**: Easy access to diagram code
-
-### 🔄 Pull Request Review
-
-- **Branch Comparison**: Compare current branch against any target branch
-- **Change Detection**: Multi-provider fallback for robust change detection
-- **Comprehensive Analysis**: Security, performance, and best practice review
-- **Git CLI Integration**: Direct integration with Git for accurate diffs
-
-### 📚 Documentation Generation
-
-- **README Generation**: Auto-generates professional README files
-- **API Documentation**: Extracts and documents REST endpoints
-- **Architecture Diagrams**: Creates Mermaid diagrams for system visualization
-- **Component Documentation**: Documents classes, interfaces, and modules
-
-### 🌐 Web Search Integration
-
-- **Tavily Search**: High-quality search results for current information
-- **URL Reranking**: Prioritizes authoritative sources
-- **Content Extraction**: Readability-based article parsing
-- **Solution Discovery**: Find fixes for errors and best practices
+| Provider  | Models                                     | Characteristics                |
+| --------- | ------------------------------------------ | ------------------------------ |
+| Gemini    | gemini-2.5-pro, gemini-1.5-flash           | General purpose, embeddings    |
+| Anthropic | claude-sonnet-4-5, claude-3-opus           | Complex reasoning, code review |
+| OpenAI    | gpt-4o, gpt-4-turbo                        | Robust general purpose         |
+| Groq      | llama-3.1-70b-versatile, llama-3.3-70b     | Fast inference                 |
+| DeepSeek  | deepseek-chat (V3), deepseek-reasoner (R1) | Cost-effective, strong coding  |
+| Qwen      | qwen-max, qwen3-coder-plus                 | Multilingual, code-focused     |
+| GLM       | glm-4, glm-4-plus                          | Chinese language support       |
+| Local     | qwen2.5-coder, llama3.2, deepseek-coder    | Privacy, offline capability    |
 
 ---
 
-## 🚀 Quick Start
+## Installation
 
-### Installation
-
-1. Open VS Code
-2. Go to Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+1. Open Visual Studio Code
+2. Navigate to Extensions (Ctrl+Shift+X / Cmd+Shift+X)
 3. Search for "CodeBuddy"
-4. Click Install
+4. Select Install
 
-### Setup
-
-1. **Select AI Model**: Choose your preferred AI provider in settings
-2. **Add API Key**: Configure your API key for the chosen model
-3. **Start Coding**: CodeBuddy is ready to assist!
-
-### Getting Your API Keys
-
-| Provider  | Get API Key                                                                 |
-| --------- | --------------------------------------------------------------------------- |
-| Gemini    | [Google AI Studio](https://aistudio.google.com/app/apikey)                  |
-| Anthropic | [Anthropic Console](https://docs.anthropic.com/en/docs/about-claude/models) |
-| Groq      | [Groq Console](https://console.groq.com/keys)                               |
-| Deepseek  | [Deepseek Platform](https://platform.deepseek.com/api_keys)                 |
-| XGrok     | [X.AI Console](https://console.x.ai/)                                       |
-| Tavily    | [Tavily Dashboard](https://app.tavily.com/home) (for web search)            |
+Alternatively, install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy).
 
 ---
 
-## 📋 How to Use
+## Configuration
 
-### Right-Click Context Menu
+### Model Selection
 
-Right-click on selected code to access:
-
-| Feature             | Description                    |
-| ------------------- | ------------------------------ |
-| 💭 Add Comments     | Intelligent code documentation |
-| 🔍 Review Code      | Comprehensive code analysis    |
-| 🔄 Refactor Code    | Smart code improvements        |
-| ⚡ Optimize Code    | Performance enhancements       |
-| 💬 Explain Code     | Clear explanations             |
-| 📝 Generate Commit  | Smart Git commit messages      |
-| 💫 Inline Chat      | Context-aware discussions      |
-| 📚 Interview Me     | Technical interview prep       |
-| 📊 Generate Diagram | Mermaid diagram creation       |
-| 🏗️ Analyze Codebase | Deep architectural analysis    |
-| 🔍 Review PR        | Pull request review            |
-
-### ⌨️ Keyboard Shortcuts
-
-| Command                       | Windows/Linux  | macOS         |
-| ----------------------------- | -------------- | ------------- |
-| Add Comment                   | `Ctrl+Shift+J` | `Cmd+Shift+J` |
-| Review Code                   | `Ctrl+Shift+R` | `Cmd+Shift+R` |
-| Refactor Code                 | `Ctrl+Shift+;` | `Cmd+Shift+;` |
-| Optimize Code                 | `Ctrl+Shift+O` | `Cmd+Shift+O` |
-| Explain Code                  | `Ctrl+Shift+1` | `Cmd+Shift+1` |
-| Generate Commit               | `Ctrl+Shift+2` | `Cmd+Shift+2` |
-| Inline Chat                   | `Ctrl+Shift+8` | `Cmd+Shift+8` |
-| Generate Architecture Diagram | `Ctrl+Shift+8` | `Cmd+Shift+8` |
-| Analyze Codebase              | `Ctrl+Shift+6` | `Cmd+Shift+6` |
-
-> **Note:** Customize shortcuts in VS Code's Keyboard Shortcuts settings (`Cmd+K Cmd+S` / `Ctrl+K Ctrl+S`)
-
-### Command Palette
-
-Access via `Ctrl+Shift+P` / `Cmd+Shift+P`:
-
-- `CodeBuddy: Generate Documentation`
-- `CodeBuddy: Show Cache Status`
-- `CodeBuddy: Clear Cache`
-- `CodeBuddy: Refresh Analysis`
-- `CodeBuddy: Restart`
-
----
-
-## 🔧 Configuration
-
-### AI Model Selection
+Configure your preferred AI provider in VS Code settings:
 
 ```json
 {
-  "generativeAi.option": "Gemini" // or "Groq", "Anthropic", "XGrok", "Deepseek"
+  "generativeAi.option": "Gemini"
 }
 ```
 
+Available options: `Gemini`, `Anthropic`, `OpenAI`, `Groq`, `Deepseek`, `Qwen`, `GLM`, `Local`
+
 ### API Keys
+
+Each provider requires its respective API key:
+
+| Provider  | Setting Key           | Documentation                                                |
+| --------- | --------------------- | ------------------------------------------------------------ |
+| Gemini    | google.gemini.apiKeys | [Google AI Studio](https://aistudio.google.com/app/apikey)   |
+| Anthropic | anthropic.apiKey      | [Anthropic Console](https://console.anthropic.com/)          |
+| OpenAI    | openai.apiKey         | [OpenAI Platform](https://platform.openai.com/api-keys)      |
+| Groq      | groq.llama3.apiKey    | [Groq Console](https://console.groq.com/keys)                |
+| DeepSeek  | deepseek.apiKey       | [DeepSeek Platform](https://platform.deepseek.com/api_keys)  |
+| Qwen      | qwen.apiKey           | [DashScope Console](https://dashscope.console.aliyun.com/)   |
+| GLM       | glm.apiKey            | [Zhipu AI Platform](https://open.bigmodel.cn/)               |
+| Tavily    | tavily.apiKey         | [Tavily Dashboard](https://app.tavily.com/home) (web search) |
+
+### Local Model Configuration
+
+For Ollama-based local models:
 
 ```json
 {
-  "google.gemini.apiKeys": "your-gemini-api-key",
-  "google.gemini.model": "gemini-2.5-pro",
-  "anthropic.apiKey": "your-anthropic-api-key",
-  "anthropic.model": "claude-sonnet-4-5",
-  "groq.llama3.apiKey": "your-groq-api-key",
-  "groq.llama3.model": "llama-3.1-70b-versatile",
-  "deepseek.apiKey": "your-deepseek-api-key",
-  "tavily.apiKey": "your-tavily-api-key"
+  "generativeAi.option": "Local",
+  "local.model": "qwen2.5-coder",
+  "local.baseUrl": "http://localhost:11434/v1"
+}
+```
+
+Alternatively, use the Settings UI in the CodeBuddy sidebar to manage local models through Docker Compose.
+
+### Project Rules
+
+Create `.codebuddy/rules.md` in your workspace root or use the command "CodeBuddy: Initialize Project Rules":
+
+```markdown
+# Project Rules
+
+## Code Style
+
+- Use functional components with hooks
+- Prefer const over let
+
+## Architecture
+
+- All API calls through src/services/
+- State management via Zustand
+```
+
+Rules settings:
+
+```json
+{
+  "codebuddy.rules.enabled": true,
+  "codebuddy.rules.maxTokens": 2000
 }
 ```
 
@@ -270,185 +198,218 @@ Access via `Ctrl+Shift+P` / `Cmd+Shift+P`:
 
 ---
 
-## 📁 Project Structure
+## Usage
+
+### Commands
+
+Access via Command Palette (Ctrl+Shift+P / Cmd+Shift+P):
+
+| Command                             | Description                       |
+| ----------------------------------- | --------------------------------- |
+| CodeBuddy: Open Project Rules       | Open or create project rules file |
+| CodeBuddy: Initialize Project Rules | Create rules file with template   |
+| CodeBuddy: Reload Project Rules     | Force reload rules from file      |
+| CodeBuddy: Generate Documentation   | Generate project documentation    |
+| CodeBuddy: Analyze Codebase         | Deep architectural analysis       |
+| CodeBuddy: Review Pull Request      | Comprehensive PR review           |
+| CodeBuddy: Show Cache Status        | Display codebase analysis cache   |
+| CodeBuddy: Clear Cache              | Clear analysis cache              |
+
+### Context Menu
+
+Right-click on selected code:
+
+| Action             | Description                     |
+| ------------------ | ------------------------------- |
+| Add Comment        | Generate documentation comments |
+| Review Code        | Comprehensive code analysis     |
+| Refactor Code      | Restructuring suggestions       |
+| Optimize Code      | Performance improvements        |
+| Explain Code       | Technical explanation           |
+| Generate Commit    | Git commit message generation   |
+| Inline Chat        | Context-aware conversation      |
+| Generate Diagram   | Mermaid diagram creation        |
+| Open Project Rules | Open rules file                 |
+
+### Keyboard Shortcuts
+
+| Action             | Windows/Linux | macOS       |
+| ------------------ | ------------- | ----------- |
+| Add Comment        | Ctrl+Shift+J  | Cmd+Shift+J |
+| Review Code        | Ctrl+Shift+R  | Cmd+Shift+R |
+| Refactor Code      | Ctrl+Shift+;  | Cmd+Shift+; |
+| Optimize Code      | Ctrl+Shift+0  | Cmd+Shift+0 |
+| Explain Code       | Ctrl+Shift+1  | Cmd+Shift+1 |
+| Generate Commit    | Ctrl+Shift+2  | Cmd+Shift+2 |
+| Inline Chat        | Ctrl+Shift+8  | Cmd+Shift+8 |
+| Analyze Codebase   | Ctrl+Shift+6  | Cmd+Shift+6 |
+| Open Project Rules | Ctrl+Shift+9  | Cmd+Shift+9 |
+
+### Chat Interface
+
+- Type messages directly in the chat panel
+- Use `@filename` to include specific files as context (supports fuzzy search)
+- Toggle between Agent and Ask modes
+- Active file is automatically included in context
+- Active workspace display shows current file path
+
+---
+
+## Architecture
 
 ```
 codebuddy/
 ├── src/
-│   ├── extension.ts              # Extension entry point
-│   ├── orchestrator.ts           # Event orchestration system
+│   ├── extension.ts                 # Extension entry point
+│   ├── orchestrator.ts              # Event orchestration
 │   ├── agents/
-│   │   ├── agentService.ts       # Main agent service
 │   │   ├── developer/
-│   │   │   ├── agent.ts          # Developer agent (DeepAgents)
-│   │   │   ├── prompts.ts        # System prompts
-│   │   │   └── subagents.ts      # Specialized sub-agents
-│   │   ├── backends/
-│   │   │   └── filesystem.ts     # VS Code filesystem backend
+│   │   │   ├── agent.ts             # Developer agent (DeepAgents)
+│   │   │   ├── prompts.ts           # System prompts
+│   │   │   └── subagents.ts         # Specialized sub-agents
 │   │   ├── langgraph/
-│   │   │   ├── tools/            # LangGraph tool implementations
-│   │   │   ├── nodes/            # Graph nodes (planner, responder, etc.)
-│   │   │   └── state/            # State management
+│   │   │   └── tools/               # LangGraph tool implementations
 │   │   └── tools/
-│   │       └── provider.ts       # Tool factory and provider
-│   ├── commands/                 # VS Code command implementations
-│   │   ├── pr/                   # PR review system
-│   │   └── *.ts                  # Individual commands
+│   │       └── provider.ts          # Tool factory
 │   ├── services/
+│   │   ├── project-rules.service.ts # Project rules management
+│   │   ├── smart-context-selector.service.ts
 │   │   ├── codebase-understanding.service.ts
-│   │   ├── documentation-generator.service.ts
-│   │   ├── context-retriever.ts
-│   │   ├── web-search-service.ts
-│   │   ├── embedding.ts
-│   │   └── *.ts
-│   ├── tools/
-│   │   └── tools.ts              # Tool definitions (Web, File, Think)
-│   ├── llms/                     # AI provider integrations
-│   ├── infrastructure/           # Logging, database, etc.
-│   └── webview-providers/        # Webview provider management
-├── webviewUi/                    # React chat interface
+│   │   ├── enhanced-prompt-builder.service.ts
+│   │   ├── docker/
+│   │   │   └── DockerModelService.ts # Local model management
+│   │   └── ...
+│   ├── llms/                        # AI provider integrations
+│   │   ├── gemini/
+│   │   ├── anthropic/
+│   │   ├── groq/
+│   │   ├── local/                   # Ollama integration
+│   │   └── ...
+│   └── webview-providers/           # UI communication
+├── webviewUi/                       # React chat interface
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── MermaidDiagram.tsx
-│   │   │   ├── thinkingComponent.tsx
-│   │   │   └── *.tsx
-│   │   └── App.tsx
-│   └── package.json
-└── package.json                  # Extension manifest
+│   │   │   ├── FileMention.tsx      # @ mention with fuzzy search
+│   │   │   └── ...
+│   │   └── constants/
+│   │       └── constant.ts          # FAQ, model configs
+└── package.json
 ```
 
----
+### Storage Architecture
 
-## 🔌 Supported AI Models
-
-| Provider      | Models                           | Best For                       |
-| ------------- | -------------------------------- | ------------------------------ |
-| **Gemini**    | gemini-2.5-pro, gemini-1.5-flash | General purpose, embeddings    |
-| **Anthropic** | claude-sonnet-4-5, claude-3-opus | Complex reasoning, code review |
-| **Groq**      | llama-3.1-70b-versatile          | Fast responses                 |
-| **Deepseek**  | deepseek-chat                    | Cost-effective coding          |
-| **XGrok**     | grok-beta                        | Latest capabilities            |
+| Path        | Backend    | Persistence   | Purpose                     |
+| ----------- | ---------- | ------------- | --------------------------- |
+| /workspace/ | Filesystem | Permanent     | Real file operations        |
+| /docs/      | Store      | Cross-session | Knowledge and documentation |
+| / (root)    | State      | Session only  | Temporary workspace         |
+| .codebuddy/ | Local      | Permanent     | Chat history, rules, logs   |
 
 ---
 
-## 🚀 Roadmap
+## Local Development
 
-### ✅ Completed
+### Prerequisites
 
-- [x] Multi-model AI support (5 providers)
-- [x] Agentic architecture with DeepAgents
-- [x] LangGraph integration for orchestration
-- [x] Specialized sub-agents (Code Analyzer, Doc Writer, Debugger, File Organizer)
-- [x] Web search with Tavily integration
-- [x] Mermaid diagram rendering with auto-fix
-- [x] PR review system
-- [x] Persistent codebase analysis (SQLite)
-- [x] Real-time streaming responses
-- [x] Keyboard shortcuts
+- Node.js 18+
+- VS Code 1.78.0+
+- npm or yarn
 
-### 🔜 Coming Soon
-
-- [ ] **MCP Integration** - Model Context Protocol for enhanced tool usage
-- [ ] **Agent-to-Agent Communication** - A2A protocol support
-- [ ] **Local LLM Support** - Ollama integration for offline usage
-- [ ] **Multi-language Support** - Extended language support
-- [ ] **Team Collaboration** - Shared contexts across teams
-- [ ] **Custom Agents** - User-defined specialized agents
-
----
-
-## 🛠️ Troubleshooting
-
-### Common Issues
-
-**❓ Agent not responding**
-
-- Verify API key is correct in settings
-- Check API quota/billing status
-- Try a different AI model
-
-**❓ Mermaid diagrams not rendering**
-
-- Diagrams auto-fix common syntax errors
-- Check console for specific parse errors
-- Try "Show Source Code" to see raw diagram
-
-**❓ PR Review not working**
-
-- Ensure you're in a Git repository
-- Check that you have multiple branches
-- Verify Git CLI is accessible
-
-**❓ Slow responses**
-
-- Try Groq for faster responses
-- Check internet connection
-- Clear cache with `CodeBuddy: Clear Cache`
-
-### Getting Help
-
-- 📖 [Documentation](docs/)
-- 🐛 [Report Issues](https://github.com/olasunkanmi-SE/codebuddy/issues)
-- 📧 Contact: oyinolasunkanmi@gmail.com
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Development Setup
+### Setup
 
 ```bash
-# Clone the repository
 git clone https://github.com/olasunkanmi-SE/codebuddy.git
+cd codebuddy
 
-# Install dependencies
 npm install
-cd webviewUi && npm install
+cd webviewUi && npm install && cd ..
 
-# Build
 npm run compile
-cd webviewUi && npm run build
+cd webviewUi && npm run build && cd ..
+```
 
-# Run in development
-# Press F5 in VS Code to launch extension development host
+### Development
+
+1. Open the project in VS Code
+2. Press F5 to launch Extension Development Host
+3. For webview development: `npm run dev:webview`
+
+### Build
+
+```bash
+npm run build
 ```
 
 ---
 
-## 📊 Technical Specs
+## Troubleshooting
 
-- **Bundle Size**: ~9MB (Extension) + ~800KB (UI)
-- **VS Code Version**: 1.78.0+
-- **AI Models**: 5 providers supported
-- **Database**: SQLite for metadata, LanceDB for vectors
-- **Agent Framework**: DeepAgents + LangGraph
-- **UI Framework**: React + styled-components
+### Agent Not Responding
+
+- Verify API key configuration
+- Check provider quota and billing status
+- Test with an alternative model
+
+### Local Model Connection Issues
+
+- Confirm Ollama is running: `ollama serve`
+- Verify base URL: `http://localhost:11434/v1`
+- Check model is pulled: `ollama list`
+- Use Settings UI to start Docker Compose server
+
+### Context Too Large (413 Error)
+
+- Smart context selection automatically manages token budgets
+- Reduce explicit file mentions if needed
+- Consider using a model with larger context window
+- Local models use 4K token budget by default
+
+### Project Rules Not Loading
+
+- Verify file exists at `.codebuddy/rules.md`
+- Check `codebuddy.rules.enabled` is true
+- Use "CodeBuddy: Reload Project Rules" command
 
 ---
 
-## 📄 License
+## Technical Specifications
 
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-## 🌟 Support the Project
-
-If CodeBuddy enhances your workflow:
-
-- ⭐ Star the repository
-- 📝 Leave a review on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
-- 📝 Leave a review on the [open-vsx.org Marketplace](https://open-vsx.org/extension/fiatinnovations/ola-code-buddy)
-- 🐛 Report bugs or suggest features
-- 🤝 Contribute to the codebase
-- 💬 Share with fellow developers
+| Specification   | Value                     |
+| --------------- | ------------------------- |
+| VS Code Version | 1.78.0+                   |
+| AI Providers    | 9 (8 cloud + 1 local)     |
+| Agent Framework | DeepAgents + LangGraph    |
+| UI Framework    | React                     |
+| Database        | SQLite (metadata)         |
+| Token Budgets   | Local: 4K, Cloud: 20K-50K |
 
 ---
 
-**Made with ❤️ by [Olasunkanmi Raymond](https://olasunkanmi.app)**
+## Contributing
 
-_Transform your coding experience with AI-powered agentic assistance. Install CodeBuddy today and code smarter, not harder!_
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-[![Install Now](https://img.shields.io/badge/Install%20Now-VS%20Code%20Marketplace-blue?style=for-the-badge&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+## Links
+
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
+- [Open VSX Registry](https://open-vsx.org/extension/fiatinnovations/ola-code-buddy)
+- [GitHub Repository](https://github.com/olasunkanmi-SE/codebuddy)
+- [Issue Tracker](https://github.com/olasunkanmi-SE/codebuddy/issues)
+
+---
+
+## Author
+
+Oyinlola Olasunkanmi Raymond
+
+- [GitHub](https://github.com/olasunkanmi-SE)
+- [LinkedIn](https://www.linkedin.com/in/oyinlola-olasunkanmi-raymond-71b6b8aa/)
+- Email: oyinolasunkanmi@gmail.com
