@@ -35,6 +35,7 @@ import type {
   BackendProtocol,
   BackendFactory,
   FileInfo,
+  FileData,
   GrepMatch,
   WriteResult,
   EditResult,
@@ -241,6 +242,24 @@ class VscodeFsBackend implements BackendProtocol {
         e,
       );
       return `Error: An unexpected error occurred while reading the file.`;
+    }
+  }
+
+  async readRaw(filePath: string): Promise<FileData> {
+    const abs = this.resolveAgentPath(filePath);
+    try {
+      const content = await fsp.readFile(abs, "utf-8");
+      const stat = await fsp.stat(abs);
+      return {
+        content: content.split("\n"),
+        created_at: stat.birthtime.toISOString(),
+        modified_at: stat.mtime.toISOString(),
+      };
+    } catch (e: any) {
+      if (e.code === "ENOENT") {
+        throw new Error(`File '${filePath}' not found`);
+      }
+      throw e;
     }
   }
 

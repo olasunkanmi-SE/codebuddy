@@ -6,10 +6,9 @@ import {
 } from "@langchain/langgraph";
 import { createAdvancedDeveloperAgent } from "../developer/agent";
 import { ICodeBuddyAgentConfig } from "../interface/agent.interface";
-import { ReactAgent } from "langchain";
 
 interface IAgentFactory {
-  createAgent(): Promise<ReactAgent<any, any, AnnotationRoot<any>, any>>;
+  createAgent(): Promise<any>;
 }
 
 export interface AgentFactoryConfig {
@@ -17,7 +16,7 @@ export interface AgentFactoryConfig {
 }
 
 export class AgentFactory implements IAgentFactory {
-  private agent: ReactAgent<any, any, AnnotationRoot<any>, any> | null = null;
+  private agent: any = null;
   private readonly config: AgentFactoryConfig;
 
   private readonly checkpointer = new MemorySaver();
@@ -27,9 +26,7 @@ export class AgentFactory implements IAgentFactory {
     this.config = { enableHITL: false, ...config };
   }
 
-  public async createAgent(
-    config?: ICodeBuddyAgentConfig,
-  ): Promise<ReactAgent<any, any, AnnotationRoot<any>, any>> {
+  public async createAgent(config?: ICodeBuddyAgentConfig): Promise<any> {
     if (!this.agent) {
       this.agent = await createAdvancedDeveloperAgent({
         checkPointer: config?.checkPointer ?? this.checkpointer,
