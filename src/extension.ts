@@ -28,6 +28,7 @@ import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
 import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
+import { ProjectRulesService } from "./services/project-rules.service";
 import { SqliteDatabaseService } from "./services/sqlite-database.service";
 import {
   getAPIKeyAndModel,
@@ -206,6 +207,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const databaseService: SqliteDatabaseService =
       SqliteDatabaseService.getInstance();
     databaseService.initialize();
+
+    // Initialize Project Rules Service
+    const projectRulesService = ProjectRulesService.getInstance();
+    projectRulesService.initialize();
+    context.subscriptions.push(projectRulesService);
 
     const mainLogger = new Logger("activate");
     mainLogger.info("CodeBuddy extension is now active!");
@@ -491,6 +497,15 @@ export async function activate(context: vscode.ExtensionContext) {
             }
           }
         }
+      },
+      "CodeBuddy.rules.open": async () => {
+        await projectRulesService.openRulesFile();
+      },
+      "CodeBuddy.rules.init": async () => {
+        await projectRulesService.createRulesFile();
+      },
+      "CodeBuddy.rules.reload": async () => {
+        await projectRulesService.reloadRules();
       },
     };
 

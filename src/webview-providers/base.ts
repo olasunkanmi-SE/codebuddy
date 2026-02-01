@@ -40,6 +40,7 @@ import { MCPService } from "../MCP/service";
 import { MCPClientState } from "../MCP/types";
 import { LocalModelService } from "../llms/local/service";
 import { DockerModelService } from "../services/docker/DockerModelService";
+import { ProjectRulesService } from "../services/project-rules.service";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -1156,6 +1157,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   getConfigValue("rules.customSystemPrompt") || "";
                 const subagentConfig = getConfigValue("rules.subagents") || {};
 
+                // Get project rules status
+                const projectRulesService = ProjectRulesService.getInstance();
+                const projectRulesStatus = projectRulesService.getStatus();
+
                 // Default subagents
                 const defaultSubagents = [
                   {
@@ -1230,7 +1235,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
                 this.currentWebView?.webview.postMessage({
                   command: "rules-data",
-                  data: { rules, systemPrompt, subagents },
+                  data: { rules, systemPrompt, subagents, projectRulesStatus },
                 });
               } catch (error: any) {
                 this.logger.error("Failed to fetch rules:", error);
@@ -1359,6 +1364,52 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
               } catch (error: any) {
                 this.logger.error("Failed to toggle subagent:", error);
+              }
+              break;
+
+            case "project-rules-open":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                await projectRulesService.openRulesFile();
+              } catch (error: any) {
+                this.logger.error("Failed to open project rules:", error);
+              }
+              break;
+
+            case "project-rules-create":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                await projectRulesService.createRulesFile();
+              } catch (error: any) {
+                this.logger.error("Failed to create project rules:", error);
+              }
+              break;
+
+            case "project-rules-reload":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                await projectRulesService.reloadRules();
+                // Send updated status to webview
+                const status = projectRulesService.getStatus();
+                this.currentWebView?.webview.postMessage({
+                  command: "project-rules-status",
+                  data: status,
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to reload project rules:", error);
+              }
+              break;
+
+            case "project-rules-get-status":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                const status = projectRulesService.getStatus();
+                this.currentWebView?.webview.postMessage({
+                  command: "project-rules-status",
+                  data: status,
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to get project rules status:", error);
               }
               break;
 
