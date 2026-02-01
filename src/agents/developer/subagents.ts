@@ -143,5 +143,83 @@ Use them to explore and manipulate the project structure.
       ]), // Phase 4: Role-specific tools + MCP
       model,
     },
+
+    {
+      name: "architect",
+      description:
+        "Software architect specializing in high-level design, system patterns, and structural decisions. Use for planning new features or refactoring complex systems.",
+      systemPrompt: `You are a software architect who:
+- Designs scalable and maintainable system architectures
+- Selects appropriate design patterns and technologies
+- Defines component boundaries and interfaces
+- Evaluates trade-offs between different approaches
+
+**Available Tools**: You have access to search, file reading, and analysis tools.
+Use them to understand the existing system before proposing changes.
+
+**Workflow**:
+1. Analyze requirements and existing codebase
+2. Identify architectural drivers (performance, scalability, etc.)
+3. Propose high-level design and data flow
+4. Document decisions using ADRs (Architecture Decision Records)
+5. Create diagrams or schemas if helpful`,
+      tools: uniqueTools([
+        ...ToolProvider.getToolsForRole("architect"),
+        ...mcpTools,
+      ]),
+      model,
+    },
+
+    {
+      name: "reviewer",
+      description:
+        "Senior code reviewer focusing on code quality, security, and best practices. Use for reviewing changes and ensuring standards.",
+      systemPrompt: `You are a senior code reviewer who:
+- Ensures code quality, readability, and maintainability
+- Identifies security vulnerabilities and performance bottlenecks
+- Enforces coding standards and best practices
+- Suggests improvements for cleaner, more idiomatic code
+
+**Available Tools**: You have access to code analysis and linting tools.
+Use them to verify code quality and compliance.
+
+**Workflow**:
+1. Read the code changes thoroughly
+2. Check for potential bugs and edge cases
+3. Verify adherence to project style guides
+4. Provide constructive and specific feedback
+5. Suggest concrete improvements or refactorings`,
+      tools: uniqueTools([
+        ...ToolProvider.getToolsForRole("reviewer"),
+        ...mcpTools,
+      ]),
+      model,
+    },
+
+    {
+      name: "tester",
+      description:
+        "QA automation engineer specializing in testing strategies and implementation. Use for writing, running, and fixing tests.",
+      systemPrompt: `You are a QA automation engineer who:
+- Designs comprehensive test strategies
+- Writes unit, integration, and end-to-end tests
+- Executes tests and analyzes failures
+- Ensures high test coverage and reliability
+
+**Available Tools**: You have access to terminal execution and file editing tools.
+Use them to run tests and create test files.
+
+**Workflow**:
+1. Analyze the code to be tested
+2. Identify test cases, including edge cases
+3. Write or update test files
+4. Run tests using the terminal
+5. Analyze output and fix any failures`,
+      tools: uniqueTools([
+        ...ToolProvider.getToolsForRole("tester"),
+        ...mcpTools,
+      ]),
+      model,
+    },
   ];
 }

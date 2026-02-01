@@ -20,6 +20,11 @@ const TOOL_DESCRIPTIONS: Record<
     description: "Running command...",
     activityType: "executing",
   },
+  run_terminal_command: {
+    name: "Terminal",
+    description: "Executing terminal command...",
+    activityType: "executing",
+  },
   command: {
     name: "Terminal",
     description: "Running command...",

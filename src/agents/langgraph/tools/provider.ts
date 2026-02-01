@@ -2,10 +2,11 @@ import { StructuredTool, Tool } from "@langchain/core/tools";
 import { Logger, LogLevel } from "../../../infrastructure/logger/logger";
 import { MCPService } from "../../../MCP/service";
 import { MCPTool } from "../../../MCP/types";
-import { FileTool, ThinkTool, TravilySearchTool } from "../../../tools/tools";
+import { FileTool, TerminalTool, ThinkTool, TravilySearchTool } from "../../../tools/tools";
 import { ContextRetriever } from "./../../../services/context-retriever";
 import { LangChainFileTool } from "./file";
 import { LangChainMCPTool } from "./mcp";
+import { LangChainTerminalTool } from "./terminal";
 import { LangChainThinkTool } from "./think";
 import { LangChainTravilySearchTool } from "./travily";
 
@@ -49,6 +50,12 @@ class ThinkToolFactory implements IToolFactory {
   }
 }
 
+class TerminalToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainTerminalTool(new TerminalTool());
+  }
+}
+
 class MCPToolFactory implements IToolFactory {
   constructor(
     private readonly mcpService: MCPService,
@@ -78,6 +85,9 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "review",
     "travily",
     "search",
+    "terminal",
+    "run",
+    "command",
   ],
   "doc-writer": [
     "search",
@@ -102,6 +112,42 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "structure",
     "organize",
     "search",
+    "terminal",
+    "run",
+    "command",
+  ],
+  architect: [
+    "search",
+    "read",
+    "structure",
+    "analyze",
+    "web",
+    "travily",
+    "list",
+    "directory",
+    "think",
+  ],
+  reviewer: [
+    "analyze",
+    "lint",
+    "review",
+    "check",
+    "read",
+    "search",
+    "git",
+    "scan",
+    "complexity",
+    "quality",
+  ],
+  tester: [
+    "terminal",
+    "run",
+    "command",
+    "test",
+    "write",
+    "read",
+    "file",
+    "search",
   ],
 };
 
@@ -122,6 +168,7 @@ export class ToolProvider {
       // new FileToolFactory(this.contextRetriever),
       new WebToolFactory(this.contextRetriever),
       // new ThinkToolFactory(),
+      new TerminalToolFactory(),
     ];
     this.tools = this.toolFactories.map(
       (factory): StructuredTool<any> => factory.createTool(),
