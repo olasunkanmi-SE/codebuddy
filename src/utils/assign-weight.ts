@@ -22,8 +22,8 @@ export type WeightedKeyword = [string, number];
  */
 export function assignWeights(
   keywords: string[],
-  maxWeight: number = 10,
-  minWeight: number = 1,
+  maxWeight = 10,
+  minWeight = 1,
 ): WeightedKeyword[] {
   if (keywords.length === 0) {
     return [];
@@ -51,8 +51,8 @@ export function assignWeights(
  */
 export function assignIntegerWeights(
   keywords: string[],
-  maxWeight: number = 10,
-  minWeight: number = 1,
+  maxWeight = 10,
+  minWeight = 1,
 ): WeightedKeyword[] {
   if (keywords.length === 0) {
     return [];
@@ -80,8 +80,8 @@ export function assignIntegerWeights(
  */
 export function assignLogarithmicWeights(
   keywords: string[],
-  maxWeight: number = 10,
-  minWeight: number = 1,
+  maxWeight = 10,
+  minWeight = 1,
 ): WeightedKeyword[] {
   if (keywords.length === 0) {
     return [];
@@ -109,9 +109,9 @@ export function assignLogarithmicWeights(
  */
 export function assignExponentialWeights(
   keywords: string[],
-  maxWeight: number = 10,
-  minWeight: number = 1,
-  decay: number = 0.8, // Decay factor (0-1, lower = faster decay)
+  maxWeight = 10,
+  minWeight = 1,
+  decay = 0.8, // Decay factor (0-1, lower = faster decay)
 ): WeightedKeyword[] {
   if (keywords.length === 0) {
     return [];
@@ -182,8 +182,8 @@ export function assignTieredWeights(
 export function assignWeightsWithMap(
   keywords: string[],
   importanceMap: Record<string, number>,
-  defaultMaxWeight: number = 10,
-  defaultMinWeight: number = 1,
+  defaultMaxWeight = 10,
+  defaultMinWeight = 1,
 ): WeightedKeyword[] {
   const unmappedKeywords: string[] = [];
   const mappedResults: WeightedKeyword[] = [];
@@ -257,7 +257,7 @@ export function toWeightObject(
  */
 export function normalizeWeights(
   weightedKeywords: WeightedKeyword[],
-  targetSum: number = 100,
+  targetSum = 100,
 ): WeightedKeyword[] {
   const currentSum = weightedKeywords.reduce(
     (sum, [, weight]) => sum + weight,

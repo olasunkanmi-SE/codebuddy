@@ -1,6 +1,7 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 // import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatGroq } from "@langchain/groq";
+import { ChatOpenAI } from "@langchain/openai";
 import { BaseStore } from "@langchain/langgraph";
 import { rgPath } from "@vscode/ripgrep";
 import { spawnSync } from "child_process";
@@ -29,7 +30,7 @@ import { createDeveloperSubagents } from "./subagents";
 
 export class DeveloperAgent {
   private config: ICodeBuddyAgentConfig;
-  private model: ChatAnthropic | ChatGroq | undefined;
+  private model: ChatAnthropic | ChatGroq | ChatOpenAI | undefined;
   private tools: StructuredTool[];
   private readonly logger: Logger;
   private readonly disposables: vscode.Disposable[] = [];
@@ -61,12 +62,14 @@ export class DeveloperAgent {
       const msg = JSON.parse(event.message);
       const model = msg.modelName;
       this.getAIConfigFromWebProvider(model);
-    } catch (error) {}
+    } catch (error) {
+      // Ignore model change errors
+    }
   }
 
   private getAIConfigFromWebProvider(model: string) {
     const apiKeyAndModel = getAPIKeyAndModel(model.toLowerCase());
-    let currentModel: ChatAnthropic | ChatGroq | undefined;
+    let currentModel: ChatAnthropic | ChatGroq | ChatOpenAI | undefined;
     switch (model.toLowerCase()) {
       case "anthropic":
         currentModel = new ChatAnthropic({
@@ -86,6 +89,16 @@ export class DeveloperAgent {
         currentModel = new ChatAnthropic({
           apiKey: apiKeyAndModel.apiKey,
           model: apiKeyAndModel.model!,
+        });
+        break;
+      case "local":
+        // Use ChatOpenAI with Ollama's OpenAI-compatible endpoint
+        currentModel = new ChatOpenAI({
+          apiKey: apiKeyAndModel.apiKey || "not-needed",
+          model: apiKeyAndModel.model || "qwen2.5-coder",
+          configuration: {
+            baseURL: apiKeyAndModel.baseUrl || "http://localhost:11434/v1",
+          },
         });
         break;
       default:
@@ -197,7 +210,7 @@ export class DeveloperAgent {
       throw new Error("Error creating DeveloperAgent: No model found");
     }
 
-    this.model = cachedModel as ChatAnthropic | ChatGroq;
+    this.model = cachedModel as ChatAnthropic | ChatGroq | ChatOpenAI;
     const { store, enableSubAgents = true, checkPointer } = this.config;
 
     // Ensure MCP tools are loaded before creating the agent

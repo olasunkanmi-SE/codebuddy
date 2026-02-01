@@ -14,6 +14,7 @@ import { GroqWebViewProvider } from "./groq";
 import { OpenAIWebViewProvider } from "./openai";
 import { QwenWebViewProvider } from "./qwen";
 import { GLMWebViewProvider } from "./glm";
+import { LocalWebViewProvider } from "./local";
 
 export class WebViewProviderManager implements vscode.Disposable {
   private static instance: WebViewProviderManager;
@@ -154,6 +155,7 @@ export class WebViewProviderManager implements vscode.Disposable {
     this.providerRegistry.set(generativeAiModels.OPENAI, OpenAIWebViewProvider);
     this.providerRegistry.set(generativeAiModels.QWEN, QwenWebViewProvider);
     this.providerRegistry.set(generativeAiModels.GLM, GLMWebViewProvider);
+    this.providerRegistry.set(generativeAiModels.LOCAL, LocalWebViewProvider);
   }
 
   registerWebViewProvider(): vscode.Disposable | undefined {

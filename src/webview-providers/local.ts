@@ -1,17 +1,16 @@
-import { GenerativeModel } from "@google/generative-ai";
+import OpenAI from "openai";
 import * as vscode from "vscode";
-import { GeminiLLM } from "../llms/gemini/gemini";
+import { COMMON, GROQ_CONFIG } from "../application/constant";
+import { LocalLLM } from "../llms/local/local";
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
+import { getAPIKeyAndModel } from "../utils/utils";
 import { BaseWebViewProvider, LLMMessage } from "./base";
-import { CodebuddyAgentService } from "../agents/agentService";
-import { MessageHandler } from "../agents/handlers/message-handler";
 
-export class GeminiWebViewProvider extends BaseWebViewProvider {
+export class LocalWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
-  readonly model: GenerativeModel;
-  readonly metaData?: Record<string, any>;
-  private readonly gemini: GeminiLLM;
+  readonly llm: LocalLLM;
+  private localDisposables: vscode.Disposable[] = [];
 
   constructor(
     extensionUri: vscode.Uri,
@@ -20,37 +19,59 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     context: vscode.ExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
-    this.gemini = GeminiLLM.getInstance({
+    // Retrieve full config including baseURL
+    const { baseUrl } = getAPIKeyAndModel("Local");
+    this.llm = LocalLLM.getInstance({
       apiKey: this.apiKey,
+      baseUrl: baseUrl,
       model: this.generativeAiModel,
-      tools: [{ googleSearch: {} }],
     });
-    this.model = this.gemini.getModel();
+    this.registerConfigListener();
+  }
+
+  private registerConfigListener() {
+    this.localDisposables.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("local")) {
+          const { apiKey, model, baseUrl } = getAPIKeyAndModel("Local");
+          this.llm.updateConfig({
+            apiKey: apiKey || "not-needed",
+            baseUrl: baseUrl,
+            model: model || "llama3.2",
+          });
+          this.logger.debug(`LocalLLM config updated: ${model}`);
+        }
+      }),
+    );
+  }
+
+  public dispose() {
+    this.localDisposables.forEach((d) => d.dispose());
+    super.dispose();
   }
 
   /**
-   * Override to update Gemini-specific chatHistory array
+   * Override to update Local-specific chatHistory array
    */
-  updateProviderChatHistory(history: any[]) {
+  updateProviderChatHistory(history: any[]): void {
     try {
-      // Convert to Gemini's IMessageInput format
       this.chatHistory = history.map((msg: any) =>
         Message.of({
-          role: msg.role === "user" ? "user" : "model",
-          parts: [{ text: msg.content }],
+          role: msg.role === "user" ? "user" : "assistant",
+          content: msg.content,
         }),
       );
 
       this.logger.debug(
-        `Updated Gemini chatHistory array with ${this.chatHistory.length} messages`,
+        `Updated Local chatHistory array with ${this.chatHistory.length} messages`,
       );
     } catch (error: any) {
-      this.logger.warn("Failed to update Gemini chat history array:", error);
+      this.logger.warn("Failed to update Local chat history array:", error);
       this.chatHistory = []; // Reset to empty on error
     }
   }
 
-  async sendResponse(
+  public async sendResponse(
     response: string,
     currentChat: string,
   ): Promise<boolean | undefined> {
@@ -59,15 +80,15 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       if (currentChat === "bot") {
         this.chatHistory.push(
           Message.of({
-            role: "model",
-            parts: [{ text: response }],
+            role: "assistant",
+            content: response,
           }),
         );
       } else {
         this.chatHistory.push(
           Message.of({
             role: "user",
-            parts: [{ text: response }],
+            content: response,
           }),
         );
       }
@@ -76,10 +97,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         message: response,
       });
     } catch (error: any) {
-      this.logger.error(
-        "Error sending sending Gemini response to webview ",
-        error,
-      );
+      this.logger.error(error);
     }
   }
 
@@ -100,10 +118,9 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       : [];
 
     try {
-      if (this.chatHistory.length) {
+      if (this.chatHistory?.length > 0) {
         this.updateProviderChatHistory(this.chatHistory);
       }
-
       let context: string | undefined;
       if (metaData?.context.length > 0) {
         context = await this.getContext(metaData.context);
@@ -114,7 +131,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
 
       const currentMessage = Message.of({
         role: "user",
-        parts: [{ text: messageWithContext }],
+        content: messageWithContext,
       });
 
       this.chatHistory = [...this.chatHistory, currentMessage];
@@ -126,20 +143,16 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         systemInstruction,
       );
 
-      const chat = this.model.startChat({
-        history,
-        systemInstruction: {
-          role: "System",
-          parts: [{ text: systemInstruction }],
-        },
-      });
+      const messages: Message[] = history.map((h) =>
+        Message.of({
+          role: h.role,
+          content: h.content,
+        }),
+      );
 
-      const result = await chat.sendMessageStream(userMessage ?? message);
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        if (chunkText) {
-          yield chunkText;
-        }
+      const stream = this.llm.stream(messages, systemInstruction);
+      for await (const chunk of stream) {
+        yield chunk;
       }
     } catch (error: any) {
       if (
@@ -150,18 +163,16 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       }
 
       Memory.set("chatHistory", this.chatHistory);
-      this.logger.error(`[DEBUG] Error in streamResponse:`, error.stack);
-
-      if (error.status === "401") {
+      if (error.status === 401) {
         vscode.window.showErrorMessage(
           "Invalid API key. Please update your API key",
         );
         this.logger.error("Invalid API key. Please update your API key", error);
       }
-      if (error.status === "503") {
+      if (error.status === 429) {
         vscode.window.showErrorMessage("Rate limiting error, try again later");
       }
-      this.logger.error("Error generating gemini response", error.stack);
+      this.logger.error("Error generating Local response", error.stack);
       throw error;
     }
   }
@@ -183,26 +194,22 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       : [];
 
     try {
-      if (this.chatHistory.length) {
+      if (this.chatHistory?.length > 0) {
         this.updateProviderChatHistory(this.chatHistory);
       }
-
       let context: string | undefined;
       if (metaData?.context.length > 0) {
         context = await this.getContext(metaData.context);
       }
+      const { max_tokens } = GROQ_CONFIG;
 
       const msg = userMessage?.length ? userMessage : message;
 
-      const messageWithContext = `${msg} \n context: ${context}`;
+      const messageWithContext = `${msg} \n context: ${context ?? ""}`;
 
       const currentMessage = Message.of({
         role: "user",
-        parts: [
-          {
-            text: messageWithContext,
-          },
-        ],
+        content: messageWithContext,
       });
 
       this.chatHistory = [...this.chatHistory, currentMessage];
@@ -215,31 +222,20 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         systemInstruction,
       );
 
-      const chat = this.model.startChat({
-        history,
-        systemInstruction: {
-          role: "System",
-          parts: [
-            {
-              text: systemInstruction,
-            },
-          ],
-        },
-      });
-
-      this.logger.info(`[DEBUG] Sending message to Gemini...`);
-      const result = await chat.sendMessage(userMessage ?? message);
-      const response = result.response;
-      const responseText = response.text();
-
-      this.logger.info(
-        `[DEBUG] Received response length: ${responseText?.length || 0} characters`,
-      );
-      this.logger.info(
-        `[DEBUG] Response ends with: "${responseText || "empty"}"`,
+      // Use the LLM instance to chat
+      // We need to convert history to the format expected by LLM.chat (Message[])
+      // Since history is already IMessageInput[], and Message implements it, it should be fine.
+      // But let's ensure types match.
+      const messages: Message[] = history.map((h) =>
+        Message.of({
+          role: h.role,
+          content: h.content,
+        }),
       );
 
-      return responseText;
+      const response = await this.llm.chat(messages, systemInstruction);
+
+      return response;
     } catch (error: any) {
       if (
         this.chatHistory?.length &&
@@ -249,24 +245,26 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       }
 
       Memory.set("chatHistory", this.chatHistory);
-      this.logger.error(`[DEBUG] Error in generateResponse:`, error.stack);
-
-      if (error.status === "401") {
+      if (error.status === 401) {
         vscode.window.showErrorMessage(
           "Invalid API key. Please update your API key",
         );
         this.logger.error("Invalid API key. Please update your API key", error);
       }
-      if (error.status === "503") {
+      if (error.status === 429) {
         vscode.window.showErrorMessage("Rate limiting error, try again later");
       }
-      this.logger.error("Error generating anthropic response", error.stack);
+      this.logger.error("Error generating Local response", error.stack);
       throw error;
     }
   }
 
+  generateContent(userInput: string) {
+    return userInput;
+  }
+
   async getTokenCounts(input: string): Promise<number> {
-    const geminiResult = await this.model.countTokens(input);
-    return geminiResult.totalTokens;
+    // Estimate
+    return Math.ceil(input.length / 4);
   }
 }

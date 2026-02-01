@@ -3,8 +3,11 @@ import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { GroqLLM } from "../llms/groq/groq";
 import { getAPIKeyAndModel } from "../utils/utils";
 import { AnalyzeCodeProvider } from "../ast/commands/analyze-code-provider";
-import { truncateForLLM } from "../ast/smart-truncate";
 import { QUESTION_TYPE_INSTRUCTIONS } from "../application/constant";
+import {
+  SmartContextSelectorService,
+  ContextSelectionResult,
+} from "./smart-context-selector.service";
 
 export interface QuestionAnalysis {
   isCodebaseRelated: boolean;
@@ -18,6 +21,12 @@ export interface PromptContext {
   fallbackContext?: string;
   activeFile?: string;
   questionAnalysis: QuestionAnalysis;
+  /** User-selected file paths from @ mentions */
+  userSelectedFiles?: string[];
+  /** Contents of user-selected files (pre-loaded) */
+  userSelectedFileContents?: Map<string, string>;
+  /** Model name for token budget calculation */
+  modelName?: string;
 }
 
 export interface QuestionTypeClassification {
@@ -40,6 +49,7 @@ export class EnhancedPromptBuilderService {
   private readonly groqLLM: GroqLLM | null;
   private readonly _context: vscode.ExtensionContext;
   private readonly codeAnalyzerProvider: AnalyzeCodeProvider;
+  private readonly smartContextSelector: SmartContextSelectorService;
 
   constructor(context: vscode.ExtensionContext) {
     this.logger = Logger.initialize("EnhancedPromptBuilderService", {
@@ -56,27 +66,66 @@ export class EnhancedPromptBuilderService {
     this.groqLLM = GroqLLM.getInstance(config);
     this._context = context;
     this.codeAnalyzerProvider = AnalyzeCodeProvider.getInstance(this._context);
+    this.smartContextSelector = SmartContextSelectorService.getInstance();
   }
 
   async createEnhancedPrompt(
     message: string,
     context: PromptContext,
   ): Promise<string> {
-    const searchTerm = await this.generateSearchTerms(message);
-    if (searchTerm?.length) {
-      context.questionAnalysis.technicalKeywords = searchTerm;
+    // Get search terms for relevance scoring (skip if user provided explicit files)
+    const hasUserSelectedFiles =
+      context.userSelectedFileContents &&
+      context.userSelectedFileContents.size > 0;
+    let searchTerms: string[] = [];
+
+    // Only generate search terms if we don't have user-provided context or for relevance scoring
+    if (!hasUserSelectedFiles) {
+      const generatedTerms = await this.generateSearchTerms(message);
+      if (generatedTerms?.length) {
+        searchTerms = generatedTerms;
+        context.questionAnalysis.technicalKeywords = searchTerms;
+      }
+    } else {
+      // Extract keywords from message for relevance scoring of auto-gathered code
+      searchTerms = this.extractSimpleKeywords(message);
+      context.questionAnalysis.technicalKeywords = searchTerms;
     }
 
-    const code = await this.codeAnalyzerProvider.analyse(searchTerm ?? []);
-    let truncatedCode: string | undefined;
-
-    if (code) {
-      truncatedCode = truncateForLLM(code, 100000);
+    // Get auto-gathered code only if no user-selected files OR we need supplementary context
+    let autoGatheredCode: string | undefined;
+    if (!hasUserSelectedFiles && searchTerms.length > 0) {
+      // Limit search terms to top 5 to avoid over-fetching
+      const limitedTerms = searchTerms.slice(0, 5);
+      autoGatheredCode = await this.codeAnalyzerProvider.analyse(limitedTerms);
     }
+
+    // Use smart context selector to pick the best context within token budget
+    const modelName = context.modelName || "default";
+    const userFiles =
+      context.userSelectedFileContents || new Map<string, string>();
+
+    const contextResult = this.smartContextSelector.selectContext(
+      userFiles,
+      autoGatheredCode,
+      searchTerms,
+      modelName,
+    );
+
+    // Format the selected context for the prompt
+    const formattedContext =
+      this.smartContextSelector.formatForPrompt(contextResult);
+
+    this.logger.info(
+      `Smart context selection: ${contextResult.totalTokens}/${contextResult.budgetTokens} tokens, ` +
+        `${contextResult.snippets.length} snippets, ${contextResult.droppedCount} dropped`,
+    );
+
     const questionType = await this.classifyQuestionType(message);
     const specificInstructions =
       this.generateQuestionSpecificInstructions(questionType);
     const responseFormat = this.generateResponseFormatGuidelines(questionType);
+
     const enhancedPrompt = `
       persona: |
         You are CodeBuddy, an expert software engineer and architect with deep knowledge of the provided codebase context. Your goal is to provide comprehensive, accurate, and actionable responses.
@@ -86,8 +135,9 @@ export class EnhancedPromptBuilderService {
 
       context:
         question_type: ${this.categorizeQuestionTypeForDisplay(questionType)}
+        token_budget_info: ${contextResult.totalTokens}/${contextResult.budgetTokens} tokens used${contextResult.wasTruncated ? ` (${contextResult.droppedCount} snippets omitted)` : ""}
         codebase_snippets: |
-          ${truncatedCode || "No relevant code found."}
+          ${formattedContext}
 
       rules:
         - Base your response *only* on the provided context. Do not invent APIs or file structures.
@@ -109,8 +159,105 @@ export class EnhancedPromptBuilderService {
       Begin response:
       `.trim();
 
-    this.logger.debug(`Enhanced prompt created.`);
+    this.logger.debug(`Enhanced prompt created with smart context selection.`);
     return enhancedPrompt;
+  }
+
+  /**
+   * Extracts simple keywords from a message without LLM call
+   * Used when user provides explicit file context
+   */
+  private extractSimpleKeywords(message: string): string[] {
+    // Remove common words and extract potential code-related terms
+    const stopWords = new Set([
+      "the",
+      "a",
+      "an",
+      "is",
+      "are",
+      "was",
+      "were",
+      "be",
+      "been",
+      "being",
+      "have",
+      "has",
+      "had",
+      "do",
+      "does",
+      "did",
+      "will",
+      "would",
+      "could",
+      "should",
+      "may",
+      "might",
+      "can",
+      "this",
+      "that",
+      "these",
+      "those",
+      "what",
+      "how",
+      "why",
+      "when",
+      "where",
+      "which",
+      "who",
+      "whom",
+      "i",
+      "you",
+      "he",
+      "she",
+      "it",
+      "we",
+      "they",
+      "me",
+      "him",
+      "her",
+      "us",
+      "them",
+      "my",
+      "your",
+      "his",
+      "its",
+      "our",
+      "their",
+      "and",
+      "or",
+      "but",
+      "if",
+      "then",
+      "else",
+      "for",
+      "of",
+      "to",
+      "in",
+      "on",
+      "at",
+      "by",
+      "with",
+      "from",
+      "about",
+      "into",
+      "through",
+      "please",
+      "explain",
+      "tell",
+      "show",
+      "help",
+      "need",
+      "want",
+    ]);
+
+    const words = message
+      .toLowerCase()
+      .replace(/[^a-z0-9_\s]/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length > 2 && !stopWords.has(word));
+
+    // Deduplicate and return top 10
+    return [...new Set(words)].slice(0, 10);
   }
 
   async generateSearchTerms(

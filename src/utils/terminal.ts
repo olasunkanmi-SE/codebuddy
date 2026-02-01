@@ -14,6 +14,8 @@ const ALLOWED_COMMANDS: Readonly<Set<AllowedCommand>> = new Set([
 export class Terminal {
   private readonly logger: Logger;
   private static instance: Terminal;
+  private extensionPath: string = "";
+
   constructor() {
     this.logger = Logger.initialize(Terminal.name, {
       minLevel: LogLevel.DEBUG,
@@ -28,6 +30,18 @@ export class Terminal {
       Terminal.instance = new Terminal();
     }
     return Terminal.instance;
+  }
+
+  /**
+   * Sets the extension path for locating docker-compose.yml and other resources
+   */
+  setExtensionPath(path: string): void {
+    this.extensionPath = path;
+    this.logger.info(`Terminal extension path set to: ${path}`);
+  }
+
+  getExtensionPath(): string {
+    return this.extensionPath;
   }
 
   /**
@@ -114,21 +128,171 @@ export class Terminal {
       ["mcp", "server", "ls", "--json"],
       ["mcp", "gateway", "run"],
       ["mcp", "--help"],
+      ["model", "ls"],
+      ["model", "ls", "--json"],
+      ["model", "--help"],
+      ["ps", "--filter", "name=ollama", "--format", "json"],
+      ["compose", "up", "-d"],
+      ["exec", "ollama", "ollama", "list"],
     ];
+
+    // Check for 'docker compose -f <path> up -d' pattern
+    if (
+      args.length === 5 &&
+      args[0] === "compose" &&
+      args[1] === "-f" &&
+      args[3] === "up" &&
+      args[4] === "-d"
+    ) {
+      // Validate that args[2] is a valid file path (ends with docker-compose.yml or .yaml)
+      const composePath = args[2];
+      if (
+        composePath.endsWith("docker-compose.yml") ||
+        composePath.endsWith("docker-compose.yaml")
+      ) {
+        return;
+      }
+    }
 
     const isAllowed = allowedSequences.some((expectedArgs) => {
       if (args.length !== expectedArgs.length) return false;
       return args.every((arg, index) => arg === expectedArgs[index]);
     });
-    if (!isAllowed) {
-      const errorMessage = `Security Alert: Disallowed 'docker' arguments provided: ${args.join(" ")}. Only 'docker mcp server ls' and 'docker mcp gateway run' are permitted.`;
-      this.logger.error(errorMessage);
-      throw new Error(errorMessage);
+
+    if (isAllowed) return;
+
+    // Special check for 'docker desktop enable model-runner --tcp=12434'
+    if (
+      args.length === 4 &&
+      args[0] === "desktop" &&
+      args[1] === "enable" &&
+      args[2] === "model-runner" &&
+      args[3] === "--tcp=12434"
+    ) {
+      return;
     }
+
+    // Special check for 'docker model pull <model>'
+    if (args.length === 3 && args[0] === "model" && args[1] === "pull") {
+      const modelName = args[2];
+      // Allow alphanumeric, slashes, colons, dashes, dots (e.g. ai/llama3.2:3b)
+      if (/^[a-zA-Z0-9/:\-.]+$/.test(modelName)) {
+        return;
+      }
+    }
+
+    // Special check for 'docker model rm <model>'
+    if (args.length === 3 && args[0] === "model" && args[1] === "rm") {
+      const modelName = args[2];
+      // Allow alphanumeric, slashes, colons, dashes, dots (e.g. ai/llama3.2:3b)
+      if (/^[a-zA-Z0-9/:\-.]+$/.test(modelName)) {
+        return;
+      }
+    }
+
+    // Special check for 'docker exec ollama ollama pull <model>'
+    if (
+      args.length === 5 &&
+      args[0] === "exec" &&
+      args[1] === "ollama" &&
+      args[2] === "ollama" &&
+      args[3] === "pull"
+    ) {
+      const modelName = args[4];
+      // Allow alphanumeric, slashes, colons, dashes, dots (e.g. llama3, ai/llama3.2:3b)
+      if (/^[a-zA-Z0-9/:\-.]+$/.test(modelName)) {
+        return;
+      }
+    }
+
+    const errorMessage = `Security Alert: Disallowed 'docker' arguments provided: ${args.join(" ")}. Only specific docker commands are permitted.`;
+    this.logger.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+
+  enableDockerModelRunner(): Promise<string> {
+    return this.executeCommand("docker", [
+      "desktop",
+      "enable",
+      "model-runner",
+      "--tcp=12434",
+    ]);
+  }
+
+  pullDockerModel(modelName: string): Promise<string> {
+    return this.executeCommand("docker", ["model", "pull", modelName]);
+  }
+
+  deleteDockerModel(modelName: string): Promise<string> {
+    return this.executeCommand("docker", ["model", "rm", modelName]);
+  }
+
+  pullOllamaModel(modelName: string): Promise<string> {
+    return this.executeCommand("docker", [
+      "exec",
+      "ollama",
+      "ollama",
+      "pull",
+      modelName,
+    ]);
+  }
+
+  getOllamaModels(): Promise<string> {
+    return this.executeCommand("docker", ["exec", "ollama", "ollama", "list"]);
   }
 
   getMcpServerList(): Promise<string> {
     return this.executeCommand("docker", ["mcp", "server", "ls", "--json"]);
+  }
+
+  getLocalModelList(): Promise<string> {
+    return this.executeCommand("docker", ["model", "ls", "--json"]).catch(() =>
+      this.executeCommand("docker", ["model", "ls"]),
+    );
+  }
+
+  checkDockerModelRunner(): Promise<boolean> {
+    return this.executeCommand("docker", ["model", "--help"], {
+      timeout: 5000,
+    })
+      .then((output) => {
+        // Verify that the output specifically mentions "Usage:  docker model"
+        // If "docker model" is not installed, it usually prints the generic "Usage:  docker [OPTIONS] COMMAND"
+        return output.includes("Usage:  docker model");
+      })
+      .catch(() => false);
+  }
+
+  getRunningOllamaContainer(): Promise<string> {
+    return this.executeCommand("docker", [
+      "ps",
+      "--filter",
+      "name=ollama",
+      "--format",
+      "json",
+    ]);
+  }
+
+  async runDockerComposeUp(): Promise<string> {
+    if (this.extensionPath) {
+      const composePath = require("path").join(
+        this.extensionPath,
+        "docker-compose.yml",
+      );
+      this.logger.info(`Running docker compose with file: ${composePath}`);
+      return this.executeCommand("docker", [
+        "compose",
+        "-f",
+        composePath,
+        "up",
+        "-d",
+      ]);
+    }
+    // Fallback to default behavior if no extension path set
+    this.logger.warn(
+      "Extension path not set, using default docker compose location",
+    );
+    return this.executeCommand("docker", ["compose", "up", "-d"]);
   }
 
   get runMcpGateway(): Promise<string> {

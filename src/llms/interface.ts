@@ -3,6 +3,7 @@ import {
   GenerateContentResult,
 } from "@google/generative-ai";
 
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface IBaseLLM {}
 
 export interface ILlmConfig {

@@ -282,7 +282,7 @@ export class GeminiLLM
   // Note: Call Groq provider directly. Remove from Gemini
   private async fallBackToGroq(userInput: string): Promise<string | undefined> {
     try {
-      let finalResult = await this.groqLLM.generateText(userInput);
+      const finalResult = await this.groqLLM.generateText(userInput);
       if (finalResult) {
         const systemMessage = Message.of({
           role: "system",

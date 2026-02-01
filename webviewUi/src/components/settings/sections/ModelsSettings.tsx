@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useSettings } from '../SettingsContext';
+import { PREDEFINED_LOCAL_MODELS } from '../../../constants/constant';
 import {
   SettingsSection,
   SectionTitle,
@@ -80,6 +81,176 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({ searchQuery: _se
   const { modelOptions } = options;
   const { onModelChange } = handlers;
 
+  const [dockerRunnerEnabled, setDockerRunnerEnabled] = useState(false);
+  const [pulledModels, setPulledModels] = useState<string[]>([]);
+  const [pullingModels, setPullingModels] = useState<string[]>([]);
+  const [deletingModels, setDeletingModels] = useState<string[]>([]);
+  const [modelErrors, setModelErrors] = useState<Record<string, string>>({});
+  const [isEnablingRunner, setIsEnablingRunner] = useState(false);
+  const [runnerError, setRunnerError] = useState<string | null>(null);
+  const [isStartingCompose, setIsStartingCompose] = useState(false);
+  const [composeError, setComposeError] = useState<string | null>(null);
+  const [composeStarted, setComposeStarted] = useState(false);
+  const [activeLocalModel, setActiveLocalModel] = useState<string | null>(null);
+  const [settingModel, setSettingModel] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check status on mount
+    handlers.postMessage({ command: 'docker-check-status' });
+    handlers.postMessage({ command: 'docker-check-ollama-status' });
+    handlers.postMessage({ command: 'docker-get-models' });
+    handlers.postMessage({ command: 'docker-get-local-model' });
+
+    // Poll every 30 seconds to reduce log spam
+    const interval = setInterval(() => {
+      // Only check runner status periodically
+      handlers.postMessage({ command: 'docker-check-status' });
+      handlers.postMessage({ command: 'docker-check-ollama-status' });
+      // Only fetch models if we know something is running to avoid error logs
+      handlers.postMessage({ command: 'docker-get-models' });
+      handlers.postMessage({ command: 'docker-get-local-model' });
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const message = event.data;
+      switch (message.type) {
+        case 'docker-status':
+          setDockerRunnerEnabled(message.available);
+          break;
+        case 'docker-ollama-status':
+          setComposeStarted(message.running);
+          break;
+        case 'docker-runner-enabled':
+          setIsEnablingRunner(false);
+          setDockerRunnerEnabled(message.success);
+          if (message.success) {
+             setRunnerError(null);
+             handlers.postMessage({ command: 'docker-get-models' });
+          } else if (message.error) {
+             setRunnerError(message.error);
+          }
+          break;
+        case 'docker-compose-started':
+          setIsStartingCompose(false);
+          setComposeStarted(message.success);
+          if (message.success) {
+            setComposeError(null);
+          } else if (message.error) {
+            setComposeError(message.error);
+          }
+          break;
+        case 'docker-models-list':
+           if (message.models) {
+             setPulledModels(message.models.map((m: any) => m.name));
+           }
+           break;
+        case 'docker-model-pulled':
+           setPullingModels(prev => prev.filter(m => m !== message.model));
+           if (message.success) {
+             setPulledModels(prev => [...prev, message.model]);
+             // Clear any previous error for this model
+             setModelErrors(prev => {
+                const next = { ...prev };
+                delete next[message.model];
+                return next;
+             });
+           } else {
+             setModelErrors(prev => ({ ...prev, [message.model]: message.error || 'Failed to pull model' }));
+           }
+           break;
+        case 'docker-model-deleted':
+           if (message.success) {
+             setPulledModels(prev => prev.filter(m => !m.includes(message.model) && !message.model.includes(m)));
+             setModelErrors(prev => {
+                const next = { ...prev };
+                delete next[message.model];
+                return next;
+             });
+           } else if (message.error) {
+             setModelErrors(prev => ({ ...prev, [message.model]: message.error }));
+           }
+           setDeletingModels(prev => prev.filter(m => m !== message.model));
+           break;
+        case 'docker-local-model':
+           setActiveLocalModel(message.model);
+           break;
+        case 'docker-model-selected':
+           setSettingModel(null);
+           if (message.success) {
+             setActiveLocalModel(message.model);
+             onModelChange("Local"); 
+           } else {
+             setModelErrors(prev => ({ ...prev, [message.model]: message.error }));
+           }
+           break;
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const handleEnableDockerRunner = () => {
+    setIsEnablingRunner(true);
+    setRunnerError(null);
+    handlers.postMessage({ command: 'docker-enable-runner' });
+  };
+
+  const handleStartCompose = () => {
+    setIsStartingCompose(true);
+    setComposeError(null);
+    handlers.postMessage({ command: 'docker-start-compose' });
+  };
+
+  const handlePullOllamaModel = (modelValue: string) => {
+    if (pullingModels.includes(modelValue)) return;
+    setPullingModels(prev => [...prev, modelValue]);
+    handlers.postMessage({ command: 'docker-pull-ollama-model', message: modelValue });
+  };
+
+  const handlePullModel = (modelValue: string) => {
+    if (pullingModels.includes(modelValue)) return;
+    setPullingModels(prev => [...prev, modelValue]);
+    handlers.postMessage({ command: 'docker-pull-model', message: modelValue });
+  };
+
+  const handleUseModel = (modelValue: string) => {
+    setSettingModel(modelValue);
+    handlers.postMessage({ command: 'docker-use-model', message: modelValue });
+  };
+
+  const handleDeleteModel = (modelValue: string) => {
+    if (deletingModels.includes(modelValue)) return;
+    setDeletingModels(prev => [...prev, modelValue]);
+    handlers.postMessage({ command: 'docker-delete-model', message: modelValue });
+  };
+
+  const isModelPulled = (modelValue: string) => {
+    // Strip 'ai/' prefix for comparison since Docker returns model names without it
+    const normalizedModelValue = modelValue.replace(/^ai\//, '');
+    return pulledModels.some(m => {
+      const normalizedPulled = m.replace(/^ai\//, '');
+      // Check if names match (ignoring ai/ prefix and allowing partial matches)
+      return normalizedPulled === normalizedModelValue || 
+             normalizedPulled.includes(normalizedModelValue) || 
+             normalizedModelValue.includes(normalizedPulled);
+    });
+  };
+
+  // Normalize active model for comparison
+  const isModelActive = (modelValue: string) => {
+    if (!activeLocalModel) return false;
+    const normalizedModelValue = modelValue.replace(/^ai\//, '');
+    const normalizedActive = activeLocalModel.replace(/^ai\//, '');
+    return normalizedModelValue === normalizedActive ||
+           normalizedModelValue.includes(normalizedActive) ||
+           normalizedActive.includes(normalizedModelValue);
+  };
+
   return (
     <>
       <SettingsSection>
@@ -134,6 +305,180 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({ searchQuery: _se
             </Stat>
           </ModelStats>
         </ModelCard>
+      </SettingsSection>
+
+      <SettingsSection>
+        <SectionTitle>Local Models (Docker)</SectionTitle>
+        
+        <SettingsRow>
+            <SettingInfo>
+                <SettingLabel>Docker Model Runner</SettingLabel>
+                <SettingDescription>
+                    Enable Docker Desktop's native Model Runner (Beta). For standard Ollama containers, select "Local" in the Primary Model dropdown above.
+                </SettingDescription>
+            </SettingInfo>
+            <SettingControl>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                    <Button 
+                        onClick={handleEnableDockerRunner} 
+                        disabled={dockerRunnerEnabled || isEnablingRunner}
+                        style={{ minWidth: '120px' }}
+                    >
+                        {isEnablingRunner ? 'Enabling...' : dockerRunnerEnabled ? 'Enabled' : 'Enable'}
+                    </Button>
+                    {runnerError && (
+                    <span style={{ color: '#ef5350', fontSize: '12px', maxWidth: '200px', textAlign: 'right' }}>
+                        Error: {runnerError}. Ensure Docker Desktop 4.37+ is installed.
+                    </span>
+                )}
+            </div>
+        </SettingControl>
+      </SettingsRow>
+
+      <SettingsRow>
+          <SettingInfo>
+              <SettingLabel>Local Ollama (Docker Compose)</SettingLabel>
+              <SettingDescription>
+                  Start a standard Ollama container using Docker Compose. Uses port 11434.
+              </SettingDescription>
+          </SettingInfo>
+          <SettingControl>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                  <Button 
+                      onClick={handleStartCompose} 
+                      disabled={composeStarted || isStartingCompose}
+                      style={{ minWidth: '120px' }}
+                  >
+                      {isStartingCompose ? 'Starting...' : composeStarted ? 'Running' : 'Start Server'}
+                  </Button>
+                  {composeError && (
+                      <span style={{ color: '#ef5350', fontSize: '12px', maxWidth: '200px', textAlign: 'right' }}>
+                          Error: {composeError}
+                      </span>
+                  )}
+              </div>
+          </SettingControl>
+      </SettingsRow>
+
+      {/* Show model list for Docker Compose mode even if Runner is disabled */}
+      {composeStarted && !dockerRunnerEnabled && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+              {PREDEFINED_LOCAL_MODELS.map((model) => {
+                  const isPulled = isModelPulled(model.value);
+                  const isPulling = pullingModels.includes(model.value);
+                  const isActive = isModelActive(model.value);
+                  const isSetting = settingModel === model.value;
+                  
+                  return (
+                      <ModelCard key={model.value}>
+                          <ModelHeader>
+                              <ModelInfo>
+                                  <ModelName>
+                                      {model.label}
+                                      {isPulled && <Badge $variant="success">Available</Badge>}
+                                      {isActive && <Badge $variant="default">Active</Badge>}
+                                  </ModelName>
+                                  <ModelDescription>{model.description}</ModelDescription>
+                              </ModelInfo>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <Button 
+                                      onClick={() => handlePullOllamaModel(model.value)}
+                                      disabled={isPulled || isPulling}
+                                  >
+                                      {isPulling ? 'Pulling...' : isPulled ? 'Pulled' : 'Pull'}
+                                  </Button>
+                                  {isPulled && !isActive && (
+                                      <Button 
+                                          onClick={() => handleUseModel(model.value)}
+                                          disabled={isSetting}
+                                          style={{ 
+                                              backgroundColor: 'rgba(76, 175, 80, 0.1)', 
+                                              color: '#4caf50',
+                                              border: '1px solid rgba(76, 175, 80, 0.5)'
+                                          }}
+                                      >
+                                          {isSetting ? 'Setting...' : 'Use'}
+                                      </Button>
+                                  )}
+                              </div>
+                          </ModelHeader>
+                          {modelErrors[model.value] && (
+                              <div style={{ color: '#ef5350', fontSize: '12px', marginTop: '8px', paddingLeft: '2px' }}>
+                                  Error: {modelErrors[model.value]}
+                              </div>
+                          )}
+                      </ModelCard>
+                  );
+              })}
+          </div>
+      )}
+
+        {/* Always show Docker Model Runner models when available */}
+        {dockerRunnerEnabled && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+                {PREDEFINED_LOCAL_MODELS.map((model) => {
+                    const isPulled = isModelPulled(model.value);
+                    const isPulling = pullingModels.includes(model.value);
+                    const isDeleting = deletingModels.includes(model.value);
+                    const isActive = isModelActive(model.value);
+                    const isSetting = settingModel === model.value;
+                    
+                    return (
+                        <ModelCard key={model.value}>
+                            <ModelHeader>
+                                <ModelInfo>
+                                    <ModelName>
+                                        {model.label}
+                                        {isPulled && <Badge $variant="success">Available</Badge>}
+                                        {isActive && <Badge $variant="default">Active</Badge>}
+                                    </ModelName>
+                                    <ModelDescription>{model.description}</ModelDescription>
+                                </ModelInfo>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Button 
+                                        onClick={() => handlePullModel(model.value)}
+                                        disabled={isPulled || isPulling || isDeleting}
+                                    >
+                                        {isPulling ? 'Pulling...' : isPulled ? 'Pulled' : 'Pull'}
+                                    </Button>
+                                    {isPulled && !isActive && (
+                                        <Button 
+                                            onClick={() => handleUseModel(model.value)}
+                                            disabled={isSetting || isDeleting}
+                                            style={{ 
+                                                backgroundColor: 'rgba(76, 175, 80, 0.1)', 
+                                                color: '#4caf50',
+                                                border: '1px solid rgba(76, 175, 80, 0.5)'
+                                            }}
+                                        >
+                                            {isSetting ? 'Setting...' : 'Use'}
+                                        </Button>
+                                    )}
+                                    {isPulled && (
+                                        <Button 
+                                            onClick={() => handleDeleteModel(model.value)}
+                                            disabled={isDeleting || isActive}
+                                            style={{ 
+                                                backgroundColor: 'rgba(211, 47, 47, 0.1)', 
+                                                color: '#ef5350',
+                                                border: '1px solid rgba(239, 83, 80, 0.5)'
+                                            }}
+                                        >
+                                            {isDeleting ? 'Deleting...' : 'Delete'}
+                                        </Button>
+                                    )}
+                                </div>
+                            </ModelHeader>
+                            {modelErrors[model.value] && (
+                                <div style={{ color: '#ef5350', fontSize: '12px', marginTop: '8px', paddingLeft: '2px' }}>
+                                    Error: {modelErrors[model.value]}
+                                </div>
+                            )}
+                        </ModelCard>
+                    );
+                })}
+            </div>
+        )}
       </SettingsSection>
 
       <SettingsSection>

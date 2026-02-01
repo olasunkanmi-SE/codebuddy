@@ -106,10 +106,10 @@ suite("Vector Database Architecture Integration Tests", () => {
       // Verify that the temp implementation matches the interface
       const tempCodeIndexer = {
         generateEmbeddings: async () => [],
-        indexFile: async () => {},
-        indexFiles: async () => {},
-        removeFromIndex: async () => {},
-        updateFileIndex: async () => {},
+        indexFile: async () => Promise.resolve(),
+        indexFiles: async () => Promise.resolve(),
+        removeFromIndex: async () => Promise.resolve(),
+        updateFileIndex: async () => Promise.resolve(),
         searchSimilar: async () => [],
         getIndexStats: async () => ({
           totalFiles: 0,
@@ -119,8 +119,10 @@ suite("Vector Database Architecture Integration Tests", () => {
           status: "ready" as const,
         }),
         isFileIndexed: async () => false,
-        clearIndex: async () => {},
-        dispose: () => {},
+        clearIndex: async () => Promise.resolve(),
+        dispose: () => {
+          // Dispose resources
+        },
       };
 
       // Test that all required methods exist
@@ -139,10 +141,10 @@ suite("Vector Database Architecture Integration Tests", () => {
     test("should provide correct return types for interface methods", async () => {
       const tempCodeIndexer = {
         generateEmbeddings: async () => [],
-        indexFile: async () => {},
-        indexFiles: async () => {},
-        removeFromIndex: async () => {},
-        updateFileIndex: async () => {},
+        indexFile: async () => Promise.resolve(),
+        indexFiles: async () => Promise.resolve(),
+        removeFromIndex: async () => Promise.resolve(),
+        updateFileIndex: async () => Promise.resolve(),
         searchSimilar: async () => [],
         getIndexStats: async () => ({
           totalFiles: 5,
@@ -152,8 +154,10 @@ suite("Vector Database Architecture Integration Tests", () => {
           status: "ready" as const,
         }),
         isFileIndexed: async () => true,
-        clearIndex: async () => {},
-        dispose: () => {},
+        clearIndex: async () => Promise.resolve(),
+        dispose: () => {
+          // Dispose resources
+        },
       };
 
       // Test return types (using the actual temp implementation signatures)

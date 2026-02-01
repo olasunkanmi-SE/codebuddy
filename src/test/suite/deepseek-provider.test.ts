@@ -9,9 +9,9 @@ import { Memory } from '../../memory/base';
 
 // Mock classes and utilities
 class MockWebview implements Partial<vscode.Webview> {
-  public html: string = '';
+  public html = '';
   public options: vscode.WebviewOptions = { enableScripts: true };
-  public cspSource: string = 'test-csp-source';
+  public cspSource = 'test-csp-source';
   public async postMessage(message: any): Promise<boolean> {
     return true;
   }
@@ -23,8 +23,8 @@ class MockWebview implements Partial<vscode.Webview> {
 
 class MockWebviewView implements Partial<vscode.WebviewView> {
   public webview: vscode.Webview = new MockWebview() as unknown as vscode.Webview;
-  public visible: boolean = true;
-  public viewType: string = 'chatView';
+  public visible = true;
+  public viewType = 'chatView';
   public onDidChangeVisibility: vscode.Event<void> = new vscode.EventEmitter<void>().event;
 }
 

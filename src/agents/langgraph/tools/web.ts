@@ -16,7 +16,7 @@ export class LangChainWebTool extends StructuredTool<any> {
   }
 
   name = "web_search";
-  description: string =
+  description =
     "Search the internet for general programming knowledge, best practices, or solutions to common coding problems. Useful for understanding concepts, exploring different approaches, or finding external libraries.";
   schema = z.object({
     query: z

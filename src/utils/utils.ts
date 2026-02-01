@@ -168,7 +168,13 @@ export const createAnthropicClient = (apiKey: string, baseURL?: string) => {
   });
 };
 
-export const createOpenAIClient = (apiKey: string) => {
+export const createOpenAIClient = (apiKey: string, baseURL?: string) => {
+  if (baseURL) {
+    return new OpenAI({
+      apiKey,
+      baseURL,
+    });
+  }
   return new OpenAI({
     apiKey,
   });
@@ -224,7 +230,7 @@ export const showInfoMessage = (message?: string): void => {
  */
 export const getAPIKeyAndModel = (
   model: string,
-): { apiKey: string; model?: string } => {
+): { apiKey: string; model?: string; baseUrl?: string } => {
   const {
     geminiKey,
     groqApiKey,
@@ -239,9 +245,13 @@ export const getAPIKeyAndModel = (
     qwenModel,
     glmApiKey,
     glmModel,
+    localBaseUrl,
+    localModel,
+    localApiKey,
   } = APP_CONFIG;
   let apiKey: string | undefined;
   let modelName: string | undefined;
+  let baseUrl: string | undefined;
 
   const lowerCaseModel = model.toLowerCase();
 
@@ -277,17 +287,22 @@ export const getAPIKeyAndModel = (
       apiKey = getConfigValue(APP_CONFIG.deepseekApiKey);
       modelName = getConfigValue(APP_CONFIG.deepseekModel);
       break;
+    case "local":
+      apiKey = getConfigValue(localApiKey) || "not-needed";
+      modelName = getConfigValue(localModel);
+      baseUrl = getConfigValue(APP_CONFIG.localBaseUrl);
+      break;
     default:
       throw new Error(`Unsupported model: ${model}`);
   }
 
-  if (!apiKey) {
+  if (!apiKey && lowerCaseModel !== "local") {
     throw new Error(
       `API key not found for model: ${model}. Please add the API key in the extension configuration.`,
     );
   }
 
-  return { apiKey, model: modelName };
+  return { apiKey: apiKey || "", model: modelName, baseUrl };
 };
 
 export const generateQueryString = (query: string) =>

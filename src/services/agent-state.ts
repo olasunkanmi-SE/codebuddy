@@ -123,10 +123,7 @@ export class AgentService {
   /**
    * Get recent chat history for an agent (optimized for performance)
    */
-  async getRecentChatHistory(
-    agentId: string,
-    limit: number = 50,
-  ): Promise<any[]> {
+  async getRecentChatHistory(agentId: string, limit = 50): Promise<any[]> {
     try {
       // Use the chat history worker for async operations
       const requestId = `recent-${agentId}-${Date.now()}`;
@@ -150,7 +147,7 @@ export class AgentService {
   /**
    * Cleanup old chat history across all agents
    */
-  async cleanupOldChatHistory(daysToKeep: number = 30): Promise<void> {
+  async cleanupOldChatHistory(daysToKeep = 30): Promise<void> {
     try {
       // Use the chat history worker for async operations
       const requestId = `cleanup-${Date.now()}`;

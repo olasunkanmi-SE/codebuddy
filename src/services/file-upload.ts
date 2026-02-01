@@ -75,7 +75,7 @@ export class FileUploadService implements vscode.Disposable {
   async uploadAndProcessFile(
     filePath: string,
     displayName: string,
-    prompt: string = "Summarize this document",
+    prompt = "Summarize this document",
   ): Promise<string | undefined> {
     let file;
     try {
@@ -130,7 +130,7 @@ export class FileUploadService implements vscode.Disposable {
   }> {
     try {
       const fileContent = createPartFromUri(file.uri, file.mimeType);
-      let cached = cacheName
+      const cached = cacheName
         ? await this.findOrCreateCache(cacheName, fileContent)
         : await this.createNewCache(fileContent);
 

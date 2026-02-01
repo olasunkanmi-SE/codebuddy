@@ -32,7 +32,7 @@ export class SqliteDatabaseService {
   private static instance: SqliteDatabaseService;
   private db: any = null; // sql.js Database instance
   private readonly logger: Logger;
-  private dbPath: string = "";
+  private dbPath = "";
   private SQL: any = null; // sql.js instance
 
   private constructor() {

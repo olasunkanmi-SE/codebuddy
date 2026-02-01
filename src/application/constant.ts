@@ -15,6 +15,7 @@ export enum CODEBUDDY_ACTIONS {
   generateUnitTest = "CodeBuddy.generateUnitTest",
   generateDiagram = "CodeBuddy.generateMermaidDiagram",
   inlineChat = "CodeBuddy.inLineChat",
+  architecturalRecommendation = "CodeBuddy.architecturalRecommendation",
   restart = "CodeBuddy.restart",
   reviewPR = "CodeBuddy.reviewPR",
   codebaseAnalysis = "CodeBuddy.codebaseAnalysis",
@@ -30,6 +31,7 @@ export enum COMMON {
   OPENAI_CHAT_HISTORY = "openaiChatHistory",
   QWEN_CHAT_HISTORY = "qwenChatHistory",
   GLM_CHAT_HISTORY = "glmChatHistory",
+  LOCAL_CHAT_HISTORY = "localChatHistory",
   USER_INPUT = "user-input",
   BOT = "bot",
   GEMINI_SNAPSHOT = "GeminiSnapshot",
@@ -62,6 +64,9 @@ export const APP_CONFIG = {
   qwenModel: "qwen.model",
   glmApiKey: "glm.apiKey",
   glmModel: "glm.model",
+  localBaseUrl: "local.baseUrl",
+  localModel: "local.model",
+  localApiKey: "local.apiKey",
   font: "font.family",
   chatview: "chatview.theme",
   chatviewFont: "chatview.font.size",
@@ -77,6 +82,7 @@ export enum generativeAiModels {
   OPENAI = "OpenAI",
   QWEN = "Qwen",
   GLM = "GLM",
+  LOCAL = "Local",
 }
 export const MEMORY_CACHE_OPTIONS = {
   sessionTTL: 24 * 60 * 60 * 1000,

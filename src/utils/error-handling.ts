@@ -12,7 +12,7 @@ export class ErrorHandler {
     operation: () => Promise<T>,
     errorMessage: string,
     logger: Logger,
-    shouldRethrow: boolean = true,
+    shouldRethrow = true,
   ): Promise<T | null> {
     try {
       return await operation();

@@ -11,11 +11,11 @@ import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export class MCPClient {
   private client: Client;
-  private transport: StdioClientTransport | null = null;
+  private transport: any | null = null;
   private process: ChildProcess | null = null;
   private state: MCPClientState = MCPClientState.DISCONNECTED;
   private toolCache: MCPTool[] | null = null;
-  private toolCacheExpiry: number = 0;
+  private toolCacheExpiry = 0;
   private readonly CACHE_TTL_MS = 5 * 60 * 1000;
   private readonly logger: Logger;
   private reconnectAttempts = 0;
@@ -65,10 +65,8 @@ export class MCPClient {
       if (isSSE) {
         try {
           // Dynamically import SSE transport from SDK
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const {
-            SSEClientTransport,
-          } = require("@modelcontextprotocol/sdk/client/sse.js");
+          const { SSEClientTransport } =
+            await import("@modelcontextprotocol/sdk/client/sse.js");
           const url = new URL(configAny.url);
           this.transport = new SSEClientTransport(url);
           this.logger.info(
@@ -135,7 +133,7 @@ export class MCPClient {
       }
 
       if (this.transport) {
-        this.transport.onerror = (error) => {
+        this.transport.onerror = (error: any) => {
           this.logger.error(`Transport error [${this.serverName}]:`, error);
           this.state = MCPClientState.ERROR;
           this.attemptReconnect();

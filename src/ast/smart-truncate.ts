@@ -406,7 +406,7 @@ export class LLMOutputTruncator {
  */
 export function truncateForLLM(
   analysisOutput: string,
-  maxTokens: number = 25000,
+  maxTokens = 25000,
 ): string {
   const truncator = new LLMOutputTruncator();
   const result = truncator.truncate(analysisOutput, { maxTokens });

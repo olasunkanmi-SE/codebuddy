@@ -57,7 +57,7 @@ export class RetryableOperation {
 
   async execute<T>(
     operation: () => Promise<T>,
-    context: string = "operation",
+    context = "operation",
   ): Promise<T> {
     let lastError: Error | undefined;
 

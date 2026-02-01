@@ -328,9 +328,9 @@ export class CodeBuddyAgentService {
 
     let eventCount = 0;
     let totalToolInvocations = 0;
-    let pendingToolCalls = new Map<string, IToolActivity>();
-    let toolCallCounts = new Map<string, number>(); // Track agent-initiated tool call frequency only
-    let fileEditCounts = new Map<string, number>(); // Track edits per file to detect file-specific loops
+    const pendingToolCalls = new Map<string, IToolActivity>();
+    const toolCallCounts = new Map<string, number>(); // Track agent-initiated tool call frequency only
+    const fileEditCounts = new Map<string, number>(); // Track edits per file to detect file-specific loops
     let hasErrored = false;
     let forceStopReason: "max_events" | "max_tools" | "timeout" | null = null;
 

@@ -40,7 +40,7 @@
     "productivity"
   ],
   "homepage": "https://github.com/olasunkanmi-SE/codebuddy#readme",
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "views": {
       "codeBuddy-view-container": [
@@ -229,7 +229,8 @@
               "Deepseek",
               "OpenAI",
               "Qwen",
-              "GLM"
+              "GLM",
+              "Local"
             ],
             "default": "Gemini",
             "description": "Select Model"
@@ -353,6 +354,30 @@
             ],
             "default": "apiKey",
             "markdownDescription": "Enter your OpenAI API Key"
+          },
+          "local.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "qwen2.5-coder",
+            "markdownDescription": "Provide the name of the Local model you want to use (e.g., qwen2.5-coder, llama3.2, gemma3, mistral)."
+          },
+          "local.baseUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "http://localhost:11434/v1",
+            "markdownDescription": "Enter the Base URL for your Local LLM. For Ollama use http://localhost:11434/v1, for Docker Model Runner use http://localhost:12434/engines/llama.cpp/v1."
+          },
+          "local.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "not-needed",
+            "markdownDescription": "Enter your Local LLM API Key (if required)."
           },
           "font.family": {
             "type": "string",

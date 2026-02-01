@@ -297,7 +297,7 @@ export class QwenLLM
               JSON.stringify(regeneratedQuery),
             );
 
-            let answer = await this.processUserQuery(regeneratedQuery);
+            const answer = await this.processUserQuery(regeneratedQuery);
             if (typeof answer === "string") {
               finalResult = answer;
               this.orchestrator.publish("onQuery", JSON.stringify(answer));
@@ -394,7 +394,7 @@ export class QwenLLM
 
   private async handleSingleFunctionCall(
     functionCall: any,
-    attempt: number = 0,
+    attempt = 0,
   ): Promise<any> {
     const MAX_RETRIES = 3;
     const args = functionCall.args as Record<string, any>;
@@ -445,7 +445,7 @@ export class QwenLLM
     functionCall?: any,
     functionResponse?: any,
     chat?: any,
-    isInitialQuery: boolean = false,
+    isInitialQuery = false,
   ): Promise<any[]> {
     let chatHistory: any = Memory.get(COMMON.QWEN_CHAT_HISTORY) || [];
     Memory.removeItems(COMMON.QWEN_CHAT_HISTORY);

@@ -139,20 +139,16 @@ export class FileManager implements IFileUploader {
     });
 
     if (file?.[0]) {
-      try {
-        const fileSize = fs.statSync(file[0].fsPath).size;
+      const fileSize = fs.statSync(file[0].fsPath).size;
 
-        if (fileSize > MAX_FILE_SIZE) {
-          this.logger.info(
-            `File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)} MB.`,
-          );
-          return;
-        }
-
-        await this.uploadFile(file[0]);
-      } catch (error: any) {
-        throw error;
+      if (fileSize > MAX_FILE_SIZE) {
+        this.logger.info(
+          `File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)} MB.`,
+        );
+        return;
       }
+
+      await this.uploadFile(file[0]);
     }
   }
 

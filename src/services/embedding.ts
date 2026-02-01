@@ -62,6 +62,7 @@ export class EmbeddingService {
    */
   private getEmbeddingModelFromConfig(): string {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const vscode = require("vscode");
       const config = vscode.workspace?.getConfiguration?.();
       return (
