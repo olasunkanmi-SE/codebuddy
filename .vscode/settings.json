@@ -13,8 +13,9 @@
   "generativeAi.option": "Gemini",
   "mcp.servers": {
     "docker-gateway": {
-      "transport": "sse",
-      "url": "http://localhost:9000",
+      "command": "docker",
+      "args": ["mcp", "gateway", "run"],
+      "description": "Docker MCP Gateway (Context7, GitHub, GitLab, Fetch)",
       "enabled": true
     }
   }

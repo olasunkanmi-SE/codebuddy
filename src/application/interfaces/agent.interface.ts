@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { GenerativeModel } from "@google/generative-ai";
 import Groq from "groq-sdk";
 
@@ -11,7 +12,7 @@ export interface ProcessInputResult {
   finalAnswer: string;
 }
 
-export type LLMs = GenerativeModel | Groq | Anthropic;
+export type LLMs = GenerativeModel | Groq | Anthropic | OpenAI;
 
 export interface ICodeBuddyToolConfig {
   name: string;

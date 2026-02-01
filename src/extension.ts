@@ -41,6 +41,7 @@ import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
 import { WebViewProviderManager } from "./webview-providers/manager";
 import { DeveloperAgent } from "./agents/developer/agent";
+import { AgentRunningGuardService } from "./services/agent-running-guard.service";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -472,11 +473,13 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     agentEventEmmitter = new EventEmitter();
+    const agentRunningGuard = AgentRunningGuardService.getInstance();
     context.subscriptions.push(
       ...subscriptions,
       quickFixCodeAction,
       agentEventEmmitter,
       orchestrator,
+      agentRunningGuard,
     );
   } catch (error: any) {
     // Memory.clear();
@@ -557,6 +560,10 @@ export function deactivate(context: vscode.ExtensionContext) {
   quickFixCodeAction.dispose();
   agentEventEmmitter.dispose();
   orchestrator.dispose();
+
+  // Dispose agent running guard
+  const agentGuard = AgentRunningGuardService.getInstance();
+  agentGuard.dispose();
 
   // Dispose provider manager
   const providerManager = WebViewProviderManager.getInstance(context);

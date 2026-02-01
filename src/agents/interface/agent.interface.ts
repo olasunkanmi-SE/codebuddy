@@ -83,10 +83,36 @@ export enum StreamEventType {
   START = "onStreamStart",
   END = "onStreamEnd",
   CHUNK = "onStreamChunk",
-  TOOL_START = "toolStart",
-  TOOL_END = "toolEnd",
+  TOOL_START = "onToolStart",
+  TOOL_END = "onToolEnd",
+  TOOL_PROGRESS = "onToolProgress",
+  THINKING = "onThinking",
+  PLANNING = "onPlanning",
+  SUMMARIZING = "onSummarizing",
   ERROR = "onStreamError",
   METADATA = "streamMetadata",
+  // New activity types for detailed streaming
+  DECISION = "onDecision",
+  READING = "onReading",
+  SEARCHING = "onSearching",
+  REVIEWING = "onReviewing",
+  ANALYZING = "onAnalyzing",
+  EXECUTING = "onExecuting",
+  WORKING = "onWorking",
+}
+
+export interface IToolActivity {
+  id: string;
+  toolName: string;
+  status: "starting" | "running" | "completed" | "failed";
+  description: string;
+  startTime: number;
+  endTime?: number;
+  result?: {
+    summary?: string;
+    itemCount?: number;
+    preview?: string;
+  };
 }
 
 export interface IStreamEvent {

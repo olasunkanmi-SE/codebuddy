@@ -4,6 +4,10 @@ export const modelOptions = [
   { value: "Gemini", label: "Gemini" },
   { value: "Anthropic", label: "Anthropic" },
   { value: "Groq", label: "Groq" },
+  { value: "Deepseek", label: "Deepseek" },
+  { value: "OpenAI", label: "OpenAI" },
+  { value: "Qwen", label: "Qwen" },
+  { value: "GLM", label: "GLM" },
 ];
 
 export const codeBuddyMode = [

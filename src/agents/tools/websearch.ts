@@ -90,7 +90,54 @@ export class TavilySearchProvider implements ISearchProvider {
 }
 
 export class SearchResponseFormatter {
+  /**
+   * Format search response as synthesized summary (default)
+   */
   static format(response: SearchResponse): string {
+    return SearchResponseFormatter.formatSynthesized(response);
+  }
+
+  /**
+   * Format as clean, synthesized summary for Claude-like output
+   */
+  static formatSynthesized(response: SearchResponse): string {
+    const { answer, results, query } = response;
+    const parts: string[] = [];
+
+    if (results.length === 0) {
+      return `No relevant results found for "${query}". Try using different keywords or rephrasing your search.`;
+    }
+
+    // Lead with the answer if available
+    if (answer) {
+      parts.push(answer);
+      parts.push("");
+    } else {
+      // Generate a summary from top results
+      const topContent = results
+        .slice(0, 2)
+        .map((r) => r.content)
+        .join(" ")
+        .slice(0, 400);
+      parts.push(
+        `Based on ${results.length} search results: ${topContent}${topContent.length >= 400 ? "..." : ""}`,
+      );
+      parts.push("");
+    }
+
+    // Key sources (compact)
+    parts.push("**Sources:**");
+    results.slice(0, 3).forEach((result, index) => {
+      parts.push(`${index + 1}. [${result.title}](${result.url})`);
+    });
+
+    return parts.join("\n");
+  }
+
+  /**
+   * Format as detailed raw output (for expandable details)
+   */
+  static formatDetailed(response: SearchResponse): string {
     const { answer, results, query } = response;
     const parts: string[] = [];
 
@@ -117,5 +164,32 @@ export class SearchResponseFormatter {
     });
 
     return parts.join("\n");
+  }
+
+  /**
+   * Get structured data for UI components
+   */
+  static toStructured(response: SearchResponse): {
+    query: string;
+    answer?: string;
+    resultCount: number;
+    sources: Array<{
+      title: string;
+      url: string;
+      snippet: string;
+      relevance?: number;
+    }>;
+  } {
+    return {
+      query: response.query,
+      answer: response.answer,
+      resultCount: response.results.length,
+      sources: response.results.map((r) => ({
+        title: r.title,
+        url: r.url,
+        snippet: r.content.slice(0, 200),
+        relevance: r.score ? Math.round(r.score * 100) : undefined,
+      })),
+    };
   }
 }

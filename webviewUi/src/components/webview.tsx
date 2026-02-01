@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
+import { VSCodeButton, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { codeBuddyMode, faqItems, modelOptions, themeOptions } from "../constants/constant";
@@ -9,13 +9,14 @@ import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
 import { FAQAccordion } from "./accordion";
+import { AgentActivityFeed } from "./AgentActivityFeed";
 import AttachmentIcon from "./attachmentIcon";
-import { BotMessage } from "./botMessage";
 import ChatInput from "./ChatInput";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 import WorkspaceSelector from "./context";
 import { Extensions } from "./extensions";
 import { FutureFeatures } from "./futureFeatures";
+import MessageRenderer from "./MessageRenderer";
 import { UserMessage } from "./personMessage";
 import { Settings } from "./settings";
 import { SkeletonLoader } from "./skeletonLoader";
@@ -45,7 +46,8 @@ export const WebviewUI = () => {
   // State variables
   const [selectedTheme, setSelectedTheme] = useState("tokyo night");
   const [selectedModel, setSelectedModel] = useState("Gemini");
-  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Ask");
+  // Default to Agent so the streaming pipeline is used during testing
+  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Agent");
   const [commandAction, setCommandAction] = useState<string>("");
   const [commandDescription, setCommandDescription] = useState<string>("");
   const [isCommandExecuting, setIsCommandExecuting] = useState(false);
@@ -63,11 +65,13 @@ export const WebviewUI = () => {
   // Initialize streaming chat hook
   const {
     messages: streamedMessages,
+    activities,
     isStreaming,
     isLoading: isBotLoading,
     sendMessage,
     clearMessages,
     setMessages,
+    pendingApproval,
   } = useStreamingChat(vsCode, {
     enableStreaming,
     onLegacyMessage: (messages) => {
@@ -242,7 +246,8 @@ export const WebviewUI = () => {
       if (!message.trim()) return;
 
       sendMessage(message, {
-        mode: selectedCodeBuddyMode,
+        // Force Agent mode during testing to ensure langgraph/deepagent streaming path runs
+        mode: selectedCodeBuddyMode || "Agent",
         context: selectedContext.split("@"),
         alias: "O",
       });
@@ -257,6 +262,10 @@ export const WebviewUI = () => {
     });
   }, []);
 
+  const handleApproveAction = useCallback(() => {
+    vsCode.postMessage({ command: "user-consent", message: "granted" });
+  }, []);
+
   const processedContext = useMemo(() => {
     const contextArray = Array.from(new Set(selectedContext.split("@").join(", ").split(", ")));
     return contextArray.filter((item) => item.length > 1);
@@ -265,7 +274,7 @@ export const WebviewUI = () => {
   const memoizedMessages = useMemo(() => {
     return streamedMessages.map((msg) =>
       msg.type === "bot" ? (
-        <BotMessage
+        <MessageRenderer
           key={msg.id}
           content={msg.content}
           language={msg.language}
@@ -282,7 +291,7 @@ export const WebviewUI = () => {
   }, [streamedMessages]);
 
   return (
-    <div style={{ overflow: "hidden" }}>
+    <div style={{ overflow: "hidden", width: "100%" }}>
       <VSCodePanels className="vscodePanels" activeid={activeTab}>
         <VSCodePanelTab id="tab-1" onClick={() => setActiveTab("tab-1")}>
           CHAT
@@ -300,7 +309,7 @@ export const WebviewUI = () => {
           FUTURE
         </VSCodePanelTab>
         <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
-          <div className="chat-content">
+          <div className="chat-content" style={{ maxWidth: "1100px", margin: "0 auto" }}>
             <div className="dropdown-container">
               <div>
                 {/* Show welcome screen when there are no messages */}
@@ -315,13 +324,21 @@ export const WebviewUI = () => {
                 ) : (
                   <>
                     {memoizedMessages}
+                    {/* Show activity feed when agent is working */}
+                    {(isStreaming || isBotLoading) && activities.length > 0 && (
+                      <AgentActivityFeed
+                        activities={activities}
+                        isActive={isStreaming || isBotLoading}
+                      />
+                    )}
                     {isCommandExecuting && (
                       <CommandFeedbackLoader
                         commandAction={commandAction}
                         commandDescription={commandDescription}
                       />
                     )}
-                    {isBotLoading && !isCommandExecuting && !isStreaming && <SkeletonLoader />}
+                    {/* Show skeleton only if no activities are being tracked */}
+                    {isBotLoading && !isCommandExecuting && !isStreaming && activities.length === 0 && <SkeletonLoader />}
                   </>
                 )}
               </div>
@@ -421,7 +438,28 @@ export const WebviewUI = () => {
             </span>
           </div>
           <WorkspaceSelector activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
-          <ChatInput onSendMessage={handleSend} />
+          {pendingApproval && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 12px",
+                border: "1px solid #2a2a36",
+                borderRadius: "10px",
+                background: "#1e1e2a",
+                marginBottom: "8px",
+              }}
+            >
+              <div style={{ color: "#d0d0dc", fontSize: "13px", marginRight: "12px" }}>
+                {`Approve ${pendingApproval.toolName || "tool"} to proceed — ${pendingApproval.description || `Preparing to run ${pendingApproval.toolName || "tool"}`}`}
+              </div>
+              <VSCodeButton appearance="primary" onClick={handleApproveAction}>
+                Approve action
+              </VSCodeButton>
+            </div>
+          )}
+          <ChatInput onSendMessage={handleSend} disabled={isStreaming || isBotLoading} />
         </div>
         <div className="horizontal-stack">
           <AttachmentIcon onClick={handleGetContext} disabled={true} />

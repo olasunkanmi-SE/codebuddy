@@ -25,6 +25,14 @@ export class MCPService implements vscode.Disposable {
   private failureCount = 0;
   private readonly logger: Logger;
 
+  // Phase 1 : Eager check for Docker, but only needed for stdio
+  private dockerAvailable = false;
+  private dockerPath = "docker";
+  private idleTimer: NodeJS.Timeout | null = null;
+  private readonly IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+  private dockerWarningShown = false;
+  private dockerRetryInProgress = false;
+
   constructor() {
     this.logger = Logger.initialize("MCPService", {
       minLevel: LogLevel.INFO,
@@ -44,18 +52,19 @@ export class MCPService implements vscode.Disposable {
 
     const config = this.loadConfiguration();
     this.serverConfigs = config;
-    this.initialized = true;
 
-    const hasDocker = await this.checkDockerMCP();
-    if (!hasDocker) {
-      this.logger.warn("Docker MCP not available - MCP features disabled");
-      vscode.window.showErrorMessage(
-        "Docker MCP not available. Install Docker Desktop 27.0.0+",
-      );
-      throw new Error(
-        "Docker MCP not available. Install Docker Desktop 27.0.0+",
-      );
+    // Check Docker status immediately
+    try {
+      this.dockerAvailable = await this.checkDockerMCP();
+      if (!this.dockerAvailable) {
+        this.logger.warn("Docker MCP not available - MCP features disabled");
+      }
+    } catch (error) {
+      this.logger.error("Failed to check Docker MCP availability", error);
+      this.dockerAvailable = false;
     }
+
+    this.initialized = true;
 
     if (Object.keys(config).length === 0) {
       this.logger.info("No MCP Server configured");
@@ -68,12 +77,148 @@ export class MCPService implements vscode.Disposable {
 
     if (this.isGatewayMode()) {
       this.logger.info(
-        "MCP initialization complete: Docker Gateway mode - unified catalog with 200+ tools available on-demand",
+        "MCP initialization complete: Docker Gateway mode - tools available on-demand",
       );
     } else {
       this.logger.info(
         `MCP initialization complete: ${enabledServers} servers available for on-demand connection`,
       );
+    }
+  }
+
+  /**
+   * Ensure gateway is connected
+   */
+  private async ensureGatewayConnected(): Promise<void> {
+    this.logger.debug(
+      `ensureGatewayConnected: isGatewayMode=${this.isGatewayMode()}`,
+    );
+
+    if (!this.isGatewayMode()) {
+      return;
+    }
+
+    const client = this.clients.get("docker-gateway");
+    if (client && client.isConnected()) {
+      return;
+    }
+
+    const gatewayConfig = this.serverConfigs["docker-gateway"];
+    const isSSE = (gatewayConfig as any)?.transport === "sse";
+
+    // Only check Docker if using stdio transport (not SSE)
+    if (!isSSE) {
+      // Docker path already resolved in initialize()
+      if (!this.dockerAvailable) {
+        this.logger.warn("Docker not available (checked during init)");
+        throw new Error("Docker MCP not available");
+      }
+
+      // Update command to use resolved path if available
+      if (
+        (gatewayConfig as any).command === "docker" &&
+        this.dockerPath &&
+        this.dockerPath !== "docker"
+      ) {
+        this.logger.info(
+          `Updating Docker Gateway command to use resolved path: ${this.dockerPath}`,
+        );
+        (gatewayConfig as any).command = this.dockerPath;
+      }
+
+      // Ensure we inject the corrected PATH into env for the actual client connection
+      if (!(gatewayConfig as any).env) {
+        (gatewayConfig as any).env = {};
+      }
+
+      const currentPath = process.env.PATH || "";
+      const extraPath =
+        process.platform === "darwin"
+          ? ":/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/local/bin"
+          : "";
+      (gatewayConfig as any).env.PATH = currentPath + extraPath;
+    }
+
+    this.logger.info(
+      isSSE
+        ? `Starting MCP Gateway via SSE to ${(gatewayConfig as any).url}...`
+        : "Starting Docker MCP Gateway on-demand...",
+    );
+    await this.ensureServerConnected("docker-gateway");
+  }
+
+  /**
+   * Re-check Docker availability when previously unavailable
+   */
+  private async retryDockerAvailability(): Promise<void> {
+    if (this.dockerRetryInProgress) {
+      return;
+    }
+
+    this.dockerRetryInProgress = true;
+    try {
+      const availableNow = await this.checkDockerMCP();
+      this.dockerAvailable = availableNow;
+      if (availableNow) {
+        this.logger.info(
+          "Docker MCP detected on retry; enabling gateway mode.",
+        );
+      }
+    } finally {
+      this.dockerRetryInProgress = false;
+    }
+  }
+
+  /**
+   * Reset idle timer after activity
+   */
+  private resetIdleTimer(): void {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+    }
+
+    this.idleTimer = setTimeout(async () => {
+      this.logger.info(
+        `MCP Gateway idle for ${this.IDLE_TIMEOUT_MS / 1000}s, shutting down to save resources...`,
+      );
+      await this.shutdownIdleGateway();
+    }, this.IDLE_TIMEOUT_MS);
+  }
+
+  /**
+   * Shutdown gateway when idle
+   */
+  private async shutdownIdleGateway(): Promise<void> {
+    if (!this.isGatewayMode()) {
+      return;
+    }
+
+    const client = this.clients.get("docker-gateway");
+    if (client) {
+      try {
+        await client.disconnect();
+        this.clients.delete("docker-gateway");
+        this.toolsLoadedPerServer.delete("docker-gateway");
+
+        // Clear tool caches for this server
+        const serverTools = this.toolsByServer.get("docker-gateway") ?? [];
+        for (const tool of serverTools) {
+          const existing = this.toolsByName.get(tool.name) ?? [];
+          const filtered = existing.filter(
+            (t) => t.serverName !== "docker-gateway",
+          );
+          if (filtered.length === 0) {
+            this.toolsByName.delete(tool.name);
+          } else {
+            this.toolsByName.set(tool.name, filtered);
+          }
+        }
+        this.toolsByServer.delete("docker-gateway");
+
+        this.logger.info("Docker MCP Gateway shutdown complete (idle timeout)");
+      } catch (error) {
+        this.logger.error("Error during idle gateway shutdown:", error);
+      }
     }
   }
 
@@ -108,7 +253,10 @@ export class MCPService implements vscode.Disposable {
   }
 
   async ensureToolsLoaded(serverName: string): Promise<void> {
+    this.logger.debug(`ensureToolsLoaded for "${serverName}"`);
+
     if (this.toolsLoadedPerServer.get(serverName)) {
+      this.logger.debug(`Tools already loaded for "${serverName}"`);
       return;
     }
 
@@ -119,7 +267,9 @@ export class MCPService implements vscode.Disposable {
     }
 
     try {
+      this.logger.debug(`Getting tools from client "${serverName}"...`);
       const tools = await client.getTools();
+      this.logger.debug(`Got ${tools.length} tools from "${serverName}"`);
 
       // Store tools by server
       this.toolsByServer.set(serverName, tools);
@@ -139,17 +289,6 @@ export class MCPService implements vscode.Disposable {
         );
       } else {
         this.logger.info(`Loaded ${tools.length} tools from ${serverName}`);
-      }
-
-      // Log any name collisions
-      const collisions = Array.from(this.toolsByName.entries())
-        .filter(([_, tools]) => tools.length > 1)
-        .map(([name, tools]) => `${name} (${tools.length} servers)`);
-
-      if (collisions.length > 0) {
-        this.logger.debug(
-          `Tool name collisions detected: ${collisions.join(", ")}`,
-        );
       }
     } catch (error) {
       this.logger.error(`Failed to load tools from ${serverName}:`, error);
@@ -211,12 +350,54 @@ export class MCPService implements vscode.Disposable {
   }
 
   async getAllTools(): Promise<MCPTool[]> {
-    if (this.isGatewayMode()) {
-      // Gateway mode: load from single unified source
-      if (!this.toolsLoadedPerServer.get("docker-gateway")) {
-        await this.ensureToolsLoaded("docker-gateway");
+    this.logger.debug("getAllTools called");
+
+    // Ensure initialization is complete
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    // Phase 1: Ensure gateway is connected (lazy start)
+    // Only attempt connection if Docker IS available
+    if (this.dockerAvailable) {
+      try {
+        await this.ensureGatewayConnected();
+      } catch (error) {
+        this.logger.error("Failed to connect to gateway", error);
       }
     } else {
+      await this.retryDockerAvailability();
+      if (!this.dockerAvailable) {
+        this.logger.warn(
+          "Skipping gateway connection because Docker is not available",
+        );
+      }
+    }
+
+    this.resetIdleTimer();
+
+    if (this.isGatewayMode()) {
+      // If docker is not available, we can't do anything in gateway mode
+      if (!this.dockerAvailable) {
+        if (!this.dockerWarningShown) {
+          this.dockerWarningShown = true;
+          vscode.window.showWarningMessage(
+            "CodeBuddy MCP: Docker MCP gateway not detected. Start Docker Desktop (with MCP enabled) or install the MCP CLI, then retry.",
+          );
+        }
+        return [];
+      }
+
+      // Gateway mode: load from single unified source
+      if (!this.toolsLoadedPerServer.get("docker-gateway")) {
+        try {
+          await this.ensureToolsLoaded("docker-gateway");
+        } catch (error) {
+          this.logger.error("Failed to load tools from gateway", error);
+        }
+      }
+    } else {
+      this.logger.debug("In multi-server mode");
       // Multi-server mode: load from each enabled server
       const loadPromises = Object.entries(this.serverConfigs)
         .filter(([_, config]) => config.enabled)
@@ -234,7 +415,9 @@ export class MCPService implements vscode.Disposable {
     }
 
     // Return all tools (flattened from the multi-value map)
-    return Array.from(this.toolsByName.values()).flat();
+    const tools = Array.from(this.toolsByName.values()).flat();
+    this.logger.debug(`getAllTools returning ${tools.length} tools`);
+    return tools;
   }
 
   async getToolsFromServer(serverName: string): Promise<MCPTool[]> {
@@ -246,10 +429,6 @@ export class MCPService implements vscode.Disposable {
     return this.toolsByServer.get(serverName) ?? [];
   }
 
-  /**
-   * Call a tool by name. If multiple servers provide the same tool,
-   * tries the first one. You can specify serverName.toolName to be explicit.
-   */
   async callTool(
     toolName: string,
     args: any,
@@ -258,6 +437,13 @@ export class MCPService implements vscode.Disposable {
     if (!this.initialized) {
       throw new Error("MCP service not initialized");
     }
+
+    // Phase 1: Ensure gateway is connected (lazy start)
+    await this.ensureGatewayConnected();
+
+    // Phase 2: Reset idle timer on every tool call
+    this.resetIdleTimer();
+
     this.invocationCount++;
 
     // Support serverName.toolName syntax
@@ -271,10 +457,7 @@ export class MCPService implements vscode.Disposable {
 
     let tools = this.toolsByName.get(name);
 
-    // If tool not in cache, try loading all tools
     if (!tools || tools.length === 0) {
-      this.logger.debug(`Tool "${name}" not in cache, loading all tools...`);
-
       await this.getAllTools();
       tools = this.toolsByName.get(name);
 
@@ -284,7 +467,6 @@ export class MCPService implements vscode.Disposable {
       }
     }
 
-    // Filter by preferred server if specified
     const candidateTools = server
       ? tools.filter((t) => t.serverName === server)
       : tools;
@@ -292,15 +474,6 @@ export class MCPService implements vscode.Disposable {
     if (candidateTools.length === 0) {
       this.failureCount++;
       throw new Error(`Tool "${name}" not found on server "${server}"`);
-    }
-
-    // Log warning if multiple tools match and no preference specified
-    if (!server && candidateTools.length > 1) {
-      this.logger.debug(
-        `Multiple servers provide "${name}": ${candidateTools
-          .map((t) => t.serverName)
-          .join(", ")}. Using ${candidateTools[0].serverName}`,
-      );
     }
 
     const tool = candidateTools[0];
@@ -353,10 +526,15 @@ export class MCPService implements vscode.Disposable {
 
   private loadConfiguration(): MCPServersConfig {
     const servers = getConfigValue("mcp.servers");
+    this.logger.debug(
+      `loadConfiguration - mcp.servers from config: ${JSON.stringify(servers)}`,
+    );
+
     if (!servers || Object.keys(servers).length === 0) {
       this.logger.info(
         "No custom MCP configuration found, using Docker Gateway default",
       );
+      this.logger.debug("Using default docker-gateway config");
       return {
         "docker-gateway": {
           command: "docker",
@@ -372,17 +550,52 @@ export class MCPService implements vscode.Disposable {
     return servers;
   }
 
-  private checkDockerMCP(): Promise<boolean> {
+  private async checkDockerMCP(): Promise<boolean> {
+    const potentialPaths = [
+      "docker",
+      "/usr/local/bin/docker",
+      "/opt/homebrew/bin/docker",
+      "/usr/bin/docker",
+      "/opt/local/bin/docker",
+    ];
+
+    for (const cmd of potentialPaths) {
+      if (await this.testDockerCommand(cmd)) {
+        this.dockerPath = cmd;
+        this.logger.info(`Found Docker executable at: ${cmd}`);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private testDockerCommand(command: string): Promise<boolean> {
     return new Promise((resolve) => {
       try {
-        const process = spawn("docker", ["mcp", "--help"], {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { spawn } = require("child_process");
+        // Ensure we pass environment where PATH includes standard binary locations
+        const env = {
+          ...process.env,
+          PATH:
+            process.env.PATH +
+            (process.platform === "darwin"
+              ? ":/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+              : ""),
+        };
+
+        const proc = spawn(command, ["mcp", "--help"], {
           stdio: "pipe",
+          env,
+          shell: false,
         });
-        process.on("error", () => resolve(false));
-        process.on("exit", (code) => resolve(code === 0));
+
+        proc.on("error", () => resolve(false));
+        proc.on("exit", (code: number | null) => resolve(code === 0));
 
         setTimeout(() => {
-          process.kill();
+          proc.kill();
           resolve(false);
         }, 5000);
       } catch {
@@ -391,9 +604,6 @@ export class MCPService implements vscode.Disposable {
     });
   }
 
-  /**
-   * Connect to a server with retry logic for resilience
-   */
   private async connectToServer(
     serverName: string,
     serverConfig: MCPServerConfig,
@@ -440,6 +650,12 @@ export class MCPService implements vscode.Disposable {
 
   async dispose(): Promise<void> {
     this.logger.info("Disposing MCP servers");
+
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+
     const disconnectPromises = Array.from(this.clients.values()).map((client) =>
       client
         .disconnect()
@@ -457,6 +673,7 @@ export class MCPService implements vscode.Disposable {
     this.toolsByServer.clear();
     this.toolsLoadedPerServer.clear();
     this.initialized = false;
+    this.dockerAvailable = false;
 
     this.logger.info("MCP service disposed");
   }

@@ -30,6 +30,7 @@ import { QuestionClassifierService } from "../services/question-classifier.servi
 import { GroqLLM } from "../llms/groq/groq";
 import { Role } from "../llms/message";
 import { MessageHandler } from "../agents/handlers/message-handler";
+import { CodeBuddyAgentService } from "../agents/services/codebuddy-agent.service";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -312,6 +313,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         _view.webview.onDidReceiveMessage(async (message) => {
           let response: any;
           switch (message.command) {
+            case "user-consent": {
+              CodeBuddyAgentService.getInstance().setUserConsent(
+                message.message === "granted",
+              );
+              break;
+            }
             case "user-input": {
               this.UserMessageCounter += 1;
               const selectedGenerativeAiModel = getConfigValue(
