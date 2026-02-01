@@ -360,16 +360,16 @@
               "string",
               "null"
             ],
-            "default": "llama3.2",
-            "markdownDescription": "Provide the name of the Local model you want to use (e.g., llama3.2, gemma3, mistral)."
+            "default": "qwen2.5-coder",
+            "markdownDescription": "Provide the name of the Local model you want to use (e.g., qwen2.5-coder, llama3.2, gemma3, mistral)."
           },
           "local.baseUrl": {
             "type": [
               "string",
               "null"
             ],
-            "default": "http://localhost:12434/engines/llama.cpp/v1",
-            "markdownDescription": "Enter the Base URL for your Local LLM. For Docker Model Runner use http://localhost:12434/engines/llama.cpp/v1, for Ollama use http://localhost:11434/v1."
+            "default": "http://localhost:11434/v1",
+            "markdownDescription": "Enter the Base URL for your Local LLM. For Ollama use http://localhost:11434/v1, for Docker Model Runner use http://localhost:12434/engines/llama.cpp/v1."
           },
           "local.apiKey": {
             "type": [

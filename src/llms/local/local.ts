@@ -34,9 +34,8 @@ export class LocalLLM
   constructor(config: ILlmConfig) {
     super(config);
     this.config = config;
-    // Default to Docker Model Runner endpoint if not provided
-    const baseURL =
-      this.config.baseUrl || "http://localhost:12434/engines/llama.cpp/v1";
+    // Default to Ollama endpoint if not provided
+    const baseURL = this.config.baseUrl || "http://localhost:11434/v1";
 
     this.client = new OpenAI({
       apiKey: this.config.apiKey || "not-needed",
@@ -65,8 +64,7 @@ export class LocalLLM
   private handleConfigurationChange() {
     // Re-initialize client if config changes
     if (this.config.apiKey || this.config.baseUrl) {
-      const baseURL =
-        this.config.baseUrl || "http://localhost:12434/engines/llama.cpp/v1";
+      const baseURL = this.config.baseUrl || "http://localhost:11434/v1";
       this.client = new OpenAI({
         apiKey: this.config.apiKey || "not-needed",
         baseURL: baseURL,
@@ -86,8 +84,7 @@ export class LocalLLM
   public updateConfig(config: ILlmConfig) {
     this.config = config;
     // Update client with new config
-    const baseURL =
-      this.config.baseUrl || "http://localhost:12434/engines/llama.cpp/v1";
+    const baseURL = this.config.baseUrl || "http://localhost:11434/v1";
     this.client = new OpenAI({
       apiKey: this.config.apiKey || "not-needed",
       baseURL: baseURL,
@@ -121,9 +118,11 @@ export class LocalLLM
     try {
       const messages: ChatCompletionMessageParam[] = [];
 
-      if (systemInstruction) {
-        messages.push({ role: "system", content: systemInstruction });
-      }
+      // Add system instruction - use default if none provided to prevent function-call mode
+      const defaultSystemPrompt =
+        "You are a helpful AI assistant. Respond naturally in plain text. Do not output JSON, function calls, or tool invocations. Just answer directly.";
+      const effectiveSystemPrompt = systemInstruction || defaultSystemPrompt;
+      messages.push({ role: "system", content: effectiveSystemPrompt });
 
       messages.push({ role: "user", content: prompt });
 
@@ -153,9 +152,11 @@ export class LocalLLM
         } as ChatCompletionMessageParam;
       });
 
-      if (systemInstruction) {
-        chatMessages.unshift({ role: "system", content: systemInstruction });
-      }
+      // Add system instruction - use default if none provided to prevent function-call mode
+      const defaultSystemPrompt =
+        "You are a helpful AI assistant. Respond naturally in plain text. Do not output JSON, function calls, or tool invocations. Just have a normal conversation.";
+      const effectiveSystemPrompt = systemInstruction || defaultSystemPrompt;
+      chatMessages.unshift({ role: "system", content: effectiveSystemPrompt });
 
       const response = await this.client.chat.completions.create({
         model: this.config.model,
@@ -183,9 +184,11 @@ export class LocalLLM
         } as ChatCompletionMessageParam;
       });
 
-      if (systemInstruction) {
-        chatMessages.unshift({ role: "system", content: systemInstruction });
-      }
+      // Add system instruction - use default if none provided to prevent function-call mode
+      const defaultSystemPrompt =
+        "You are a helpful AI assistant. Respond naturally in plain text. Do not output JSON, function calls, or tool invocations. Just have a normal conversation.";
+      const effectiveSystemPrompt = systemInstruction || defaultSystemPrompt;
+      chatMessages.unshift({ role: "system", content: effectiveSystemPrompt });
 
       const stream = await this.client.chat.completions.create({
         model: this.config.model,

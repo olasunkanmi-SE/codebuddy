@@ -1,5 +1,6 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGroq } from "@langchain/groq";
+import { ChatOpenAI } from "@langchain/openai";
 import { SubAgent } from "deepagents";
 import { StructuredTool } from "langchain";
 import { ToolProvider } from "../langgraph/tools/provider";
@@ -25,7 +26,7 @@ function uniqueTools(tools: StructuredTool[]): StructuredTool[] {
  * Phase 4: Each subagent receives role-specific filtered tools
  */
 export function createDeveloperSubagents(
-  model: ChatAnthropic | ChatGroq, // this should be either anthropic or groq or Gemini
+  model: ChatAnthropic | ChatGroq | ChatOpenAI, // supports anthropic, groq, gemini, or local models
   tools: StructuredTool[],
 ): SubAgent[] {
   // Extract MCP tools from the provided tools list to ensure they are available

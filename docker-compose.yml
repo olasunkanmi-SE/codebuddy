@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   ollama:
@@ -9,6 +9,10 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32G
     # Uncomment to enable GPU support (requires NVIDIA Container Toolkit)
     # deploy:
     #   resources:

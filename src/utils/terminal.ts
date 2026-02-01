@@ -161,14 +161,13 @@ export class Terminal {
 
     if (isAllowed) return;
 
-    // Special check for 'docker desktop enable model-runner --tcp 12434'
+    // Special check for 'docker desktop enable model-runner --tcp=12434'
     if (
-      args.length === 5 &&
+      args.length === 4 &&
       args[0] === "desktop" &&
       args[1] === "enable" &&
       args[2] === "model-runner" &&
-      args[3] === "--tcp" &&
-      args[4] === "12434"
+      args[3] === "--tcp=12434"
     ) {
       return;
     }
@@ -216,8 +215,7 @@ export class Terminal {
       "desktop",
       "enable",
       "model-runner",
-      "--tcp",
-      "12434",
+      "--tcp=12434",
     ]);
   }
 
