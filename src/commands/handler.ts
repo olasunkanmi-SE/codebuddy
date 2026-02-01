@@ -6,6 +6,7 @@ import Groq from "groq-sdk";
 import * as vscode from "vscode";
 import {
   APP_CONFIG,
+  CODEBUDDY_ACTIONS,
   COMMON,
   generativeAiModels,
 } from "../application/constant";
@@ -115,8 +116,6 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     action: string;
     description: string;
   } {
-    const { CODEBUDDY_ACTIONS } = require("../application/constant");
-
     const commandDescriptions: Record<
       string,
       { action: string; description: string }

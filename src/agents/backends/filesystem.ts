@@ -81,7 +81,7 @@ class SimpleMutex {
 
 /** Convert basic glob pattern to RegExp (supports *, **, ?). */
 function globToRegExp(pattern: string): RegExp {
-  let normalized = pattern.replace(/^\/+|\/+$/g, "");
+  const normalized = pattern.replace(/^\/+|\/+$/g, "");
 
   if (!normalized) {
     return new RegExp("^.*$");
@@ -382,7 +382,7 @@ class VscodeFsBackend implements BackendProtocol {
     }
   }
 
-  async globInfo(pattern: string, basePath: string = "/"): Promise<FileInfo[]> {
+  async globInfo(pattern: string, basePath = "/"): Promise<FileInfo[]> {
     const absBase = this.resolveAgentPath(basePath);
 
     const normalizedPattern = pattern.startsWith("/")

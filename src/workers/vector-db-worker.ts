@@ -34,6 +34,7 @@ export class VectorDbWorkerManager {
     this.isInitialized = true;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async indexFiles(files: string[], options?: any): Promise<void> {
     // TODO: Implement LanceDB file indexing
     console.log("Stub: Would index " + files.length + " files with LanceDB");
@@ -52,7 +53,8 @@ export class VectorDbWorkerManager {
     }
   }
 
-  async searchSemantic(query: string, limit: number = 10): Promise<any[]> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async searchSemantic(query: string, limit = 10): Promise<any[]> {
     // TODO: Implement LanceDB semantic search
     console.log("Stub: Would search for '" + query + "' with LanceDB");
     return [];

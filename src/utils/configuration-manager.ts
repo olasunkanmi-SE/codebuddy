@@ -8,7 +8,9 @@ import { getAPIKeyAndModel } from "./utils";
 export class ConfigurationManager {
   private static instance: ConfigurationManager;
 
-  private constructor() {}
+  private constructor() {
+    // Singleton pattern
+  }
 
   public static getInstance(): ConfigurationManager {
     if (!ConfigurationManager.instance) {

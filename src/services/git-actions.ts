@@ -281,7 +281,7 @@ export class GitActions {
    */
   async getCommitHistory(
     baseBranch: string,
-    targetBranch: string = "HEAD",
+    targetBranch = "HEAD",
   ): Promise<string[]> {
     try {
       const log = await this.git.log({
@@ -342,7 +342,7 @@ export class GitActions {
    */
   async getModifiedFiles(
     baseBranch: string,
-    targetBranch: string = "HEAD",
+    targetBranch = "HEAD",
   ): Promise<string[]> {
     try {
       const diff = await this.git.raw([
@@ -363,7 +363,7 @@ export class GitActions {
    */
   async getDiffStats(
     baseBranch: string,
-    targetBranch: string = "HEAD",
+    targetBranch = "HEAD",
   ): Promise<string> {
     try {
       return await this.git.raw(["diff", "--stat", baseBranch, targetBranch]);
@@ -388,7 +388,7 @@ export class GitActions {
   /**
    * Get remote URL
    */
-  async getRemoteUrl(remoteName: string = "origin"): Promise<string> {
+  async getRemoteUrl(remoteName = "origin"): Promise<string> {
     try {
       return await this.git.raw(["remote", "get-url", remoteName]);
     } catch (error: any) {

@@ -77,7 +77,7 @@ export interface ChatHistoryWorkerData {
  */
 export class ChatHistoryWorker {
   private readonly chatHistoryRepo: ChatHistoryRepository;
-  private isProcessing: boolean = false;
+  private isProcessing = false;
   private currentRequestId: string | null = null;
   private readonly logger: Logger;
 

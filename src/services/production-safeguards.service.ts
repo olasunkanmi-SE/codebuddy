@@ -69,7 +69,7 @@ export class ProductionSafeguards implements vscode.Disposable {
   private lastRecoveryAttempts: Map<RecoveryAction, number> = new Map();
   private retryCounters: Map<RecoveryAction, number> = new Map();
   private monitoringInterval?: NodeJS.Timeout;
-  private emergencyStopActive: boolean = false;
+  private emergencyStopActive = false;
   private readonly disposables: vscode.Disposable[] = [];
   private serviceStatusChecker?: ServiceStatusChecker;
 
@@ -470,7 +470,7 @@ export class ProductionSafeguards implements vscode.Disposable {
         vscode.commands.executeCommand("codebuddy.reduceBatchSize");
         break;
 
-      case "PAUSE_INDEXING":
+      case "PAUSE_INDEXING": {
         // Log current indexing status for debugging
         const indexingStats = this.serviceStatusChecker?.getIndexingStats?.();
         this.logger.info("PAUSE_INDEXING recovery action triggered", {
@@ -491,6 +491,7 @@ export class ProductionSafeguards implements vscode.Disposable {
             }
           });
         break;
+      }
 
       case "RESTART_WORKER":
         // Signal worker restart

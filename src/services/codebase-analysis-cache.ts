@@ -108,7 +108,7 @@ export class CodebaseAnalysisCache {
     key: string,
     data: T,
     ttl: number = this.defaultTTL,
-    workspaceDependent: boolean = true,
+    workspaceDependent = true,
   ): Promise<void> {
     const hash = workspaceDependent ? await this.getWorkspaceHash() : "static";
 

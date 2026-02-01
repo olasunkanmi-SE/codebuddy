@@ -8,6 +8,7 @@ export const modelOptions = [
   { value: "OpenAI", label: "OpenAI" },
   { value: "Qwen", label: "Alibaba Qwen" },
   { value: "GLM", label: "Zhipu GLM" },
+  { value: "Local", label: "Local (OpenAI Compatible)" },
 ];
 
 export const codeBuddyMode = [
@@ -27,16 +28,39 @@ export const themeOptions = [
   { value: "Atom One Dark Reasonable", label: "Atom One Dark Reasonable" },
 ];
 
+export const PREDEFINED_LOCAL_MODELS = [
+  {
+    value: "ai/llama3.2:3b",
+    label: "Llama 3.2 (3B)",
+    description: "Efficient general purpose model",
+  },
+  {
+    value: "ai/gemma:2b",
+    label: "Gemma (2B)",
+    description: "Google's lightweight open model",
+  },
+  {
+    value: "ai/qwen2.5:3b",
+    label: "Qwen 2.5 (3B)",
+    description: "Strong coding capabilities",
+  },
+  {
+    value: "ai/mistral:7b",
+    label: "Mistral (7B)",
+    description: "High performance general model",
+  },
+];
+
 export const faqItems: FAQItem[] = [
   {
     question: "HOW DO I SET UP CODEBUDDY?",
     answer: `<p>Setting up CodeBuddy is simple:</p>
       <ol>
-          <li>Obtain API keys for one of the supported LLMs: Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, or Groq</li>
+          <li>Obtain API keys for one of the supported LLMs: Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, or use a Local model</li>
           <li>Open VS Code settings (File > Preferences > Settings)</li>
           <li>Search for "CodeBuddy" in the settings search bar</li>
           <li>Select your preferred AI model from the dropdown</li>
-          <li>Enter your API key in the appropriate field</li>
+          <li>Enter your API key (or Base URL for Local models) in the appropriate field</li>
           <li>Save your settings and restart VS Code if needed</li>
       </ol>
     <p>That's it! CodeBuddy should now be ready to assist you.</p>`,
@@ -51,6 +75,7 @@ export const faqItems: FAQItem[] = [
             <li><strong>OpenAI:</strong> GPT-4o offers robust general-purpose coding assistance</li>
             <li><strong>Qwen:</strong> Qwen 2.5 Coder is a strong open-weight contender</li>
             <li><strong>Groq:</strong> Offers ultra-fast inference with Llama models</li>
+            <li><strong>Local:</strong> Run your own models (like Llama 3, Mistral) via tools like Ollama or LM Studio</li>
         </ul>
         <p>The best model may depend on your specific use case and coding preferences.</p>`,
   },
@@ -59,11 +84,54 @@ export const faqItems: FAQItem[] = [
     answer: `<p>To use CodeBuddy's Agent Mode:</p>
       <ol>
           <li>Ensure you've selected a model in the settings</li>
-          <li>Most supported models (Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq) support agent functionality</li>
+          <li>Most supported models (Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, Local) support agent functionality</li>
           <li>Open the CodeBuddy sidebar in VS Code</li>
           <li>Select "Agent" mode from the mode switcher</li>
       </ol>
       <p>Agent Mode allows CodeBuddy to use tools like file reading, writing, and web search to help you with your tasks.</p>`,
+  },
+  {
+    question: "HOW DO I INSTALL LOCAL MODELS?",
+    answer: `<p>To run local models with CodeBuddy, you need a local LLM server compatible with OpenAI's API format.</p>
+    <h3>Option 1: Ollama (Recommended)</h3>
+    <ol>
+      <li>Download and install Ollama from <a href="https://ollama.com">ollama.com</a></li>
+      <li>Run a model in your terminal: <code>ollama run llama3</code> or <code>ollama run deepseek-coder</code></li>
+      <li>In CodeBuddy settings:
+        <ul>
+          <li>Set Model to <strong>Local</strong></li>
+          <li>Set Base URL to <code>http://localhost:11434/v1</code></li>
+          <li>Set Model Name to the model you pulled (e.g., <code>llama3</code>)</li>
+        </ul>
+      </li>
+    </ol>
+    <h3>Option 2: LM Studio</h3>
+    <ol>
+      <li>Download LM Studio from <a href="https://lmstudio.ai">lmstudio.ai</a></li>
+      <li>Load a model and start the "Local Server"</li>
+      <li>In CodeBuddy settings, use the URL provided by LM Studio (usually <code>http://localhost:1234/v1</code>)</li>
+    </ol>
+    <h3>Option 3: Docker (Ollama)</h3>
+    <p>You can use the built-in Docker Compose support:</p>
+    <ol>
+      <li>In CodeBuddy settings, click <strong>"Start Server"</strong> under "Local Ollama (Docker Compose)".</li>
+      <li>Or run manually: <code>docker compose up -d</code> (a <code>docker-compose.yml</code> file is included in the project root).</li>
+      <li>Pull a model: <code>docker exec -it ollama ollama run llama3</code></li>
+      <li>CodeBuddy connects to <code>http://localhost:11434/v1</code> by default.</li>
+    </ol>
+    <h3>Option 4: Docker Model Runner (Beta)</h3>
+    <p>For Docker Desktop 4.40+ on macOS (Apple Silicon):</p>
+    <ol>
+      <li>Enable Model Runner with TCP: <code>docker desktop enable model-runner --tcp 12434</code> (or enable in Docker Desktop Settings > Beta Features)</li>
+      <li>Pull a model (e.g., Llama 3.2): <code>docker model pull ai/llama3.2:3b</code></li>
+      <li>In CodeBuddy settings:
+        <ul>
+          <li>Set Model to <strong>Local</strong></li>
+          <li>Set Base URL to <code>http://localhost:12434/v1</code></li>
+          <li>Set Model Name to the model you pulled (e.g., <code>ai/llama3.2:3b</code>)</li>
+        </ul>
+      </li>
+    </ol>`,
   },
   {
     question: "WHAT ARE THE CODEBUDDY AGENT CAPABILITIES?",

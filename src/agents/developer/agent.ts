@@ -61,7 +61,9 @@ export class DeveloperAgent {
       const msg = JSON.parse(event.message);
       const model = msg.modelName;
       this.getAIConfigFromWebProvider(model);
-    } catch (error) {}
+    } catch (error) {
+      // Ignore model change errors
+    }
   }
 
   private getAIConfigFromWebProvider(model: string) {

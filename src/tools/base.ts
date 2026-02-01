@@ -1,5 +1,7 @@
 export abstract class CodeBuddyTool {
-  constructor() {}
+  constructor() {
+    // Base constructor
+  }
 
   abstract execute(data: any): any;
 

@@ -93,7 +93,7 @@ export class FileService {
   async writeFile(
     filePath: string,
     content: string,
-    encoding: string = "utf8",
+    encoding = "utf8",
   ): Promise<void> {
     try {
       const uri = vscode.Uri.file(filePath);
@@ -173,7 +173,7 @@ export class FileService {
    */
   async getRecentlyModifiedFiles(
     patterns: string[],
-    daysBack: number = 7,
+    daysBack = 7,
     excludePatterns: string[] = [],
   ): Promise<string[]> {
     const cutoffDate = new Date();
@@ -310,10 +310,7 @@ export class FileService {
   /**
    * Get related files (files in same directory or with similar names)
    */
-  async getRelatedFiles(
-    filePath: string,
-    maxResults: number = 10,
-  ): Promise<string[]> {
+  async getRelatedFiles(filePath: string, maxResults = 10): Promise<string[]> {
     const directory = path.dirname(filePath);
     const baseName = path.basename(filePath, path.extname(filePath));
 

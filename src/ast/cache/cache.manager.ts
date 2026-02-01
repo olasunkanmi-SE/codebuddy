@@ -21,7 +21,7 @@ export class CacheManager {
 
   private constructor(
     private outputChannel: vscode.OutputChannel,
-    maxSize: number = 50,
+    maxSize = 50,
   ) {
     this.cache = new LRUCache<string, CacheEntry>({
       max: maxSize,

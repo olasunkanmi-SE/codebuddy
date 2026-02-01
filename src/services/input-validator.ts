@@ -117,6 +117,7 @@ export class InputValidator {
     let sanitized = input.replace(/\s+/g, " ").trim();
 
     // Remove potential control characters using character codes
+    // eslint-disable-next-line no-control-regex
     sanitized = sanitized.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
 
     // Limit consecutive special characters

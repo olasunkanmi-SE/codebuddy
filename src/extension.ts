@@ -42,6 +42,7 @@ import { GroqWebViewProvider } from "./webview-providers/groq";
 import { OpenAIWebViewProvider } from "./webview-providers/openai";
 import { QwenWebViewProvider } from "./webview-providers/qwen";
 import { GLMWebViewProvider } from "./webview-providers/glm";
+import { LocalWebViewProvider } from "./webview-providers/local";
 import { WebViewProviderManager } from "./webview-providers/manager";
 import { DeveloperAgent } from "./agents/developer/agent";
 import { AgentRunningGuardService } from "./services/agent-running-guard.service";
@@ -70,11 +71,13 @@ const {
   qwenModel,
   glmApiKey,
   glmModel,
+  localApiKey,
+  localModel,
 } = APP_CONFIG;
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
-let orchestrator = Orchestrator.getInstance();
+const orchestrator = Orchestrator.getInstance();
 
 /**
  * Initialize WebView providers lazily for faster startup
@@ -134,6 +137,11 @@ function initializeWebViewProviders(
           key: glmApiKey,
           model: glmModel,
           webviewProviderClass: GLMWebViewProvider,
+        },
+        [generativeAiModels.LOCAL]: {
+          key: localApiKey,
+          model: localModel,
+          webviewProviderClass: LocalWebViewProvider,
         },
       };
 
@@ -481,7 +489,7 @@ export async function activate(context: vscode.ExtensionContext) {
       },
     };
 
-    let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
+    const subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
       ([action, handler]) => {
         logger.info(`Registering command: ${action}`);
         return vscode.commands.registerCommand(action, handler);

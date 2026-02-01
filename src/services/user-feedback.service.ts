@@ -207,7 +207,7 @@ export class UserFeedbackService implements vscode.Disposable {
   /**
    * Show quick status message in status bar
    */
-  showStatusMessage(message: string, timeout: number = 3000): void {
+  showStatusMessage(message: string, timeout = 3000): void {
     if (!this.options.enableStatusBar) {
       return;
     }
@@ -289,7 +289,7 @@ export class UserFeedbackService implements vscode.Disposable {
   /**
    * Show sync status for file operations
    */
-  showSyncStatus(filesQueued: number, processing: boolean = false): void {
+  showSyncStatus(filesQueued: number, processing = false): void {
     if (!this.options.enableStatusBar) {
       return;
     }

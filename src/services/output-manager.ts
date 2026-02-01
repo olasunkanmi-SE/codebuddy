@@ -10,7 +10,7 @@ export class OutputManager {
   private static instance: OutputManager | null = null;
   private outputChannel: vscode.OutputChannel;
 
-  private constructor(channelName: string = "CodeBuddy Analysis") {
+  private constructor(channelName = "CodeBuddy Analysis") {
     this.outputChannel = vscode.window.createOutputChannel(channelName);
   }
 
@@ -30,7 +30,7 @@ export class OutputManager {
     this.outputChannel.clear();
   }
 
-  show(preserveFocus: boolean = true): void {
+  show(preserveFocus = true): void {
     this.outputChannel.show(preserveFocus);
   }
 

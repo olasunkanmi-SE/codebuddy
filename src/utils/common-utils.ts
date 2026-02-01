@@ -256,8 +256,8 @@ export class AsyncUtils {
   static async processBatches<T>(
     items: T[],
     processor: (item: T) => Promise<void>,
-    batchSize: number = 10,
-    delayMs: number = 0,
+    batchSize = 10,
+    delayMs = 0,
   ): Promise<void> {
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
@@ -275,7 +275,7 @@ export class AsyncUtils {
   static async processBatchesWithProgress<T>(
     items: T[],
     processor: (item: T, index: number) => Promise<void>,
-    batchSize: number = 10,
+    batchSize = 10,
     progressCallback?: (current: number, total: number) => void,
   ): Promise<void> {
     let processed = 0;

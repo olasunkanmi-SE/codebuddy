@@ -33,6 +33,8 @@ import { MessageHandler } from "../agents/handlers/message-handler";
 import { CodeBuddyAgentService } from "../agents/services/codebuddy-agent.service";
 import { MCPService } from "../MCP/service";
 import { MCPClientState } from "../MCP/types";
+import { LocalModelService } from "../llms/local/service";
+import { DockerModelService } from "../services/docker/DockerModelService";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -242,10 +244,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
-    view.webview.html = getWebviewContent(
-      this.currentWebView?.webview!,
-      this._extensionUri,
-    );
+    view.webview.html = getWebviewContent(view.webview, this._extensionUri);
   }
 
   private async getFiles() {
@@ -470,6 +469,169 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 "workbench.action.openSettings",
                 "@ext:fiatinnovations.ola-code-buddy",
               );
+              break;
+
+            // Docker Model Runner Commands
+            case "docker-enable-runner":
+              try {
+                const service = DockerModelService.getInstance();
+                const result = await service.enableModelRunner();
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-runner-enabled",
+                  success: result.success,
+                  error: result.error,
+                });
+              } catch (error) {
+                this.logger.error(
+                  "Failed to enable Docker Model Runner",
+                  error,
+                );
+              }
+              break;
+
+            case "docker-start-compose":
+              try {
+                const service = DockerModelService.getInstance();
+                const result = await service.startComposeOllama();
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-compose-started",
+                  success: result.success,
+                  error: result.error,
+                });
+              } catch (error) {
+                this.logger.error("Failed to start Docker Compose", error);
+              }
+              break;
+
+            case "docker-pull-ollama-model":
+              try {
+                const service = DockerModelService.getInstance();
+                const success = await service.pullOllamaModel(message.message);
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-pulled",
+                  model: message.message,
+                  success: success.success,
+                  error: success.error,
+                });
+              } catch (error) {
+                this.logger.error("Failed to pull Ollama model", error);
+              }
+              break;
+
+            case "docker-pull-model":
+              try {
+                const service = DockerModelService.getInstance();
+                const success = await service.pullModel(message.message);
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-pulled",
+                  model: message.message,
+                  success,
+                });
+              } catch (error) {
+                this.logger.error("Failed to pull Docker model", error);
+              }
+              break;
+
+            case "docker-delete-model":
+              try {
+                const service = DockerModelService.getInstance();
+                const result = await service.deleteModel(message.message);
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-deleted",
+                  model: message.message,
+                  success: result.success,
+                  error: result.error,
+                });
+              } catch (error) {
+                this.logger.error("Failed to delete Docker model", error);
+              }
+              break;
+
+            case "docker-use-model":
+              try {
+                // Update local.model setting
+                const config = vscode.workspace.getConfiguration("local");
+                await config.update(
+                  "model",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+
+                // Also ensure Primary Model is set to Local
+                const mainConfig =
+                  vscode.workspace.getConfiguration("generativeAi");
+                await mainConfig.update(
+                  "option",
+                  "Local",
+                  vscode.ConfigurationTarget.Global,
+                );
+
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-selected",
+                  model: message.message,
+                  success: true,
+                });
+              } catch (error) {
+                this.logger.error("Failed to set local model", error);
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-selected",
+                  model: message.message,
+                  success: false,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+              break;
+
+            case "docker-get-models":
+              try {
+                const service = DockerModelService.getInstance();
+                const models = await service.getModels();
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-models-list",
+                  models,
+                });
+              } catch (error) {
+                this.logger.error("Failed to get Docker models", error);
+              }
+              break;
+
+            case "docker-get-local-model":
+              try {
+                const config = vscode.workspace.getConfiguration("local");
+                const model = config.get<string>("model");
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-local-model",
+                  model,
+                });
+              } catch (error) {
+                this.logger.error("Failed to get local model config", error);
+              }
+              break;
+
+            case "docker-check-ollama-status":
+              try {
+                const service = DockerModelService.getInstance();
+                const running = await service.checkOllamaRunning();
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-ollama-status",
+                  running,
+                });
+              } catch (error) {
+                this.logger.error("Failed to check Ollama status", error);
+              }
+              break;
+
+            case "docker-check-status":
+              try {
+                const service = DockerModelService.getInstance();
+                const available = await service.checkModelRunnerAvailable();
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-status",
+                  available,
+                });
+              } catch (error) {
+                this.logger.error("Failed to check Docker status", error);
+              }
               break;
 
             // MCP Settings Commands
@@ -747,6 +909,33 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 this.currentWebView?.webview.postMessage({
                   command: "mcp-servers-data",
                   data: { servers: [], error: error.message },
+                });
+              }
+              break;
+
+            case "get-local-models":
+              try {
+                this.logger.info("Fetching local models...");
+                const localModelService = LocalModelService.getInstance();
+                const models = await localModelService.getLocalModels();
+                const isModelRunnerAvailable =
+                  await localModelService.isModelRunnerAvailable();
+                const isOllamaRunning =
+                  await localModelService.isOllamaRunning();
+
+                this.currentWebView?.webview.postMessage({
+                  command: "local-models-data",
+                  data: {
+                    models,
+                    isModelRunnerAvailable,
+                    isOllamaRunning,
+                  },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to fetch local models:", error);
+                this.currentWebView?.webview.postMessage({
+                  command: "local-models-data",
+                  data: { models: [], error: error.message },
                 });
               }
               break;
@@ -1394,7 +1583,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       })),
     );
 
-    let currentTokenCount =
+    const currentTokenCount =
       systemInstructionTokens +
       historyWithTokens.reduce((sum, item) => sum + item.tokens, 0);
     this.logger.info(
@@ -1461,7 +1650,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       summaryMessage = anthropicOrGroqSummary;
     }
 
-    let newHistoryWithTokens = [
+    const newHistoryWithTokens = [
       { message: summaryMessage, tokens: summaryTokens },
       ...recentMessages,
     ];
@@ -1506,7 +1695,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     systemInstruction: string,
   ): Promise<any[]> {
     try {
-      let mutableHistory = [...history];
+      const mutableHistory = [...history];
       while (mutableHistory.length > 0 && mutableHistory[0].role !== "user") {
         this.logger.warn(
           `History does not start with 'user'. Removing oldest message to correct pattern.`,

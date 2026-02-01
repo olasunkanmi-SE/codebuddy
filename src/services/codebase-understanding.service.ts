@@ -48,8 +48,8 @@ export class CodebaseUnderstandingService {
   private readonly workspaceService: WorkspaceService;
   private readonly cache: CodebaseAnalysisCache;
   private readonly fileReferenceIndex: Map<string, number> = new Map();
-  private fileReferenceCounter: number = 0;
-  private isWebviewMode: boolean = true;
+  private fileReferenceCounter = 0;
+  private isWebviewMode = true;
 
   private constructor() {
     this.logger = Logger.initialize("CodebaseUnderstandingService", {
@@ -226,7 +226,7 @@ export class CodebaseUnderstandingService {
   }
 
   public async getCodebaseContext(
-    isWebview: boolean = true,
+    isWebview = true,
     cancellationToken?: vscode.CancellationToken,
     progress?: vscode.Progress<{ message?: string; increment?: number }>,
   ): Promise<string> {
@@ -376,10 +376,7 @@ ${this.formatFileReferenceIndex()}
     return result;
   }
 
-  private createFileReference(
-    filePath: string,
-    isWebview: boolean = true,
-  ): string {
+  private createFileReference(filePath: string, isWebview = true): string {
     if (!filePath) return "";
 
     // Use global indexing for consistent reference numbers
@@ -1149,7 +1146,7 @@ ${this.formatFileReferenceIndex()}
     const property = properties.find((p) => p.name === propertyName);
     if (property) {
       // Remove array notation and common suffixes
-      let type = property.type.replace("[]", "").trim();
+      const type = property.type.replace("[]", "").trim();
       if (type.endsWith("Entity")) {
         return type;
       }

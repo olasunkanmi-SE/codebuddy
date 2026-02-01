@@ -229,7 +229,8 @@
               "Deepseek",
               "OpenAI",
               "Qwen",
-              "GLM"
+              "GLM",
+              "Local"
             ],
             "default": "Gemini",
             "description": "Select Model"
@@ -353,6 +354,30 @@
             ],
             "default": "apiKey",
             "markdownDescription": "Enter your OpenAI API Key"
+          },
+          "local.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "llama3",
+            "markdownDescription": "Provide the name of the Local model you want to use (e.g., llama3, mistral)."
+          },
+          "local.baseUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "http://localhost:11434/v1",
+            "markdownDescription": "Enter the Base URL for your Local LLM (e.g., http://localhost:11434/v1 for Ollama)."
+          },
+          "local.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "not-needed",
+            "markdownDescription": "Enter your Local LLM API Key (if required)."
           },
           "font.family": {
             "type": "string",

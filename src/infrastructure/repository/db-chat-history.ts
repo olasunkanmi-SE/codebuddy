@@ -123,7 +123,7 @@ export class ChatHistoryRepository {
   /**
    * Get recent chat history with limit
    */
-  public getRecent(agentId: string, limit: number = 50): any[] {
+  public getRecent(agentId: string, limit = 50): any[] {
     try {
       const results = this.dbService.executeSql(
         "SELECT * FROM chat_history WHERE agent_id = ? ORDER BY timestamp DESC LIMIT ?",
@@ -151,7 +151,7 @@ export class ChatHistoryRepository {
   /**
    * Delete old chat history to manage storage size
    */
-  public cleanup(daysToKeep: number = 30): void {
+  public cleanup(daysToKeep = 30): void {
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);

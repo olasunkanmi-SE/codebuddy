@@ -477,7 +477,7 @@ export class ChatHistoryManager {
   // Smart pruning that removes data based on importance/relevance
   async intelligentPrune(
     key: string,
-    targetTokens: number = 4000,
+    targetTokens = 4000,
   ): Promise<{
     originalTokens: number;
     finalTokens: number;
@@ -514,7 +514,7 @@ export class ChatHistoryManager {
     const nonSystemMessages = history.filter((msg) => msg.role !== "system");
 
     // Start with system messages
-    let prunedHistory = [...systemMessages];
+    const prunedHistory = [...systemMessages];
     let currentTokens = systemMessages.reduce((total, msg) => {
       const content = msg.content || msg.parts?.[0]?.text || "";
       return total + this.estimateTokenCount(content);
