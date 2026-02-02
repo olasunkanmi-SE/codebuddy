@@ -18,6 +18,7 @@ import {
   openDocumentationCommand,
   regenerateDocumentationCommand,
 } from "./commands/generate-documentation";
+import { indexWorkspaceCommand } from "./commands/index-workspace";
 import { InLineChat } from "./commands/inline-chat";
 import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
@@ -30,6 +31,7 @@ import { Memory } from "./memory/base";
 import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
 import { ProjectRulesService } from "./services/project-rules.service";
 import { SqliteDatabaseService } from "./services/sqlite-database.service";
+import { ContextRetriever } from "./services/context-retriever";
 import {
   getAPIKeyAndModel,
   getConfigValue,
@@ -208,6 +210,37 @@ export async function activate(context: vscode.ExtensionContext) {
       SqliteDatabaseService.getInstance();
     databaseService.initialize();
 
+    // Initialize ContextRetriever for semantic search
+    const contextRetriever = ContextRetriever.initialize(context);
+
+    // Auto-index files on save
+    context.subscriptions.push(
+      vscode.workspace.onDidSaveTextDocument(async (document) => {
+        // Skip irrelevant files
+        if (
+          document.languageId === "git-commit" ||
+          document.languageId === "log" ||
+          document.fileName.includes("node_modules") ||
+          document.fileName.includes(".git")
+        ) {
+          return;
+        }
+
+        try {
+          // Index the updated file content
+          await contextRetriever.indexFile(
+            document.fileName,
+            document.getText(),
+          );
+        } catch (error) {
+          logger.error(
+            `Failed to auto-index file: ${document.fileName}`,
+            error,
+          );
+        }
+      }),
+    );
+
     // Initialize Project Rules Service
     const projectRulesService = ProjectRulesService.getInstance();
     projectRulesService.initialize();
@@ -242,6 +275,13 @@ export async function activate(context: vscode.ExtensionContext) {
     // });
 
     logger.info("✓ CodeBuddy: Core services started, UI ready");
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "codebuddy.indexWorkspace",
+        indexWorkspaceCommand,
+      ),
+    );
 
     const {
       comment,

@@ -2,13 +2,34 @@ import { StructuredTool, Tool } from "@langchain/core/tools";
 import { Logger, LogLevel } from "../../../infrastructure/logger/logger";
 import { MCPService } from "../../../MCP/service";
 import { MCPTool } from "../../../MCP/types";
-import { FileTool, TerminalTool, ThinkTool, TravilySearchTool } from "../../../tools/tools";
+import {
+  FileTool,
+  TerminalTool,
+  ThinkTool,
+  TravilySearchTool,
+  RipgrepSearchTool,
+  DiagnosticsTool,
+  GitTool,
+  SymbolSearchTool,
+  ListFilesTool,
+  EditFileTool,
+  WebPreviewTool,
+  SearchTool,
+} from "../../../tools/tools";
 import { ContextRetriever } from "./../../../services/context-retriever";
 import { LangChainFileTool } from "./file";
 import { LangChainMCPTool } from "./mcp";
 import { LangChainTerminalTool } from "./terminal";
 import { LangChainThinkTool } from "./think";
 import { LangChainTravilySearchTool } from "./travily";
+import { LangChainRipgrepTool } from "./ripgrep";
+import { LangChainDiagnosticsTool } from "./diagnostics";
+import { LangChainGitTool } from "./git";
+import { LangChainSymbolSearchTool } from "./symbol";
+import { LangChainListFilesTool } from "./list_files";
+import { LangChainEditFileTool } from "./edit_file";
+import { LangChainWebPreviewTool } from "./web_preview";
+import { LangChainSearchTool } from "./search";
 
 const logger = Logger.initialize("ToolProvider", {
   minLevel: LogLevel.DEBUG,
@@ -56,6 +77,55 @@ class TerminalToolFactory implements IToolFactory {
   }
 }
 
+class RipgrepToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainRipgrepTool(new RipgrepSearchTool());
+  }
+}
+
+class DiagnosticsToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainDiagnosticsTool(new DiagnosticsTool());
+  }
+}
+
+class GitToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainGitTool(new GitTool());
+  }
+}
+
+class SymbolSearchToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainSymbolSearchTool(new SymbolSearchTool());
+  }
+}
+
+class ListFilesToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainListFilesTool(new ListFilesTool());
+  }
+}
+
+class EditFileToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainEditFileTool(new EditFileTool());
+  }
+}
+
+class WebPreviewToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainWebPreviewTool(new WebPreviewTool());
+  }
+}
+
+class SearchToolFactory implements IToolFactory {
+  constructor(private contextRetriever: ContextRetriever) {}
+  createTool(): StructuredTool<any> {
+    return new LangChainSearchTool(new SearchTool(this.contextRetriever));
+  }
+}
+
 class MCPToolFactory implements IToolFactory {
   constructor(
     private readonly mcpService: MCPService,
@@ -88,6 +158,12 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "terminal",
     "run",
     "command",
+    "ripgrep_search",
+    "get_diagnostics",
+    "git",
+    "search_symbols",
+    "list_files",
+    "search_vector_db",
   ],
   "doc-writer": [
     "search",
@@ -98,8 +174,13 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "reference",
     "travily",
     "web",
+    "ripgrep_search",
+    "git",
+    "search_symbols",
+    "list_files",
+    "edit_file",
+    "search_vector_db",
   ],
-  debugger: ["*"], // Debugger gets ALL tools
   "file-organizer": [
     "file",
     "directory",
@@ -115,6 +196,10 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "terminal",
     "run",
     "command",
+    "ripgrep_search",
+    "git",
+    "list_files",
+    "edit_file",
   ],
   architect: [
     "search",
@@ -126,6 +211,12 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "list",
     "directory",
     "think",
+    "ripgrep_search",
+    "git",
+    "search_symbols",
+    "list_files",
+    "open_web_preview",
+    "search_vector_db",
   ],
   reviewer: [
     "analyze",
@@ -138,6 +229,11 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "scan",
     "complexity",
     "quality",
+    "ripgrep_search",
+    "get_diagnostics",
+    "search_symbols",
+    "list_files",
+    "search_vector_db",
   ],
   tester: [
     "terminal",
@@ -148,6 +244,13 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "read",
     "file",
     "search",
+    "ripgrep_search",
+    "get_diagnostics",
+    "git",
+    "list_files",
+    "edit_file",
+    "open_web_preview",
+    "search_vector_db",
   ],
 };
 
@@ -165,16 +268,37 @@ export class ToolProvider {
     this.contextRetriever ??= ContextRetriever.initialize();
     this.mcpService = MCPService.getInstance();
     this.toolFactories = [
-      // new FileToolFactory(this.contextRetriever),
-      new WebToolFactory(this.contextRetriever),
-      // new ThinkToolFactory(),
+      new FileToolFactory(this.contextRetriever),
+      // new WebToolFactory(this.contextRetriever),
+      new ThinkToolFactory(),
       new TerminalToolFactory(),
+      // new RipgrepToolFactory(), // Provided by DeepAgent backend
+      new DiagnosticsToolFactory(),
+      new GitToolFactory(),
+      new SymbolSearchToolFactory(),
+      // new ListFilesToolFactory(), // Provided by DeepAgent backend
+      // new EditFileToolFactory(), // Provided by DeepAgent backend
+      new WebPreviewToolFactory(),
+      new SearchToolFactory(this.contextRetriever),
     ];
-    this.tools = this.toolFactories.map(
-      (factory): StructuredTool<any> => factory.createTool(),
-    );
+
+    // Deduplicate tools during initialization
+    const uniqueToolsMap = new Map<string, StructuredTool<any>>();
+    this.toolFactories.forEach((factory) => {
+      const tool = factory.createTool();
+      if (uniqueToolsMap.has(tool.name)) {
+        logger.warn(
+          `Duplicate core tool detected in ToolProvider: ${tool.name}. Skipping.`,
+        );
+      } else {
+        uniqueToolsMap.set(tool.name, tool);
+      }
+    });
+
+    this.tools = Array.from(uniqueToolsMap.values());
+
     logger.info(
-      `ToolProvider initialized with ${this.tools.length} core tools.`,
+      `ToolProvider initialized with ${this.tools.length} unique core tools.`,
     );
 
     // Phase 1: Load MCP tools lazily (non-blocking)
@@ -273,10 +397,17 @@ export class ToolProvider {
     }
 
     // If not initialized yet (either failed or returned 0 tools), retry
-    if (!instance.mcpInitialized) {
+    // FIX: Do not retry if we already attempted and failed. Docker should be optional.
+    // If we retry here, every call to getTools() will trigger the 6-second timeout loop,
+    // causing the application to "break" or become unresponsive when Docker is down.
+    if (!instance.mcpInitialized && !instance.mcpLoadAttempted) {
       logger.debug("Retrying MCP tool loading (attempt after lazy load)...");
       logger.info("Retrying MCP tool loading...");
       await instance.loadMCPTools();
+    } else if (!instance.mcpInitialized && instance.mcpLoadAttempted) {
+      logger.debug(
+        "MCP tools not initialized (attempted but failed or 0 tools). Continuing with core tools.",
+      );
     }
 
     logger.debug(

@@ -183,6 +183,8 @@ export class CodeBuddyAgentService {
     // Customize description based on tool args
     if (toolName === "web_search" && args?.query) {
       description = `Searching the web for: "${args.query.substring(0, 50)}${args.query.length > 50 ? "..." : ""}"`;
+    } else if (toolName === "think" && args?.thought) {
+      description = args.thought;
     } else if (toolName === "read_file" && args?.path) {
       description = `Reading file: ${args.path.split("/").pop()}`;
     } else if (toolName === "analyze_files_for_question" && args?.files) {
@@ -304,8 +306,8 @@ export class CodeBuddyAgentService {
 
     // Safety limits - increased from 50 to handle complex multi-step tasks
     // Event count is higher because agent emits many events per "turn"
-    const maxEventCount = 500; // Total events from the stream
-    const maxToolInvocations = 80; // Maximum agent-initiated tool calls (excludes middleware)
+    const maxEventCount = 1000; // Total events from the stream
+    const maxToolInvocations = 200; // Maximum agent-initiated tool calls (excludes middleware)
     const maxToolCallsPerType = 20; // Limit repeated calls to same tool (agent-initiated only)
     // Critical/mutating tools have stricter limits to prevent infinite loops
     const criticalToolLimits: Record<string, number> = {
@@ -313,6 +315,7 @@ export class CodeBuddyAgentService {
       write_file: 8,
       delete_file: 3,
       run_command: 10,
+      run_terminal_command: 100,
       web_search: 8,
     };
     // Read-only tools are allowed many more calls - gathering context is normal
@@ -818,20 +821,34 @@ export class CodeBuddyAgentService {
               };
 
               // Also emit an activity-specific event for detailed streaming
-              const activityEventType = this.getActivityEventType(
-                toolCall.name,
-              );
-              yield {
-                type: activityEventType,
-                content: toolActivity.description,
-                metadata: {
-                  toolName: toolCall.name,
-                  node: nodeName,
-                  toolId: toolActivity.id,
-                  activityType: this.getToolInfo(toolCall.name).activityType,
-                  timestamp: Date.now(),
-                },
-              };
+              if (toolCall.name === "think") {
+                yield {
+                  type: StreamEventType.THINKING_START,
+                  content: toolActivity.description,
+                  metadata: {
+                    toolName: toolCall.name,
+                    node: nodeName,
+                    toolId: toolActivity.id,
+                    activityType: this.getToolInfo(toolCall.name).activityType,
+                    timestamp: Date.now(),
+                  },
+                };
+              } else {
+                const activityEventType = this.getActivityEventType(
+                  toolCall.name,
+                );
+                yield {
+                  type: activityEventType,
+                  content: toolActivity.description,
+                  metadata: {
+                    toolName: toolCall.name,
+                    node: nodeName,
+                    toolId: toolActivity.id,
+                    activityType: this.getToolInfo(toolCall.name).activityType,
+                    timestamp: Date.now(),
+                  },
+                };
+              }
             }
           }
         }
@@ -855,6 +872,16 @@ export class CodeBuddyAgentService {
             duration: activity.endTime - activity.startTime,
           },
         };
+        if (toolName === "think") {
+          yield {
+            type: StreamEventType.THINKING_END,
+            content: activity.description,
+            metadata: {
+              toolName,
+              timestamp: Date.now(),
+            },
+          };
+        }
       }
 
       // Emit summarizing event before final response

@@ -32,12 +32,12 @@ export interface IToolConfig extends ICodeBuddyToolConfig {
 }
 
 export interface IFileToolConfig {
-  class_name: string;
-  function_name: string;
+  class_name?: string;
+  function_name?: string;
   file_path: string;
 }
 
 export interface IFileToolResponse {
-  function: string;
+  function?: string;
   content: string;
 }

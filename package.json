@@ -117,6 +117,10 @@
     },
     "commands": [
       {
+        "command": "codebuddy.indexWorkspace",
+        "title": "CodeBuddy: Index Workspace for Semantic Search"
+      },
+      {
         "command": "CodeBuddy.commentCode",
         "title": "CodeBuddy. Add comment to selected code."
       },

@@ -47,11 +47,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
       <VSCodeTextArea
         value={userInput}
         onInput={handleTextChange}
-        placeholder={disabled ? "Agent is working..." : "Ask Anything"}
+        placeholder={disabled ? "Agent is working..." : "Ask CodeBuddy..."}
         onKeyDown={handleKeyDown}
         disabled={disabled}
         style={{ 
-          background: "#16161e",
+          width: "100%",
           opacity: disabled ? 0.6 : 1,
           cursor: disabled ? "not-allowed" : "text",
         }}

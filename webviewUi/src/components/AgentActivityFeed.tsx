@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import styled, { keyframes } from "styled-components";
+import { ThinkingComponent } from "./thinkingComponent";
 
 export interface ActivityItem {
   id: string;
@@ -10,7 +11,6 @@ export interface ActivityItem {
     | "planning"
     | "summarizing"
     | "progress"
-    // New detailed activity types
     | "decision"
     | "reading"
     | "searching"
@@ -27,6 +27,7 @@ export interface ActivityItem {
     itemCount?: number;
   };
   duration?: number;
+  terminalOutput?: string;
 }
 
 interface AgentActivityFeedProps {
@@ -45,9 +46,9 @@ const spin = keyframes`
 `;
 
 const Container = styled.div`
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 12px;
+  background: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
   padding: 12px 14px;
   margin: 12px 0;
 `;
@@ -59,10 +60,10 @@ const MainStatus = styled.div`
 `;
 
 const Spinner = styled.div`
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(59, 130, 246, 0.3);
-  border-top-color: #3b82f6;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--vscode-scrollbarSlider-background, rgba(255, 255, 255, 0.1));
+  border-top-color: var(--vscode-progressBar-background, #3b82f6);
   border-radius: 50%;
   animation: ${spin} 0.8s linear infinite;
 `;
@@ -161,17 +162,18 @@ const DetailTime = styled.span`
 const DecisionBadge = styled.div`
   margin-top: 10px;
   padding: 10px 12px;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
 `;
 
 const DecisionLabel = styled.div`
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: rgba(139, 92, 246, 0.8);
+  color: var(--vscode-foreground);
+  opacity: 0.7;
   margin-bottom: 8px;
 `;
 
@@ -192,8 +194,38 @@ const ToolChip = styled.span`
   color: rgba(255, 255, 255, 0.85);
 `;
 
+const TerminalView = styled.div`
+  margin-top: 8px;
+  background: var(--vscode-terminal-background, #1e1e1e);
+  border-radius: 6px;
+  padding: 8px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--vscode-terminal-foreground, #e0e0e0);
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-background, rgba(255, 255, 255, 0.2));
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--vscode-scrollbarSlider-hoverBackground, rgba(255, 255, 255, 0.3));
+  }
+`;
+
 const ChipCount = styled.span`
-  color: rgba(139, 92, 246, 0.9);
+  color: var(--vscode-textLink-foreground);
   font-weight: 600;
 `;
 
@@ -222,43 +254,26 @@ const TOOL_INFO: Record<string, { displayName: string }> = {
   default: { displayName: "Tool" },
 };
 
+
 export const AgentActivityFeed: React.FC<AgentActivityFeedProps> = ({
   activities,
   isActive,
 }) => {
   const [expanded, setExpanded] = useState(false);
 
-  const getToolInfo = (toolName: string): { displayName: string } => {
-    return TOOL_INFO[toolName] || TOOL_INFO.default;
-  };
-
-  const formatTime = (timestamp: number): string => {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000);
-    if (seconds < 5) return "now";
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    return `${minutes}m`;
-  };
-
   if (activities.length === 0) {
     return null;
   }
 
-  // Get the current/latest activity for main status
   const latestActivity = activities[activities.length - 1];
-  const latestInfo = getToolInfo(latestActivity?.toolName || latestActivity?.type);
-  
-  // Find decision activities to show prominently
+  const latestInfo = TOOL_INFO[latestActivity?.toolName || latestActivity?.type] || TOOL_INFO.default;
+
   const decisions = activities.filter((a) => a.type === "decision");
   const latestDecision = decisions[decisions.length - 1];
-  
-  // Parse decision description into tool chips
-  // Format: "Using: Web Search (x2), File Reader (x4)"
+
   const parseDecisionToChips = (description: string): { name: string; count?: number }[] => {
-    // Remove "Using: " or "Decided to use: " prefix
     const toolsPart = description.replace(/^(Using:|Decided to use:)\s*/i, "");
     if (!toolsPart) return [];
-    
     return toolsPart.split(", ").map((item) => {
       const match = item.match(/^(.+?)\s*\(x(\d+)\)$/);
       if (match) {
@@ -269,19 +284,15 @@ export const AgentActivityFeed: React.FC<AgentActivityFeedProps> = ({
   };
 
   const decisionChips = latestDecision ? parseDecisionToChips(latestDecision.description) : [];
-  
-  // Count completed items
+
   const completedCount = activities.filter((a) => a.status === "completed").length;
 
-  // Get main status text
-  const getMainStatus = () => {
-    if (!isActive && completedCount === activities.length) {
-      return `Completed ${completedCount} ${completedCount === 1 ? "action" : "actions"}`;
-    }
-    if (latestActivity) {
-      return `${latestInfo.displayName}: ${latestActivity.description}`;
-    }
-    return "Working...";
+  const formatTime = (timestamp: number): string => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 5) return "now";
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}m`;
   };
 
   return (
@@ -296,7 +307,17 @@ export const AgentActivityFeed: React.FC<AgentActivityFeedProps> = ({
             </svg>
           </DoneIcon>
         )}
-        <StatusText>{getMainStatus()}</StatusText>
+        <StatusText>
+          {(() => {
+            if (!isActive && completedCount === activities.length) {
+              return `Completed ${completedCount} ${completedCount === 1 ? "action" : "actions"}`;
+            }
+            if (latestActivity) {
+              return `${latestInfo.displayName}: ${latestActivity.description}`;
+            }
+            return "Working...";
+          })()}
+        </StatusText>
         {activities.length > 1 && (
           <ToggleButton $expanded={expanded} onClick={() => setExpanded(!expanded)}>
             {activities.length} {activities.length === 1 ? "step" : "steps"}
@@ -324,14 +345,30 @@ export const AgentActivityFeed: React.FC<AgentActivityFeedProps> = ({
       <DetailsContainer $expanded={expanded}>
         <DetailsList>
           {activities.map((activity) => {
-            const toolInfo = getToolInfo(activity.toolName || activity.type);
+            const toolInfo = TOOL_INFO[activity.toolName || activity.type] || TOOL_INFO.default;
+
+            if (activity.type === "thinking" || activity.toolName === "think") {
+              const hasTags = activity.description.includes("<think>") || activity.description.includes("&lt;think&gt;");
+              const content = hasTags ? activity.description : `<think>${activity.description}</think>`;
+              return (
+                <div key={activity.id} style={{ marginBottom: "8px" }}>
+                  <ThinkingComponent content={content} />
+                </div>
+              );
+            }
+
             return (
               <DetailItem key={activity.id} $status={activity.status}>
-                <DetailDot $active={activity.status === "active"} />
-                <DetailText>
-                  {toolInfo.displayName}: {activity.description}
-                </DetailText>
-                <DetailTime>{formatTime(activity.timestamp)}</DetailTime>
+                <div style={{ width: "100%" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <DetailDot $active={activity.status === "active"} />
+                    <DetailText>
+                      {toolInfo.displayName}: {activity.description}
+                    </DetailText>
+                    <DetailTime>{formatTime(activity.timestamp)}</DetailTime>
+                  </div>
+                  {activity.terminalOutput && <TerminalView>{activity.terminalOutput}</TerminalView>}
+                </div>
               </DetailItem>
             );
           })}

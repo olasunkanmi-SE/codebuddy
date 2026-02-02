@@ -7,11 +7,13 @@ interface MessageProps {
 
 export const UserMessage: React.FC<MessageProps> = ({ message, alias }) => {
   return (
-    <div className="message-container">
-      <div className="avatar-container">
-        <div className="avatar">{alias || "U"}</div>
+    <div style={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
+      <div className="message-container user-message" style={{ flexDirection: "row-reverse" }}>
+        <div className="avatar-container">
+          <div className="avatar">{alias || "U"}</div>
+        </div>
+        <div className="message-content" style={{ textAlign: "left" }}>{message}</div>
       </div>
-      <div className="message-content">{message}</div>
     </div>
   );
 };

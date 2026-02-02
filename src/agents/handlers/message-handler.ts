@@ -55,6 +55,39 @@ export class MessageHandler {
 
         // Forward event to orchestrator based on type
         switch (event.type) {
+          case StreamEventType.THINKING:
+            await this.orchestrator.publish(StreamEventType.THINKING, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+          case StreamEventType.PLANNING:
+          case StreamEventType.THINKING_START:
+            await this.orchestrator.publish(StreamEventType.THINKING_START, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+          case StreamEventType.THINKING_UPDATE:
+            await this.orchestrator.publish(StreamEventType.THINKING_UPDATE, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
+          case StreamEventType.THINKING_END:
+            await this.orchestrator.publish(StreamEventType.THINKING_END, {
+              requestId,
+              threadId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+            break;
           case StreamEventType.PLANNING:
             await this.orchestrator.publish(StreamEventType.PLANNING, {
               requestId,

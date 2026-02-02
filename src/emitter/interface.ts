@@ -43,6 +43,9 @@ type AgentEventKeys =
   | "onToolProgress"
   | "onPlanning"
   | "onSummarizing"
+  | "onThinkingStart"
+  | "onThinkingUpdate"
+  | "onThinkingEnd"
   // New detailed activity events
   | "onDecision"
   | "onReading"

@@ -229,9 +229,23 @@ export class DeveloperAgent {
     // Ensure MCP tools are loaded before creating the agent
     this.logger.info("Ensuring MCP tools are loaded...");
     const providerTools = await ToolProvider.getToolsAsync();
-    this.tools = [...(this.config.additionalTools || []), ...providerTools];
+
+    // Combine and deduplicate tools
+    const allTools = [...(this.config.additionalTools || []), ...providerTools];
+    const uniqueToolsMap = new Map<string, StructuredTool>();
+
+    allTools.forEach((tool) => {
+      if (uniqueToolsMap.has(tool.name)) {
+        this.logger.warn(`Duplicate tool detected and skipped: ${tool.name}`);
+      } else {
+        uniqueToolsMap.set(tool.name, tool);
+      }
+    });
+
+    this.tools = Array.from(uniqueToolsMap.values());
+
     this.logger.info(
-      `Agent initialized with ${this.tools.length} tools (including MCP)`,
+      `Agent initialized with ${this.tools.length} unique tools (including MCP)`,
     );
 
     const subagents = enableSubAgents

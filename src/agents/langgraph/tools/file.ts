@@ -15,26 +15,26 @@ export class LangChainFileTool extends StructuredTool<any> {
       enableTelemetry: true,
     });
   }
-  name = "analyze_file_for_question";
+  name = "analyze_files_for_question";
   description =
-    "Analyze specific code files to understand their functionality and answer user questions related to the code. Use this tool when the user is asking about specific parts of the codebase or how certain features are implemented.";
+    "Read the content of specific code files. Use this tool when you need to examine existing code, configuration files, or documentation.";
   schema = z.object({
     files: z
       .array(
         z.object({
-          class_name: z
-            .string()
-            .describe(
-              "The class name within the file that is relevant to the user's query.",
-            ),
-          function_name: z
-            .string()
-            .describe(
-              "The function name within the file that is relevant to the user's query.",
-            ),
           file_path: z
             .string()
-            .describe("The path to the code file to be analyzed."),
+            .describe("The absolute path to the file to read."),
+          class_name: z
+            .string()
+            .optional()
+            .describe("(Optional) The class name to focus on (metadata only)."),
+          function_name: z
+            .string()
+            .optional()
+            .describe(
+              "(Optional) The function name to focus on (metadata only).",
+            ),
         }),
       )
       .describe("An array of file configuration to analyze"),
