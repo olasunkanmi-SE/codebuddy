@@ -6,11 +6,11 @@ An AI-powered coding assistant for Visual Studio Code featuring agentic architec
 
 ## What's New in v3.8.x
 
-**Terminal Integration** - Agents can now execute shell commands (builds, tests, git) with real-time output streaming and safety guards.
-**Expanded Agent Team** - New specialized agents: **Architect**, **Reviewer**, and **Tester** join the existing team.
-**Collaboration Protocols** - Agents follow structured playbooks for New Features, Bug Fixes, and Refactoring.
-**Local LLM Support** - Full support for Ollama and LM Studio (OpenAI-compatible endpoints).
-**New Model Support** - Added support for Qwen, GLM-4, and DeepSeek-R1/V3.
+- **Terminal Integration** - Agents can now execute shell commands (builds, tests, git) with real-time output streaming and safety guards.
+- **Expanded Agent Team** - New specialized agents: **Architect**, **Reviewer**, and **Tester** join the existing team.
+- **Collaboration Protocols** - Agents follow structured playbooks for New Features, Bug Fixes, and Refactoring.
+- **Local LLM Support** - Full support for Ollama and LM Studio (OpenAI-compatible endpoints).
+- **New Model Support** - Added support for Qwen, GLM-4, and DeepSeek-R1/V3.
 
 The extension supports nine AI providers including cloud-based models (Gemini, Anthropic Claude, OpenAI, Groq, DeepSeek, Qwen, GLM) and local models via Ollama, giving developers flexibility in choosing the right model for their privacy and performance requirements.
 
