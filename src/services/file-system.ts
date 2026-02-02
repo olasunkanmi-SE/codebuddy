@@ -158,12 +158,17 @@ export class FileService {
         return filesContent;
       }
       for (const fileName of fileNames) {
-        if (fileName.length < 2) {
+        const trimmedName = fileName.trim();
+        if (trimmedName.length < 2) {
           continue;
         }
-        const files: vscode.Uri[] = await vscode.workspace.findFiles(
-          `**/${fileName.trim()}`,
-        );
+
+        // If it's a path (contains /), use it directly; otherwise glob search
+        const isPath = trimmedName.includes("/");
+        const globPattern = isPath ? trimmedName : `**/${trimmedName}`;
+
+        const files: vscode.Uri[] =
+          await vscode.workspace.findFiles(globPattern);
         if (files.length > 0) {
           const fileUri = files[0];
           try {

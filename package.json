@@ -104,6 +104,14 @@
         {
           "command": "CodeBuddy.reviewPR",
           "group": "CodeBuddy"
+        },
+        {
+          "command": "CodeBuddy.rules.open",
+          "group": "CodeBuddy@9"
+        },
+        {
+          "command": "CodeBuddy.rules.init",
+          "group": "CodeBuddy@9"
         }
       ]
     },
@@ -151,6 +159,18 @@
       {
         "command": "CodeBuddy.reviewPR",
         "title": "CodeBuddy. Review Pull Request"
+      },
+      {
+        "command": "CodeBuddy.rules.open",
+        "title": "CodeBuddy: Open Project Rules"
+      },
+      {
+        "command": "CodeBuddy.rules.init",
+        "title": "CodeBuddy: Initialize Project Rules"
+      },
+      {
+        "command": "CodeBuddy.rules.reload",
+        "title": "CodeBuddy: Reload Project Rules"
       }
     ],
     "keybindings": [
@@ -204,6 +224,11 @@
         "command": "CodeBuddy.codebaseAnalysis",
         "key": "ctrl+shift+6",
         "mac": "cmd+shift+6"
+      },
+      {
+        "command": "CodeBuddy.rules.open",
+        "key": "ctrl+shift+9",
+        "mac": "cmd+shift+9"
       }
     ],
     "viewsContainers": {
@@ -419,6 +444,21 @@
             ],
             "default": 16,
             "description": "Enter your preferred font size (default is 16)"
+          },
+          "codebuddy.rules.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable project rules from .codebuddy/rules.md file"
+          },
+          "codebuddy.rules.maxTokens": {
+            "type": "number",
+            "default": 2000,
+            "description": "Maximum tokens allowed for project rules (rules exceeding this will be truncated)"
+          },
+          "codebuddy.rules.showIndicator": {
+            "type": "boolean",
+            "default": true,
+            "description": "Show indicator in UI when project rules are active"
           },
           "rules.customRules": {
             "type": "array",

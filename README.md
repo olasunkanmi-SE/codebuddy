@@ -1,4 +1,6 @@
-# CodeBuddy: AI-Powered Agentic Coding Assistant
+# CodeBuddy
+
+An AI-powered coding assistant for Visual Studio Code featuring agentic architecture, multi-model support, local model integration, and intelligent codebase understanding.
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/fiatinnovations.ola-code-buddy)](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
 [![Downloads](https://img.shields.io/visual-studio-marketplace/d/fiatinnovations.ola-code-buddy)](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
@@ -14,48 +16,7 @@
 **Local LLM Support** - Full support for Ollama and LM Studio (OpenAI-compatible endpoints).
 **New Model Support** - Added support for Qwen, GLM-4, and DeepSeek-R1/V3.
 
----
-
-## Architecture Overview
-
-CodeBuddy employs a sophisticated **multi-agent architecture** built on **DeepAgents** and **LangGraph**:
-
-```mermaid
-flowchart TB
-    subgraph Extension["CodeBuddy Extension"]
-        subgraph AgentLayer["Agent Service Layer"]
-            ProjectManager["Project Manager<br/>(Main Agent)"]
-
-            subgraph SubAgents["Specialized Team"]
-                Architect["Architect<br/>(System Design)"]
-                CodeAnalyzer["Code<br/>Analyzer"]
-                Reviewer["Reviewer<br/>(Quality/Security)"]
-                Tester["Tester<br/>(QA/Automation)"]
-                Debugger["Debugger"]
-                DocWriter["Doc<br/>Writer"]
-                FileOrganizer["File<br/>Organizer"]
-            end
-        end
-
-        subgraph Tools["Tool Provider"]
-            Terminal["Terminal<br/>(Exec Command)"]
-            WebSearch["Web<br/>Search"]
-            FileTool["File<br/>Ops"]
-            ThinkTool["Reasoning"]
-        end
-
-        subgraph Backends["Backend Systems"]
-            Filesystem["Filesystem<br/>(/workspace/)"]
-            Store["Store<br/>(/docs/)"]
-            State["State<br/>(/ ephemeral)"]
-        end
-    end
-
-    ProjectManager --> SubAgents
-    ProjectManager --> Tools
-    SubAgents --> Tools
-    Tools --> Backends
-```
+The extension supports nine AI providers including cloud-based models (Gemini, Anthropic Claude, OpenAI, Groq, DeepSeek, Qwen, GLM) and local models via Ollama, giving developers flexibility in choosing the right model for their privacy and performance requirements.
 
 ### The Agent Team
 
@@ -68,7 +29,7 @@ flowchart TB
 - **Doc Writer**: Generates comprehensive documentation and API references.
 - **File Organizer**: Refactors directory structures and cleans up projects.
 
----
+### Smart Context Selection
 
 ## Core Features
 

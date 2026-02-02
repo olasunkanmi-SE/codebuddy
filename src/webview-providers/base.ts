@@ -40,6 +40,7 @@ import { MCPService } from "../MCP/service";
 import { MCPClientState } from "../MCP/types";
 import { LocalModelService } from "../llms/local/service";
 import { DockerModelService } from "../services/docker/DockerModelService";
+import { ProjectRulesService } from "../services/project-rules.service";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -176,7 +177,31 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onUpdateThemePreferences(
         this.handleThemePreferences.bind(this),
       ),
+      // Listen for workspace folder changes and update active workspace
+      vscode.workspace.onDidChangeWorkspaceFolders(async () => {
+        this.logger.info(
+          "Workspace folders changed, publishing updated workspace",
+        );
+        await this.publishActiveWorkspace();
+        await this.publishWorkSpace();
+      }),
+      // Listen for active editor changes to update the current file display
+      vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+        if (editor) {
+          this.logger.info(
+            "Active editor changed, publishing updated active file",
+          );
+          await this.publishActiveWorkspace();
+        }
+      }),
     );
+  }
+
+  /**
+   * Gets the current model name for token budget calculation
+   */
+  protected getCurrentModelName(): string {
+    return this.generativeAiModel || "default";
   }
 
   async *streamResponse(
@@ -222,6 +247,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     // Get the current workspace files from DB.
     setImmediate(() => this.getFiles());
+
+    // Note: publishWorkSpace is called when webview signals "webview-ready"
   }
 
   /**
@@ -334,12 +361,80 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         type: "bootstrap",
         message: JSON.stringify(files[0].children),
       });
+
+      // Also publish the active workspace name
+      await this.publishActiveWorkspace();
     } catch (error: any) {
       this.logger.error("Error while getting workspace", error.message);
     }
   }
 
+  /**
+   * Publishes the active file/workspace info to the webview
+   * Shows the current active file name, or workspace name if no file is open
+   * Untitled files show as empty string
+   */
+  private async publishActiveWorkspace(): Promise<void> {
+    try {
+      const activeEditor = vscode.window.activeTextEditor;
+      let displayName: string = "";
+
+      // Reset the tracked active file path
+      this.currentActiveFilePath = undefined;
+
+      if (activeEditor) {
+        // Check if it's an untitled (unsaved) file
+        if (activeEditor.document.isUntitled) {
+          displayName = "";
+          this.currentActiveFilePath = undefined;
+        } else {
+          // Show the current file name with relative path from workspace
+          const filePath = activeEditor.document.uri.fsPath;
+          const workspaceFolder = vscode.workspace.getWorkspaceFolder(
+            activeEditor.document.uri,
+          );
+          if (workspaceFolder) {
+            // Get relative path from workspace root
+            const relativePath = vscode.workspace.asRelativePath(
+              activeEditor.document.uri,
+              false,
+            );
+            displayName = relativePath;
+            // Store the full path for context inclusion
+            this.currentActiveFilePath = filePath;
+          } else {
+            // Fallback to just the file name
+            displayName =
+              activeEditor.document.fileName.split(/[\\/]/).pop() || "";
+            this.currentActiveFilePath = filePath;
+          }
+        }
+      } else {
+        // No active editor, show workspace name
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+          displayName = workspaceFolders[0].name;
+        } else {
+          displayName = "";
+        }
+      }
+
+      await this.currentWebView?.webview.postMessage({
+        type: "onActiveworkspaceUpdate",
+        message: displayName,
+      });
+      this.logger.info(
+        `Active workspace/file published: ${displayName || "(empty)"}`,
+      );
+    } catch (error: any) {
+      this.logger.error("Error publishing active workspace", error.message);
+    }
+  }
+
   private UserMessageCounter = 0;
+
+  // Track the current active file path for context inclusion
+  private currentActiveFilePath: string | undefined;
 
   private async setupMessageHandler(_view: vscode.WebviewView): Promise<void> {
     try {
@@ -428,8 +523,40 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 );
               }
 
+              // Extract user-selected files from @ mentions and model name for smart context selection
+              let userSelectedFiles =
+                message.metaData?.context?.filter(
+                  (f: string) => f && f.trim().length > 0,
+                ) || [];
+
+              // Include the current active file as context if it exists and not already in the list
+              if (this.currentActiveFilePath) {
+                const activeFileAlreadyIncluded = userSelectedFiles.some(
+                  (f: string) =>
+                    f === this.currentActiveFilePath ||
+                    f.endsWith(
+                      this.currentActiveFilePath!.split(/[\\/]/).pop() || "",
+                    ),
+                );
+                if (!activeFileAlreadyIncluded) {
+                  userSelectedFiles = [
+                    this.currentActiveFilePath,
+                    ...userSelectedFiles,
+                  ];
+                  this.logger.info(
+                    `Including active file in context: ${this.currentActiveFilePath}`,
+                  );
+                }
+              }
+
+              const modelName = this.getCurrentModelName();
+
               const messageAndSystemInstruction =
-                await this.enhanceMessageWithCodebaseContext(sanitizedMessage);
+                await this.enhanceMessageWithCodebaseContext(
+                  sanitizedMessage,
+                  userSelectedFiles,
+                  modelName,
+                );
 
               const requestId = generateUUID();
 
@@ -500,9 +627,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
               break;
             }
-            // case "webview-ready":
-            //   await this.publishWorkSpace();
-            //   break;
+            case "webview-ready":
+              await this.publishWorkSpace();
+              break;
             case "upload-file":
               await this.fileManager.uploadFileHandler();
               break;
@@ -1061,6 +1188,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   getConfigValue("rules.customSystemPrompt") || "";
                 const subagentConfig = getConfigValue("rules.subagents") || {};
 
+                // Get project rules status
+                const projectRulesService = ProjectRulesService.getInstance();
+                const projectRulesStatus = projectRulesService.getStatus();
+
                 // Default subagents
                 const defaultSubagents = [
                   {
@@ -1135,7 +1266,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
                 this.currentWebView?.webview.postMessage({
                   command: "rules-data",
-                  data: { rules, systemPrompt, subagents },
+                  data: { rules, systemPrompt, subagents, projectRulesStatus },
                 });
               } catch (error: any) {
                 this.logger.error("Failed to fetch rules:", error);
@@ -1264,6 +1395,52 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
               } catch (error: any) {
                 this.logger.error("Failed to toggle subagent:", error);
+              }
+              break;
+
+            case "project-rules-open":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                await projectRulesService.openRulesFile();
+              } catch (error: any) {
+                this.logger.error("Failed to open project rules:", error);
+              }
+              break;
+
+            case "project-rules-create":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                await projectRulesService.createRulesFile();
+              } catch (error: any) {
+                this.logger.error("Failed to create project rules:", error);
+              }
+              break;
+
+            case "project-rules-reload":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                await projectRulesService.reloadRules();
+                // Send updated status to webview
+                const status = projectRulesService.getStatus();
+                this.currentWebView?.webview.postMessage({
+                  command: "project-rules-status",
+                  data: status,
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to reload project rules:", error);
+              }
+              break;
+
+            case "project-rules-get-status":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                const status = projectRulesService.getStatus();
+                this.currentWebView?.webview.postMessage({
+                  command: "project-rules-status",
+                  data: status,
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to get project rules status:", error);
               }
               break;
 
@@ -1506,9 +1683,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   /**
    * Enhances user messages with codebase context if the question is codebase-related
+   * @param message - The user's message
+   * @param userSelectedFiles - Optional array of file paths from @ mentions
+   * @param modelName - Optional model name for token budget calculation
    */
   private async enhanceMessageWithCodebaseContext(
     message: string,
+    userSelectedFiles?: string[],
+    modelName?: string,
   ): Promise<LLMMessage> {
     try {
       const categorizedQuestion = await this.categorizeQuestion(message);
@@ -1527,6 +1709,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         `Detected codebase question with confidence: ${questionAnalysis.confidence}, categories: ${questionAnalysis.categories.join(", ")}`,
       );
 
+      // Load content of user-selected files (@ mentions)
+      let userSelectedFileContents: Map<string, string> | undefined;
+      if (userSelectedFiles && userSelectedFiles.length > 0) {
+        userSelectedFileContents =
+          await this.fileService.getFilesContent(userSelectedFiles);
+        this.logger.info(
+          `Loaded ${userSelectedFileContents?.size || 0} user-selected files for context`,
+        );
+      }
+
       // Create enhanced prompt using the dedicated service
       const promptContext: PromptContext = {
         questionAnalysis: {
@@ -1536,6 +1728,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               ? this.convertConfidenceToNumber(questionAnalysis.confidence)
               : questionAnalysis.confidence,
         },
+        userSelectedFileContents,
+        modelName: modelName || "default",
       };
 
       const enhancedMessage =

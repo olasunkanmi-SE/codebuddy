@@ -30,24 +30,29 @@ export const themeOptions = [
 
 export const PREDEFINED_LOCAL_MODELS = [
   {
-    value: "ai/llama3.2",
+    value: "qwen2.5-coder",
+    label: "Qwen 2.5 Coder (7B)",
+    description: "Excellent for code tasks - Recommended",
+  },
+  {
+    value: "qwen2.5-coder:3b",
+    label: "Qwen 2.5 Coder (3B)",
+    description: "Faster, lighter coding model",
+  },
+  {
+    value: "llama3.2",
     label: "Llama 3.2 (3B)",
     description: "Efficient general purpose model",
   },
   {
-    value: "ai/gemma3",
-    label: "Gemma 3 (4B)",
-    description: "Google's lightweight open model",
+    value: "deepseek-coder",
+    label: "DeepSeek Coder",
+    description: "Strong code completion capabilities",
   },
   {
-    value: "ai/qwen2.5",
-    label: "Qwen 2.5 (7B)",
-    description: "Strong general purpose model",
-  },
-  {
-    value: "ai/mistral",
-    label: "Mistral (7B)",
-    description: "High performance general model",
+    value: "codellama",
+    label: "CodeLlama (7B)",
+    description: "Meta's code-focused model",
   },
 ];
 
@@ -68,6 +73,7 @@ export const faqItems: FAQItem[] = [
   {
     question: "WHICH AI MODELS WORK BEST WITH CODEBUDDY?",
     answer: `<p>For optimal performance with CodeBuddy, we recommend:</p>
+        <h3>Cloud Models:</h3>
         <ul>
             <li><strong>Gemini:</strong> Gemini-2.0-flash or higher versions provide excellent results</li>
             <li><strong>Deepseek:</strong> DeepSeek-V3 or R1 models are highly capable for coding tasks</li>
@@ -75,63 +81,94 @@ export const faqItems: FAQItem[] = [
             <li><strong>OpenAI:</strong> GPT-4o offers robust general-purpose coding assistance</li>
             <li><strong>Qwen:</strong> Qwen 2.5 Coder is a strong open-weight contender</li>
             <li><strong>Groq:</strong> Offers ultra-fast inference with Llama models</li>
-            <li><strong>Local:</strong> Run your own models (like Llama 3, Mistral) via tools like Ollama or LM Studio</li>
         </ul>
-        <p>The best model may depend on your specific use case and coding preferences.</p>`,
+        <h3>Local Models (Privacy-First):</h3>
+        <ul>
+            <li><strong>Qwen 2.5 Coder (7B):</strong> Excellent code understanding and generation - <em>recommended for local use</em></li>
+            <li><strong>Qwen 2.5 Coder (3B):</strong> Faster, lighter version for quick tasks</li>
+            <li><strong>DeepSeek Coder:</strong> Strong performance on coding benchmarks</li>
+            <li><strong>CodeLlama:</strong> Meta's code-specialized model</li>
+            <li><strong>Llama 3.2:</strong> Good general-purpose model that handles code well</li>
+        </ul>
+        <p><strong>Tip:</strong> Local models via Ollama work great for both Chat and Agent modes, keeping your code completely private!</p>
+        <p>The best model depends on your use case: cloud models for maximum capability, local models for privacy and offline access.</p>`,
   },
   {
     question: "HOW DO I USE THE AGENT MODE?",
     answer: `<p>To use CodeBuddy's Agent Mode:</p>
       <ol>
           <li>Ensure you've selected a model in the settings</li>
-          <li>Most supported models (Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, Local) support agent functionality</li>
+          <li>Agent mode works with all supported models: Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, and <strong>Local models</strong></li>
           <li>Open the CodeBuddy sidebar in VS Code</li>
-          <li>Select "Agent" mode from the mode switcher</li>
+          <li>Select "Agent" mode from the mode switcher at the top</li>
       </ol>
-      <p>Agent Mode allows CodeBuddy to use tools like file reading, writing, and web search to help you with your tasks.</p>`,
+      <h3>What Agent Mode Does:</h3>
+      <ul>
+          <li><strong>File Operations:</strong> Read, write, and edit files in your workspace</li>
+          <li><strong>Web Search:</strong> Search for documentation, solutions, and best practices</li>
+          <li><strong>Code Analysis:</strong> Analyze your codebase structure and dependencies</li>
+          <li><strong>Context Awareness:</strong> Automatically includes your active file and @mentioned files</li>
+      </ul>
+      <h3>Using Local Models with Agent:</h3>
+      <p>Local models like <strong>Qwen 2.5 Coder</strong> (via Ollama) fully support Agent mode, allowing you to:</p>
+      <ul>
+          <li>Keep all your code completely private (nothing leaves your machine)</li>
+          <li>Work offline without internet connectivity</li>
+          <li>Avoid API costs for frequent usage</li>
+      </ul>
+      <p><strong>Tip:</strong> The smart context system respects local model token limits (typically 4K tokens), automatically selecting the most relevant code snippets.</p>`,
   },
   {
     question: "HOW DO I INSTALL LOCAL MODELS?",
     answer: `<p>To run local models with CodeBuddy, you need a local LLM server compatible with OpenAI's API format.</p>
-    <h3>Option 1: Ollama (Recommended)</h3>
+    
+    <h3>Option 1: CodeBuddy Settings UI (Easiest)</h3>
+    <ol>
+      <li>Open CodeBuddy sidebar and go to <strong>Settings → Local Models</strong></li>
+      <li>Click <strong>"Start Server"</strong> to launch Ollama via Docker Compose</li>
+      <li>Select a model from the predefined list (e.g., Qwen 2.5 Coder, Llama 3.2)</li>
+      <li>Click <strong>"Pull"</strong> to download the model</li>
+      <li>Once pulled, click <strong>"Use"</strong> to configure CodeBuddy to use it</li>
+    </ol>
+    <p><em>The UI shows model status, allows pulling/deleting models, and automatically configures the API endpoint.</em></p>
+    
+    <h3>Option 2: Ollama (Manual)</h3>
     <ol>
       <li>Download and install Ollama from <a href="https://ollama.com">ollama.com</a></li>
-      <li>Run a model in your terminal: <code>ollama run llama3</code> or <code>ollama run deepseek-coder</code></li>
+      <li>Run a model in your terminal: <code>ollama run qwen2.5-coder</code> or <code>ollama run llama3</code></li>
       <li>In CodeBuddy settings:
         <ul>
           <li>Set Model to <strong>Local</strong></li>
           <li>Set Base URL to <code>http://localhost:11434/v1</code></li>
-          <li>Set Model Name to the model you pulled (e.g., <code>llama3</code>)</li>
+          <li>Set Model Name to the model you pulled (e.g., <code>qwen2.5-coder</code>)</li>
         </ul>
       </li>
     </ol>
-    <h3>Option 2: LM Studio</h3>
+    
+    <h3>Option 3: LM Studio</h3>
     <ol>
       <li>Download LM Studio from <a href="https://lmstudio.ai">lmstudio.ai</a></li>
       <li>Load a model and start the "Local Server"</li>
       <li>In CodeBuddy settings, use the URL provided by LM Studio (usually <code>http://localhost:1234/v1</code>)</li>
     </ol>
-    <h3>Option 3: Docker (Ollama)</h3>
-    <p>You can use the built-in Docker Compose support:</p>
+    
+    <h3>Option 4: Docker Compose (Recommended for Teams)</h3>
+    <p>Use the built-in Docker Compose support with 32GB memory allocation:</p>
     <ol>
-      <li>In CodeBuddy settings, click <strong>"Start Server"</strong> under "Local Ollama (Docker Compose)".</li>
-      <li>Or run manually: <code>docker compose up -d</code> (a <code>docker-compose.yml</code> file is included in the project root).</li>
-      <li>Pull a model: <code>docker exec -it ollama ollama run llama3</code></li>
-      <li>CodeBuddy connects to <code>http://localhost:11434/v1</code> by default.</li>
+      <li>Click <strong>"Start Server"</strong> in Settings → Local Models, or run: <code>docker compose -f docker-compose.yml up -d</code></li>
+      <li>Pull a model via UI or: <code>docker exec -it ollama ollama pull qwen2.5-coder</code></li>
+      <li>CodeBuddy auto-connects to <code>http://localhost:11434/v1</code></li>
     </ol>
-    <h3>Option 4: Docker Model Runner (Beta)</h3>
-    <p>For Docker Desktop 4.40+ on macOS (Apple Silicon):</p>
-    <ol>
-      <li>Enable Model Runner with TCP: <code>docker desktop enable model-runner --tcp 12434</code> (or enable in Docker Desktop Settings > Beta Features)</li>
-      <li>Pull a model (e.g., Llama 3.2): <code>docker model pull ai/llama3.2:3b</code></li>
-      <li>In CodeBuddy settings:
-        <ul>
-          <li>Set Model to <strong>Local</strong></li>
-          <li>Set Base URL to <code>http://localhost:12434/v1</code></li>
-          <li>Set Model Name to the model you pulled (e.g., <code>ai/llama3.2:3b</code>)</li>
-        </ul>
-      </li>
-    </ol>`,
+    
+    <h3>Recommended Models for Coding:</h3>
+    <ul>
+      <li><strong>qwen2.5-coder (7B)</strong> - Excellent for code generation and understanding</li>
+      <li><strong>qwen2.5-coder:3b</strong> - Faster, lighter version for quick tasks</li>
+      <li><strong>deepseek-coder</strong> - Strong code completion capabilities</li>
+      <li><strong>codellama</strong> - Meta's code-focused model</li>
+    </ul>
+    
+    <p><strong>Note:</strong> Local models work with both Chat and Agent modes in CodeBuddy!</p>`,
   },
   {
     question: "WHAT ARE THE CODEBUDDY AGENT CAPABILITIES?",
@@ -162,6 +199,14 @@ export const faqItems: FAQItem[] = [
             <li>Can reference existing implementations to maintain code consistency</li>
           </ul>
         </li>
+        <li><strong>Smart Context Selection</strong>
+          <ul>
+            <li>Automatically includes your active file as context</li>
+            <li>Respects token limits based on your model (4K for local, 20K+ for cloud)</li>
+            <li>Prioritizes @mentioned files over auto-gathered context</li>
+            <li>Uses relevance scoring to select the most helpful code snippets</li>
+          </ul>
+        </li>
         <li><strong>RAG-Based Architecture</strong> (Retrieval-Augmented Generation)
           <ul>
             <li>Combines knowledge retrieval with generative AI capabilities</li>
@@ -172,7 +217,7 @@ export const faqItems: FAQItem[] = [
         </li>
       </ol>
       <p>The CodeBuddy Agent is specifically designed to function as your intelligent coding companion, helping you write better, more efficient code while saving time on research and debugging.</p>
-      <p><strong>Note:</strong> The full Agent mode with all capabilities is exclusively available when using the Gemini model.</p>`,
+      <p><strong>Supported Models:</strong> Agent mode works with Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, and <strong>Local models</strong> (like Qwen 2.5 Coder via Ollama).</p>`,
   },
 
   {
@@ -181,28 +226,66 @@ export const faqItems: FAQItem[] = [
   },
   {
     question: "WHAT IS THE ACTIVE WORKSPACE",
-    answer: `<p>The active workspace displays the current working workspace of the user within VS Code, providing the following benefits:</p>
+    answer: `<p>The <strong>Active Workspace</strong> display shows your current working context in CodeBuddy, dynamically updating as you navigate your project:</p>
 
+<h3>How It Works:</h3>
 <ul>
-    <li><strong>Workspace Context:</strong>Your current workspace appears at the top of the file and directory hierarchy as you navigate through your codebase, making it easier to stay oriented</li>
-    <li><strong>Workspace Management:</strong> Particularly useful when different workspace is opened, as it confirms which project CodeBuddy is analyzing</li>
+    <li><strong>Shows Current File:</strong> When you have a file open, it displays the relative path from your workspace root (e.g., <code>src/components/App.tsx</code>)</li>
+    <li><strong>Auto-Updates:</strong> Automatically changes when you switch between files in VS Code</li>
+    <li><strong>Untitled Files:</strong> Shows empty when editing unsaved/untitled files</li>
+    <li><strong>Workspace Fallback:</strong> When no file is open, shows your workspace folder name</li>
 </ul>
+
+<h3>Context Integration:</h3>
+<ul>
+    <li><strong>Automatic Context:</strong> The currently displayed active file is <strong>automatically included as context</strong> when you send a message</li>
+    <li><strong>Combined with @ Mentions:</strong> If you also add files using <strong>@file</strong> mentions, both the active file and @mentioned files are included together</li>
+    <li><strong>Smart Deduplication:</strong> If you @mention the same file that's active, it won't be added twice</li>
+</ul>
+
+<p>This means CodeBuddy always has awareness of what you're currently working on, providing more relevant and contextual responses.</p>
 `,
   },
   {
-    question:
-      "WHAT IS THE CHAT CONTEXT AND HOW CAN IT HELP ME TO ENHANCE MY CODING EXPERIENCE ",
+    question: "WHAT IS THE CHAT CONTEXT AND HOW CAN I USE @ MENTIONS?",
     answer: `
 
-<p>Chat Context in CodeBuddy is a powerful feature that allows you to add multiple files to provide relevant background information to the AI model when you ask questions. Here's how it works and why it's beneficial:</p>
+<p>Chat Context in CodeBuddy allows you to provide relevant files to the AI model for more accurate, contextual responses. With the new <strong>@ mention</strong> feature, adding context is easier than ever!</p>
 
-<h3>How Chat Context Works:</h3> <ul> <li>When working on complex code problems, you can select specific files from your workspace to include as "context"</li> <li>These files are bundled together and sent to the LLM (Gemini, Anthropic, or Groq) along with your question</li> <li>The AI can then analyze these files to understand your codebase's structure, dependencies, and implementation details</li> <li>This gives the AI a more comprehensive understanding of your project, enabling it to provide more accurate and contextually relevant answers</li> </ul>
+<h3>How to Add Context:</h3>
+<ul>
+    <li><strong>Type @</strong> in the chat input to open the file selector</li>
+    <li><strong>Fuzzy Search:</strong> Start typing any part of a filename to quickly filter results</li>
+    <li><strong>Visual Icons:</strong> Files display with appropriate icons (📄 for files, 📁 for folders)</li>
+    <li><strong>Full Paths:</strong> See the complete path to avoid confusion with similarly named files</li>
+    <li><strong>Keyboard Navigation:</strong> Use ↑/↓ arrows and Enter to select files quickly</li>
+</ul>
 
-<h3>Benefits of Using Chat Context:</h3> <ul> <li><strong>More accurate responses:</strong> The AI can provide solutions that align with your existing code patterns and architectural decisions</li> <li><strong>Reduced explanation effort:</strong> Instead of describing your code structure in detail, you can simply include relevant files</li> <li><strong>Contextual debugging:</strong> Include error logs or problematic files to help the AI pinpoint issues faster</li> <li><strong>Project-aware recommendations:</strong> Receive suggestions that take into account your specific implementation, not just generic advice</li> <li><strong>Time savings:</strong> Eliminate back-and-forth exchanges where the AI requests more information about your code</li> </ul>
+<h3>Smart Context Selection:</h3>
+<p>CodeBuddy uses intelligent context management to stay within model limits:</p>
+<ul>
+    <li><strong>Token Budget Aware:</strong> Automatically adjusts context size based on your model's limits (4K for local models, 20K+ for cloud models)</li>
+    <li><strong>Priority System:</strong> Your @mentioned files get highest priority, followed by the active file, then auto-gathered context</li>
+    <li><strong>Relevance Scoring:</strong> When auto-gathering context, snippets are ranked by relevance to your question</li>
+    <li><strong>Smart Extraction:</strong> Extracts function signatures and key code blocks rather than full files when space is limited</li>
+</ul>
 
-<h3>When to Use Chat Context:</h3> <ul> <li>When debugging complex issues that span multiple files</li> <li>When asking how to implement a feature that needs to integrate with your existing code</li> <li>When seeking code optimization advice for specific parts of your application</li> <li>When requesting explanations about code functionality across different components</li> </ul>
+<h3>Context Sources (in priority order):</h3>
+<ol>
+    <li><strong>@ Mentioned Files:</strong> Files you explicitly select using @filename</li>
+    <li><strong>Active File:</strong> The file currently displayed in your "Active workspace" (auto-included)</li>
+    <li><strong>Auto-Gathered:</strong> Relevant code snippets found through codebase search (when asking codebase-related questions)</li>
+</ol>
 
-<p>By utilizing Chat Context, you transform CodeBuddy from a general coding assistant into a specialized collaborator that truly understands your unique project environment.</p> </div>
+<h3>When to Use @ Mentions:</h3>
+<ul>
+    <li>When debugging issues that involve specific files</li>
+    <li>When asking about implementation details in particular components</li>
+    <li>When you want the AI to understand relationships between multiple files</li>
+    <li>When seeking code review or optimization for specific files</li>
+</ul>
+
+<p>By combining automatic active file context with manual @ mentions, CodeBuddy understands your project deeply and provides highly relevant assistance.</p>
 `,
   },
 
@@ -216,15 +299,18 @@ export const faqItems: FAQItem[] = [
       <ul>
           <li>All user data and conversations remain within your local VS Code environment</li>
           <li>Your code snippets, queries, and chat history are stored locally in a .codebuddy file (which is automatically gitignored)</li>
-          <li>When using AI models (Gemini, Anthropic, or Groq), your queries are sent directly to these services using your personal API keys</li>
+          <li>When using cloud AI models (Gemini, Anthropic, OpenAI, etc.), your queries are sent directly to these services using your personal API keys</li>
+          <li><strong>Local models (Ollama/LM Studio) keep everything on your machine</strong> - no data leaves your computer</li>
           <li>CodeBuddy itself does not collect, store, or transmit your data to any external servers</li>
           <li>Your API keys are stored securely in your VS Code settings</li>
-          <li>When using Agent mode with web search, only your search queries are sent to external services, not your codebase</li>
+          <li>The active file context feature sends only what's visible in your "Active workspace" display</li>
+          <li>Smart context selection limits what code is sent based on token budgets</li>
       </ul>
       <p>For optimal privacy:</p>
       <ul>
+          <li><strong>Use Local models</strong> for sensitive/proprietary code - nothing leaves your machine</li>
           <li>Regularly clear your chat history if working with sensitive code</li>
-          <li>Be mindful of what code snippets you share with the LLM services</li>
+          <li>Be mindful of what code snippets you share with cloud LLM services</li>
           <li>Review the privacy policies of the specific AI model providers you choose to use</li>
       </ul>
       <p>We're committed to ensuring your code and data remain under your control at all times.</p>`,
