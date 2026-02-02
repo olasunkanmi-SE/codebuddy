@@ -4,6 +4,8 @@ import { ContextRetriever } from "../services/context-retriever";
 import { Terminal } from "../utils/terminal";
 import { z } from "zod";
 import * as vscode from "vscode";
+import { DiffReviewService } from "../services/diff-review.service";
+import * as path from "path";
 
 export class SearchTool {
   constructor(private readonly contextRetriever?: ContextRetriever) {}
@@ -208,11 +210,10 @@ export class EditFileTool {
   ): Promise<string> {
     try {
       const uri = vscode.Uri.file(filePath);
+      let newContent = "";
 
       if (mode === "overwrite") {
-        const data = new Uint8Array(Buffer.from(content, "utf8"));
-        await vscode.workspace.fs.writeFile(uri, data);
-        return `Successfully overwrote ${filePath}`;
+        newContent = content;
       } else if (mode === "replace") {
         if (!search || replace === undefined) {
           return "Error: 'search' and 'replace' arguments are required for replace mode.";
@@ -225,14 +226,24 @@ export class EditFileTool {
           return `Error: Search text not found in ${filePath}.`;
         }
 
-        // Replace only the first occurrence to be safe, similar to the system tool
-        const newContent = existingContent.replace(search, replace);
-        const data = new Uint8Array(Buffer.from(newContent, "utf8"));
-        await vscode.workspace.fs.writeFile(uri, data);
-        return `Successfully replaced content in ${filePath}`;
+        // Replace only the first occurrence to be safe
+        newContent = existingContent.replace(search, replace);
       } else {
         return "Error: Invalid mode. Use 'overwrite' or 'replace'.";
       }
+
+      // Safe Apply: Create a pending change instead of writing directly
+      const change = DiffReviewService.getInstance().addPendingChange(
+        filePath,
+        newContent,
+      );
+
+      const fileName = path.basename(filePath);
+      // Format link so VS Code command handler receives the ID string
+      // Note: command args in markdown links are JSON encoded
+      const args = encodeURIComponent(JSON.stringify(change.id));
+      
+      return `I have prepared changes for **${fileName}**. [Review & Apply](command:codebuddy.reviewChange?${args})`;
     } catch (e: any) {
       return `Error editing file: ${e.message}`;
     }
@@ -386,6 +397,74 @@ export class WebPreviewTool {
           },
         },
         required: ["url"],
+      },
+    };
+  }
+}
+
+import { DeepTerminalService } from "../services/deep-terminal.service";
+
+export class DeepTerminalTool {
+  public async execute(
+    action: "start" | "execute" | "read" | "terminate",
+    sessionId: string,
+    command?: string,
+    waitMs?: number,
+  ): Promise<string> {
+    const service = DeepTerminalService.getInstance();
+    try {
+      switch (action) {
+        case "start":
+          return await service.startSession(sessionId);
+        case "execute":
+          if (!command) return "Error: Command required for execute action.";
+          const result = await service.executeCommand(sessionId, command);
+          if (waitMs && waitMs > 0) {
+            await new Promise((r) => setTimeout(r, waitMs));
+            return result + "\nOutput:\n" + service.readOutput(sessionId);
+          }
+          return result;
+        case "read":
+          return service.readOutput(sessionId) || "(No new output)";
+        case "terminate":
+          return service.terminateSession(sessionId);
+        default:
+          return "Invalid action. Use 'start', 'execute', 'read', or 'terminate'.";
+      }
+    } catch (e: any) {
+      return `Error: ${e.message}`;
+    }
+  }
+
+  config() {
+    return {
+      name: "manage_terminal",
+      description:
+        "Manage persistent terminal sessions. Allows starting sessions, running interactive commands (input), reading streaming output, and terminating sessions. Use this for complex tasks requiring state (e.g. 'cd', env vars) or monitoring long-running processes.",
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          action: {
+            type: SchemaType.STRING,
+            enum: ["start", "execute", "read", "terminate"],
+            description: "The action to perform.",
+          },
+          sessionId: {
+            type: SchemaType.STRING,
+            description:
+              "Unique identifier for the terminal session (e.g., 'main', 'test-server').",
+          },
+          command: {
+            type: SchemaType.STRING,
+            description: "The shell command to execute (required for 'execute').",
+          },
+          waitMs: {
+            type: SchemaType.INTEGER,
+            description:
+              "Optional time (ms) to wait after executing before returning output. Useful to capture immediate response.",
+          },
+        },
+        required: ["action", "sessionId"],
       },
     };
   }

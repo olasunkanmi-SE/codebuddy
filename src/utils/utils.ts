@@ -278,14 +278,17 @@ export const getAPIKeyAndModel = (
     case "qwen":
       apiKey = getConfigValue(qwenApiKey);
       modelName = getConfigValue(qwenModel);
+      baseUrl = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
       break;
     case "glm":
       apiKey = getConfigValue(glmApiKey);
       modelName = getConfigValue(glmModel);
+      baseUrl = "https://open.bigmodel.cn/api/paas/v4";
       break;
     case "deepseek":
       apiKey = getConfigValue(APP_CONFIG.deepseekApiKey);
       modelName = getConfigValue(APP_CONFIG.deepseekModel);
+      baseUrl = "https://api.deepseek.com";
       break;
     case "local":
       apiKey = getConfigValue(localApiKey) || "not-needed";

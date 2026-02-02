@@ -54,6 +54,8 @@ import { WebViewProviderManager } from "./webview-providers/manager";
 import { DeveloperAgent } from "./agents/developer/agent";
 import { AgentRunningGuardService } from "./services/agent-running-guard.service";
 
+import { DiffReviewService } from "./services/diff-review.service";
+
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
   enableConsole: true,
@@ -205,7 +207,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     new DeveloperAgent({});
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
-    setConfigValue("generativeAi.option", "Gemini");
+    // setConfigValue("generativeAi.option", "Gemini");
     initializeWebViewProviders(context, selectedGenerativeAiModel);
     Logger.sessionId = Logger.generateId();
 
@@ -284,6 +286,91 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand(
         "codebuddy.indexWorkspace",
         indexWorkspaceCommand,
+      ),
+    );
+
+    // Initialize Diff Review Service
+    const diffReviewService = DiffReviewService.getInstance();
+    context.subscriptions.push(
+      vscode.workspace.registerTextDocumentContentProvider(
+        DiffReviewService.SCHEME,
+        diffReviewService,
+      ),
+    );
+
+    // Register Review Commands
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "codebuddy.reviewChange",
+        async (id: string) => {
+          const change = diffReviewService.getPendingChange(id);
+          if (change) {
+            const left = vscode.Uri.file(change.filePath);
+            const right = vscode.Uri.parse(
+              `${DiffReviewService.SCHEME}:${change.id}`,
+            );
+            const title = `Review: ${path.basename(change.filePath)}`;
+            await vscode.commands.executeCommand(
+              "vscode.diff",
+              left,
+              right,
+              title,
+            );
+          } else {
+            vscode.window.showErrorMessage("Change not found or expired.");
+          }
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.applyChange",
+        async (id?: string) => {
+          // If ID is not passed, try to get it from the active editor
+          if (!id) {
+            const activeEditor = vscode.window.activeTextEditor;
+            if (
+              activeEditor &&
+              activeEditor.document.uri.scheme === DiffReviewService.SCHEME
+            ) {
+              id = activeEditor.document.uri.path;
+            }
+          }
+
+          if (id) {
+            const success = await diffReviewService.applyChange(id);
+            if (success) {
+              vscode.window.showInformationMessage(
+                "Change applied successfully.",
+              );
+              // Optionally close the diff editor?
+              // vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+            }
+          } else {
+            vscode.window.showErrorMessage(
+              "Could not determine change ID to apply.",
+            );
+          }
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.rejectChange",
+        async (id?: string) => {
+          if (!id) {
+            const activeEditor = vscode.window.activeTextEditor;
+            if (
+              activeEditor &&
+              activeEditor.document.uri.scheme === DiffReviewService.SCHEME
+            ) {
+              id = activeEditor.document.uri.path;
+            }
+          }
+          if (id) {
+            diffReviewService.removePendingChange(id);
+            vscode.window.showInformationMessage("Change rejected/discarded.");
+            vscode.commands.executeCommand(
+              "workbench.action.closeActiveEditor",
+            );
+          }
+        },
       ),
     );
 

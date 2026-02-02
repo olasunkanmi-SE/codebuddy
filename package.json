@@ -53,6 +53,18 @@
       ]
     },
     "menus": {
+      "editor/title": [
+        {
+          "command": "codebuddy.applyChange",
+          "group": "navigation",
+          "when": "resourceScheme == codebuddy-diff"
+        },
+        {
+          "command": "codebuddy.rejectChange",
+          "group": "navigation",
+          "when": "resourceScheme == codebuddy-diff"
+        }
+      ],
       "editor/context": [
         {
           "when": "editorHasSelection",
@@ -183,6 +195,16 @@
       {
         "command": "codebuddy.completion.openSettings",
         "title": "CodeBuddy: Configure Completion Settings"
+      },
+      {
+        "command": "codebuddy.applyChange",
+        "title": "Apply Change",
+        "icon": "$(check)"
+      },
+      {
+        "command": "codebuddy.rejectChange",
+        "title": "Discard Change",
+        "icon": "$(close)"
       }
     ],
     "keybindings": [

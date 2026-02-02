@@ -15,11 +15,13 @@ import {
   EditFileTool,
   WebPreviewTool,
   SearchTool,
+  DeepTerminalTool,
 } from "../../../tools/tools";
 import { ContextRetriever } from "./../../../services/context-retriever";
 import { LangChainFileTool } from "./file";
 import { LangChainMCPTool } from "./mcp";
 import { LangChainTerminalTool } from "./terminal";
+import { LangChainDeepTerminalTool } from "./deep-terminal";
 import { LangChainThinkTool } from "./think";
 import { LangChainTravilySearchTool } from "./travily";
 import { LangChainRipgrepTool } from "./ripgrep";
@@ -74,6 +76,12 @@ class ThinkToolFactory implements IToolFactory {
 class TerminalToolFactory implements IToolFactory {
   createTool(): StructuredTool<any> {
     return new LangChainTerminalTool(new TerminalTool());
+  }
+}
+
+class DeepTerminalToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainDeepTerminalTool(new DeepTerminalTool());
   }
 }
 
@@ -200,6 +208,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "git",
     "list_files",
     "edit_file",
+    "manage_terminal",
   ],
   architect: [
     "search",
@@ -251,6 +260,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "edit_file",
     "open_web_preview",
     "search_vector_db",
+    "manage_terminal",
   ],
 };
 
@@ -272,6 +282,7 @@ export class ToolProvider {
       // new WebToolFactory(this.contextRetriever),
       new ThinkToolFactory(),
       new TerminalToolFactory(),
+      new DeepTerminalToolFactory(),
       // new RipgrepToolFactory(), // Provided by DeepAgent backend
       new DiagnosticsToolFactory(),
       new GitToolFactory(),
