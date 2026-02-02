@@ -15,7 +15,7 @@ export async function indexWorkspaceCommand(): Promise<void> {
   // Find all files, excluding common ignored folders
   const files = await vscode.workspace.findFiles(
     "**/*",
-    "**/{node_modules,.git,dist,out,build,coverage}/**",
+    "**/{node_modules,.git,dist,out,build,coverage,.codebuddy}/**",
   );
 
   if (files.length === 0) {

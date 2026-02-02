@@ -16,6 +16,20 @@ export interface ILlmConfig {
   additionalConfig?: Record<string, any>;
 }
 
+export interface ICodeCompletionOptions {
+  stopSequences?: string[];
+  maxTokens?: number;
+  temperature?: number;
+  model?: string;
+}
+
+export interface ICodeCompleter {
+  completeCode(
+    prompt: string,
+    options?: ICodeCompletionOptions,
+  ): Promise<string>;
+}
+
 export type GeminiModelResponseType =
   | EmbedContentResponse
   | GenerateContentResult

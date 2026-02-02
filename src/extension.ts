@@ -32,6 +32,9 @@ import { PersistentCodebaseUnderstandingService } from "./services/persistent-co
 import { ProjectRulesService } from "./services/project-rules.service";
 import { SqliteDatabaseService } from "./services/sqlite-database.service";
 import { ContextRetriever } from "./services/context-retriever";
+import { InlineCompletionService } from "./services/inline-completion.service";
+import { CompletionStatusBarService } from "./services/completion-status-bar.service";
+import { OutputManager } from "./services/output-manager";
 import {
   getAPIKeyAndModel,
   getConfigValue,
@@ -221,7 +224,8 @@ export async function activate(context: vscode.ExtensionContext) {
           document.languageId === "git-commit" ||
           document.languageId === "log" ||
           document.fileName.includes("node_modules") ||
-          document.fileName.includes(".git")
+          document.fileName.includes(".git") ||
+          document.fileName.includes(".codebuddy")
         ) {
           return;
         }
@@ -280,6 +284,51 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand(
         "codebuddy.indexWorkspace",
         indexWorkspaceCommand,
+      ),
+    );
+
+    // Initialize Inline Completion Service
+    logger.info("Initializing Inline Completion Service...");
+    const outputChannel = OutputManager.getInstance().getChannel();
+    const inlineCompletionService = new InlineCompletionService(
+      context.extensionPath,
+      outputChannel,
+    );
+    const inlineCompletionProvider =
+      vscode.languages.registerInlineCompletionItemProvider(
+        { pattern: "**" },
+        inlineCompletionService,
+      );
+    context.subscriptions.push(inlineCompletionProvider);
+    logger.info("Inline Completion Provider registered");
+
+    // Initialize Status Bar
+    const completionStatusBar = new CompletionStatusBarService(context);
+
+    // Register Completion Commands
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "codebuddy.completion.toggle",
+        async () => {
+          const config = vscode.workspace.getConfiguration(
+            "codebuddy.completion",
+          );
+          const current = config.get<boolean>("enabled", true);
+          await config.update(
+            "enabled",
+            !current,
+            vscode.ConfigurationTarget.Global,
+          );
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.completion.openSettings",
+        () => {
+          vscode.commands.executeCommand(
+            "workbench.action.openSettings",
+            "codebuddy.completion",
+          );
+        },
       ),
     );
 

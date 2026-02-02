@@ -163,6 +163,7 @@ export class FileUtils {
       /node_modules/,
       /\.git/,
       /\.vscode/,
+      /\.codebuddy/,
       /dist/,
       /build/,
       /out/,

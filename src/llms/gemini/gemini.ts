@@ -16,13 +16,18 @@ import { CodeBuddyToolProvider } from "../../tools/factory/tool";
 import { generateUUID, getAPIKeyAndModel } from "../../utils/utils";
 import { BaseLLM } from "../base";
 import { GroqLLM } from "../groq/groq";
-import { GeminiLLMSnapShot, ILlmConfig } from "../interface";
+import {
+  GeminiLLMSnapShot,
+  ICodeCompleter,
+  ICodeCompletionOptions,
+  ILlmConfig,
+} from "../interface";
 import { Message } from "../message";
 import { createAdvancedDeveloperAgent } from "../../agents/developer/agent";
 
 export class GeminiLLM
   extends BaseLLM<GeminiLLMSnapShot>
-  implements vscode.Disposable
+  implements vscode.Disposable, ICodeCompleter
 {
   private readonly generativeAi: GoogleGenerativeAI;
   private response: EmbedContentResponse | GenerateContentResult | undefined;
@@ -85,6 +90,33 @@ export class GeminiLLM
     } catch (error) {
       this.logger.error("Failed to generate embeddings", { error, text });
       throw new Error("Embedding generation failed");
+    }
+  }
+
+  async completeCode(
+    prompt: string,
+    options?: ICodeCompletionOptions,
+  ): Promise<string> {
+    const stopSequences = options?.stopSequences;
+    const maxOutputTokens = options?.maxTokens || 128;
+    const temperature = options?.temperature || 0.1;
+
+    try {
+      const model = this.getModel(); // Gets model with current config
+      // Override generation config for this specific call
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          stopSequences,
+          maxOutputTokens,
+          temperature,
+        },
+      });
+
+      return result.response.text();
+    } catch (error) {
+      this.logger.error("Failed to complete code", { error });
+      return "";
     }
   }
 

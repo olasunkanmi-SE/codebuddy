@@ -4,7 +4,11 @@ import { COMMON } from "../../application/constant";
 import { Memory } from "../../memory/base";
 import { CodeBuddyToolProvider } from "../../tools/factory/tool";
 import { BaseLLM } from "../base";
-import { ILlmConfig } from "../interface";
+import {
+  ILlmConfig,
+  ICodeCompleter,
+  ICodeCompletionOptions,
+} from "../interface";
 import { Message } from "../message";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import OpenAI from "openai";
@@ -21,7 +25,7 @@ interface LocalLLMSnapshot {
 
 export class LocalLLM
   extends BaseLLM<LocalLLMSnapshot>
-  implements vscode.Disposable
+  implements vscode.Disposable, ICodeCompleter
 {
   private client: OpenAI;
   private response: any;
@@ -175,7 +179,7 @@ export class LocalLLM
     messages: Message[],
     systemInstruction?: string,
   ): AsyncGenerator<string, void, unknown> {
-    try {
+    const makeRequest = async (client: OpenAI) => {
       const chatMessages: ChatCompletionMessageParam[] = messages.map((msg) => {
         const role = msg.role as "user" | "assistant" | "system";
         return {
@@ -190,12 +194,15 @@ export class LocalLLM
       const effectiveSystemPrompt = systemInstruction || defaultSystemPrompt;
       chatMessages.unshift({ role: "system", content: effectiveSystemPrompt });
 
-      const stream = await this.client.chat.completions.create({
+      return await client.chat.completions.create({
         model: this.config.model,
         messages: chatMessages,
         stream: true,
       });
+    };
 
+    try {
+      const stream = await makeRequest(this.client);
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content || "";
         if (content) {
@@ -203,13 +210,102 @@ export class LocalLLM
         }
       }
     } catch (error: any) {
-      this.logger.error("Failed to stream", { error });
-      throw new Error(`Stream failed: ${error.message}`);
+      // Check for connection refused on port 12434 and fallback to 11434
+      // We check multiple properties because different library versions/environments expose the error differently
+      const isConnectionRefused =
+        error?.code === "ECONNREFUSED" ||
+        error?.cause?.code === "ECONNREFUSED" ||
+        error?.errno === "ECONNREFUSED" ||
+        error?.message?.includes("ECONNREFUSED");
+
+      const isPort12434 =
+        this.client.baseURL.includes("12434") ||
+        error?.cause?.message?.includes("12434");
+
+      if (isConnectionRefused && isPort12434) {
+        this.logger.warn(
+          "Connection refused on port 12434. Attempting fallback to 11434.",
+        );
+
+        // Update config to use fallback port
+        const newBaseUrl = "http://localhost:11434/v1";
+        this.client = new OpenAI({
+          apiKey: this.config.apiKey || "not-needed",
+          baseURL: newBaseUrl,
+        });
+
+        // Update the persistent configuration so future requests succeed immediately
+        const config = vscode.workspace.getConfiguration("local");
+        await config.update(
+          "baseUrl",
+          newBaseUrl,
+          vscode.ConfigurationTarget.Global,
+        );
+
+        // Retry the request with the new client
+        try {
+          const stream = await makeRequest(this.client);
+          for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || "";
+            if (content) {
+              yield content;
+            }
+          }
+          return; // Exit successfully after fallback
+        } catch (retryError: any) {
+          this.logger.error("Fallback request to 11434 also failed", {
+            error: retryError,
+          });
+          throw retryError;
+        }
+      }
+
+      this.logger.error("Failed to stream chat", { error });
+      throw new Error(`Stream chat failed: ${error.message}`);
     }
   }
 
   public getModel(): OpenAI {
     return this.client;
+  }
+
+  async completeCode(
+    prompt: string,
+    options?: ICodeCompletionOptions,
+  ): Promise<string> {
+    const stop = options?.stopSequences;
+    const maxTokens = options?.maxTokens || 128;
+    const temperature = options?.temperature || 0.1;
+    const model = options?.model || this.config.model;
+
+    try {
+      // 1. Try Legacy Completion API (standard for FIM)
+      const completion = await this.client.completions.create({
+        model: model,
+        prompt: prompt,
+        stop: stop,
+        temperature: temperature,
+        max_tokens: maxTokens,
+        stream: false,
+      });
+
+      return completion.choices[0].text;
+    } catch (error) {
+      // 2. Fallback to Chat API (if model only supports chat)
+      try {
+        const chatCompletion = await this.client.chat.completions.create({
+          model: model,
+          messages: [{ role: "user", content: prompt }],
+          stop: stop,
+          temperature: temperature,
+          max_tokens: maxTokens,
+        });
+        return chatCompletion.choices[0].message.content || "";
+      } catch (chatError) {
+        this.logger.error("Failed to complete code", { error, chatError });
+        return "";
+      }
+    }
   }
 
   public dispose() {

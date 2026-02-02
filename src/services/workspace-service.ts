@@ -20,6 +20,7 @@ export class WorkspaceService implements IWorkspaceService {
     "build",
     ".git",
     "dist",
+    ".codebuddy",
   ];
   private readonly excludedFiles = ["package-lock.json", ".vscode", ".env"];
 

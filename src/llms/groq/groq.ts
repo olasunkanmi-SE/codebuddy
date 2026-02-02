@@ -2,9 +2,16 @@ import Groq from "groq-sdk";
 import * as vscode from "vscode";
 import { GROQ_CONFIG } from "../../application/constant";
 import { BaseLLM } from "../base";
-import { ILlmConfig } from "../interface";
+import {
+  ICodeCompleter,
+  ICodeCompletionOptions,
+  ILlmConfig,
+} from "../interface";
 
-export class GroqLLM extends BaseLLM<any> implements vscode.Disposable {
+export class GroqLLM
+  extends BaseLLM<any>
+  implements vscode.Disposable, ICodeCompleter
+{
   private static instance: GroqLLM;
   private readonly groq: Groq;
 
@@ -50,6 +57,32 @@ export class GroqLLM extends BaseLLM<any> implements vscode.Disposable {
         );
       }
       throw error;
+    }
+  }
+
+  async completeCode(
+    prompt: string,
+    options?: ICodeCompletionOptions,
+  ): Promise<string> {
+    const stop = options?.stopSequences;
+    const maxTokens = options?.maxTokens || 128;
+    const temperature = options?.temperature || 0.1;
+    const model = options?.model || this.config.model;
+
+    try {
+      // Groq mainly supports Chat API
+      const chatCompletion = await this.groq.chat.completions.create({
+        messages: [{ role: "user", content: prompt }],
+        model: model,
+        temperature: temperature,
+        max_tokens: maxTokens,
+        stream: false,
+        stop: stop,
+      });
+      return chatCompletion.choices[0]?.message?.content || "";
+    } catch (error: any) {
+      this.logger.error("Failed to complete code", { error });
+      return "";
     }
   }
 

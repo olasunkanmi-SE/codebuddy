@@ -278,6 +278,7 @@ export class FileService {
       "**/build/**",
       "**/out/**",
       "**/.git/**",
+      "**/.codebuddy/**",
       "**/coverage/**",
       "**/*.min.js",
       "**/*.bundle.js",

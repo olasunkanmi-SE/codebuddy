@@ -175,6 +175,14 @@
       {
         "command": "CodeBuddy.rules.reload",
         "title": "CodeBuddy: Reload Project Rules"
+      },
+      {
+        "command": "codebuddy.completion.toggle",
+        "title": "CodeBuddy: Toggle Inline Completions"
+      },
+      {
+        "command": "codebuddy.completion.openSettings",
+        "title": "CodeBuddy: Configure Completion Settings"
       }
     ],
     "keybindings": [
@@ -448,6 +456,58 @@
             ],
             "default": 16,
             "description": "Enter your preferred font size (default is 16)"
+          },
+          "codebuddy.completion.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable inline code completions (ghost text)"
+          },
+          "codebuddy.completion.provider": {
+            "type": "string",
+            "enum": [
+              "Gemini",
+              "Groq",
+              "Anthropic",
+              "Deepseek",
+              "OpenAI",
+              "Qwen",
+              "GLM",
+              "Local"
+            ],
+            "default": "Local",
+            "description": "Provider for inline completions (can be different from chat provider)"
+          },
+          "codebuddy.completion.model": {
+            "type": "string",
+            "default": "qwen2.5-coder",
+            "description": "Model to use for completions (e.g., qwen2.5-coder, deepseek-coder)"
+          },
+          "codebuddy.completion.apiKey": {
+            "type": ["string", "null"],
+            "default": "",
+            "description": "API key for completion provider (optional, falls back to main key if empty)"
+          },
+          "codebuddy.completion.debounceMs": {
+            "type": "number",
+            "default": 300,
+            "minimum": 50,
+            "description": "Delay in milliseconds before triggering a completion"
+          },
+          "codebuddy.completion.maxTokens": {
+            "type": "number",
+            "default": 128,
+            "description": "Maximum tokens to generate for a completion"
+          },
+          "codebuddy.completion.triggerMode": {
+            "type": "string",
+            "enum": ["automatic", "manual"],
+            "default": "automatic",
+            "description": "How completions are triggered (automatic on type, or manual hotkey)"
+          },
+          "codebuddy.completion.multiLine": {
+            "type": "boolean",
+            "default": true,
+            "description": "Allow multi-line completions"
           },
           "codebuddy.rules.enabled": {
             "type": "boolean",

@@ -28,10 +28,11 @@ export class MessageHandler {
     return (MessageHandler.instance ??= new MessageHandler());
   }
 
-  async handleUserMessage(message: string, metaData?: any) {
+  async handleUserMessage(message: string, metaData?: any): Promise<string> {
     const requestId = `request-${Date.now()}`;
     const threadId = metaData?.threadId;
     this.activeRequests.set(requestId, { threadId });
+    let fullResponse = "";
 
     try {
       // Tag stream start with requestId/threadId so the webview can associate subsequent chunks
@@ -101,50 +102,11 @@ export class MessageHandler {
             await this.orchestrator.publish(StreamEventType.METADATA, {
               requestId,
               threadId,
-              ...event.metadata,
-              content: event.content,
-            });
-            break;
-
-          case StreamEventType.TOOL_START:
-            await this.orchestrator.publish(StreamEventType.TOOL_START, {
-              requestId,
-              threadId,
-              ...JSON.parse(event.content),
-              metadata: { ...event.metadata, requestId, threadId },
-            });
-            this.logger.debug(`Tool started: ${event.metadata?.toolName}`);
-            break;
-
-          case StreamEventType.TOOL_END:
-            await this.orchestrator.publish(StreamEventType.TOOL_END, {
-              requestId,
-              threadId,
-              ...JSON.parse(event.content),
-              metadata: { ...event.metadata, requestId, threadId },
-            });
-            this.logger.debug(`Tool ended: ${event.metadata?.toolName}`);
-            break;
-
-          case StreamEventType.TOOL_PROGRESS:
-            await this.orchestrator.publish(StreamEventType.TOOL_PROGRESS, {
-              requestId,
-              threadId,
-              content: event.content,
-              metadata: { ...event.metadata, requestId, threadId },
-            });
-            break;
-
-          case StreamEventType.SUMMARIZING:
-            await this.orchestrator.publish(StreamEventType.SUMMARIZING, {
-              requestId,
-              threadId,
               content: event.content,
               metadata: event.metadata,
             });
             break;
 
-          // New detailed activity events
           case StreamEventType.DECISION:
             await this.orchestrator.publish(StreamEventType.DECISION, {
               requestId,
@@ -152,11 +114,10 @@ export class MessageHandler {
               content: event.content,
               metadata: event.metadata,
             });
-            this.logger.debug(`Decision: ${event.content}`);
             break;
 
-          case StreamEventType.READING:
-            await this.orchestrator.publish(StreamEventType.READING, {
+          case StreamEventType.TOOL_START:
+            await this.orchestrator.publish(StreamEventType.TOOL_START, {
               requestId,
               threadId,
               content: event.content,
@@ -164,35 +125,8 @@ export class MessageHandler {
             });
             break;
 
-          case StreamEventType.SEARCHING:
-            await this.orchestrator.publish(StreamEventType.SEARCHING, {
-              requestId,
-              threadId,
-              content: event.content,
-              metadata: event.metadata,
-            });
-            break;
-
-          case StreamEventType.REVIEWING:
-            await this.orchestrator.publish(StreamEventType.REVIEWING, {
-              requestId,
-              threadId,
-              content: event.content,
-              metadata: event.metadata,
-            });
-            break;
-
-          case StreamEventType.ANALYZING:
-            await this.orchestrator.publish(StreamEventType.ANALYZING, {
-              requestId,
-              threadId,
-              content: event.content,
-              metadata: event.metadata,
-            });
-            break;
-
-          case StreamEventType.EXECUTING:
-            await this.orchestrator.publish(StreamEventType.EXECUTING, {
+          case StreamEventType.TOOL_END:
+            await this.orchestrator.publish(StreamEventType.TOOL_END, {
               requestId,
               threadId,
               content: event.content,
@@ -210,47 +144,48 @@ export class MessageHandler {
             break;
 
           case StreamEventType.CHUNK:
+            // Capture the accumulated response
+            if (event.accumulated) {
+              fullResponse = event.accumulated;
+            } else {
+              // Fallback if accumulated is missing (shouldn't happen based on service code)
+              fullResponse += event.content;
+            }
+
             await this.orchestrator.publish(StreamEventType.CHUNK, {
               requestId,
               threadId,
               content: event.content,
-              accumulated: event.accumulated,
               metadata: event.metadata,
             });
-            break;
-
-          case StreamEventType.END:
-            await this.orchestrator.publish(StreamEventType.END, {
-              requestId,
-              threadId,
-              content: event.content,
-              metadata: event.metadata,
-            });
-            this.activeRequests.delete(requestId);
-            this.logger.info(`Request ${requestId} completed`);
             break;
 
           case StreamEventType.ERROR:
             await this.orchestrator.publish(StreamEventType.ERROR, {
               requestId,
               threadId,
-              error: event.content,
+              content: event.content,
               metadata: event.metadata,
             });
-            this.activeRequests.delete(requestId);
-            this.logger.error(`Request ${requestId} failed: ${event.content}`);
             break;
         }
       }
-    } catch (error: any) {
-      this.logger.error(`Request ${requestId} failed`, error);
+
+      return fullResponse;
+    } catch (error) {
+      this.logger.error("Error in message handler", error);
       await this.orchestrator.publish(StreamEventType.ERROR, {
         requestId,
         threadId,
-        error: `Request ${requestId} failed: ${error.message}`,
-        metadata: { timestamp: Date.now() },
+        content: error instanceof Error ? error.message : "Unknown error",
       });
+      throw error;
+    } finally {
       this.activeRequests.delete(requestId);
+      await this.orchestrator.publish(StreamEventType.END, {
+        requestId,
+        threadId,
+      });
     }
   }
 
