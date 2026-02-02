@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 type AllowedCommand = "git" | "npm" | "ls" | "echo" | "docker";
@@ -15,6 +16,7 @@ export class Terminal {
   private readonly logger: Logger;
   private static instance: Terminal;
   private extensionPath: string = "";
+  private outputChannel: vscode.OutputChannel;
 
   constructor() {
     this.logger = Logger.initialize(Terminal.name, {
@@ -23,6 +25,7 @@ export class Terminal {
       enableFile: true,
       enableTelemetry: true,
     });
+    this.outputChannel = vscode.window.createOutputChannel("CodeBuddy Terminal");
   }
 
   static getInstance(): Terminal {
@@ -42,6 +45,71 @@ export class Terminal {
 
   getExtensionPath(): string {
     return this.extensionPath;
+  }
+
+  /**
+   * Executes any shell command and streams output to the CodeBuddy Terminal channel.
+   * Includes a safety guard requiring user confirmation before execution.
+   * @param command The command to execute.
+   * @param cwd Optional working directory.
+   * @returns A promise that resolves with the command's stdout.
+   */
+  public async executeAnyCommand(command: string, cwd?: string): Promise<string> {
+    // Safety Guard: User Confirmation
+    const selection = await vscode.window.showWarningMessage(
+      `CodeBuddy wants to execute: "${command}"`,
+      { modal: true },
+      "Execute",
+      "Cancel"
+    );
+
+    if (selection !== "Execute") {
+      this.logger.info(`User denied execution of command: ${command}`);
+      return Promise.reject(new Error("User denied command execution."));
+    }
+
+    this.outputChannel.show(true);
+    this.outputChannel.appendLine(`> ${command}`);
+    this.logger.info(`Executing command: ${command}`);
+
+    return new Promise((resolve, reject) => {
+      const process = spawn(command, {
+        shell: true,
+        cwd: cwd || (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || this.extensionPath) || undefined
+      });
+
+      let stdout = "";
+      let stderr = "";
+
+      process.stdout.on("data", (data) => {
+        const str = data.toString();
+        stdout += str;
+        this.outputChannel.append(str);
+      });
+
+      process.stderr.on("data", (data) => {
+        const str = data.toString();
+        stderr += str;
+        this.outputChannel.append(str);
+      });
+
+      process.on("error", (err) => {
+        this.outputChannel.appendLine(`Error: ${err.message}`);
+        this.logger.error(`Command execution error: ${err.message}`);
+        reject(err);
+      });
+
+      process.on("close", (code) => {
+        if (code === 0) {
+          this.logger.info(`Command finished successfully.`);
+          resolve(stdout);
+        } else {
+          const errorMessage = `Command failed with exit code ${code}`;
+          this.logger.error(`${errorMessage}. Stderr: ${stderr}`);
+          reject(new Error(`${errorMessage}\n${stderr}`));
+        }
+      });
+    });
   }
 
   /**

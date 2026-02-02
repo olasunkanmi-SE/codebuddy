@@ -197,6 +197,23 @@ export class SqliteDatabaseService {
       `);
 
       this.db.run(`
+        CREATE TABLE IF NOT EXISTS chat_summaries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          agent_id TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_summary_agent_id ON chat_summaries(agent_id)
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_summary_timestamp ON chat_summaries(timestamp)
+      `);
+
+      this.db.run(`
         CREATE INDEX IF NOT EXISTS idx_chat_timestamp ON chat_history(timestamp)
       `);
     } catch (error: any) {
@@ -677,6 +694,7 @@ export class SqliteDatabaseService {
       const stmt = this.db.prepare(query);
       const result = stmt.run(params);
       stmt.free();
+      this.saveToDisk();
       return result;
     } catch (error: any) {
       this.logger.error(`SQL command execution failed: ${query}`, error);

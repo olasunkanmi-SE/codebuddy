@@ -33,25 +33,26 @@ export class Message {
   }
 
   static of(input: MessageInput): MessageOutput {
-    const { role, content, parts } = input;
+    let { role, content, parts } = input;
 
-    if (content && parts) {
-      // vscode.window.showErrorMessage(
-      //   "Model message must have either content or parts.",
-      // );
+    if (!content && !parts) {
+      vscode.window.showErrorMessage(
+        "Model message must have either content or parts.",
+      );
       throw new Error("Model message must have either content or parts.");
     }
 
-    if (content) {
-      return { role, content };
+    if (content && !parts) {
+      parts = [{ text: content }];
     }
 
-    if (parts) {
-      return { role, parts };
+    if (!content && parts) {
+      content = parts
+        .map((part) => part.text || "")
+        .join("\n")
+        .trim();
     }
-    vscode.window.showErrorMessage(
-      "Model message must have either content or parts.",
-    );
-    throw new Error("Model message must have either content or parts.");
+
+    return { role, content, parts };
   }
 }

@@ -41,6 +41,7 @@ export class GLMWebViewProvider extends BaseWebViewProvider {
         Message.of({
           role: msg.role === "user" ? "user" : "assistant",
           content: msg.content,
+          parts: msg.parts,
         }),
       );
     } catch (error: any) {
@@ -127,6 +128,7 @@ export class GLMWebViewProvider extends BaseWebViewProvider {
         this.chatHistory,
         6000,
         systemInstruction,
+        "agentId",
       );
 
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -223,6 +225,7 @@ export class GLMWebViewProvider extends BaseWebViewProvider {
         this.chatHistory,
         6000,
         systemInstruction,
+        "agentId",
       );
 
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [

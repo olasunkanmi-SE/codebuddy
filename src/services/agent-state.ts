@@ -121,6 +121,40 @@ export class AgentService {
   }
 
   /**
+   * Save chat summary
+   */
+  async saveChatSummary(agentId: string, summary: string): Promise<void> {
+    try {
+      const requestId = `save-summary-${agentId}-${Date.now()}`;
+      await this.chatHistoryWorker.processRequest(
+        ChatHistoryWorkerOperation.SAVE_SUMMARY,
+        { agentId, summary },
+        requestId,
+      );
+    } catch (error: any) {
+      console.warn(`Failed to save chat summary for agent ${agentId}:`, error);
+    }
+  }
+
+  /**
+   * Get chat summary
+   */
+  async getChatSummary(agentId: string): Promise<string | null> {
+    try {
+      const requestId = `get-summary-${agentId}-${Date.now()}`;
+      const result = await this.chatHistoryWorker.processRequest(
+        ChatHistoryWorkerOperation.GET_SUMMARY,
+        { agentId },
+        requestId,
+      );
+      return result.summary || null;
+    } catch (error: any) {
+      console.warn(`Failed to get chat summary for agent ${agentId}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Get recent chat history for an agent (optimized for performance)
    */
   async getRecentChatHistory(agentId: string, limit = 50): Promise<any[]> {

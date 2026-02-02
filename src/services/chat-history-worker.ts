@@ -28,6 +28,8 @@ export enum ChatHistoryWorkerOperation {
   ADD_CHAT_MESSAGE = "ADD_CHAT_MESSAGE",
   GET_RECENT_HISTORY = "GET_RECENT_HISTORY",
   CLEANUP_OLD_HISTORY = "CLEANUP_OLD_HISTORY",
+  SAVE_SUMMARY = "SAVE_SUMMARY",
+  GET_SUMMARY = "GET_SUMMARY",
 }
 
 /**
@@ -60,6 +62,8 @@ export interface ChatHistoryWorkerData {
     sessionId?: string;
     metadata?: any;
   };
+  /** Summary data (for summary operations) */
+  summary?: string;
   /** Configuration parameters */
   config?: {
     /** Number of recent messages to retrieve */
@@ -148,6 +152,21 @@ export class ChatHistoryWorker {
           break;
         }
 
+        case ChatHistoryWorkerOperation.SAVE_SUMMARY: {
+          if (!data.summary) {
+            throw new Error("Summary data is required for save operation");
+          }
+          await this.saveSummary(data.agentId, data.summary);
+          result = { success: true };
+          break;
+        }
+
+        case ChatHistoryWorkerOperation.GET_SUMMARY: {
+          const summary = await this.getSummary(data.agentId);
+          result = { summary };
+          break;
+        }
+
         default:
           throw new Error(`Unknown operation: ${operation}`);
       }
@@ -157,6 +176,44 @@ export class ChatHistoryWorker {
       this.isProcessing = false;
       this.currentRequestId = null;
     }
+  }
+
+  /**
+   * Save chat summary for an agent
+   */
+  private async saveSummary(agentId: string, summary: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        try {
+          this.chatHistoryRepo.saveSummary(agentId, summary);
+          resolve();
+        } catch (error: any) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to save summary: ${errorMessage}`);
+          reject(new Error(`Failed to save summary: ${errorMessage}`));
+        }
+      }, 0);
+    });
+  }
+
+  /**
+   * Get chat summary for an agent
+   */
+  private async getSummary(agentId: string): Promise<string | null> {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        try {
+          const summary = this.chatHistoryRepo.getSummary(agentId);
+          resolve(summary);
+        } catch (error: any) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to get summary: ${errorMessage}`);
+          reject(new Error(`Failed to get summary: ${errorMessage}`));
+        }
+      }, 0);
+    });
   }
 
   /**

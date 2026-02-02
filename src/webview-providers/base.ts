@@ -259,20 +259,38 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     try {
       // Get chat history from database via AgentService
       const agentId = "agentId"; // Using the same hardcoded ID as WebViewProviderManager
-      const persistentHistory = await this.agentService.getChatHistory(agentId);
+      const persistentHistory =
+        (await this.agentService.getChatHistory(agentId)) || [];
+      const persistentSummary = await this.agentService.getChatSummary(agentId);
 
-      if (persistentHistory && persistentHistory.length > 0) {
+      if (persistentHistory.length > 0 || persistentSummary) {
         // Convert database format to provider's IMessageInput format
         const providerHistory = persistentHistory.map((msg: any) => ({
-          role: msg.type === "user" ? "user" : "model",
+          type: msg.type === "user" ? "user" : "model",
           content: msg.content,
           timestamp: msg.timestamp || Date.now(),
           metadata: msg.metadata,
         }));
 
+        // Prepend summary if it exists
+        if (persistentSummary) {
+          providerHistory.unshift({
+            type: "user",
+            content: `[System Note: This is a summary of our earlier conversation to preserve context]:\n${persistentSummary}`,
+            timestamp: Date.now(),
+            metadata: { isSummary: true },
+          });
+        }
+
         this.logger.debug(
-          `Synchronized ${persistentHistory.length} chat messages from database`,
+          `Synchronized ${persistentHistory.length} chat messages from database${persistentSummary ? " + summary" : ""}`,
         );
+
+        // Send history to webview
+        await this.currentWebView?.webview.postMessage({
+          type: "chat-history",
+          message: JSON.stringify(providerHistory),
+        });
       } else {
         this.logger.debug("No chat history found in database to synchronize");
       }
@@ -560,6 +578,19 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     payload: { requestId, content: chunk },
                   });
                 }
+
+                // Save chat history to database
+                await this.agentService.addChatMessage("agentId", {
+                  content: sanitizedMessage,
+                  type: "user",
+                  sessionId: requestId,
+                });
+
+                await this.agentService.addChatMessage("agentId", {
+                  content: fullResponse,
+                  type: "model",
+                  sessionId: requestId,
+                });
               } catch (error: any) {
                 this.logger.error("Error during streaming", error);
                 await this.currentWebView?.webview.postMessage({
@@ -1827,13 +1858,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
    * @param history The current chat history.
    * @param maxTokens The maximum number of tokens allowed for the context window.
    * @param systemInstruction The system instruction, which also counts towards the token limit.
-   * @param generateSummary An async function that takes a list of messages and returns a summary string.
+   * @param agentId The agent ID to save the summary for.
    * @returns A promise that resolves to the new, potentially summarized and pruned, chat history.
    */
   async pruneChatHistoryWithSummary(
     history: any[],
     maxTokens: number,
     systemInstruction: string,
+    agentId?: string,
   ): Promise<any[]> {
     // --- 1. Calculate initial token count (same as before) ---
     const systemInstructionTokens =
@@ -1892,6 +1924,13 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     const summaryText = await this.generateSummaryForModel(
       messagesToSummarize.map((item) => item.message),
     );
+
+    // Save summary if agentId is provided
+    if (summaryText && agentId) {
+      await this.chatHistoryManager.saveSummary(agentId, summaryText);
+      this.logger.info(`Saved chat summary for agent ${agentId}`);
+    }
+
     const summaryTokens = await this.getTokenCounts(summaryText ?? "");
 
     let summaryMessage;
@@ -1977,14 +2016,15 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         return [];
       }
 
-      const systemInstructionTokens =
-        await this.getTokenCounts(systemInstruction);
+      const systemInstructionTokens = await this.getTokenCounts(
+        systemInstruction || "",
+      );
 
       const historyWithTokens = await Promise.all(
         mutableHistory.map(async (msg) => ({
           message: msg,
           tokens: await this.getTokenCounts(
-            msg.parts ? msg.parts[0].text : msg.content,
+            (msg.parts ? msg.parts[0].text : msg.content) || "",
           ),
         })),
       );

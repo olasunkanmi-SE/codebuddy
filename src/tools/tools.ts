@@ -1,6 +1,7 @@
 import { SchemaType } from "@google/generative-ai";
 import { IFileToolConfig } from "../application/interfaces/agent.interface";
 import { ContextRetriever } from "../services/context-retriever";
+import { Terminal } from "../utils/terminal";
 import { z } from "zod";
 
 // class SearchTool {
@@ -199,9 +200,34 @@ export class ThinkTool {
   }
 }
 
+export class TerminalTool {
+  public async execute(command: string) {
+    return await Terminal.getInstance().executeAnyCommand(command);
+  }
+
+  config() {
+    return {
+      name: "run_terminal_command",
+      description:
+        "Execute a shell command in the terminal. Requires user confirmation. Use this to run tests, build scripts, check file status, or perform other system operations. The output will be returned and also displayed to the user.",
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          command: {
+            type: SchemaType.STRING,
+            description: "The shell command to execute.",
+          },
+        },
+        required: ["command"],
+      },
+    };
+  }
+}
+
 export const TOOL_CONFIGS = {
   // SearchTool: { tool: SearchTool, useContextRetriever: true },
   FileTool: { tool: FileTool, useContextRetriever: true },
   WebTool: { tool: WebTool, useContextRetriever: true },
   ThinkTool: { tool: ThinkTool, useContextRetriever: true },
+  TerminalTool: { tool: TerminalTool, useContextRetriever: false },
 };
