@@ -31,6 +31,7 @@ import { Memory } from "./memory/base";
 import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
 import { ProjectRulesService } from "./services/project-rules.service";
 import { SqliteDatabaseService } from "./services/sqlite-database.service";
+import { SchedulerService } from "./services/scheduler.service";
 import { ContextRetriever } from "./services/context-retriever";
 import { InlineCompletionService } from "./services/inline-completion.service";
 import { CompletionStatusBarService } from "./services/completion-status-bar.service";
@@ -214,6 +215,9 @@ export async function activate(context: vscode.ExtensionContext) {
     const databaseService: SqliteDatabaseService =
       SqliteDatabaseService.getInstance();
     databaseService.initialize();
+
+    // Start Scheduler Service
+    SchedulerService.getInstance().start();
 
     // Initialize ContextRetriever for semantic search
     const contextRetriever = ContextRetriever.initialize(context);

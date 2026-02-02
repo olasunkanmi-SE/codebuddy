@@ -216,6 +216,37 @@ export class SqliteDatabaseService {
       this.db.run(`
         CREATE INDEX IF NOT EXISTS idx_chat_timestamp ON chat_history(timestamp)
       `);
+
+      // Scheduled Tasks Table
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS scheduled_tasks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          cron_expression TEXT NOT NULL,
+          command TEXT NOT NULL,
+          last_run DATETIME,
+          next_run DATETIME,
+          status TEXT DEFAULT 'active'
+        )
+      `);
+
+      // News Items Table
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS news_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          url TEXT NOT NULL,
+          summary TEXT,
+          source TEXT NOT NULL,
+          published_at DATETIME,
+          fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          read_status INTEGER DEFAULT 0
+        )
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_news_read_status ON news_items(read_status)
+      `);
     } catch (error: any) {
       console.warn("Failed to initialize chat history schema:", error);
     }
