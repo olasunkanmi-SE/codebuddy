@@ -282,6 +282,10 @@ export const WebviewUI = () => {
     clearMessages();
   }, [clearMessages]);
 
+  const handleIndexWorkspace = useCallback(() => {
+    vsCode.postMessage({ command: "index-workspace" });
+  }, []);
+
   const handleUserPreferences = useCallback(() => {
     vsCode.postMessage({
       command: "update-user-info",
@@ -537,6 +541,7 @@ export const WebviewUI = () => {
             onStreamingChange={setEnableStreaming}
             onDarkModeChange={handleToggle}
             onClearHistory={handleClearHistory}
+            onIndexWorkspace={handleIndexWorkspace}
             onSavePreferences={handleUserPreferences}
           />
         </VSCodePanelView>

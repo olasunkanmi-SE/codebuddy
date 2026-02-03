@@ -136,18 +136,7 @@ export const BotMessage: React.FC<BotMessageProps> = ({
 
   // Show normal message with streaming cursor if applicable
   return (
-    <div className="code-block">
-      <div className="code-header">
-        {/* <span className="language-label">{language}</span> */}
-        <div className="header-buttons">
-          {isStreaming && (
-            <span style={{ marginRight: "8px", fontSize: "12px", color: "#888" }}>
-              Streaming...
-            </span>
-          )}
-          <DownloadIcon onClick={handleCopyMarkdown} />
-        </div>
-      </div>
+    <div className="bot-message">
       {parsedUrls.length > 0 ? (
         <div className="doc-content">
           <UrlCardList metadatas={parsedUrls} />
@@ -170,6 +159,17 @@ export const BotMessage: React.FC<BotMessageProps> = ({
           )}
         </div>
       )}
+      
+      <div className="bot-message-actions">
+        {isStreaming && (
+          <span className="streaming-status">
+            Generating...
+          </span>
+        )}
+        <div className="action-buttons">
+          <DownloadIcon onClick={handleCopyMarkdown} />
+        </div>
+      </div>
     </div>
   );
 };

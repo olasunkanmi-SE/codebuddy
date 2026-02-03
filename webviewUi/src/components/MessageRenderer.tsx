@@ -12,34 +12,28 @@ function filterToolMetadata(text: string): string {
 
   let cleaned = text;
 
-  // Remove command/message JSON objects: {"command":"...", "message":"..."}
   cleaned = cleaned.replace(
     /\{"command"\s*:\s*"[^"]*"\s*,\s*"message"\s*:\s*"[^"]*"[^}]*\}/g,
     ""
   );
 
-  // Remove tool_call objects: {"name":"...", "args":{...}, "type":"tool_call"...}
   cleaned = cleaned.replace(
     /\{"name"\s*:\s*"[^"]+"\s*,\s*"args"\s*:\s*\{[^}]*\}[^}]*\}/g,
     ""
   );
 
-  // Remove tool_use objects
   cleaned = cleaned.replace(
     /\{"type"\s*:\s*"tool_use"[^}]*\}/g,
     ""
   );
 
-  // Remove objects with toolu_ IDs (Anthropic tool call IDs)
   cleaned = cleaned.replace(
     /\{[^}]*"id"\s*:\s*"toolu_[^}]+\}/g,
     ""
   );
 
-  // Remove partial tool-related JSON at the end
   cleaned = cleaned.replace(/\{"(command|name|type)"\s*:\s*"[^"]*"[\s\S]*$/g, "");
 
-  // Clean up multiple newlines
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
 
   return cleaned.trim();

@@ -181,6 +181,7 @@ export class PersistentCodebaseUnderstandingService {
           "**/dist/**",
           "**/build/**",
           "**/.git/**",
+          "**/.codebuddy/**",
           "**/coverage/**",
           "**/.next/**",
           "**/.nuxt/**",

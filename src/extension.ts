@@ -18,6 +18,7 @@ import {
   openDocumentationCommand,
   regenerateDocumentationCommand,
 } from "./commands/generate-documentation";
+import { indexWorkspaceCommand } from "./commands/index-workspace";
 import { InLineChat } from "./commands/inline-chat";
 import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
@@ -30,6 +31,10 @@ import { Memory } from "./memory/base";
 import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
 import { ProjectRulesService } from "./services/project-rules.service";
 import { SqliteDatabaseService } from "./services/sqlite-database.service";
+import { ContextRetriever } from "./services/context-retriever";
+import { InlineCompletionService } from "./services/inline-completion.service";
+import { CompletionStatusBarService } from "./services/completion-status-bar.service";
+import { OutputManager } from "./services/output-manager";
 import {
   getAPIKeyAndModel,
   getConfigValue,
@@ -48,6 +53,8 @@ import { LocalWebViewProvider } from "./webview-providers/local";
 import { WebViewProviderManager } from "./webview-providers/manager";
 import { DeveloperAgent } from "./agents/developer/agent";
 import { AgentRunningGuardService } from "./services/agent-running-guard.service";
+
+import { DiffReviewService } from "./services/diff-review.service";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -200,13 +207,45 @@ export async function activate(context: vscode.ExtensionContext) {
 
     new DeveloperAgent({});
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
-    setConfigValue("generativeAi.option", "Gemini");
+    // setConfigValue("generativeAi.option", "Gemini");
     initializeWebViewProviders(context, selectedGenerativeAiModel);
     Logger.sessionId = Logger.generateId();
 
     const databaseService: SqliteDatabaseService =
       SqliteDatabaseService.getInstance();
     databaseService.initialize();
+
+    // Initialize ContextRetriever for semantic search
+    const contextRetriever = ContextRetriever.initialize(context);
+
+    // Auto-index files on save
+    context.subscriptions.push(
+      vscode.workspace.onDidSaveTextDocument(async (document) => {
+        // Skip irrelevant files
+        if (
+          document.languageId === "git-commit" ||
+          document.languageId === "log" ||
+          document.fileName.includes("node_modules") ||
+          document.fileName.includes(".git") ||
+          document.fileName.includes(".codebuddy")
+        ) {
+          return;
+        }
+
+        try {
+          // Index the updated file content
+          await contextRetriever.indexFile(
+            document.fileName,
+            document.getText(),
+          );
+        } catch (error) {
+          logger.error(
+            `Failed to auto-index file: ${document.fileName}`,
+            error,
+          );
+        }
+      }),
+    );
 
     // Initialize Project Rules Service
     const projectRulesService = ProjectRulesService.getInstance();
@@ -242,6 +281,143 @@ export async function activate(context: vscode.ExtensionContext) {
     // });
 
     logger.info("✓ CodeBuddy: Core services started, UI ready");
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "codebuddy.indexWorkspace",
+        indexWorkspaceCommand,
+      ),
+    );
+
+    // Initialize Diff Review Service
+    const diffReviewService = DiffReviewService.getInstance();
+    context.subscriptions.push(
+      vscode.workspace.registerTextDocumentContentProvider(
+        DiffReviewService.SCHEME,
+        diffReviewService,
+      ),
+    );
+
+    // Register Review Commands
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "codebuddy.reviewChange",
+        async (id: string) => {
+          const change = diffReviewService.getPendingChange(id);
+          if (change) {
+            const left = vscode.Uri.file(change.filePath);
+            const right = vscode.Uri.parse(
+              `${DiffReviewService.SCHEME}:${change.id}`,
+            );
+            const title = `Review: ${path.basename(change.filePath)}`;
+            await vscode.commands.executeCommand(
+              "vscode.diff",
+              left,
+              right,
+              title,
+            );
+          } else {
+            vscode.window.showErrorMessage("Change not found or expired.");
+          }
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.applyChange",
+        async (id?: string) => {
+          // If ID is not passed, try to get it from the active editor
+          if (!id) {
+            const activeEditor = vscode.window.activeTextEditor;
+            if (
+              activeEditor &&
+              activeEditor.document.uri.scheme === DiffReviewService.SCHEME
+            ) {
+              id = activeEditor.document.uri.path;
+            }
+          }
+
+          if (id) {
+            const success = await diffReviewService.applyChange(id);
+            if (success) {
+              vscode.window.showInformationMessage(
+                "Change applied successfully.",
+              );
+              // Optionally close the diff editor?
+              // vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+            }
+          } else {
+            vscode.window.showErrorMessage(
+              "Could not determine change ID to apply.",
+            );
+          }
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.rejectChange",
+        async (id?: string) => {
+          if (!id) {
+            const activeEditor = vscode.window.activeTextEditor;
+            if (
+              activeEditor &&
+              activeEditor.document.uri.scheme === DiffReviewService.SCHEME
+            ) {
+              id = activeEditor.document.uri.path;
+            }
+          }
+          if (id) {
+            diffReviewService.removePendingChange(id);
+            vscode.window.showInformationMessage("Change rejected/discarded.");
+            vscode.commands.executeCommand(
+              "workbench.action.closeActiveEditor",
+            );
+          }
+        },
+      ),
+    );
+
+    // Initialize Inline Completion Service
+    logger.info("Initializing Inline Completion Service...");
+    const outputChannel = OutputManager.getInstance().getChannel();
+    const inlineCompletionService = new InlineCompletionService(
+      context.extensionPath,
+      outputChannel,
+    );
+    const inlineCompletionProvider =
+      vscode.languages.registerInlineCompletionItemProvider(
+        { pattern: "**" },
+        inlineCompletionService,
+      );
+    context.subscriptions.push(inlineCompletionProvider);
+    logger.info("Inline Completion Provider registered");
+
+    // Initialize Status Bar
+    const completionStatusBar = new CompletionStatusBarService(context);
+
+    // Register Completion Commands
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "codebuddy.completion.toggle",
+        async () => {
+          const config = vscode.workspace.getConfiguration(
+            "codebuddy.completion",
+          );
+          const current = config.get<boolean>("enabled", true);
+          await config.update(
+            "enabled",
+            !current,
+            vscode.ConfigurationTarget.Global,
+          );
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.completion.openSettings",
+        () => {
+          vscode.commands.executeCommand(
+            "workbench.action.openSettings",
+            "codebuddy.completion",
+          );
+        },
+      ),
+    );
 
     const {
       comment,

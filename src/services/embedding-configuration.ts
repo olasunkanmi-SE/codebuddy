@@ -419,6 +419,7 @@ export class EmbeddingConfigurationManager {
           "**/build/**",
           "**/out/**",
           "**/.git/**",
+          "**/.codebuddy/**",
           "**/coverage/**",
           "**/.vscode-test/**",
           "**/*.min.js",

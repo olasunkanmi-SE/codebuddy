@@ -8,6 +8,12 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onUpdate: vscode.Event<IEventPayload> = this.createEvent("onUpdate");
   onPromptGenerated: vscode.Event<IEventPayload> = this.createEvent("onQuery");
   onThinking: vscode.Event<IEventPayload> = this.createEvent("onThinking");
+  onThinkingStart: vscode.Event<IEventPayload> =
+    this.createEvent("onThinkingStart");
+  onThinkingUpdate: vscode.Event<IEventPayload> =
+    this.createEvent("onThinkingUpdate");
+  onThinkingEnd: vscode.Event<IEventPayload> =
+    this.createEvent("onThinkingEnd");
   onResponse: vscode.Event<IEventPayload> = this.createEvent("onResponse");
   onSecretChange: vscode.Event<IEventPayload> =
     this.createEvent("onSecretChange");

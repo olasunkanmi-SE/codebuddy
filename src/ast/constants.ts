@@ -33,6 +33,7 @@ export const defaultIgnorePatterns = [
   "out",
   ".git",
   ".vscode",
+  ".codebuddy",
   ".idea",
   "vendor",
   "__pycache__",

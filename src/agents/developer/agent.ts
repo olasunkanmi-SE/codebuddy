@@ -19,6 +19,7 @@ import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { Memory } from "../../memory/base";
 import { Orchestrator } from "../../orchestrator";
 import { ProjectRulesService } from "../../services/project-rules.service";
+import { SkillManager } from "../../services/skill-manager";
 import { getAPIKeyAndModel } from "../../utils/utils";
 import { createVscodeFsBackendFactory } from "../backends/filesystem";
 import {
@@ -99,6 +100,23 @@ export class DeveloperAgent {
           model: apiKeyAndModel.model || "qwen2.5-coder",
           configuration: {
             baseURL: apiKeyAndModel.baseUrl || "http://localhost:11434/v1",
+          },
+        });
+        break;
+      case "openai":
+        currentModel = new ChatOpenAI({
+          apiKey: apiKeyAndModel.apiKey,
+          model: apiKeyAndModel.model!,
+        });
+        break;
+      case "qwen":
+      case "glm":
+      case "deepseek":
+        currentModel = new ChatOpenAI({
+          apiKey: apiKeyAndModel.apiKey,
+          model: apiKeyAndModel.model!,
+          configuration: {
+            baseURL: apiKeyAndModel.baseUrl,
           },
         });
         break;
@@ -191,6 +209,9 @@ export class DeveloperAgent {
       prompt += `\n\n## 📋 Additional Instructions:\n${customSystemPrompt}`;
     }
 
+    // Add skills prompt
+    prompt += SkillManager.getInstance().getSkillsPrompt();
+
     return prompt;
   }
 
@@ -229,10 +250,35 @@ export class DeveloperAgent {
     // Ensure MCP tools are loaded before creating the agent
     this.logger.info("Ensuring MCP tools are loaded...");
     const providerTools = await ToolProvider.getToolsAsync();
-    this.tools = [...(this.config.additionalTools || []), ...providerTools];
+
+    // Combine and deduplicate tools
+    const allTools = [...(this.config.additionalTools || []), ...providerTools];
+    const uniqueToolsMap = new Map<string, StructuredTool>();
+
+    allTools.forEach((tool) => {
+      if (uniqueToolsMap.has(tool.name)) {
+        this.logger.warn(`Duplicate tool detected and skipped: ${tool.name}`);
+      } else {
+        uniqueToolsMap.set(tool.name, tool);
+      }
+    });
+
+    this.tools = Array.from(uniqueToolsMap.values());
+
     this.logger.info(
-      `Agent initialized with ${this.tools.length} tools (including MCP)`,
+      `Agent initialized with ${this.tools.length} unique tools (including MCP)`,
     );
+
+    // Load skills from workspace
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspacePath) {
+      try {
+        await SkillManager.getInstance().loadSkills(workspacePath);
+        this.logger.info("Skills loaded successfully");
+      } catch (error) {
+        this.logger.error("Error loading skills", error);
+      }
+    }
 
     const subagents = enableSubAgents
       ? createDeveloperSubagents(this.model, this.tools)

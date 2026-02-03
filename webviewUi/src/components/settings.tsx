@@ -18,6 +18,7 @@ interface SettingsProps {
   onStreamingChange: (value: boolean) => void;
   onDarkModeChange: (value: boolean) => void;
   onClearHistory: () => void;
+  onIndexWorkspace?: () => void;
   onSavePreferences?: () => void;
 }
 
@@ -248,6 +249,7 @@ export const Settings: React.FC<SettingsProps> = ({
   onStreamingChange,
   onDarkModeChange,
   onClearHistory,
+  onIndexWorkspace,
   onSavePreferences,
 }) => {
   return (
@@ -256,6 +258,18 @@ export const Settings: React.FC<SettingsProps> = ({
       <Section>
         <SectionTitle>General</SectionTitle>
         
+        <SettingRow>
+          <SettingInfo>
+            <SettingLabel>Workspace Knowledge</SettingLabel>
+            <SettingDescription>Manually re-index the workspace for semantic search</SettingDescription>
+          </SettingInfo>
+          <SettingControl>
+            <Button onClick={onIndexWorkspace} disabled={!onIndexWorkspace}>
+              Index Workspace
+            </Button>
+          </SettingControl>
+        </SettingRow>
+
         <SettingRow>
           <SettingInfo>
             <SettingLabel>Nickname</SettingLabel>

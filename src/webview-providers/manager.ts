@@ -15,6 +15,7 @@ import { OpenAIWebViewProvider } from "./openai";
 import { QwenWebViewProvider } from "./qwen";
 import { GLMWebViewProvider } from "./glm";
 import { LocalWebViewProvider } from "./local";
+import { Terminal } from "../utils/terminal";
 
 export class WebViewProviderManager implements vscode.Disposable {
   private static instance: WebViewProviderManager;
@@ -76,6 +77,18 @@ export class WebViewProviderManager implements vscode.Disposable {
       this.orchestrator.onToolProgress(this.handleToolProgress.bind(this)),
       this.orchestrator.onPlanning(this.handlePlanning.bind(this)),
       this.orchestrator.onSummarizing(this.handleSummarizing.bind(this)),
+      this.orchestrator.onThinking(
+        this.handleActivityEvent.bind(this, StreamEventType.THINKING),
+      ),
+      this.orchestrator.onThinkingStart(
+        this.handleActivityEvent.bind(this, StreamEventType.THINKING_START),
+      ),
+      this.orchestrator.onThinkingUpdate(
+        this.handleActivityEvent.bind(this, StreamEventType.THINKING_UPDATE),
+      ),
+      this.orchestrator.onThinkingEnd(
+        this.handleActivityEvent.bind(this, StreamEventType.THINKING_END),
+      ),
       // New detailed activity event handlers
       this.orchestrator.onDecision(
         this.handleActivityEvent.bind(this, StreamEventType.DECISION),
@@ -98,6 +111,14 @@ export class WebViewProviderManager implements vscode.Disposable {
       this.orchestrator.onWorking(
         this.handleActivityEvent.bind(this, StreamEventType.WORKING),
       ),
+      Terminal.getInstance().onOutput((data) => {
+        if (this.webviewView?.webview) {
+          this.webviewView.webview.postMessage({
+            type: StreamEventType.TERMINAL_OUTPUT,
+            payload: { content: data },
+          });
+        }
+      }),
     );
     this.isInitialized = true;
   }

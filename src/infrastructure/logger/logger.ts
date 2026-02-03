@@ -156,6 +156,13 @@ export class Logger {
         module: event.module,
         ...event.data,
       });
+    } else if (event.level === LogLevel.INFO || event.level === LogLevel.WARN) {
+      // Allow recording interesting events
+      // Use the log message as the event name
+      Logger.telemetry.recordEvent(event.message, {
+        module: event.module,
+        ...event.data,
+      });
     }
   }
 

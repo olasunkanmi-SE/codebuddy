@@ -87,6 +87,9 @@ export enum StreamEventType {
   TOOL_END = "onToolEnd",
   TOOL_PROGRESS = "onToolProgress",
   THINKING = "onThinking",
+  THINKING_START = "onThinkingStart",
+  THINKING_UPDATE = "onThinkingUpdate",
+  THINKING_END = "onThinkingEnd",
   PLANNING = "onPlanning",
   SUMMARIZING = "onSummarizing",
   ERROR = "onStreamError",
@@ -99,6 +102,7 @@ export enum StreamEventType {
   ANALYZING = "onAnalyzing",
   EXECUTING = "onExecuting",
   WORKING = "onWorking",
+  TERMINAL_OUTPUT = "onTerminalOutput",
 }
 
 export interface IToolActivity {

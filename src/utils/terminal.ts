@@ -17,6 +17,11 @@ export class Terminal {
   private static instance: Terminal;
   private extensionPath: string = "";
   private outputChannel: vscode.OutputChannel;
+  private listeners: ((data: string) => void)[] = [];
+  private backgroundProcesses: Map<
+    number,
+    import("child_process").ChildProcess
+  > = new Map();
 
   constructor() {
     this.logger = Logger.initialize(Terminal.name, {
@@ -25,7 +30,8 @@ export class Terminal {
       enableFile: true,
       enableTelemetry: true,
     });
-    this.outputChannel = vscode.window.createOutputChannel("CodeBuddy Terminal");
+    this.outputChannel =
+      vscode.window.createOutputChannel("CodeBuddy Terminal");
   }
 
   static getInstance(): Terminal {
@@ -33,6 +39,18 @@ export class Terminal {
       Terminal.instance = new Terminal();
     }
     return Terminal.instance;
+  }
+
+  /**
+   * Register a listener for terminal output.
+   * @param listener The callback function to receive output data.
+   * @returns A disposable to remove the listener.
+   */
+  public onOutput(listener: (data: string) => void): vscode.Disposable {
+    this.listeners.push(listener);
+    return new vscode.Disposable(() => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    });
   }
 
   /**
@@ -47,6 +65,13 @@ export class Terminal {
     return this.extensionPath;
   }
 
+  private isDangerousCommand(command: string): boolean {
+    // Regex to match dangerous commands: rm, rmdir, unlink
+    // Matches whole words to avoid false positives (e.g. "firm" should not match)
+    const dangerousPattern = /\b(rm|rmdir|unlink)\b/;
+    return dangerousPattern.test(command);
+  }
+
   /**
    * Executes any shell command and streams output to the CodeBuddy Terminal channel.
    * Includes a safety guard requiring user confirmation before execution.
@@ -54,29 +79,47 @@ export class Terminal {
    * @param cwd Optional working directory.
    * @returns A promise that resolves with the command's stdout.
    */
-  public async executeAnyCommand(command: string, cwd?: string): Promise<string> {
-    // Safety Guard: User Confirmation
-    const selection = await vscode.window.showWarningMessage(
-      `CodeBuddy wants to execute: "${command}"`,
-      { modal: true },
-      "Execute",
-      "Cancel"
-    );
+  public async executeAnyCommand(
+    command: string,
+    cwd?: string,
+    background: boolean = false,
+  ): Promise<string> {
+    // Safety Guard: User Confirmation only for dangerous commands
+    if (this.isDangerousCommand(command)) {
+      const selection = await vscode.window.showWarningMessage(
+        `CodeBuddy wants to execute a potentially destructive command: "${command}"`,
+        { modal: true },
+        "Execute",
+        "Cancel",
+      );
 
-    if (selection !== "Execute") {
-      this.logger.info(`User denied execution of command: ${command}`);
-      return Promise.reject(new Error("User denied command execution."));
+      if (selection !== "Execute") {
+        this.logger.info(`User denied execution of command: ${command}`);
+        return Promise.reject(new Error("User denied command execution."));
+      }
     }
 
     this.outputChannel.show(true);
-    this.outputChannel.appendLine(`> ${command}`);
-    this.logger.info(`Executing command: ${command}`);
+    this.outputChannel.appendLine(
+      `> ${command} ${background ? "(background)" : ""}`,
+    );
+    this.logger.info(
+      `Executing command: ${command} (background: ${background})`,
+    );
 
     return new Promise((resolve, reject) => {
       const process = spawn(command, {
         shell: true,
-        cwd: cwd || (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || this.extensionPath) || undefined
+        cwd:
+          cwd ||
+          vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
+          this.extensionPath ||
+          undefined,
       });
+
+      if (background && process.pid) {
+        this.backgroundProcesses.set(process.pid, process);
+      }
 
       let stdout = "";
       let stderr = "";
@@ -85,21 +128,35 @@ export class Terminal {
         const str = data.toString();
         stdout += str;
         this.outputChannel.append(str);
+        this.listeners.forEach((listener) => listener(str));
       });
 
       process.stderr.on("data", (data) => {
         const str = data.toString();
         stderr += str;
         this.outputChannel.append(str);
+        this.listeners.forEach((listener) => listener(str));
       });
 
       process.on("error", (err) => {
+        const errorMessage = `Error: ${err.message}\n`;
         this.outputChannel.appendLine(`Error: ${err.message}`);
+        this.listeners.forEach((listener) => listener(errorMessage));
         this.logger.error(`Command execution error: ${err.message}`);
-        reject(err);
+        if (!background) {
+          reject(err);
+        }
       });
 
       process.on("close", (code) => {
+        if (background && process.pid) {
+          this.backgroundProcesses.delete(process.pid);
+          this.logger.info(
+            `Background command "${command}" finished with code ${code}`,
+          );
+          return;
+        }
+
         if (code === 0) {
           this.logger.info(`Command finished successfully.`);
           resolve(stdout);
@@ -109,6 +166,10 @@ export class Terminal {
           reject(new Error(`${errorMessage}\n${stderr}`));
         }
       });
+
+      if (background) {
+        resolve(`Background process started with PID ${process.pid}`);
+      }
     });
   }
 

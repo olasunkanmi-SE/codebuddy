@@ -448,6 +448,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               );
               break;
             }
+            case "index-workspace": {
+              vscode.commands.executeCommand("codebuddy.indexWorkspace");
+              break;
+            }
             case "user-input": {
               this.UserMessageCounter += 1;
               const selectedGenerativeAiModel = getConfigValue(
@@ -512,15 +516,39 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
 
               if (message.metaData?.mode === "Agent") {
+                // Save user message to history
+                await this.agentService.addChatMessage("agentId", {
+                  content: message.message,
+                  type: "user",
+                  metadata: { threadId: message.metaData?.threadId },
+                });
+
                 let context: string | undefined;
-                if (message.metaData?.context.length > 0) {
+                if (message.metaData?.context?.length > 0) {
                   context = await this.getContext(message.metaData.context);
                 }
-                return await this.codeBuddyAgent.handleUserMessage(
-                  context
-                    ? JSON.stringify(`${message} \n context: ${context ?? ""}`)
-                    : JSON.stringify(message),
-                );
+
+                const payload = context
+                  ? JSON.stringify(
+                      `${message.message} \n context: ${context ?? ""}`,
+                    )
+                  : JSON.stringify(message.message);
+
+                const fullResponse =
+                  await this.codeBuddyAgent.handleUserMessage(
+                    payload,
+                    message.metaData,
+                  );
+
+                // Save agent response to history
+                if (fullResponse) {
+                  await this.agentService.addChatMessage("agentId", {
+                    content: fullResponse,
+                    type: "model",
+                    metadata: { threadId: message.metaData?.threadId },
+                  });
+                }
+                return;
               }
 
               // Extract user-selected files from @ mentions and model name for smart context selection
@@ -761,11 +789,41 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
                 // For Docker Model Runner, use port 12434 and strip "ai/" prefix
                 // For Ollama, use port 11434
-                const baseUrl = isDockerModelRunner
+                let baseUrl = isDockerModelRunner
                   ? "http://localhost:12434/engines/llama.cpp/v1"
                   : "http://localhost:11434/v1";
 
+                // Fallback mechanism: If Model Runner (12434) is unreachable, try Ollama (11434)
+                if (isDockerModelRunner) {
+                  try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(
+                      () => controller.abort(),
+                      1000,
+                    );
+                    await fetch("http://localhost:12434", {
+                      method: "HEAD",
+                      signal: controller.signal,
+                    }).catch(() => {
+                      // Fetch failed (network error or timeout)
+                      throw new Error("Connection failed");
+                    });
+                    clearTimeout(timeoutId);
+                  } catch (error) {
+                    this.logger.info(
+                      "Docker Model Runner (12434) unreachable, falling back to Ollama (11434)",
+                    );
+                    baseUrl = "http://localhost:11434/v1";
+                  }
+                }
+
                 // Strip "ai/" prefix for model name when using Docker Model Runner
+                // Note: If we fell back to Ollama (11434), we should ALSO strip "ai/" prefix
+                // because standard Ollama doesn't expect "ai/" prefixed model names usually,
+                // BUT Docker Model Runner models are named "ai/user/model".
+                // If the user has a local Ollama model that happens to be the same, fine.
+                // However, often "ai/" models are specific to Docker Model Runner.
+                // Let's assume stripping is correct for both if we are in this block.
                 const modelName = isDockerModelRunner
                   ? message.message.replace(/^ai\//, "")
                   : message.message;

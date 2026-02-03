@@ -1,289 +1,124 @@
 import React, { useState, useMemo } from "react";
 import DOMPurify from "dompurify";
-import styled, { keyframes } from "styled-components";
+import styled from "styled-components";
 import { MermaidDiagram } from "./MermaidDiagram";
 
 interface ThinkingComponentProps {
   content: string;
 }
 
-const glow = keyframes`
-  0%, 100% {
-    box-shadow: 0 0 5px rgba(138, 43, 226, 0.3), 0 0 10px rgba(138, 43, 226, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 10px rgba(138, 43, 226, 0.5), 0 0 20px rgba(138, 43, 226, 0.3);
-  }
-`;
-
-const pulse = keyframes`
-  0%, 100% {
-    opacity: 0.6;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
-`;
-
-const slideDown = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
 const ThinkingContainer = styled.div`
   margin: 16px 0;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(138, 43, 226, 0.05) 0%, rgba(75, 0, 130, 0.05) 100%);
-  border: 1px solid rgba(138, 43, 226, 0.2);
-  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
 
   &:hover {
-    border-color: rgba(138, 43, 226, 0.4);
-    animation: ${glow} 2s ease-in-out infinite;
+    border-color: rgba(255, 255, 255, 0.2);
   }
 `;
 
 const ThinkingHeader = styled.button`
   width: 100%;
-  padding: 14px 18px;
-  background: linear-gradient(135deg, rgba(138, 43, 226, 0.1) 0%, rgba(75, 0, 130, 0.1) 100%);
+  padding: 10px 14px;
+  background: transparent;
   border: none;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -200%;
-    width: 200%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(138, 43, 226, 0.1) 50%,
-      transparent 100%
-    );
-    transition: left 0.5s ease;
-  }
-
-  &:hover::before {
-    left: 200%;
-  }
-
+  transition: background 0.2s ease;
+  
   &:hover {
-    background: linear-gradient(135deg, rgba(138, 43, 226, 0.15) 0%, rgba(75, 0, 130, 0.15) 100%);
-  }
-
-  &:active {
-    transform: scale(0.98);
+    background: rgba(255, 255, 255, 0.03);
   }
 `;
 
 const ThinkingHeaderLeft = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
-  z-index: 1;
+  gap: 8px;
 `;
 
 const ThinkingIcon = styled.span`
-  font-size: 20px;
-  animation: ${pulse} 2s ease-in-out infinite;
-  filter: drop-shadow(0 0 8px rgba(138, 43, 226, 0.6));
+  font-size: 14px;
+  opacity: 0.7;
 `;
 
 const ThinkingTitle = styled.span`
-  font-weight: 600;
-  font-size: 14px;
-  color: #a855f7;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  background: linear-gradient(90deg, #a855f7, #8b5cf6, #a855f7);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--vscode-foreground);
+  opacity: 0.8;
 `;
 
 const ThinkingHeaderRight = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-  z-index: 1;
-`;
-
-const ThinkingStatus = styled.span`
-  font-size: 11px;
-  color: rgba(168, 85, 247, 0.7);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 4px 10px;
-  background: rgba(138, 43, 226, 0.15);
-  border-radius: 12px;
-  border: 1px solid rgba(138, 43, 226, 0.3);
 `;
 
 const ThinkingChevron = styled.span<{ $isExpanded: boolean }>`
-  font-size: 12px;
-  color: #a855f7;
-  transition: transform 0.3s ease;
+  font-size: 10px;
+  color: var(--vscode-foreground);
+  opacity: 0.5;
+  transition: transform 0.2s ease;
   transform: ${props => props.$isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'};
 `;
 
 const ThinkingContent = styled.div`
-  animation: ${slideDown} 0.3s ease-out;
-  border-top: 1px solid rgba(138, 43, 226, 0.2);
-  background: rgba(20, 20, 30, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.1);
 `;
 
 const ThinkingContentHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 18px;
-  background: linear-gradient(90deg, rgba(138, 43, 226, 0.08) 0%, transparent 100%);
-  border-bottom: 1px solid rgba(138, 43, 226, 0.15);
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 `;
 
 const ThinkingExpandText = styled.div`
-  font-size: 12px;
-  color: rgba(168, 85, 247, 0.8);
+  font-size: 11px;
+  color: var(--vscode-foreground);
+  opacity: 0.6;
   font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  &::before {
-    content: '⚡';
-    font-size: 14px;
-    animation: ${pulse} 1.5s ease-in-out infinite;
-  }
 `;
 
 const ThinkingCopyButton = styled.button<{ $copied: boolean }>`
-  padding: 6px 14px;
-  background: ${props => props.$copied 
-    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-    : 'linear-gradient(135deg, rgba(138, 43, 226, 0.2) 0%, rgba(75, 0, 130, 0.2) 100%)'
-  };
-  color: ${props => props.$copied ? '#fff' : '#a855f7'};
-  border: 1px solid ${props => props.$copied 
-    ? 'rgba(16, 185, 129, 0.5)'
-    : 'rgba(138, 43, 226, 0.3)'
-  };
-  border-radius: 8px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  opacity: 0.6;
+  border: 1px solid transparent;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    transform: translate(-50%, -50%);
-    transition: width 0.3s ease, height 0.3s ease;
-  }
-
-  &:hover::before {
-    width: 200px;
-    height: 200px;
-  }
+  font-size: 10px;
+  transition: all 0.2s ease;
 
   &:hover {
-    background: ${props => props.$copied 
-      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-      : 'linear-gradient(135deg, rgba(138, 43, 226, 0.3) 0%, rgba(75, 0, 130, 0.3) 100%)'
-    };
-    border-color: ${props => props.$copied 
-      ? 'rgba(16, 185, 129, 0.7)'
-      : 'rgba(138, 43, 226, 0.5)'
-    };
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px ${props => props.$copied 
-      ? 'rgba(16, 185, 129, 0.3)'
-      : 'rgba(138, 43, 226, 0.3)'
-    };
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-
-  span {
-    position: relative;
-    z-index: 1;
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
   }
 `;
 
 const ThinkingText = styled.div`
-  padding: 18px;
-  color: rgba(200, 200, 220, 0.9);
-  font-size: 13px;
-  line-height: 1.7;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  text-align: left;
+  padding: 14px;
+  color: var(--vscode-foreground);
+  opacity: 0.8;
+  font-size: 12px;
+  line-height: 1.6;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', 'Courier New', monospace;
+  white-space: pre-wrap;
   
-  /* Styling for code blocks within thinking */
   code {
-    background: rgba(138, 43, 226, 0.1);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-    border: 1px solid rgba(138, 43, 226, 0.2);
-  }
-
-  /* Styling for paragraphs */
-  p {
-    margin: 8px 0;
-  }
-
-  /* Styling for lists */
-  ul, ol {
-    margin: 8px 0;
-    padding-left: 20px;
-  }
-
-  li {
-    margin: 4px 0;
-  }
-
-  /* Add a subtle gradient overlay at the bottom */
-  position: relative;
-  
-  &::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to bottom, transparent, rgba(20, 20, 30, 0.3));
-    pointer-events: none;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
   }
 `;
 
@@ -517,11 +352,10 @@ export const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ content })
           aria-controls="thinking-content"
         >
           <ThinkingHeaderLeft>
-            <ThinkingIcon>💭</ThinkingIcon>
-            <ThinkingTitle>Thoughts</ThinkingTitle>
+            <ThinkingIcon>🧠</ThinkingIcon>
+            <ThinkingTitle>Thought Process</ThinkingTitle>
           </ThinkingHeaderLeft>
           <ThinkingHeaderRight>
-            <ThinkingStatus>{isExpanded ? 'Visible' : 'Hidden'}</ThinkingStatus>
             <ThinkingChevron $isExpanded={isExpanded}>▼</ThinkingChevron>
           </ThinkingHeaderRight>
         </ThinkingHeader>
@@ -529,7 +363,7 @@ export const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ content })
         {isExpanded && (
           <ThinkingContent id="thinking-content">
             <ThinkingContentHeader>
-              <ThinkingExpandText>Model reasoning process</ThinkingExpandText>
+              <ThinkingExpandText>Reasoning trace</ThinkingExpandText>
               <ThinkingCopyButton 
                 onClick={copyThinkingContent} 
                 title="Copy thinking content"

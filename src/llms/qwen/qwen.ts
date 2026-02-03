@@ -5,7 +5,11 @@ import { Memory } from "../../memory/base";
 import { CodeBuddyToolProvider } from "../../tools/factory/tool";
 import { createPrompt } from "../../utils/prompt";
 import { BaseLLM } from "../base";
-import { ILlmConfig } from "../interface";
+import {
+  ICodeCompleter,
+  ICodeCompletionOptions,
+  ILlmConfig,
+} from "../interface";
 import { Message } from "../message";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import OpenAI from "openai";
@@ -22,7 +26,7 @@ interface QwenLLMSnapshot {
 
 export class QwenLLM
   extends BaseLLM<QwenLLMSnapshot>
-  implements vscode.Disposable
+  implements vscode.Disposable, ICodeCompleter
 {
   private readonly client: OpenAI;
   private response: any;
@@ -94,6 +98,45 @@ export class QwenLLM
     } catch (error: any) {
       this.logger.error("Failed to generate embeddings", { error, text });
       throw new Error(`Embedding generation failed: ${error}`);
+    }
+  }
+
+  async completeCode(
+    prompt: string,
+    options?: ICodeCompletionOptions,
+  ): Promise<string> {
+    const stop = options?.stopSequences;
+    const maxTokens = options?.maxTokens || 128;
+    const temperature = options?.temperature || 0.1;
+    const model = options?.model || this.config.model;
+
+    try {
+      // 1. Try Legacy Completion API (standard for FIM)
+      const completion = await this.client.completions.create({
+        model: model,
+        prompt: prompt,
+        stop: stop,
+        temperature: temperature,
+        max_tokens: maxTokens,
+        stream: false,
+      });
+
+      return completion.choices[0].text;
+    } catch (error) {
+      // 2. Fallback to Chat API (if model only supports chat)
+      try {
+        const chatCompletion = await this.client.chat.completions.create({
+          model: model,
+          messages: [{ role: "user", content: prompt }],
+          stop: stop,
+          temperature: temperature,
+          max_tokens: maxTokens,
+        });
+        return chatCompletion.choices[0].message.content || "";
+      } catch (chatError) {
+        this.logger.error("Failed to complete code", { error, chatError });
+        return "";
+      }
     }
   }
 

@@ -28,6 +28,10 @@ const StreamEventType = {
   TOOL_PROGRESS: "onToolProgress",
   PLANNING: "onPlanning",
   SUMMARIZING: "onSummarizing",
+  THINKING: "onThinking",
+  THINKING_START: "onThinkingStart",
+  THINKING_UPDATE: "onThinkingUpdate",
+  THINKING_END: "onThinkingEnd",
   ERROR: "onStreamError",
   METADATA: "streamMetadata",
   // New detailed activity events
@@ -38,6 +42,7 @@ const StreamEventType = {
   ANALYZING: "onAnalyzing",
   EXECUTING: "onExecuting",
   WORKING: "onWorking",
+  TERMINAL_OUTPUT: "onTerminalOutput",
 } as const;
 
 export const useStreamingChat = (
@@ -365,62 +370,72 @@ export const useStreamingChat = (
     }
   }, []);
 
-  /**
-   * Handler for detailed activity events (decision, reading, searching, etc.)
-   * These provide real-time visibility into agent actions
-   */
   const handleActivityEvent = useCallback(
-    (activityType: string, payload: any) => {
-      const typeToDisplayName: Record<string, string> = {
-        decision: "Decision",
-        reading: "Reading",
-        searching: "Searching",
-        reviewing: "Reviewing",
-        analyzing: "Analyzing",
-        executing: "Executing",
-        working: "Working",
-      };
+    (
+      type: ActivityItem["type"],
+      payload: any,
+      status: ActivityItem["status"] = "active",
+    ) => {
+      // De-duplicate working events if they are identical to the last one
+      if (type === "working") {
+        setActivities((prev) => {
+          const last = prev[prev.length - 1];
+          if (
+            last &&
+            last.type === "working" &&
+            last.description === payload.content
+          ) {
+            return prev;
+          }
+          return [
+            ...prev,
+            {
+              id: payload.id || `activity-${Date.now()}`,
+              type,
+              description: payload.content || "Working...",
+              status,
+              timestamp: Date.now(),
+            },
+          ];
+        });
+        return;
+      }
 
-      const displayName = typeToDisplayName[activityType] || "Activity";
-      const content = payload.content || `${displayName}...`;
-
-      // Create an activity item for the feed
       const activity: ActivityItem = {
-        id: `${activityType}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        type: activityType as ActivityItem["type"],
-        toolName: payload.metadata?.toolName || activityType,
-        description: content,
-        status: "active",
+        id: payload.id || `activity-${Date.now()}`,
+        type,
+        description: payload.content || `Agent is ${type}...`,
+        status,
         timestamp: Date.now(),
       };
-
-      setActivities((prev) => {
-        // Avoid duplicate activities of the same type within a short window
-        const recent = prev.filter(
-          (a) => a.type === activityType && Date.now() - a.timestamp < 500,
-        );
-        if (recent.length > 0) {
-          // Update existing activity instead
-          return prev.map((a) =>
-            a.id === recent[0].id ? { ...a, description: content } : a,
-          );
-        }
-        return [...prev, activity];
-      });
-
-      // Mark activity as completed after a short delay
-      setTimeout(() => {
-        setActivities((prev) =>
-          prev.map((a) =>
-            a.id === activity.id && a.status === "active"
-              ? { ...a, status: "completed" as const }
-              : a,
-          ),
-        );
-      }, 1500);
+      setActivities((prev) => [...prev, activity]);
     },
     [],
   );
+
+  const handleTerminalOutput = useCallback((payload: any) => {
+    setActivities((prev) => {
+      // Find the last active activity that is likely a command execution
+      const lastActiveIndex = prev.findLastIndex(
+        (a) =>
+          a.status === "active" &&
+          (a.type === "executing" ||
+            a.toolName === "run_command" ||
+            a.toolName === "command"),
+      );
+
+      if (lastActiveIndex !== -1) {
+        const newActivities = [...prev];
+        const activity = newActivities[lastActiveIndex];
+        newActivities[lastActiveIndex] = {
+          ...activity,
+          terminalOutput: (activity.terminalOutput || "") + payload.content,
+        };
+        return newActivities;
+      }
+      return prev;
+    });
+  }, []);
 
   // Legacy bot response handler
   const handleLegacyBotResponse = useCallback(
@@ -517,6 +532,37 @@ export const useStreamingChat = (
           console.log("[useStreamingChat] SUMMARIZING:", message.payload);
           handleSummarizing(message.payload);
           break;
+        case StreamEventType.THINKING:
+          console.log("[useStreamingChat] THINKING:", message.payload);
+          handleActivityEvent("thinking", message.payload);
+          break;
+        case StreamEventType.THINKING_START:
+          console.log("[useStreamingChat] THINKING_START:", message.payload);
+          handleActivityEvent("thinking", message.payload, "active");
+          break;
+        case StreamEventType.THINKING_UPDATE:
+          console.log("[useStreamingChat] THINKING_UPDATE:", message.payload);
+          setActivities((prev) => {
+            const idx = prev.findLastIndex((a) => a.type === "thinking");
+            if (idx === -1) return prev;
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              description: message.payload.content || updated[idx].description,
+            };
+            return updated;
+          });
+          break;
+        case StreamEventType.THINKING_END:
+          console.log("[useStreamingChat] THINKING_END:", message.payload);
+          setActivities((prev) =>
+            prev.map((a) =>
+              a.type === "thinking" && a.status === "active"
+                ? { ...a, status: "completed" as const }
+                : a,
+            ),
+          );
+          break;
         case StreamEventType.METADATA:
           console.log("[useStreamingChat] METADATA:", message.payload);
           handleMetadata(message.payload);
@@ -548,6 +594,9 @@ export const useStreamingChat = (
         case StreamEventType.WORKING:
           handleActivityEvent("working", message.payload);
           break;
+        case StreamEventType.TERMINAL_OUTPUT:
+          handleTerminalOutput(message.payload);
+          break;
 
         // Legacy non-streaming response
         case "bot-response":
@@ -578,6 +627,7 @@ export const useStreamingChat = (
     handleSummarizing,
     handleMetadata,
     handleActivityEvent,
+    handleTerminalOutput,
     handleLegacyBotResponse,
   ]);
 

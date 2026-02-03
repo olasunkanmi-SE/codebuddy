@@ -11,7 +11,9 @@ import { ToolProvider } from "../langgraph/tools/provider";
 function uniqueTools(tools: StructuredTool[]): StructuredTool[] {
   const map = new Map<string, StructuredTool>();
   for (const tool of tools) {
-    if (!map.has(tool.name)) {
+    if (map.has(tool.name)) {
+      // console.log(`[SubAgent] Duplicate tool filtered: ${tool.name}`);
+    } else {
       map.set(tool.name, tool);
     }
   }
