@@ -41,6 +41,7 @@ import { MCPClientState } from "../MCP/types";
 import { LocalModelService } from "../llms/local/service";
 import { DockerModelService } from "../services/docker/DockerModelService";
 import { ProjectRulesService } from "../services/project-rules.service";
+import { NewsService } from "../services/news.service";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -436,6 +437,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   // Track the current active file path for context inclusion
   private currentActiveFilePath: string | undefined;
 
+  private async synchronizeNews(): Promise<void> {
+    try {
+        const news = NewsService.getInstance().getUnreadNews();
+        if (news.length > 0) {
+            await this.currentWebView?.webview.postMessage({
+                type: 'news-update',
+                payload: { news }
+            });
+        }
+    } catch (error: any) {
+        this.logger.error('Failed to synchronize news', error);
+    }
+  }
+
   private async setupMessageHandler(_view: vscode.WebviewView): Promise<void> {
     try {
       this.disposables.push(
@@ -657,7 +672,15 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             }
             case "webview-ready":
               await this.publishWorkSpace();
+              await this.synchronizeNews();
               break;
+            case "news-mark-read": {
+              const { ids } = message;
+              if (ids && Array.isArray(ids)) {
+                  NewsService.getInstance().markAsRead(ids);
+              }
+              break;
+            }
             case "upload-file":
               await this.fileManager.uploadFileHandler();
               break;
