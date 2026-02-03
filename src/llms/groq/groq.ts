@@ -53,9 +53,16 @@ export class GroqLLM extends BaseLLM<any> implements vscode.Disposable {
     }
   }
 
-  createSnapShot() {}
+  createSnapShot() {
+    // Not implemented for Groq yet
+  }
 
-  loadSnapShot(snapshot: any) {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  loadSnapShot(snapshot: any) {
+    // Not implemented for Groq yet
+  }
 
-  dispose() {}
+  dispose() {
+    // No cleanup required for Groq client
+  }
 }

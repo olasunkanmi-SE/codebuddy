@@ -10,11 +10,7 @@ export class LinkGenerator {
   /**
    * Creates a clickable file link in VS Code's file:line:column format
    */
-  static createFileLink(
-    filePath: string,
-    line: number,
-    column: number = 0,
-  ): string {
+  static createFileLink(filePath: string, line: number, column = 0): string {
     return `${filePath}:${line + 1}:${column + 1}`;
   }
 

@@ -104,6 +104,14 @@
         {
           "command": "CodeBuddy.reviewPR",
           "group": "CodeBuddy"
+        },
+        {
+          "command": "CodeBuddy.rules.open",
+          "group": "CodeBuddy@9"
+        },
+        {
+          "command": "CodeBuddy.rules.init",
+          "group": "CodeBuddy@9"
         }
       ]
     },
@@ -151,6 +159,18 @@
       {
         "command": "CodeBuddy.reviewPR",
         "title": "CodeBuddy. Review Pull Request"
+      },
+      {
+        "command": "CodeBuddy.rules.open",
+        "title": "CodeBuddy: Open Project Rules"
+      },
+      {
+        "command": "CodeBuddy.rules.init",
+        "title": "CodeBuddy: Initialize Project Rules"
+      },
+      {
+        "command": "CodeBuddy.rules.reload",
+        "title": "CodeBuddy: Reload Project Rules"
       }
     ],
     "keybindings": [
@@ -204,6 +224,11 @@
         "command": "CodeBuddy.codebaseAnalysis",
         "key": "ctrl+shift+6",
         "mac": "cmd+shift+6"
+      },
+      {
+        "command": "CodeBuddy.rules.open",
+        "key": "ctrl+shift+9",
+        "mac": "cmd+shift+9"
       }
     ],
     "viewsContainers": {
@@ -226,7 +251,11 @@
               "Groq",
               "Anthropic",
               "XGrok",
-              "Deepseek"
+              "Deepseek",
+              "OpenAI",
+              "Qwen",
+              "GLM",
+              "Local"
             ],
             "default": "Gemini",
             "description": "Select Model"
@@ -293,7 +322,7 @@
               "null"
             ],
             "default": "deepseek-chat",
-            "markdownDescription": "Provide the name of the Deepseek model you want to use."
+            "markdownDescription": "Provide the name of the Deepseek model you want to use (e.g., deepseek-chat (V3), deepseek-reasoner (R1))."
           },
           "deepseek.apiKey": {
             "type": [
@@ -302,6 +331,78 @@
             ],
             "default": "apiKey",
             "markdownDescription": "Enter your Deepseek API Key"
+          },
+          "qwen.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "qwen-max",
+            "markdownDescription": "Provide the name of the Qwen model you want to use (e.g., qwen-max, qwen-plus, qwen3-coder-plus, qwen3-coder-max)."
+          },
+          "qwen.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "apiKey",
+            "markdownDescription": "Enter your Qwen (DashScope) API Key"
+          },
+          "glm.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "glm-4",
+            "markdownDescription": "Provide the name of the GLM model you want to use (e.g., glm-4, glm-4-plus, glm-4v)."
+          },
+          "glm.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "apiKey",
+            "markdownDescription": "Enter your GLM (Zhipu AI) API Key"
+          },
+          "openai.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "gpt-4o",
+            "markdownDescription": "Provide the name of the OpenAI model you want to use."
+          },
+          "openai.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "apiKey",
+            "markdownDescription": "Enter your OpenAI API Key"
+          },
+          "local.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "qwen2.5-coder",
+            "markdownDescription": "Provide the name of the Local model you want to use (e.g., qwen2.5-coder, llama3.2, gemma3, mistral)."
+          },
+          "local.baseUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "http://localhost:11434/v1",
+            "markdownDescription": "Enter the Base URL for your Local LLM. For Ollama use http://localhost:11434/v1, for Docker Model Runner use http://localhost:12434/engines/llama.cpp/v1."
+          },
+          "local.apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "not-needed",
+            "markdownDescription": "Enter your Local LLM API Key (if required)."
           },
           "font.family": {
             "type": "string",
@@ -343,6 +444,53 @@
             ],
             "default": 16,
             "description": "Enter your preferred font size (default is 16)"
+          },
+          "codebuddy.rules.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable project rules from .codebuddy/rules.md file"
+          },
+          "codebuddy.rules.maxTokens": {
+            "type": "number",
+            "default": 2000,
+            "description": "Maximum tokens allowed for project rules (rules exceeding this will be truncated)"
+          },
+          "codebuddy.rules.showIndicator": {
+            "type": "boolean",
+            "default": true,
+            "description": "Show indicator in UI when project rules are active"
+          },
+          "rules.customRules": {
+            "type": "array",
+            "default": [],
+            "description": "Custom rules for code generation. Each rule is appended to the agent's system prompt.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "description": { "type": "string" },
+                "content": { "type": "string" },
+                "enabled": { "type": "boolean" },
+                "createdAt": { "type": "number" }
+              }
+            }
+          },
+          "rules.customSystemPrompt": {
+            "type": "string",
+            "default": "",
+            "description": "Additional instructions appended to the base system prompt"
+          },
+          "rules.subagents": {
+            "type": "object",
+            "default": {},
+            "description": "Subagent configuration. Keys are subagent IDs, values contain enabled state.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" }
+              }
+            }
           }
         }
       }
@@ -392,6 +540,8 @@
     "@langchain/groq": "^1.0.2",
     "@langchain/langgraph": "^1.0.0",
     "@langchain/langgraph-checkpoint-sqlite": "^1.0.0",
+    "@langchain/openai": "^1.2.4",
+    "@modelcontextprotocol/sdk": "^1.24.3",
     "@mozilla/readability": "^0.4.1",
     "@types/fast-levenshtein": "^0.0.4",
     "@types/node-fetch": "^2.6.11",

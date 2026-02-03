@@ -6,9 +6,11 @@ import {
   generativeAiModels,
 } from "../application/constant";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { Memory } from "../memory/base";
 import * as crypto from "crypto";
 import { Buffer } from "buffer";
+import { spawn } from "child_process";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -136,6 +138,15 @@ export const resetChatHistory = (model: string) => {
     case generativeAiModels.GROQ:
       Memory.set(COMMON.GROQ_CHAT_HISTORY, []);
       break;
+    case generativeAiModels.OPENAI:
+      Memory.set(COMMON.OPENAI_CHAT_HISTORY, []);
+      break;
+    case generativeAiModels.QWEN:
+      Memory.set(COMMON.QWEN_CHAT_HISTORY, []);
+      break;
+    case generativeAiModels.GLM:
+      Memory.set(COMMON.GLM_CHAT_HISTORY, []);
+      break;
     default:
       break;
   }
@@ -153,6 +164,18 @@ export const createAnthropicClient = (apiKey: string, baseURL?: string) => {
     });
   }
   return new Anthropic({
+    apiKey,
+  });
+};
+
+export const createOpenAIClient = (apiKey: string, baseURL?: string) => {
+  if (baseURL) {
+    return new OpenAI({
+      apiKey,
+      baseURL,
+    });
+  }
+  return new OpenAI({
     apiKey,
   });
 };
@@ -207,7 +230,7 @@ export const showInfoMessage = (message?: string): void => {
  */
 export const getAPIKeyAndModel = (
   model: string,
-): { apiKey: string; model?: string } => {
+): { apiKey: string; model?: string; baseUrl?: string } => {
   const {
     geminiKey,
     groqApiKey,
@@ -216,9 +239,19 @@ export const getAPIKeyAndModel = (
     geminiModel,
     anthropicModel,
     tavilyApiKey,
+    openaiApiKey,
+    openaiModel,
+    qwenApiKey,
+    qwenModel,
+    glmApiKey,
+    glmModel,
+    localBaseUrl,
+    localModel,
+    localApiKey,
   } = APP_CONFIG;
   let apiKey: string | undefined;
   let modelName: string | undefined;
+  let baseUrl: string | undefined;
 
   const lowerCaseModel = model.toLowerCase();
 
@@ -238,17 +271,38 @@ export const getAPIKeyAndModel = (
     case "tavily":
       apiKey = getConfigValue(tavilyApiKey);
       break;
+    case "openai":
+      apiKey = getConfigValue(openaiApiKey);
+      modelName = getConfigValue(openaiModel);
+      break;
+    case "qwen":
+      apiKey = getConfigValue(qwenApiKey);
+      modelName = getConfigValue(qwenModel);
+      break;
+    case "glm":
+      apiKey = getConfigValue(glmApiKey);
+      modelName = getConfigValue(glmModel);
+      break;
+    case "deepseek":
+      apiKey = getConfigValue(APP_CONFIG.deepseekApiKey);
+      modelName = getConfigValue(APP_CONFIG.deepseekModel);
+      break;
+    case "local":
+      apiKey = getConfigValue(localApiKey) || "not-needed";
+      modelName = getConfigValue(localModel);
+      baseUrl = getConfigValue(APP_CONFIG.localBaseUrl);
+      break;
     default:
       throw new Error(`Unsupported model: ${model}`);
   }
 
-  if (!apiKey) {
+  if (!apiKey && lowerCaseModel !== "local") {
     throw new Error(
       `API key not found for model: ${model}. Please add the API key in the extension configuration.`,
     );
   }
 
-  return { apiKey, model: modelName };
+  return { apiKey: apiKey || "", model: modelName, baseUrl };
 };
 
 export const generateQueryString = (query: string) =>

@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import * as vscode from "vscode";
 import {
   APP_CONFIG,
+  CODEBUDDY_ACTIONS,
   COMMON,
   generativeAiModels,
 } from "../application/constant";
@@ -12,8 +14,17 @@ import { AnthropicWebViewProvider } from "../webview-providers/anthropic";
 import { DeepseekWebViewProvider } from "../webview-providers/deepseek";
 import { GeminiWebViewProvider } from "../webview-providers/gemini";
 import { GroqWebViewProvider } from "../webview-providers/groq";
+import { OpenAIWebViewProvider } from "../webview-providers/openai";
+import { QwenWebViewProvider } from "../webview-providers/qwen";
+import { GLMWebViewProvider } from "../webview-providers/glm";
+import { QwenLLM } from "../llms/qwen/qwen";
+import { GLMLLM } from "../llms/glm/glm";
+import { WebViewProviderManager } from "../webview-providers/manager";
 import {
   createAnthropicClient,
+  createOpenAIClient,
+  formatText,
+  generateUUID,
   getConfigValue,
   getLatestChatHistory,
   getXGroKBaseURL,
@@ -42,6 +53,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   private readonly anthropicApiKey: string;
   private readonly xGrokApiKey: string;
   private readonly xGrokModel: string;
+  private readonly openaiApiKey: string;
+  private readonly openaiModel: string;
+  private readonly qwenApiKey: string;
+  private readonly qwenModel: string;
+  private readonly glmApiKey: string;
+  private readonly glmModel: string;
   protected readonly logger: Logger;
   constructor(
     private readonly action: string,
@@ -60,6 +77,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       anthropicApiKey,
       grokApiKey,
       grokModel,
+      openaiApiKey,
+      openaiModel,
+      qwenApiKey,
+      qwenModel,
+      glmApiKey,
+      glmModel,
     } = APP_CONFIG;
     this.generativeAi = getConfigValue(generativeAi);
     this.geminiApiKey = getConfigValue(geminiKey);
@@ -70,6 +93,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     this.anthropicApiKey = getConfigValue(anthropicApiKey);
     this.xGrokApiKey = getConfigValue(grokApiKey);
     this.xGrokModel = getConfigValue(grokModel);
+    this.openaiApiKey = getConfigValue(openaiApiKey);
+    this.openaiModel = getConfigValue(openaiModel);
+    this.qwenApiKey = getConfigValue(qwenApiKey);
+    this.qwenModel = getConfigValue(qwenModel);
+    this.glmApiKey = getConfigValue(glmApiKey);
+    this.glmModel = getConfigValue(glmModel);
     this.logger = Logger.initialize("CodeCommandHandler", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
@@ -90,8 +119,6 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     action: string;
     description: string;
   } {
-    const { CODEBUDDY_ACTIONS } = require("../application/constant");
-
     const commandDescriptions: Record<
       string,
       { action: string; description: string }
@@ -204,6 +231,24 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           message: feedback,
         });
         break;
+      case generativeAiModels.OPENAI:
+        await OpenAIWebViewProvider.webView?.webview.postMessage({
+          type: "codebuddy-commands",
+          message: feedback,
+        });
+        break;
+      case generativeAiModels.QWEN:
+        await QwenWebViewProvider.webView?.webview.postMessage({
+          type: "codebuddy-commands",
+          message: feedback,
+        });
+        break;
+      case generativeAiModels.GLM:
+        await GLMWebViewProvider.webView?.webview.postMessage({
+          type: "codebuddy-commands",
+          message: feedback,
+        });
+        break;
       default:
         this.logger.error("Unknown generative AI", "");
         break;
@@ -248,6 +293,24 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         const apiKey: string = this.xGrokApiKey;
         modelName = this.xGrokModel;
         model = this.createAnthropicModel(apiKey);
+      }
+
+      if (this.generativeAi === generativeAiModels.OPENAI) {
+        const apiKey: string = this.openaiApiKey;
+        modelName = this.openaiModel;
+        model = createOpenAIClient(apiKey);
+      }
+
+      if (this.generativeAi === generativeAiModels.QWEN) {
+        const apiKey: string = this.qwenApiKey;
+        modelName = this.qwenModel;
+        model = QwenLLM.getInstance({ apiKey, model: modelName }).getModel();
+      }
+
+      if (this.generativeAi === generativeAiModels.GLM) {
+        const apiKey: string = this.glmApiKey;
+        modelName = this.glmModel;
+        model = GLMLLM.getInstance({ apiKey, model: modelName }).getModel();
       }
       return { generativeAi: this.generativeAi, model, modelName };
     } catch (error: any) {
@@ -321,6 +384,21 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         case generativeAiModels.GROK:
           if (modelName) {
             response = await this.anthropicResponse(model, modelName, text);
+          }
+          break;
+        case generativeAiModels.OPENAI:
+          if (modelName) {
+            response = await this.openAIResponse(model, modelName, text);
+          }
+          break;
+        case generativeAiModels.QWEN:
+          if (modelName) {
+            response = await this.qwenResponse(model, modelName, text);
+          }
+          break;
+        case generativeAiModels.GLM:
+          if (modelName) {
+            response = await this.glmResponse(model, modelName, text);
           }
           break;
         default:
@@ -416,6 +494,75 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     }
   }
 
+  private async openAIResponse(
+    model: OpenAI,
+    generativeAiModel: string,
+    prompt: string,
+  ): Promise<string | undefined> {
+    try {
+      const chatHistory = Memory.has(COMMON.OPENAI_CHAT_HISTORY)
+        ? Memory.get(COMMON.OPENAI_CHAT_HISTORY)
+        : [];
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        ...chatHistory,
+        { role: "user", content: prompt },
+      ];
+      const completion = await model.chat.completions.create({
+        messages,
+        model: generativeAiModel,
+      });
+      return completion.choices[0]?.message?.content ?? undefined;
+    } catch (error: any) {
+      this.logger.error("Error generating OpenAI response:", error);
+    }
+  }
+
+  private async qwenResponse(
+    model: OpenAI,
+    generativeAiModel: string,
+    prompt: string,
+  ): Promise<string | undefined> {
+    try {
+      const chatHistory = Memory.has(COMMON.QWEN_CHAT_HISTORY)
+        ? Memory.get(COMMON.QWEN_CHAT_HISTORY)
+        : [];
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        ...chatHistory,
+        { role: "user", content: prompt },
+      ];
+      const completion = await model.chat.completions.create({
+        messages,
+        model: generativeAiModel,
+      });
+      return completion.choices[0]?.message?.content ?? undefined;
+    } catch (error: any) {
+      this.logger.error("Error generating Qwen response:", error);
+    }
+  }
+
+  private async glmResponse(
+    model: OpenAI,
+    generativeAiModel: string,
+    prompt: string,
+  ): Promise<string | undefined> {
+    try {
+      const chatHistory = Memory.has(COMMON.GLM_CHAT_HISTORY)
+        ? Memory.get(COMMON.GLM_CHAT_HISTORY)
+        : [];
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        ...chatHistory,
+        { role: "user", content: prompt },
+      ];
+      const completion = await model.chat.completions.create({
+        messages,
+        model: generativeAiModel,
+      });
+      return completion.choices[0]?.message?.content ?? undefined;
+    } catch (error: any) {
+      this.logger.error("Error generating GLM response:", error);
+    }
+  }
+
   abstract formatResponse(comment: string): string;
 
   abstract createPrompt(text?: string): any;
@@ -506,6 +653,48 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
             },
           ]);
           break;
+        case generativeAiModels.OPENAI:
+          chatHistory = getLatestChatHistory(COMMON.OPENAI_CHAT_HISTORY);
+          Memory.set(COMMON.OPENAI_CHAT_HISTORY, [
+            ...chatHistory,
+            {
+              role: "user",
+              content: prompt,
+            },
+            {
+              role: "assistant",
+              content: response,
+            },
+          ]);
+          break;
+        case generativeAiModels.QWEN:
+          chatHistory = getLatestChatHistory(COMMON.QWEN_CHAT_HISTORY);
+          Memory.set(COMMON.QWEN_CHAT_HISTORY, [
+            ...chatHistory,
+            {
+              role: "user",
+              content: prompt,
+            },
+            {
+              role: "assistant",
+              content: response,
+            },
+          ]);
+          break;
+        case generativeAiModels.GLM:
+          chatHistory = getLatestChatHistory(COMMON.GLM_CHAT_HISTORY);
+          Memory.set(COMMON.GLM_CHAT_HISTORY, [
+            ...chatHistory,
+            {
+              role: "user",
+              content: prompt,
+            },
+            {
+              role: "assistant",
+              content: response,
+            },
+          ]);
+          break;
         default:
           throw new Error(`Generative model ${model} not available`);
       }
@@ -535,49 +724,70 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       // Send command feedback immediately at the start
       await this.sendCommandFeedback(action || this.action);
 
-      let prompt: string | undefined;
-      const response = (await this.generateResponse(
-        prompt ?? message,
-      )) as string;
-      if (!response) {
+      this.logger.info(this.action);
+      let prompt;
+      const selectedCode = this.getSelectedWindowArea();
+      if (!message && !selectedCode) {
+        vscode.window.showErrorMessage("select a piece of code.");
+        return;
+      }
+
+      if (message && selectedCode) {
+        prompt = await this.createPrompt(`${message} \n ${selectedCode}`);
+      } else {
+        message
+          ? (prompt = await this.createPrompt(message))
+          : (prompt = await this.createPrompt(selectedCode));
+      }
+
+      if (!prompt) {
         vscode.window.showErrorMessage("model not reponding, try again later");
         return;
       }
-      const formattedResponse = this.formatResponse(response);
-      if (!formattedResponse) {
-        vscode.window.showErrorMessage("model not reponding, try again later");
+
+      const providerManager = WebViewProviderManager.getInstance(this.context);
+      const provider = providerManager.getCurrentProvider();
+
+      if (!provider) {
+        vscode.window.showErrorMessage("Provider not initialized");
         return;
       }
-      switch (this.generativeAi) {
-        case generativeAiModels.GROQ:
-          await GroqWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
+
+      const requestId = generateUUID();
+      await provider.currentWebView?.webview.postMessage({
+        type: "onStreamStart",
+        payload: { requestId },
+      });
+
+      let fullResponse = "";
+      try {
+        for await (const chunk of provider.streamResponse(prompt)) {
+          fullResponse += chunk;
+          await provider.currentWebView?.webview.postMessage({
+            type: "onStreamChunk",
+            payload: { requestId, content: chunk },
           });
-          break;
-        case generativeAiModels.GEMINI:
-          await GeminiWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
-          });
-          break;
-        case generativeAiModels.DEEPSEEK:
-          await DeepseekWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
-          });
-          break;
-        case generativeAiModels.ANTHROPIC:
-        case generativeAiModels.GROK:
-          await AnthropicWebViewProvider.webView?.webview.postMessage({
-            type: "bot-response",
-            message: formattedResponse,
-          });
-          break;
-        default:
-          this.logger.error("Unknown generative AI", "");
-          break;
+        }
+      } catch (error: any) {
+        this.logger.error("Error during streaming", error);
+        await provider.currentWebView?.webview.postMessage({
+          type: "onStreamError",
+          payload: { requestId, error: error.message },
+        });
+        return;
       }
+
+      const formattedResponse = this.formatResponse(fullResponse);
+
+      await provider.currentWebView?.webview.postMessage({
+        type: "onStreamEnd",
+        payload: { requestId, content: formattedResponse },
+      });
+
+      await provider.currentWebView?.webview.postMessage({
+        type: "bot-response",
+        message: formattedResponse,
+      });
     } catch (error: any) {
       this.logger.error(
         "Error while passing model response to the webview",

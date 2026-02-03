@@ -197,11 +197,12 @@ export class PerformanceProfiler implements vscode.Disposable {
       case "search":
         this.metrics.searchLatency.add(measurement.duration);
         break;
-      case "indexing":
+      case "indexing": {
         // Calculate throughput (items per second, assume 1 item for simplicity)
         const throughput = 1000 / measurement.duration; // items per second
         this.metrics.indexingThroughput.add(throughput);
         break;
+      }
     }
 
     // Record error rate

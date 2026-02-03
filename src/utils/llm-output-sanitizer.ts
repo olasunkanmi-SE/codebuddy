@@ -143,10 +143,7 @@ export class LLMOutputSanitizer {
    * @param isHtml - Whether the content is HTML or markdown/text
    * @returns Sanitized content
    */
-  public static sanitizeLLMOutput(
-    content: string,
-    isHtml: boolean = false,
-  ): string {
+  public static sanitizeLLMOutput(content: string, isHtml = false): string {
     if (!content) return "";
 
     if (isHtml) {

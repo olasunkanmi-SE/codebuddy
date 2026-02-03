@@ -121,6 +121,13 @@ const WorkspaceSelector: React.FC<WorkspceSelectorProps> = ({
     return [activeEditorCategory, ...workspaceFolders];
   }, [activeEditorCategory, workspaceFolders]);
 
+  // Update currentCategories when workspaceFolders changes (e.g., when data arrives)
+  useEffect(() => {
+    if (workspaceFolders.length > 0 && breadcrumbs.length === 0) {
+      setCurrentCategories(initialCategories);
+    }
+  }, [workspaceFolders, initialCategories, breadcrumbs.length]);
+
   // Handle input changes using useCallback
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {

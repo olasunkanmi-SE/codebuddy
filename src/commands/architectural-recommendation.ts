@@ -8,7 +8,7 @@ import { Logger } from "../infrastructure/logger/logger";
 import { LogLevel } from "../services/telemetry";
 import { Orchestrator } from "../orchestrator";
 
-let orchestrator = Orchestrator.getInstance();
+const orchestrator = Orchestrator.getInstance();
 
 /**
  * Determines if analysis cache should be refreshed based on age and availability

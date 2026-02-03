@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "out"
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "webviewUi",
+    "docs",
+    "src/test/suite/intelligent-chunking.test.ts",
+    "src/test/suite/phase2-implementation.test.ts",
+    "src/test/suite/vector-db-initialization-fix.test.ts",
+    "src/test/suite/vector-db-sync-stats.test.ts"
+  ]
+}

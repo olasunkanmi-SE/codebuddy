@@ -157,20 +157,20 @@ export class WebSearchService {
   private extractTitle(doc: Document): string | undefined {
     let title: string | undefined;
 
-    let titleElement = doc.querySelector("title");
+    const titleElement = doc.querySelector("title");
     if (titleElement) {
       title = titleElement.textContent?.trim();
     }
 
     if (!title) {
-      let ogTitle = doc.querySelector('meta[property="og:title"]');
+      const ogTitle = doc.querySelector('meta[property="og:title"]');
       if (ogTitle) {
         title = ogTitle.getAttribute("content")?.trim();
       }
     }
 
     if (!title) {
-      let twitterTitle = doc.querySelector('meta[name="twitter:title"]');
+      const twitterTitle = doc.querySelector('meta[name="twitter:title"]');
       if (twitterTitle) {
         title = twitterTitle.getAttribute("content")?.trim();
       }

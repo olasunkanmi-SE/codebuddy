@@ -32,7 +32,7 @@ export class SqliteDatabaseService {
   private static instance: SqliteDatabaseService;
   private db: any = null; // sql.js Database instance
   private readonly logger: Logger;
-  private dbPath: string = "";
+  private dbPath = "";
   private SQL: any = null; // sql.js instance
 
   private constructor() {
@@ -194,6 +194,23 @@ export class SqliteDatabaseService {
 
       this.db.run(`
         CREATE INDEX IF NOT EXISTS idx_chat_agent_id ON chat_history(agent_id)
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS chat_summaries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          agent_id TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_summary_agent_id ON chat_summaries(agent_id)
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_summary_timestamp ON chat_summaries(timestamp)
       `);
 
       this.db.run(`
@@ -677,6 +694,7 @@ export class SqliteDatabaseService {
       const stmt = this.db.prepare(query);
       const result = stmt.run(params);
       stmt.free();
+      this.saveToDisk();
       return result;
     } catch (error: any) {
       this.logger.error(`SQL command execution failed: ${query}`, error);

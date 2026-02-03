@@ -1,25 +1,56 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
+import { VSCodeButton, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import styled from "styled-components";
 import { codeBuddyMode, faqItems, modelOptions, themeOptions } from "../constants/constant";
 import { IWebviewMessage, useStreamingChat } from "../hooks/useStreamingChat";
 import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
 import { FAQAccordion } from "./accordion";
+import { AgentActivityFeed } from "./AgentActivityFeed";
 import AttachmentIcon from "./attachmentIcon";
-import { BotMessage } from "./botMessage";
 import ChatInput from "./ChatInput";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
-import WorkspaceSelector from "./context";
+import FileMention from "./FileMention";
 import { Extensions } from "./extensions";
 import { FutureFeatures } from "./futureFeatures";
+import MessageRenderer from "./MessageRenderer";
 import { UserMessage } from "./personMessage";
 import { Settings } from "./settings";
+import { SettingsPanel, SettingsGearIcon, SettingsValues, SettingsOptions, SettingsHandlers, DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS, CustomRule, SubagentConfig } from "./settings/index";
 import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
+
+// Styled components for settings toggle
+const SettingsToggleButton = styled.button`
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -45,7 +76,8 @@ export const WebviewUI = () => {
   // State variables
   const [selectedTheme, setSelectedTheme] = useState("tokyo night");
   const [selectedModel, setSelectedModel] = useState("Gemini");
-  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Ask");
+  // Default to Agent so the streaming pipeline is used during testing
+  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Agent");
   const [commandAction, setCommandAction] = useState<string>("");
   const [commandDescription, setCommandDescription] = useState<string>("");
   const [isCommandExecuting, setIsCommandExecuting] = useState(false);
@@ -56,6 +88,12 @@ export const WebviewUI = () => {
   const [username, setUsername] = useState("");
   const [darkMode, setDarkMode] = useState(false);
   const [enableStreaming, setEnableStreaming] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  // Rules & Subagents state
+  const [customRules, setCustomRules] = useState<CustomRule[]>([]);
+  const [customSystemPrompt, setCustomSystemPrompt] = useState("");
+  const [subagents, setSubagents] = useState<SubagentConfig[]>(DEFAULT_SUBAGENTS);
 
   // Ref for username input element
   // const nameInputRef = useRef<HTMLInputElement>(null);
@@ -63,11 +101,13 @@ export const WebviewUI = () => {
   // Initialize streaming chat hook
   const {
     messages: streamedMessages,
+    activities,
     isStreaming,
     isLoading: isBotLoading,
     sendMessage,
     clearMessages,
     setMessages,
+    pendingApproval,
   } = useStreamingChat(vsCode, {
     enableStreaming,
     onLegacyMessage: (messages) => {
@@ -178,6 +218,28 @@ export const WebviewUI = () => {
         }
         break;
 
+      case "rules-data":
+        // Handle rules and subagents data from extension
+        if (message.data) {
+          if (message.data.rules) {
+            setCustomRules(message.data.rules);
+          }
+          if (message.data.systemPrompt !== undefined) {
+            setCustomSystemPrompt(message.data.systemPrompt);
+          }
+          if (message.data.subagents) {
+            setSubagents(message.data.subagents);
+          }
+        }
+        break;
+
+      case "rule-added":
+        // Handle single rule added
+        if (message.data?.rule) {
+          setCustomRules(prev => [...prev, message.data.rule]);
+        }
+        break;
+
       default:
         // Ignore unknown message types
         break;
@@ -196,6 +258,11 @@ export const WebviewUI = () => {
       window.removeEventListener("message", legacyMessageHandler);
     };
   }, [legacyMessageHandler]);
+
+  // Signal to extension that webview is ready to receive messages
+  useEffect(() => {
+    vsCode.postMessage({ command: "webview-ready" });
+  }, []);
 
   // Highlight code blocks when messages update
   useEffect(() => {
@@ -242,7 +309,8 @@ export const WebviewUI = () => {
       if (!message.trim()) return;
 
       sendMessage(message, {
-        mode: selectedCodeBuddyMode,
+        // Force Agent mode during testing to ensure langgraph/deepagent streaming path runs
+        mode: selectedCodeBuddyMode || "Agent",
         context: selectedContext.split("@"),
         alias: "O",
       });
@@ -257,6 +325,10 @@ export const WebviewUI = () => {
     });
   }, []);
 
+  const handleApproveAction = useCallback(() => {
+    vsCode.postMessage({ command: "user-consent", message: "granted" });
+  }, []);
+
   const processedContext = useMemo(() => {
     const contextArray = Array.from(new Set(selectedContext.split("@").join(", ").split(", ")));
     return contextArray.filter((item) => item.length > 1);
@@ -265,7 +337,7 @@ export const WebviewUI = () => {
   const memoizedMessages = useMemo(() => {
     return streamedMessages.map((msg) =>
       msg.type === "bot" ? (
-        <BotMessage
+        <MessageRenderer
           key={msg.id}
           content={msg.content}
           language={msg.language}
@@ -281,8 +353,109 @@ export const WebviewUI = () => {
     );
   }, [streamedMessages]);
 
+  // Settings context values for the new settings panel
+  const settingsValues = useMemo<SettingsValues>(() => ({
+    theme: selectedTheme,
+    language: 'en',
+    keymap: 'default',
+    nickname: username,
+    codeBuddyMode: selectedCodeBuddyMode,
+    enableStreaming: enableStreaming,
+    selectedModel: selectedModel,
+    username: username,
+    accountType: 'Free',
+    customRules: customRules,
+    customSystemPrompt: customSystemPrompt,
+    subagents: subagents,
+  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, selectedModel, customRules, customSystemPrompt, subagents]);
+
+  const settingsOptions = useMemo<SettingsOptions>(() => ({
+    themeOptions: themeOptions,
+    modelOptions: modelOptions,
+    codeBuddyModeOptions: codeBuddyMode,
+    keymapOptions: DEFAULT_KEYMAP_OPTIONS,
+    languageOptions: DEFAULT_LANGUAGE_OPTIONS,
+  }), []);
+
+  const settingsHandlers = useMemo<SettingsHandlers>(() => ({
+    onThemeChange: (value: string) => {
+      setSelectedTheme(value);
+      vsCode.postMessage({ command: "theme-change-event", message: value });
+    },
+    onLanguageChange: (_value: string) => {
+      // Coming soon - language change
+    },
+    onKeymapChange: (_value: string) => {
+      // Coming soon - keymap change
+    },
+    onNicknameChange: (value: string) => {
+      setUsername(value);
+    },
+    onCodeBuddyModeChange: (value: string) => {
+      setSelectedCodeBuddyMode(value);
+      vsCode.postMessage({ command: "codebuddy-model-change-event", message: value });
+    },
+    onStreamingChange: (enabled: boolean) => {
+      setEnableStreaming(enabled);
+    },
+    onModelChange: (value: string) => {
+      setSelectedModel(value);
+      vsCode.postMessage({ command: "update-model-event", message: value });
+    },
+    onUsernameChange: (value: string) => {
+      setUsername(value);
+    },
+    postMessage: (message: { command: string; message?: any }) => {
+      vsCode.postMessage(message);
+    },
+    // Rules & Subagents handlers
+    onAddRule: (rule) => {
+      const newRule: CustomRule = {
+        ...rule,
+        id: `rule-${Date.now()}`,
+        createdAt: Date.now(),
+      };
+      setCustomRules(prev => [...prev, newRule]);
+    },
+    onUpdateRule: (id, updates) => {
+      setCustomRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+    },
+    onDeleteRule: (id) => {
+      setCustomRules(prev => prev.filter(r => r.id !== id));
+    },
+    onToggleRule: (id, enabled) => {
+      setCustomRules(prev => prev.map(r => r.id === id ? { ...r, enabled } : r));
+    },
+    onUpdateSystemPrompt: (prompt) => {
+      setCustomSystemPrompt(prompt);
+    },
+    onToggleSubagent: (id, enabled) => {
+      setSubagents(prev => prev.map(s => s.id === id ? { ...s, enabled } : s));
+    },
+  }), []);
+
   return (
-    <div style={{ overflow: "hidden" }}>
+    <div style={{ overflow: "hidden", width: "100%" }}>
+      {/* Settings Toggle Button */}
+      <SettingsToggleButton
+        onClick={() => setIsSettingsOpen(true)}
+        aria-label="Open settings"
+        title="Settings"
+      >
+        <SettingsGearIcon size={18} />
+      </SettingsToggleButton>
+
+      {/* Settings Panel */}
+      <SettingsPanel
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        username={username || 'CodeBuddy User'}
+        accountType="Free"
+        settingsValues={settingsValues}
+        settingsOptions={settingsOptions}
+        settingsHandlers={settingsHandlers}
+      />
+
       <VSCodePanels className="vscodePanels" activeid={activeTab}>
         <VSCodePanelTab id="tab-1" onClick={() => setActiveTab("tab-1")}>
           CHAT
@@ -300,7 +473,7 @@ export const WebviewUI = () => {
           FUTURE
         </VSCodePanelTab>
         <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
-          <div className="chat-content">
+          <div className="chat-content" style={{ maxWidth: "1100px", margin: "0 auto" }}>
             <div className="dropdown-container">
               <div>
                 {/* Show welcome screen when there are no messages */}
@@ -315,13 +488,21 @@ export const WebviewUI = () => {
                 ) : (
                   <>
                     {memoizedMessages}
+                    {/* Show activity feed when agent is working */}
+                    {(isStreaming || isBotLoading) && activities.length > 0 && (
+                      <AgentActivityFeed
+                        activities={activities}
+                        isActive={isStreaming || isBotLoading}
+                      />
+                    )}
                     {isCommandExecuting && (
                       <CommandFeedbackLoader
                         commandAction={commandAction}
                         commandDescription={commandDescription}
                       />
                     )}
-                    {isBotLoading && !isCommandExecuting && !isStreaming && <SkeletonLoader />}
+                    {/* Show skeleton only if no activities are being tracked */}
+                    {isBotLoading && !isCommandExecuting && !isStreaming && activities.length === 0 && <SkeletonLoader />}
                   </>
                 )}
               </div>
@@ -420,8 +601,29 @@ export const WebviewUI = () => {
               <small className="attachment-icon">{activeEditor}</small>
             </span>
           </div>
-          <WorkspaceSelector activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
-          <ChatInput onSendMessage={handleSend} />
+          <FileMention activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
+          {pendingApproval && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 12px",
+                border: "1px solid #2a2a36",
+                borderRadius: "10px",
+                background: "#1e1e2a",
+                marginBottom: "8px",
+              }}
+            >
+              <div style={{ color: "#d0d0dc", fontSize: "13px", marginRight: "12px" }}>
+                {`Approve ${pendingApproval.toolName || "tool"} to proceed — ${pendingApproval.description || `Preparing to run ${pendingApproval.toolName || "tool"}`}`}
+              </div>
+              <VSCodeButton appearance="primary" onClick={handleApproveAction}>
+                Approve action
+              </VSCodeButton>
+            </div>
+          )}
+          <ChatInput onSendMessage={handleSend} disabled={isStreaming || isBotLoading} />
         </div>
         <div className="horizontal-stack">
           <AttachmentIcon onClick={handleGetContext} disabled={true} />

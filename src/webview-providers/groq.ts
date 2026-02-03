@@ -33,6 +33,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         Message.of({
           role: msg.role === "user" ? "user" : "assistant",
           content: msg.content,
+          parts: msg.parts,
         }),
       );
 
@@ -91,6 +92,108 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
     }
   }
 
+  async *streamResponse(
+    message: LLMMessage,
+    metaData?: any,
+  ): AsyncGenerator<string, void, unknown> {
+    let systemInstruction = "";
+    let userMessage = "";
+
+    if (typeof message === "object") {
+      systemInstruction = message.systemInstruction;
+      userMessage = message.userMessage;
+    }
+
+    this.chatHistory = Memory.has("chatHistory")
+      ? Memory.get("chatHistory")
+      : [];
+
+    try {
+      if (this.chatHistory?.length > 0) {
+        this.updateProviderChatHistory(this.chatHistory);
+      }
+      let context: string | undefined;
+      if (metaData?.context.length > 0) {
+        context = await this.getContext(metaData.context);
+      }
+      const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;
+
+      const msg = userMessage?.length ? userMessage : message;
+
+      const messageWithContext = context
+        ? `${msg} \n context: ${context}`
+        : `${msg}`;
+
+      const currentMessage = Message.of({
+        role: "user",
+        content: messageWithContext,
+      });
+
+      this.chatHistory = [...this.chatHistory, currentMessage];
+
+      Memory.set("chatHistory", this.chatHistory);
+
+      const history = await this.pruneChatHistoryWithSummary(
+        this.chatHistory,
+        6000,
+        systemInstruction,
+        "agentId",
+      );
+
+      const chatCompletionStream = await this.model.chat.completions.create({
+        messages: [
+          { role: "system", content: systemInstruction ?? "" },
+          ...history.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+        ],
+        model: this.generativeAiModel,
+        temperature,
+        top_p,
+        stream: true,
+        stop,
+        max_tokens: GROQ_CONFIG.max_tokens,
+      });
+
+      for await (const chunk of chatCompletionStream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          yield content;
+        }
+      }
+    } catch (error: any) {
+      if (
+        this.chatHistory?.length &&
+        this.chatHistory[this.chatHistory.length - 1].role === "user"
+      ) {
+        this.chatHistory.pop();
+      }
+      Memory.set("chatHistory", this.chatHistory);
+
+      if (error.status === 401) {
+        vscode.window.showErrorMessage(
+          "Invalid Groq API key. Please check your settings.",
+        );
+        this.logger.error("Invalid Groq API key.", error);
+      } else if (error.status === 503 || error.status === 429) {
+        vscode.window.showErrorMessage(
+          "Groq API rate limit reached or service unavailable. Please try again later.",
+        );
+        this.logger.error(
+          "Groq API rate limiting or availability error.",
+          error,
+        );
+      } else {
+        this.logger.error(
+          "Error generating Groq response:",
+          error.stack || error.message,
+        );
+      }
+      throw error;
+    }
+  }
+
   // Corrected generateResponse function
   async generateResponse(
     message: LLMMessage,
@@ -137,6 +240,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         this.chatHistory,
         6000,
         systemInstruction,
+        "agentId",
       );
 
       const chatCompletionStream = await this.model.chat.completions.create({

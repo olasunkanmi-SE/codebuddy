@@ -30,6 +30,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         Message.of({
           role: msg.role === "user" ? "user" : "assistant",
           content: msg.content,
+          parts: msg.parts,
         }),
       );
 
@@ -69,6 +70,102 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       });
     } catch (error: any) {
       this.logger.error(error);
+    }
+  }
+
+  async *streamResponse(
+    message: LLMMessage,
+    metaData?: any,
+  ): AsyncGenerator<string, void, unknown> {
+    let systemInstruction = "";
+    let userMessage = "";
+
+    if (typeof message === "object") {
+      systemInstruction = message.systemInstruction;
+      userMessage = message.userMessage;
+    }
+
+    this.chatHistory = Memory.has("chatHistory")
+      ? Memory.get("chatHistory")
+      : [];
+
+    try {
+      if (this.chatHistory?.length > 0) {
+        this.updateProviderChatHistory(this.chatHistory);
+      }
+      let context: string | undefined;
+      if (metaData?.context.length > 0) {
+        context = await this.getContext(metaData.context);
+      }
+      const { max_tokens } = GROQ_CONFIG;
+
+      const msg = userMessage?.length ? userMessage : message;
+
+      const messageWithContext = `${msg} \n context: ${context ?? ""}`;
+
+      const currentMessage = Message.of({
+        role: "user",
+        content: messageWithContext,
+      });
+
+      this.chatHistory = [...this.chatHistory, currentMessage];
+
+      Memory.set("chatHistory", this.chatHistory);
+
+      const history = await this.pruneChatHistoryWithSummary(
+        this.chatHistory,
+        6000,
+        systemInstruction,
+        "agentId",
+      );
+
+      const stream = await this.model.messages.create({
+        messages: history.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        model: this.generativeAiModel,
+        max_tokens,
+        stream: true,
+        system: [
+          {
+            text: systemInstruction?.length
+              ? systemInstruction
+              : "You are an helpful assistant",
+
+            type: "text",
+          },
+        ],
+      });
+
+      for await (const chunk of stream) {
+        if (
+          chunk.type === "content_block_delta" &&
+          chunk.delta.type === "text_delta"
+        ) {
+          yield chunk.delta.text;
+        }
+      }
+    } catch (error: any) {
+      if (
+        this.chatHistory?.length &&
+        this.chatHistory[this.chatHistory.length - 1].role === "user"
+      ) {
+        this.chatHistory.pop();
+      }
+
+      Memory.set("chatHistory", this.chatHistory);
+      if (error.status === "401") {
+        vscode.window.showErrorMessage(
+          "Invalid API key. Please update your API key",
+        );
+        this.logger.error("Invalid API key. Please update your API key", error);
+      }
+      if (error.status === "503") {
+        vscode.window.showErrorMessage("Rate limiting error, try again later");
+      }
+      this.logger.error("Error generating anthropic response", error.stack);
+      throw error;
     }
   }
 
@@ -115,6 +212,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         this.chatHistory,
         6000,
         systemInstruction,
+        "agentId",
       );
 
       const chatCompletion = await this.model.messages.create({

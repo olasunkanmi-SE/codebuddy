@@ -3,9 +3,9 @@ import { LogLevel } from "../services/telemetry";
 import { validateLlmConfig } from "../utils/llm-config-validator";
 import { IBaseLLM, ILlmConfig } from "./interface";
 
-export abstract class BaseLLM<T extends Record<string, any>>
-  implements IBaseLLM
-{
+export abstract class BaseLLM<
+  T extends Record<string, any>,
+> implements IBaseLLM {
   protected logger: Logger;
   constructor(protected config: ILlmConfig) {
     this.logger = Logger.initialize("BaseLLM", {

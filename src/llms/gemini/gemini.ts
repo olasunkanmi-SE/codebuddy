@@ -178,7 +178,8 @@ export class GeminiLLM
   async *runx(userMessage: string) {
     try {
       const agent = await createAdvancedDeveloperAgent({});
-      const result = await agent.stream({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await (agent as any).stream({
         messages: [
           {
             role: "user",
@@ -187,9 +188,7 @@ export class GeminiLLM
         ],
       });
       for await (const event of result) {
-        for (const [nodeName, update] of Object.entries(
-          event as Record<string, any>,
-        )) {
+        for (const [nodeName, update] of Object.entries(event)) {
           yield { node: nodeName, update };
           this.logger.log(LogLevel.INFO, `Stream event from node: ${nodeName}`);
         }
@@ -203,8 +202,9 @@ export class GeminiLLM
   async processUserQuery(userInput: string): Promise<any> {
     const stream = await this.runx(userInput);
     for await (const update of stream) {
-      if (update?.update?.messages) {
-        const lastMessageContent = this.handleUserQuery(update.update.messages);
+      const nodeUpdate = update?.update as any;
+      if (nodeUpdate?.messages) {
+        const lastMessageContent = this.handleUserQuery(nodeUpdate.messages);
         if (lastMessageContent) {
           this.orchestrator.publish("onQuery", String(lastMessageContent));
         }
@@ -282,7 +282,7 @@ export class GeminiLLM
   // Note: Call Groq provider directly. Remove from Gemini
   private async fallBackToGroq(userInput: string): Promise<string | undefined> {
     try {
-      let finalResult = await this.groqLLM.generateText(userInput);
+      const finalResult = await this.groqLLM.generateText(userInput);
       if (finalResult) {
         const systemMessage = Message.of({
           role: "system",

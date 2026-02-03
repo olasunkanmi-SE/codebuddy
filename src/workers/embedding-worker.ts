@@ -3,6 +3,7 @@
  * to prevent blocking the main VS Code UI thread
  */
 import { Worker, isMainThread, parentPort, workerData } from "worker_threads";
+import * as os from "os";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { IFunctionData } from "../application/interfaces";
 import { EmbeddingsConfig } from "../application/constant";
@@ -40,12 +41,66 @@ if (!isMainThread && parentPort) {
   /**
    * Centralized error formatting for consistent error handling
    */
-  function formatError(error: unknown): string {
+  const formatError = (error: unknown): string => {
     if (error instanceof Error) {
       return error.message;
     }
     return String(error);
-  }
+  };
+
+  /**
+   * Generate embeddings for a single text in worker thread
+   */
+  const generateEmbeddingsInWorker = async (
+    text: string,
+  ): Promise<number[]> => {
+    const model = genAI.getGenerativeModel({
+      model: EmbeddingsConfig.embeddingModel,
+    });
+
+    const result = await model.embedContent(text);
+    return result.embedding.values;
+  };
+
+  /**
+   * Process a batch of function data in worker thread
+   */
+  const processBatchInWorker = async (
+    batch: IFunctionData[],
+  ): Promise<IFunctionData[]> => {
+    const results: IFunctionData[] = [];
+
+    for (let i = 0; i < batch.length; i++) {
+      const item = batch[i];
+      try {
+        const embedding = await generateEmbeddingsInWorker(item.compositeText);
+        results.push({
+          ...item,
+          embedding,
+          processedAt: new Date().toISOString(),
+        });
+
+        // Report progress
+        const progress = ((i + 1) / batch.length) * 100;
+        parentPort?.postMessage({
+          success: true,
+          progress,
+          data: { completed: i + 1, total: batch.length },
+        });
+
+        // Small delay to prevent overwhelming the API
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error: any) {
+        logger.error(
+          `Failed to process item ${item.name || item.path || "unknown"}:`,
+          error,
+        );
+        // Continue with next item
+      }
+    }
+
+    return results;
+  };
 
   parentPort.on("message", async (task: WorkerTask) => {
     switch (task.type) {
@@ -91,58 +146,6 @@ if (!isMainThread && parentPort) {
         });
     }
   });
-
-  /**
-   * Generate embeddings for a single text in worker thread
-   */
-  async function generateEmbeddingsInWorker(text: string): Promise<number[]> {
-    const model = genAI.getGenerativeModel({
-      model: EmbeddingsConfig.embeddingModel,
-    });
-
-    const result = await model.embedContent(text);
-    return result.embedding.values;
-  }
-
-  /**
-   * Process a batch of function data in worker thread
-   */
-  async function processBatchInWorker(
-    batch: IFunctionData[],
-  ): Promise<IFunctionData[]> {
-    const results: IFunctionData[] = [];
-
-    for (let i = 0; i < batch.length; i++) {
-      const item = batch[i];
-      try {
-        const embedding = await generateEmbeddingsInWorker(item.compositeText);
-        results.push({
-          ...item,
-          embedding,
-          processedAt: new Date().toISOString(),
-        });
-
-        // Report progress
-        const progress = ((i + 1) / batch.length) * 100;
-        parentPort?.postMessage({
-          success: true,
-          progress,
-          data: { completed: i + 1, total: batch.length },
-        });
-
-        // Small delay to prevent overwhelming the API
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error: any) {
-        logger.error(
-          `Failed to process item ${item.name || item.path || "unknown"}:`,
-          error,
-        );
-        // Continue with next item
-      }
-    }
-
-    return results;
-  }
 }
 
 /**
@@ -157,7 +160,7 @@ export class WorkerEmbeddingService {
     private readonly apiKey: string,
     private readonly options: EmbeddingWorkerOptions = {},
   ) {
-    this.maxWorkers = Math.min(4, require("os").cpus().length);
+    this.maxWorkers = Math.min(4, os.cpus().length);
   }
 
   /**

@@ -24,12 +24,23 @@ import { ProductionSafeguards } from "../services/production-safeguards.service"
 import { LogLevel } from "../services/telemetry";
 import { UserFeedbackService } from "../services/user-feedback.service";
 import { WorkspaceService } from "../services/workspace-service";
-import { formatText, getAPIKeyAndModel, getConfigValue } from "../utils/utils";
+import {
+  formatText,
+  getAPIKeyAndModel,
+  getConfigValue,
+  generateUUID,
+} from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
 import { QuestionClassifierService } from "../services/question-classifier.service";
 import { GroqLLM } from "../llms/groq/groq";
 import { Role } from "../llms/message";
 import { MessageHandler } from "../agents/handlers/message-handler";
+import { CodeBuddyAgentService } from "../agents/services/codebuddy-agent.service";
+import { MCPService } from "../MCP/service";
+import { MCPClientState } from "../MCP/types";
+import { LocalModelService } from "../llms/local/service";
+import { DockerModelService } from "../services/docker/DockerModelService";
+import { ProjectRulesService } from "../services/project-rules.service";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -166,7 +177,41 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onUpdateThemePreferences(
         this.handleThemePreferences.bind(this),
       ),
+      // Listen for workspace folder changes and update active workspace
+      vscode.workspace.onDidChangeWorkspaceFolders(async () => {
+        this.logger.info(
+          "Workspace folders changed, publishing updated workspace",
+        );
+        await this.publishActiveWorkspace();
+        await this.publishWorkSpace();
+      }),
+      // Listen for active editor changes to update the current file display
+      vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+        if (editor) {
+          this.logger.info(
+            "Active editor changed, publishing updated active file",
+          );
+          await this.publishActiveWorkspace();
+        }
+      }),
     );
+  }
+
+  /**
+   * Gets the current model name for token budget calculation
+   */
+  protected getCurrentModelName(): string {
+    return this.generativeAiModel || "default";
+  }
+
+  async *streamResponse(
+    message: LLMMessage,
+    metaData?: any,
+  ): AsyncGenerator<string, void, unknown> {
+    const response = await this.generateResponse(message, metaData);
+    if (response) {
+      yield response;
+    }
   }
 
   async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
@@ -202,6 +247,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     // Get the current workspace files from DB.
     setImmediate(() => this.getFiles());
+
+    // Note: publishWorkSpace is called when webview signals "webview-ready"
   }
 
   /**
@@ -212,20 +259,38 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     try {
       // Get chat history from database via AgentService
       const agentId = "agentId"; // Using the same hardcoded ID as WebViewProviderManager
-      const persistentHistory = await this.agentService.getChatHistory(agentId);
+      const persistentHistory =
+        (await this.agentService.getChatHistory(agentId)) || [];
+      const persistentSummary = await this.agentService.getChatSummary(agentId);
 
-      if (persistentHistory && persistentHistory.length > 0) {
+      if (persistentHistory.length > 0 || persistentSummary) {
         // Convert database format to provider's IMessageInput format
         const providerHistory = persistentHistory.map((msg: any) => ({
-          role: msg.type === "user" ? "user" : "model",
+          type: msg.type === "user" ? "user" : "model",
           content: msg.content,
           timestamp: msg.timestamp || Date.now(),
           metadata: msg.metadata,
         }));
 
+        // Prepend summary if it exists
+        if (persistentSummary) {
+          providerHistory.unshift({
+            type: "user",
+            content: `[System Note: This is a summary of our earlier conversation to preserve context]:\n${persistentSummary}`,
+            timestamp: Date.now(),
+            metadata: { isSummary: true },
+          });
+        }
+
         this.logger.debug(
-          `Synchronized ${persistentHistory.length} chat messages from database`,
+          `Synchronized ${persistentHistory.length} chat messages from database${persistentSummary ? " + summary" : ""}`,
         );
+
+        // Send history to webview
+        await this.currentWebView?.webview.postMessage({
+          type: "chat-history",
+          message: JSON.stringify(providerHistory),
+        });
       } else {
         this.logger.debug("No chat history found in database to synchronize");
       }
@@ -239,10 +304,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
-    view.webview.html = getWebviewContent(
-      this.currentWebView?.webview!,
-      this._extensionUri,
-    );
+    view.webview.html = getWebviewContent(view.webview, this._extensionUri);
   }
 
   private async getFiles() {
@@ -299,12 +361,80 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         type: "bootstrap",
         message: JSON.stringify(files[0].children),
       });
+
+      // Also publish the active workspace name
+      await this.publishActiveWorkspace();
     } catch (error: any) {
       this.logger.error("Error while getting workspace", error.message);
     }
   }
 
+  /**
+   * Publishes the active file/workspace info to the webview
+   * Shows the current active file name, or workspace name if no file is open
+   * Untitled files show as empty string
+   */
+  private async publishActiveWorkspace(): Promise<void> {
+    try {
+      const activeEditor = vscode.window.activeTextEditor;
+      let displayName: string = "";
+
+      // Reset the tracked active file path
+      this.currentActiveFilePath = undefined;
+
+      if (activeEditor) {
+        // Check if it's an untitled (unsaved) file
+        if (activeEditor.document.isUntitled) {
+          displayName = "";
+          this.currentActiveFilePath = undefined;
+        } else {
+          // Show the current file name with relative path from workspace
+          const filePath = activeEditor.document.uri.fsPath;
+          const workspaceFolder = vscode.workspace.getWorkspaceFolder(
+            activeEditor.document.uri,
+          );
+          if (workspaceFolder) {
+            // Get relative path from workspace root
+            const relativePath = vscode.workspace.asRelativePath(
+              activeEditor.document.uri,
+              false,
+            );
+            displayName = relativePath;
+            // Store the full path for context inclusion
+            this.currentActiveFilePath = filePath;
+          } else {
+            // Fallback to just the file name
+            displayName =
+              activeEditor.document.fileName.split(/[\\/]/).pop() || "";
+            this.currentActiveFilePath = filePath;
+          }
+        }
+      } else {
+        // No active editor, show workspace name
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+          displayName = workspaceFolders[0].name;
+        } else {
+          displayName = "";
+        }
+      }
+
+      await this.currentWebView?.webview.postMessage({
+        type: "onActiveworkspaceUpdate",
+        message: displayName,
+      });
+      this.logger.info(
+        `Active workspace/file published: ${displayName || "(empty)"}`,
+      );
+    } catch (error: any) {
+      this.logger.error("Error publishing active workspace", error.message);
+    }
+  }
+
   private UserMessageCounter = 0;
+
+  // Track the current active file path for context inclusion
+  private currentActiveFilePath: string | undefined;
 
   private async setupMessageHandler(_view: vscode.WebviewView): Promise<void> {
     try {
@@ -312,6 +442,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         _view.webview.onDidReceiveMessage(async (message) => {
           let response: any;
           switch (message.command) {
+            case "user-consent": {
+              CodeBuddyAgentService.getInstance().setUserConsent(
+                message.message === "granted",
+              );
+              break;
+            }
             case "user-input": {
               this.UserMessageCounter += 1;
               const selectedGenerativeAiModel = getConfigValue(
@@ -382,48 +518,118 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
                 return await this.codeBuddyAgent.handleUserMessage(
                   context
-                    ? JSON.stringify(`${message} \n context: ${context}`)
+                    ? JSON.stringify(`${message} \n context: ${context ?? ""}`)
                     : JSON.stringify(message),
                 );
               }
 
+              // Extract user-selected files from @ mentions and model name for smart context selection
+              let userSelectedFiles =
+                message.metaData?.context?.filter(
+                  (f: string) => f && f.trim().length > 0,
+                ) || [];
+
+              // Include the current active file as context if it exists and not already in the list
+              if (this.currentActiveFilePath) {
+                const activeFileAlreadyIncluded = userSelectedFiles.some(
+                  (f: string) =>
+                    f === this.currentActiveFilePath ||
+                    f.endsWith(
+                      this.currentActiveFilePath!.split(/[\\/]/).pop() || "",
+                    ),
+                );
+                if (!activeFileAlreadyIncluded) {
+                  userSelectedFiles = [
+                    this.currentActiveFilePath,
+                    ...userSelectedFiles,
+                  ];
+                  this.logger.info(
+                    `Including active file in context: ${this.currentActiveFilePath}`,
+                  );
+                }
+              }
+
+              const modelName = this.getCurrentModelName();
+
               const messageAndSystemInstruction =
-                  await this.enhanceMessageWithCodebaseContext(
-                    sanitizedMessage,
-                  ),
-                response = await this.generateResponse(
+                await this.enhanceMessageWithCodebaseContext(
+                  sanitizedMessage,
+                  userSelectedFiles,
+                  modelName,
+                );
+
+              const requestId = generateUUID();
+
+              // Send Stream Start
+              await this.currentWebView?.webview.postMessage({
+                type: "onStreamStart",
+                payload: { requestId },
+              });
+
+              let fullResponse = "";
+              try {
+                for await (const chunk of this.streamResponse(
                   messageAndSystemInstruction,
                   message.metaData,
-                );
-              if (this.UserMessageCounter === 1) {
-                await this.publishWorkSpace();
+                )) {
+                  fullResponse += chunk;
+                  await this.currentWebView?.webview.postMessage({
+                    type: "onStreamChunk",
+                    payload: { requestId, content: chunk },
+                  });
+                }
+
+                // Save chat history to database
+                await this.agentService.addChatMessage("agentId", {
+                  content: sanitizedMessage,
+                  type: "user",
+                  sessionId: requestId,
+                });
+
+                await this.agentService.addChatMessage("agentId", {
+                  content: fullResponse,
+                  type: "model",
+                  sessionId: requestId,
+                });
+              } catch (error: any) {
+                this.logger.error("Error during streaming", error);
+                await this.currentWebView?.webview.postMessage({
+                  type: "onStreamError",
+                  payload: { requestId, error: error.message },
+                });
+                return; // Stop processing
               }
-              if (response) {
+
+              if (fullResponse) {
                 this.logger.info(
-                  `[DEBUG] Response from generateResponse: ${response.length} characters`,
+                  `[DEBUG] Response from streamResponse: ${fullResponse.length} characters`,
                 );
-                const formattedResponse = formatText(response);
+                const formattedResponse = formatText(fullResponse);
                 this.logger.info(
                   `[DEBUG] Formatted response: ${formattedResponse.length} characters`,
                 );
-                this.logger.info(
-                  `[DEBUG] Formatted response: ${formattedResponse}`,
-                );
-                this.logger.info(
-                  `[DEBUG] Original response ends with: "${response.slice(-100)}"`,
-                );
 
+                // Send Bot Response (Legacy/History update) - Ignored by UI if streaming is active
                 await this.sendResponse(formattedResponse, "bot");
+
+                // Send Stream End
+                await this.currentWebView?.webview.postMessage({
+                  type: "onStreamEnd",
+                  payload: { requestId, content: formattedResponse },
+                });
               } else {
                 this.logger.info(
-                  `[DEBUG] No response received from generateResponse`,
+                  `[DEBUG] No response received from streamResponse`,
                 );
+              }
+              if (this.UserMessageCounter === 1) {
+                await this.publishWorkSpace();
               }
               break;
             }
-            // case "webview-ready":
-            //   await this.publishWorkSpace();
-            //   break;
+            case "webview-ready":
+              await this.publishWorkSpace();
+              break;
             case "upload-file":
               await this.fileManager.uploadFileHandler();
               break;
@@ -452,6 +658,807 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   theme: message.message,
                 },
               );
+              break;
+
+            case "open-codebuddy-settings":
+              // Open VS Code settings filtered to CodeBuddy settings
+              this.logger.info("Opening CodeBuddy settings...");
+              vscode.commands.executeCommand(
+                "workbench.action.openSettings",
+                "@ext:fiatinnovations.ola-code-buddy",
+              );
+              break;
+
+            // Docker Model Runner Commands
+            case "docker-enable-runner":
+              try {
+                const service = DockerModelService.getInstance();
+                const result = await service.enableModelRunner();
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-runner-enabled",
+                  success: result.success,
+                  error: result.error,
+                });
+              } catch (error) {
+                this.logger.error(
+                  "Failed to enable Docker Model Runner",
+                  error,
+                );
+              }
+              break;
+
+            case "docker-start-compose":
+              try {
+                const service = DockerModelService.getInstance();
+                const result = await service.startComposeOllama();
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-compose-started",
+                  success: result.success,
+                  error: result.error,
+                });
+              } catch (error) {
+                this.logger.error("Failed to start Docker Compose", error);
+              }
+              break;
+
+            case "docker-pull-ollama-model":
+              try {
+                const service = DockerModelService.getInstance();
+                const success = await service.pullOllamaModel(message.message);
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-pulled",
+                  model: message.message,
+                  success: success.success,
+                  error: success.error,
+                });
+              } catch (error) {
+                this.logger.error("Failed to pull Ollama model", error);
+              }
+              break;
+
+            case "docker-pull-model":
+              try {
+                const service = DockerModelService.getInstance();
+                const result = await service.pullModel(message.message);
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-pulled",
+                  model: message.message,
+                  success: result.success,
+                  error: result.error,
+                });
+              } catch (error) {
+                this.logger.error("Failed to pull Docker model", error);
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-pulled",
+                  model: message.message,
+                  success: false,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+              break;
+
+            case "docker-delete-model":
+              try {
+                const service = DockerModelService.getInstance();
+                const result = await service.deleteModel(message.message);
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-deleted",
+                  model: message.message,
+                  success: result.success,
+                  error: result.error,
+                });
+              } catch (error) {
+                this.logger.error("Failed to delete Docker model", error);
+              }
+              break;
+
+            case "docker-use-model":
+              try {
+                const config = vscode.workspace.getConfiguration("local");
+
+                // Determine if this is a Docker Model Runner model (ai/...) or Ollama model
+                const isDockerModelRunner = message.message.startsWith("ai/");
+
+                // For Docker Model Runner, use port 12434 and strip "ai/" prefix
+                // For Ollama, use port 11434
+                const baseUrl = isDockerModelRunner
+                  ? "http://localhost:12434/engines/llama.cpp/v1"
+                  : "http://localhost:11434/v1";
+
+                // Strip "ai/" prefix for model name when using Docker Model Runner
+                const modelName = isDockerModelRunner
+                  ? message.message.replace(/^ai\//, "")
+                  : message.message;
+
+                // Update local.model setting
+                await config.update(
+                  "model",
+                  modelName,
+                  vscode.ConfigurationTarget.Global,
+                );
+
+                // Update baseUrl for Docker Model Runner
+                await config.update(
+                  "baseUrl",
+                  baseUrl,
+                  vscode.ConfigurationTarget.Global,
+                );
+
+                // Also ensure Primary Model is set to Local
+                const mainConfig =
+                  vscode.workspace.getConfiguration("generativeAi");
+                await mainConfig.update(
+                  "option",
+                  "Local",
+                  vscode.ConfigurationTarget.Global,
+                );
+
+                this.logger.info(
+                  `Local model configured: ${modelName} at ${baseUrl}`,
+                );
+
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-selected",
+                  model: message.message,
+                  success: true,
+                });
+              } catch (error) {
+                this.logger.error("Failed to set local model", error);
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-model-selected",
+                  model: message.message,
+                  success: false,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+              break;
+
+            case "docker-get-models":
+              try {
+                const service = DockerModelService.getInstance();
+                const models = await service.getModels();
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-models-list",
+                  models,
+                });
+              } catch (error) {
+                this.logger.error("Failed to get Docker models", error);
+              }
+              break;
+
+            case "docker-get-local-model":
+              try {
+                const config = vscode.workspace.getConfiguration("local");
+                const model = config.get<string>("model");
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-local-model",
+                  model,
+                });
+              } catch (error) {
+                this.logger.error("Failed to get local model config", error);
+              }
+              break;
+
+            case "docker-check-ollama-status":
+              try {
+                const service = DockerModelService.getInstance();
+                const running = await service.checkOllamaRunning();
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-ollama-status",
+                  running,
+                });
+              } catch (error) {
+                this.logger.error("Failed to check Ollama status", error);
+              }
+              break;
+
+            case "docker-check-status":
+              try {
+                const service = DockerModelService.getInstance();
+                const available = await service.checkModelRunnerAvailable();
+                await this.currentWebView?.webview.postMessage({
+                  type: "docker-status",
+                  available,
+                });
+              } catch (error) {
+                this.logger.error("Failed to check Docker status", error);
+              }
+              break;
+
+            // MCP Settings Commands
+            case "mcp-get-servers":
+              try {
+                this.logger.info("Fetching MCP servers data...");
+                const mcpService = MCPService.getInstance();
+                const stats = mcpService.getStat();
+                const allTools = await mcpService.getAllTools();
+
+                // Get server configurations
+                const serverConfigs = getConfigValue("mcp.servers") || {};
+
+                // Build servers data with tools
+                const servers = Object.entries(serverConfigs).map(
+                  ([id, config]: [string, any]) => {
+                    const serverTools = allTools.filter(
+                      (t) => t.serverName === id,
+                    );
+                    const client = mcpService.getClient(id);
+
+                    // Determine status
+                    let status:
+                      | "connected"
+                      | "disconnected"
+                      | "connecting"
+                      | "error" = "disconnected";
+                    if (client) {
+                      const clientState =
+                        client.getState?.() || MCPClientState.DISCONNECTED;
+                      if (clientState === MCPClientState.CONNECTED)
+                        status = "connected";
+                      else if (clientState === MCPClientState.CONNECTING)
+                        status = "connecting";
+                      else if (clientState === MCPClientState.ERROR)
+                        status = "error";
+                    }
+
+                    // Get disabled tools from config
+                    const disabledTools =
+                      getConfigValue(`mcp.disabledTools.${id}`) || [];
+
+                    return {
+                      id,
+                      name: id
+                        .replace(/-/g, " ")
+                        .replace(/\b\w/g, (c) => c.toUpperCase()),
+                      description: config.description || `MCP Server: ${id}`,
+                      status,
+                      enabled: config.enabled !== false,
+                      toolCount: serverTools.length,
+                      tools: serverTools.map((t) => ({
+                        name: t.name,
+                        description: t.description,
+                        serverName: t.serverName,
+                        enabled: !disabledTools.includes(t.name),
+                      })),
+                    };
+                  },
+                );
+
+                // If no custom config, show docker-gateway
+                if (
+                  Object.keys(serverConfigs).length === 0 &&
+                  stats.isGatewayMode
+                ) {
+                  const gatewayTools = allTools.filter(
+                    (t) => t.serverName === "docker-gateway",
+                  );
+                  const disabledTools =
+                    getConfigValue("mcp.disabledTools.docker-gateway") || [];
+                  servers.push({
+                    id: "docker-gateway",
+                    name: "Docker MCP Gateway",
+                    description: "Docker MCP Gateway (unified catalog)",
+                    status:
+                      stats.connectedServers > 0 ? "connected" : "disconnected",
+                    enabled: true,
+                    toolCount: gatewayTools.length,
+                    tools: gatewayTools.map((t) => ({
+                      name: t.name,
+                      description: t.description,
+                      serverName: t.serverName,
+                      enabled: !disabledTools.includes(t.name),
+                    })),
+                  });
+                }
+
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-servers-data",
+                  data: { servers },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to fetch MCP servers:", error);
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-servers-data",
+                  data: { servers: [], error: error.message },
+                });
+              }
+              break;
+
+            case "mcp-toggle-server":
+              try {
+                const { serverName, enabled } = message.message || {};
+                this.logger.info(
+                  `Toggling MCP server ${serverName}: ${enabled}`,
+                );
+
+                // Update the server config
+                const currentServers = getConfigValue("mcp.servers") || {};
+                if (currentServers[serverName]) {
+                  currentServers[serverName].enabled = enabled;
+                  await vscode.workspace
+                    .getConfiguration("ola-code-buddy")
+                    .update(
+                      "mcp.servers",
+                      currentServers,
+                      vscode.ConfigurationTarget.Global,
+                    );
+                }
+
+                // Notify UI of the change
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-server-updated",
+                  data: { serverName, enabled },
+                });
+
+                // Reload MCP service if needed
+                if (!enabled) {
+                  const mcpService = MCPService.getInstance();
+                  const client = mcpService.getClient(serverName);
+                  if (client) {
+                    await client.disconnect();
+                  }
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to toggle MCP server:", error);
+              }
+              break;
+
+            case "mcp-toggle-tool":
+              try {
+                const { serverName, toolName, enabled } = message.message || {};
+                this.logger.info(
+                  `Toggling MCP tool ${serverName}.${toolName}: ${enabled}`,
+                );
+
+                // Get current disabled tools for this server
+                const disabledToolsKey = `mcp.disabledTools.${serverName}`;
+                let disabledTools: string[] =
+                  getConfigValue(disabledToolsKey) || [];
+
+                if (enabled) {
+                  // Remove from disabled list
+                  disabledTools = disabledTools.filter((t) => t !== toolName);
+                } else {
+                  // Add to disabled list
+                  if (!disabledTools.includes(toolName)) {
+                    disabledTools.push(toolName);
+                  }
+                }
+
+                // Update config
+                await vscode.workspace
+                  .getConfiguration("ola-code-buddy")
+                  .update(
+                    disabledToolsKey,
+                    disabledTools,
+                    vscode.ConfigurationTarget.Global,
+                  );
+
+                // Notify UI
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-tool-updated",
+                  data: { serverName, toolName, enabled },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to toggle MCP tool:", error);
+              }
+              break;
+
+            case "mcp-refresh-tools":
+              try {
+                this.logger.info("Refreshing MCP tools...");
+                const mcpService = MCPService.getInstance();
+                await mcpService.refreshTools();
+
+                // Re-fetch and send updated data
+                const stats = mcpService.getStat();
+                const allTools = await mcpService.getAllTools();
+                const serverConfigs = getConfigValue("mcp.servers") || {};
+
+                const servers = Object.entries(serverConfigs).map(
+                  ([id, config]: [string, any]) => {
+                    const serverTools = allTools.filter(
+                      (t) => t.serverName === id,
+                    );
+                    const client = mcpService.getClient(id);
+
+                    let status:
+                      | "connected"
+                      | "disconnected"
+                      | "connecting"
+                      | "error" = "disconnected";
+                    if (client) {
+                      const clientState =
+                        client.getState?.() || MCPClientState.DISCONNECTED;
+                      if (clientState === MCPClientState.CONNECTED)
+                        status = "connected";
+                      else if (clientState === MCPClientState.CONNECTING)
+                        status = "connecting";
+                      else if (clientState === MCPClientState.ERROR)
+                        status = "error";
+                    }
+
+                    const disabledTools =
+                      getConfigValue(`mcp.disabledTools.${id}`) || [];
+
+                    return {
+                      id,
+                      name: id
+                        .replace(/-/g, " ")
+                        .replace(/\b\w/g, (c) => c.toUpperCase()),
+                      description: config.description || `MCP Server: ${id}`,
+                      status,
+                      enabled: config.enabled !== false,
+                      toolCount: serverTools.length,
+                      tools: serverTools.map((t) => ({
+                        name: t.name,
+                        description: t.description,
+                        serverName: t.serverName,
+                        enabled: !disabledTools.includes(t.name),
+                      })),
+                    };
+                  },
+                );
+
+                // Docker gateway fallback
+                if (
+                  Object.keys(serverConfigs).length === 0 &&
+                  stats.isGatewayMode
+                ) {
+                  const gatewayTools = allTools.filter(
+                    (t) => t.serverName === "docker-gateway",
+                  );
+                  const disabledTools =
+                    getConfigValue("mcp.disabledTools.docker-gateway") || [];
+                  servers.push({
+                    id: "docker-gateway",
+                    name: "Docker MCP Gateway",
+                    description: "Docker MCP Gateway (unified catalog)",
+                    status:
+                      stats.connectedServers > 0 ? "connected" : "disconnected",
+                    enabled: true,
+                    toolCount: gatewayTools.length,
+                    tools: gatewayTools.map((t) => ({
+                      name: t.name,
+                      description: t.description,
+                      serverName: t.serverName,
+                      enabled: !disabledTools.includes(t.name),
+                    })),
+                  });
+                }
+
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-servers-data",
+                  data: { servers },
+                });
+
+                vscode.window.showInformationMessage(
+                  `MCP tools refreshed: ${allTools.length} tools available`,
+                );
+              } catch (error: any) {
+                this.logger.error("Failed to refresh MCP tools:", error);
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-servers-data",
+                  data: { servers: [], error: error.message },
+                });
+              }
+              break;
+
+            case "get-local-models":
+              try {
+                this.logger.info("Fetching local models...");
+                const localModelService = LocalModelService.getInstance();
+                const models = await localModelService.getLocalModels();
+                const isModelRunnerAvailable =
+                  await localModelService.isModelRunnerAvailable();
+                const isOllamaRunning =
+                  await localModelService.isOllamaRunning();
+
+                this.currentWebView?.webview.postMessage({
+                  command: "local-models-data",
+                  data: {
+                    models,
+                    isModelRunnerAvailable,
+                    isOllamaRunning,
+                  },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to fetch local models:", error);
+                this.currentWebView?.webview.postMessage({
+                  command: "local-models-data",
+                  data: { models: [], error: error.message },
+                });
+              }
+              break;
+
+            case "open-mcp-settings":
+              // Open VS Code settings filtered to MCP settings
+              this.logger.info("Opening MCP settings...");
+              vscode.commands.executeCommand(
+                "workbench.action.openSettings",
+                "@ext:fiatinnovations.ola-code-buddy mcp",
+              );
+              break;
+
+            // Rules & Subagents Commands
+            case "rules-get-all":
+              try {
+                const rules = getConfigValue("rules.customRules") || [];
+                const systemPrompt =
+                  getConfigValue("rules.customSystemPrompt") || "";
+                const subagentConfig = getConfigValue("rules.subagents") || {};
+
+                // Get project rules status
+                const projectRulesService = ProjectRulesService.getInstance();
+                const projectRulesStatus = projectRulesService.getStatus();
+
+                // Default subagents
+                const defaultSubagents = [
+                  {
+                    id: "code-analyzer",
+                    name: "Code Analyzer",
+                    description:
+                      "Deep code analysis, security scanning, and architecture review",
+                    enabled: true,
+                    toolPatterns: [
+                      "analyze",
+                      "lint",
+                      "security",
+                      "complexity",
+                      "quality",
+                      "ast",
+                      "parse",
+                      "check",
+                      "scan",
+                      "review",
+                    ],
+                  },
+                  {
+                    id: "doc-writer",
+                    name: "Documentation Writer",
+                    description:
+                      "Generate comprehensive documentation and API references",
+                    enabled: true,
+                    toolPatterns: [
+                      "search",
+                      "read",
+                      "generate",
+                      "doc",
+                      "api",
+                      "reference",
+                      "web",
+                    ],
+                  },
+                  {
+                    id: "debugger",
+                    name: "Debugger",
+                    description:
+                      "Find and fix bugs with access to all available tools",
+                    enabled: true,
+                    toolPatterns: ["*"],
+                  },
+                  {
+                    id: "file-organizer",
+                    name: "File Organizer",
+                    description:
+                      "Restructure and organize project files and directories",
+                    enabled: true,
+                    toolPatterns: [
+                      "file",
+                      "directory",
+                      "list",
+                      "read",
+                      "write",
+                      "move",
+                      "rename",
+                      "delete",
+                      "structure",
+                      "organize",
+                    ],
+                  },
+                ];
+
+                // Merge saved config with defaults
+                const subagents = defaultSubagents.map((s) => ({
+                  ...s,
+                  enabled: subagentConfig[s.id]?.enabled ?? s.enabled,
+                }));
+
+                this.currentWebView?.webview.postMessage({
+                  command: "rules-data",
+                  data: { rules, systemPrompt, subagents, projectRulesStatus },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to fetch rules:", error);
+              }
+              break;
+
+            case "rules-add":
+              try {
+                const newRule = message.message;
+                if (newRule) {
+                  const rules = getConfigValue("rules.customRules") || [];
+                  const ruleWithId = {
+                    ...newRule,
+                    id: `rule-${Date.now()}`,
+                    createdAt: Date.now(),
+                  };
+                  rules.push(ruleWithId);
+                  await vscode.workspace
+                    .getConfiguration("ola-code-buddy")
+                    .update(
+                      "rules.customRules",
+                      rules,
+                      vscode.ConfigurationTarget.Global,
+                    );
+
+                  this.logger.info(`Added custom rule: ${ruleWithId.name}`);
+                  this.currentWebView?.webview.postMessage({
+                    command: "rule-added",
+                    data: { rule: ruleWithId },
+                  });
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to add rule:", error);
+              }
+              break;
+
+            case "rules-update":
+              try {
+                const { id, updates } = message.message || {};
+                if (id) {
+                  const rules = getConfigValue("rules.customRules") || [];
+                  const index = rules.findIndex((r: any) => r.id === id);
+                  if (index !== -1) {
+                    rules[index] = { ...rules[index], ...updates };
+                    await vscode.workspace
+                      .getConfiguration("ola-code-buddy")
+                      .update(
+                        "rules.customRules",
+                        rules,
+                        vscode.ConfigurationTarget.Global,
+                      );
+
+                    this.logger.info(`Updated rule: ${id}`);
+                  }
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to update rule:", error);
+              }
+              break;
+
+            case "rules-delete":
+              try {
+                const { id } = message.message || {};
+                if (id) {
+                  const rules = getConfigValue("rules.customRules") || [];
+                  const filteredRules = rules.filter((r: any) => r.id !== id);
+                  await vscode.workspace
+                    .getConfiguration("ola-code-buddy")
+                    .update(
+                      "rules.customRules",
+                      filteredRules,
+                      vscode.ConfigurationTarget.Global,
+                    );
+
+                  this.logger.info(`Deleted rule: ${id}`);
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to delete rule:", error);
+              }
+              break;
+
+            case "rules-toggle":
+              try {
+                const { id, enabled } = message.message || {};
+                if (id !== undefined) {
+                  const rules = getConfigValue("rules.customRules") || [];
+                  const index = rules.findIndex((r: any) => r.id === id);
+                  if (index !== -1) {
+                    rules[index].enabled = enabled;
+                    await vscode.workspace
+                      .getConfiguration("ola-code-buddy")
+                      .update(
+                        "rules.customRules",
+                        rules,
+                        vscode.ConfigurationTarget.Global,
+                      );
+
+                    this.logger.info(`Toggled rule ${id}: ${enabled}`);
+                  }
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to toggle rule:", error);
+              }
+              break;
+
+            case "subagents-get-all":
+              // Handled by rules-get-all
+              break;
+
+            case "subagents-toggle":
+              try {
+                const { id, enabled } = message.message || {};
+                if (id) {
+                  const subagentConfig =
+                    getConfigValue("rules.subagents") || {};
+                  subagentConfig[id] = { ...subagentConfig[id], enabled };
+                  await vscode.workspace
+                    .getConfiguration("ola-code-buddy")
+                    .update(
+                      "rules.subagents",
+                      subagentConfig,
+                      vscode.ConfigurationTarget.Global,
+                    );
+
+                  this.logger.info(`Toggled subagent ${id}: ${enabled}`);
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to toggle subagent:", error);
+              }
+              break;
+
+            case "project-rules-open":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                await projectRulesService.openRulesFile();
+              } catch (error: any) {
+                this.logger.error("Failed to open project rules:", error);
+              }
+              break;
+
+            case "project-rules-create":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                await projectRulesService.createRulesFile();
+              } catch (error: any) {
+                this.logger.error("Failed to create project rules:", error);
+              }
+              break;
+
+            case "project-rules-reload":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                await projectRulesService.reloadRules();
+                // Send updated status to webview
+                const status = projectRulesService.getStatus();
+                this.currentWebView?.webview.postMessage({
+                  command: "project-rules-status",
+                  data: status,
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to reload project rules:", error);
+              }
+              break;
+
+            case "project-rules-get-status":
+              try {
+                const projectRulesService = ProjectRulesService.getInstance();
+                const status = projectRulesService.getStatus();
+                this.currentWebView?.webview.postMessage({
+                  command: "project-rules-status",
+                  data: status,
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to get project rules status:", error);
+              }
+              break;
+
+            case "system-prompt-update":
+              try {
+                const { prompt } = message.message || {};
+                await vscode.workspace
+                  .getConfiguration("ola-code-buddy")
+                  .update(
+                    "rules.customSystemPrompt",
+                    prompt || "",
+                    vscode.ConfigurationTarget.Global,
+                  );
+
+                this.logger.info("Updated custom system prompt");
+              } catch (error: any) {
+                this.logger.error("Failed to update system prompt:", error);
+              }
               break;
 
             // Phase 5: Performance & Production Commands
@@ -676,9 +1683,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   /**
    * Enhances user messages with codebase context if the question is codebase-related
+   * @param message - The user's message
+   * @param userSelectedFiles - Optional array of file paths from @ mentions
+   * @param modelName - Optional model name for token budget calculation
    */
   private async enhanceMessageWithCodebaseContext(
     message: string,
+    userSelectedFiles?: string[],
+    modelName?: string,
   ): Promise<LLMMessage> {
     try {
       const categorizedQuestion = await this.categorizeQuestion(message);
@@ -697,6 +1709,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         `Detected codebase question with confidence: ${questionAnalysis.confidence}, categories: ${questionAnalysis.categories.join(", ")}`,
       );
 
+      // Load content of user-selected files (@ mentions)
+      let userSelectedFileContents: Map<string, string> | undefined;
+      if (userSelectedFiles && userSelectedFiles.length > 0) {
+        userSelectedFileContents =
+          await this.fileService.getFilesContent(userSelectedFiles);
+        this.logger.info(
+          `Loaded ${userSelectedFileContents?.size || 0} user-selected files for context`,
+        );
+      }
+
       // Create enhanced prompt using the dedicated service
       const promptContext: PromptContext = {
         questionAnalysis: {
@@ -706,6 +1728,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               ? this.convertConfidenceToNumber(questionAnalysis.confidence)
               : questionAnalysis.confidence,
         },
+        userSelectedFileContents,
+        modelName: modelName || "default",
       };
 
       const enhancedMessage =
@@ -834,13 +1858,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
    * @param history The current chat history.
    * @param maxTokens The maximum number of tokens allowed for the context window.
    * @param systemInstruction The system instruction, which also counts towards the token limit.
-   * @param generateSummary An async function that takes a list of messages and returns a summary string.
+   * @param agentId The agent ID to save the summary for.
    * @returns A promise that resolves to the new, potentially summarized and pruned, chat history.
    */
   async pruneChatHistoryWithSummary(
     history: any[],
     maxTokens: number,
     systemInstruction: string,
+    agentId?: string,
   ): Promise<any[]> {
     // --- 1. Calculate initial token count (same as before) ---
     const systemInstructionTokens =
@@ -857,7 +1882,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       })),
     );
 
-    let currentTokenCount =
+    const currentTokenCount =
       systemInstructionTokens +
       historyWithTokens.reduce((sum, item) => sum + item.tokens, 0);
     this.logger.info(
@@ -899,6 +1924,13 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     const summaryText = await this.generateSummaryForModel(
       messagesToSummarize.map((item) => item.message),
     );
+
+    // Save summary if agentId is provided
+    if (summaryText && agentId) {
+      await this.chatHistoryManager.saveSummary(agentId, summaryText);
+      this.logger.info(`Saved chat summary for agent ${agentId}`);
+    }
+
     const summaryTokens = await this.getTokenCounts(summaryText ?? "");
 
     let summaryMessage;
@@ -924,7 +1956,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       summaryMessage = anthropicOrGroqSummary;
     }
 
-    let newHistoryWithTokens = [
+    const newHistoryWithTokens = [
       { message: summaryMessage, tokens: summaryTokens },
       ...recentMessages,
     ];
@@ -969,7 +2001,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     systemInstruction: string,
   ): Promise<any[]> {
     try {
-      let mutableHistory = [...history];
+      const mutableHistory = [...history];
       while (mutableHistory.length > 0 && mutableHistory[0].role !== "user") {
         this.logger.warn(
           `History does not start with 'user'. Removing oldest message to correct pattern.`,
@@ -984,14 +2016,15 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         return [];
       }
 
-      const systemInstructionTokens =
-        await this.getTokenCounts(systemInstruction);
+      const systemInstructionTokens = await this.getTokenCounts(
+        systemInstruction || "",
+      );
 
       const historyWithTokens = await Promise.all(
         mutableHistory.map(async (msg) => ({
           message: msg,
           tokens: await this.getTokenCounts(
-            msg.parts ? msg.parts[0].text : msg.content,
+            (msg.parts ? msg.parts[0].text : msg.content) || "",
           ),
         })),
       );

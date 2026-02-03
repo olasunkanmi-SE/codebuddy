@@ -35,6 +35,7 @@ import type {
   BackendProtocol,
   BackendFactory,
   FileInfo,
+  FileData,
   GrepMatch,
   WriteResult,
   EditResult,
@@ -80,7 +81,7 @@ class SimpleMutex {
 
 /** Convert basic glob pattern to RegExp (supports *, **, ?). */
 function globToRegExp(pattern: string): RegExp {
-  let normalized = pattern.replace(/^\/+|\/+$/g, "");
+  const normalized = pattern.replace(/^\/+|\/+$/g, "");
 
   if (!normalized) {
     return new RegExp("^.*$");
@@ -244,6 +245,24 @@ class VscodeFsBackend implements BackendProtocol {
     }
   }
 
+  async readRaw(filePath: string): Promise<FileData> {
+    const abs = this.resolveAgentPath(filePath);
+    try {
+      const content = await fsp.readFile(abs, "utf-8");
+      const stat = await fsp.stat(abs);
+      return {
+        content: content.split("\n"),
+        created_at: stat.birthtime.toISOString(),
+        modified_at: stat.mtime.toISOString(),
+      };
+    } catch (e: any) {
+      if (e.code === "ENOENT") {
+        throw new Error(`File '${filePath}' not found`);
+      }
+      throw e;
+    }
+  }
+
   async grepRaw(
     pattern: string,
     basePath: string | null = "/",
@@ -363,7 +382,7 @@ class VscodeFsBackend implements BackendProtocol {
     }
   }
 
-  async globInfo(pattern: string, basePath: string = "/"): Promise<FileInfo[]> {
+  async globInfo(pattern: string, basePath = "/"): Promise<FileInfo[]> {
     const absBase = this.resolveAgentPath(basePath);
 
     const normalizedPattern = pattern.startsWith("/")

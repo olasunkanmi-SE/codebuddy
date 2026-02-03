@@ -60,13 +60,12 @@ const TipsContainer = styled.div`
 `;
 
 const TipsTitle = styled.div`
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   text-align: left;
 `;
 
@@ -123,10 +122,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ username }) => {
       </WelcomeSubtitle>
 
       <TipsContainer>
-        <TipsTitle>
-          <span>💡</span>
-          <span>Quick Tips</span>
-        </TipsTitle>
+        <TipsTitle>Quick Tips</TipsTitle>
         <TipsList>
           <TipItem>Check out the FAQ and SETTINGS section to configure your AI assistant</TipItem>
           <TipItem>Select code in editor to ask questions about it</TipItem>

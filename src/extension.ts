@@ -28,19 +28,26 @@ import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { Memory } from "./memory/base";
 import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
+import { ProjectRulesService } from "./services/project-rules.service";
 import { SqliteDatabaseService } from "./services/sqlite-database.service";
 import {
   getAPIKeyAndModel,
   getConfigValue,
   setConfigValue,
 } from "./utils/utils";
+import { Terminal } from "./utils/terminal";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
 import { CodeActionsProvider } from "./webview-providers/code-actions";
 import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
+import { OpenAIWebViewProvider } from "./webview-providers/openai";
+import { QwenWebViewProvider } from "./webview-providers/qwen";
+import { GLMWebViewProvider } from "./webview-providers/glm";
+import { LocalWebViewProvider } from "./webview-providers/local";
 import { WebViewProviderManager } from "./webview-providers/manager";
 import { DeveloperAgent } from "./agents/developer/agent";
+import { AgentRunningGuardService } from "./services/agent-running-guard.service";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -60,11 +67,19 @@ const {
   grokModel,
   deepseekApiKey,
   deepseekModel,
+  openaiApiKey,
+  openaiModel,
+  qwenApiKey,
+  qwenModel,
+  glmApiKey,
+  glmModel,
+  localApiKey,
+  localModel,
 } = APP_CONFIG;
 
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
-let orchestrator = Orchestrator.getInstance();
+const orchestrator = Orchestrator.getInstance();
 
 /**
  * Initialize WebView providers lazily for faster startup
@@ -109,6 +124,26 @@ function initializeWebViewProviders(
           key: deepseekApiKey,
           model: deepseekModel,
           webviewProviderClass: DeepseekWebViewProvider,
+        },
+        [generativeAiModels.OPENAI]: {
+          key: openaiApiKey,
+          model: openaiModel,
+          webviewProviderClass: OpenAIWebViewProvider,
+        },
+        [generativeAiModels.QWEN]: {
+          key: qwenApiKey,
+          model: qwenModel,
+          webviewProviderClass: QwenWebViewProvider,
+        },
+        [generativeAiModels.GLM]: {
+          key: glmApiKey,
+          model: glmModel,
+          webviewProviderClass: GLMWebViewProvider,
+        },
+        [generativeAiModels.LOCAL]: {
+          key: localApiKey,
+          model: localModel,
+          webviewProviderClass: LocalWebViewProvider,
         },
       };
 
@@ -159,6 +194,10 @@ function initializeWebViewProviders(
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    // Initialize Terminal with extension path early for Docker Compose support
+    const terminal = Terminal.getInstance();
+    terminal.setExtensionPath(context.extensionPath);
+
     new DeveloperAgent({});
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
     setConfigValue("generativeAi.option", "Gemini");
@@ -168,6 +207,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const databaseService: SqliteDatabaseService =
       SqliteDatabaseService.getInstance();
     databaseService.initialize();
+
+    // Initialize Project Rules Service
+    const projectRulesService = ProjectRulesService.getInstance();
+    projectRulesService.initialize();
+    context.subscriptions.push(projectRulesService);
 
     const mainLogger = new Logger("activate");
     mainLogger.info("CodeBuddy extension is now active!");
@@ -454,9 +498,18 @@ export async function activate(context: vscode.ExtensionContext) {
           }
         }
       },
+      "CodeBuddy.rules.open": async () => {
+        await projectRulesService.openRulesFile();
+      },
+      "CodeBuddy.rules.init": async () => {
+        await projectRulesService.createRulesFile();
+      },
+      "CodeBuddy.rules.reload": async () => {
+        await projectRulesService.reloadRules();
+      },
     };
 
-    let subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
+    const subscriptions: vscode.Disposable[] = Object.entries(actionMap).map(
       ([action, handler]) => {
         logger.info(`Registering command: ${action}`);
         return vscode.commands.registerCommand(action, handler);
@@ -472,11 +525,13 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     agentEventEmmitter = new EventEmitter();
+    const agentRunningGuard = AgentRunningGuardService.getInstance();
     context.subscriptions.push(
       ...subscriptions,
       quickFixCodeAction,
       agentEventEmmitter,
       orchestrator,
+      agentRunningGuard,
     );
   } catch (error: any) {
     // Memory.clear();
@@ -557,6 +612,10 @@ export function deactivate(context: vscode.ExtensionContext) {
   quickFixCodeAction.dispose();
   agentEventEmmitter.dispose();
   orchestrator.dispose();
+
+  // Dispose agent running guard
+  const agentGuard = AgentRunningGuardService.getInstance();
+  agentGuard.dispose();
 
   // Dispose provider manager
   const providerManager = WebViewProviderManager.getInstance(context);

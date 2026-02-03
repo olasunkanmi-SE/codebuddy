@@ -61,14 +61,23 @@ export class DeepseekLLM
 
   private handleConfigurationChange() {
     // Reset client when configuration changes
-    this.client;
+    // this.client;
   }
 
   static getInstance(config: ILlmConfig): DeepseekLLM {
     if (!DeepseekLLM.instance) {
       DeepseekLLM.instance = new DeepseekLLM(config);
+    } else {
+      DeepseekLLM.instance.updateConfig(config);
     }
     return DeepseekLLM.instance;
+  }
+
+  public updateConfig(config: ILlmConfig) {
+    this.config = config;
+    // We might want to re-initialize the client if API key or Base URL changes,
+    // but the OpenAI client is read-only.
+    // However, since we use `this.config.model` in generateText, updating `this.config` is enough for model switching.
   }
 
   getEmbeddingModel(): string {
@@ -294,7 +303,7 @@ export class DeepseekLLM
               JSON.stringify(regeneratedQuery),
             );
 
-            let answer = await this.processUserQuery(regeneratedQuery);
+            const answer = await this.processUserQuery(regeneratedQuery);
             if (typeof answer === "string") {
               finalResult = answer;
               this.orchestrator.publish("onQuery", JSON.stringify(answer));
@@ -395,7 +404,7 @@ export class DeepseekLLM
 
   private async handleSingleFunctionCall(
     functionCall: any,
-    attempt: number = 0,
+    attempt = 0,
   ): Promise<any> {
     const MAX_RETRIES = 3;
     const args = functionCall.args as Record<string, any>;
@@ -446,7 +455,7 @@ export class DeepseekLLM
     functionCall?: any,
     functionResponse?: any,
     chat?: any,
-    isInitialQuery: boolean = false,
+    isInitialQuery = false,
   ): Promise<any[]> {
     let chatHistory: any = Memory.get(COMMON.DEEPSEEK_CHAT_HISTORY) || [];
     Memory.removeItems(COMMON.DEEPSEEK_CHAT_HISTORY);

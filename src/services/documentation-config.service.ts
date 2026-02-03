@@ -81,7 +81,9 @@ export class DocumentationConfigService {
     return DocumentationConfigService.instance;
   }
 
-  private constructor() {}
+  private constructor() {
+    // Singleton pattern
+  }
 
   /**
    * Get localized message by key path

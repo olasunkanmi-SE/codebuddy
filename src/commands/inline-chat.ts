@@ -19,7 +19,7 @@ export class InLineChat extends CodeCommandHandler {
 
   async createPrompt(selectedCode: string): Promise<string> {
     const inlineChat = await this.getUserInLineChat();
-    let context = this.getCurrentActiveEditorCode() ?? "";
+    const context = this.getCurrentActiveEditorCode() ?? "";
     const fullPrompt = `${inlineChat} \n ${selectedCode} \n Here is the code context ${context}`;
     return fullPrompt;
   }
