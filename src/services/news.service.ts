@@ -1,95 +1,104 @@
-import axios from 'axios';
-import { SqliteDatabaseService } from './sqlite-database.service';
-import { Logger } from '../infrastructure/logger/logger';
+import axios from "axios";
+import { SqliteDatabaseService } from "./sqlite-database.service";
+import { Logger } from "../infrastructure/logger/logger";
 
 export interface NewsItem {
-    id?: number;
-    title: string;
-    url: string;
-    summary?: string;
-    source: string;
-    published_at?: string;
-    fetched_at?: string;
-    read_status?: number; // 0 = unread, 1 = read
+  id?: number;
+  title: string;
+  url: string;
+  summary?: string;
+  source: string;
+  published_at?: string;
+  fetched_at?: string;
+  read_status?: number; // 0 = unread, 1 = read
 }
 
 export class NewsService {
-    private static instance: NewsService;
-    private dbService: SqliteDatabaseService;
-    private logger: Logger;
+  private static instance: NewsService;
+  private dbService: SqliteDatabaseService;
+  private logger: Logger;
 
-    private constructor() {
-        this.dbService = SqliteDatabaseService.getInstance();
-        this.logger = Logger.initialize('NewsService', {});
+  private constructor() {
+    this.dbService = SqliteDatabaseService.getInstance();
+    this.logger = Logger.initialize("NewsService", {});
+  }
+
+  public static getInstance(): NewsService {
+    if (!NewsService.instance) {
+      NewsService.instance = new NewsService();
     }
+    return NewsService.instance;
+  }
 
-    public static getInstance(): NewsService {
-        if (!NewsService.instance) {
-            NewsService.instance = new NewsService();
+  public async fetchAndStoreNews(): Promise<void> {
+    try {
+      this.logger.info("Fetching news from Hacker News...");
+
+      // Get top stories IDs
+      const { data: topStories } = await axios.get<number[]>(
+        "https://hacker-news.firebaseio.com/v0/topstories.json",
+      );
+
+      // Get details for top 5 stories
+      const top5 = topStories.slice(0, 5);
+      const newsItems: NewsItem[] = [];
+
+      for (const id of top5) {
+        const { data: story } = await axios.get(
+          `https://hacker-news.firebaseio.com/v0/item/${id}.json`,
+        );
+        if (story && story.url) {
+          newsItems.push({
+            title: story.title,
+            url: story.url,
+            source: "Hacker News",
+            published_at: new Date(story.time * 1000).toISOString(),
+          });
         }
-        return NewsService.instance;
-    }
+      }
 
-    public async fetchAndStoreNews(): Promise<void> {
-        try {
-            this.logger.info('Fetching news from Hacker News...');
-            
-            // Get top stories IDs
-            const { data: topStories } = await axios.get<number[]>('https://hacker-news.firebaseio.com/v0/topstories.json');
-            
-            // Get details for top 5 stories
-            const top5 = topStories.slice(0, 5);
-            const newsItems: NewsItem[] = [];
+      // Store in DB
+      this.logger.info(`Storing ${newsItems.length} news items...`);
+      for (const item of newsItems) {
+        // Check for duplicates based on URL
+        const existing = this.dbService.executeSqlAll(
+          `SELECT id FROM news_items WHERE url = ?`,
+          [item.url],
+        );
 
-            for (const id of top5) {
-                const { data: story } = await axios.get(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
-                if (story && story.url) {
-                    newsItems.push({
-                        title: story.title,
-                        url: story.url,
-                        source: 'Hacker News',
-                        published_at: new Date(story.time * 1000).toISOString()
-                    });
-                }
-            }
-
-            // Store in DB
-            this.logger.info(`Storing ${newsItems.length} news items...`);
-            for (const item of newsItems) {
-                // Check for duplicates based on URL
-                const existing = this.dbService.executeSql(
-                    `SELECT id FROM news_items WHERE url = ?`,
-                    [item.url]
-                );
-
-                if (existing.length === 0) {
-                    this.dbService.executeSqlCommand(
-                        `INSERT INTO news_items (title, url, source, published_at, read_status) 
+        if (existing.length === 0) {
+          this.dbService.executeSqlCommand(
+            `INSERT INTO news_items (title, url, source, published_at, read_status) 
                          VALUES (?, ?, ?, ?, 0)`,
-                        [item.title, item.url, item.source, item.published_at]
-                    );
-                }
-            }
-            
-            this.logger.info('News fetched and stored successfully.');
-        } catch (error) {
-            this.logger.error('Failed to fetch news', error);
+            [item.title, item.url, item.source, item.published_at],
+          );
         }
-    }
+      }
 
-    public getUnreadNews(): NewsItem[] {
-        const results = this.dbService.executeSql(
-            `SELECT * FROM news_items WHERE read_status = 0 ORDER BY fetched_at DESC LIMIT 10`
-        );
-        return results as NewsItem[];
+      this.logger.info("News fetched and stored successfully.");
+    } catch (error) {
+      this.logger.error("Failed to fetch news", error);
     }
+  }
 
-    public markAsRead(ids: number[]): void {
-        if (ids.length === 0) return;
-        const placeholders = ids.map(() => '?').join(',');
-        this.dbService.executeSqlCommand(
-            `UPDATE news_items SET read_status = 1 WHERE id IN (${placeholders})`,
-            ids
-        );
-    }
+  public getUnreadNews(): NewsItem[] {
+    // Cleanup invalid items first
+    this.dbService.executeSqlCommand(
+      `DELETE FROM news_items WHERE title IS NULL OR title = '' OR url IS NULL`,
+    );
+
+    const results = this.dbService.executeSqlAll(
+      `SELECT * FROM news_items WHERE read_status = 0 ORDER BY fetched_at DESC LIMIT 10`,
+    );
+    return results as NewsItem[];
+  }
+
+  public markAsRead(ids: number[]): void {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => "?").join(",");
+    this.dbService.executeSqlCommand(
+      `UPDATE news_items SET read_status = 1 WHERE id IN (${placeholders})`,
+      ids,
+    );
+  }
 }

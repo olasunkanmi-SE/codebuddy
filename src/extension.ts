@@ -280,9 +280,10 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     // ⚡ DEFER HEAVY OPERATIONS: Initialize in background after UI is ready
-    // setImmediate(() => {
-    //   initializeBackgroundServices(context);
-    // });
+    setImmediate(() => {
+      // initializeBackgroundServices(context);
+      SchedulerService.getInstance().start();
+    });
 
     logger.info("✓ CodeBuddy: Core services started, UI ready");
 
@@ -776,6 +777,9 @@ async function restartExtension(context: vscode.ExtensionContext) {
 
 export function deactivate(context: vscode.ExtensionContext) {
   logger.info("Deactivating CodeBuddy extension...");
+
+  // Stop Scheduler Service
+  SchedulerService.getInstance().stop();
 
   // Clear database history before deactivation
   clearFileStorageData();

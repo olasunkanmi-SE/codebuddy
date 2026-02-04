@@ -6,6 +6,9 @@ import { z } from "zod";
 import * as vscode from "vscode";
 import { DiffReviewService } from "../services/diff-review.service";
 import * as path from "path";
+import { TodoTool } from "./todo";
+import { MemoryTool } from "./memory";
+export { TodoTool, MemoryTool };
 
 export class SearchTool {
   constructor(private readonly contextRetriever?: ContextRetriever) {}
@@ -242,7 +245,7 @@ export class EditFileTool {
       // Format link so VS Code command handler receives the ID string
       // Note: command args in markdown links are JSON encoded
       const args = encodeURIComponent(JSON.stringify(change.id));
-      
+
       return `I have prepared changes for **${fileName}**. [Review & Apply](command:codebuddy.reviewChange?${args})`;
     } catch (e: any) {
       return `Error editing file: ${e.message}`;
@@ -456,7 +459,8 @@ export class DeepTerminalTool {
           },
           command: {
             type: SchemaType.STRING,
-            description: "The shell command to execute (required for 'execute').",
+            description:
+              "The shell command to execute (required for 'execute').",
           },
           waitMs: {
             type: SchemaType.INTEGER,
@@ -792,4 +796,6 @@ export const TOOL_CONFIGS = {
   ListFilesTool: { tool: ListFilesTool, useContextRetriever: false },
   EditFileTool: { tool: EditFileTool, useContextRetriever: false },
   WebPreviewTool: { tool: WebPreviewTool, useContextRetriever: false },
+  TodoTool: { tool: TodoTool, useContextRetriever: false },
+  MemoryTool: { tool: MemoryTool, useContextRetriever: false },
 };

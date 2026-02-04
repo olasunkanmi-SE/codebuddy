@@ -243,9 +243,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.setWebviewHtml(this.currentWebView);
     this.setupMessageHandler(this.currentWebView);
 
-    // Synchronize provider chat history with database on startup
-    setImmediate(() => this.synchronizeChatHistoryFromDatabase());
-
     // Get the current workspace files from DB.
     setImmediate(() => this.getFiles());
 
@@ -267,10 +264,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       if (persistentHistory.length > 0 || persistentSummary) {
         // Convert database format to provider's IMessageInput format
         const providerHistory = persistentHistory.map((msg: any) => ({
-          type: msg.type === "user" ? "user" : "model",
+          type: msg.type === "user" ? "user" : "bot",
           content: msg.content,
           timestamp: msg.timestamp || Date.now(),
           metadata: msg.metadata,
+          alias: msg.metadata?.alias,
         }));
 
         // Prepend summary if it exists
@@ -280,6 +278,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             content: `[System Note: This is a summary of our earlier conversation to preserve context]:\n${persistentSummary}`,
             timestamp: Date.now(),
             metadata: { isSummary: true },
+            alias: undefined,
           });
         }
 
@@ -439,15 +438,15 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   private async synchronizeNews(): Promise<void> {
     try {
-        const news = NewsService.getInstance().getUnreadNews();
-        if (news.length > 0) {
-            await this.currentWebView?.webview.postMessage({
-                type: 'news-update',
-                payload: { news }
-            });
-        }
+      const news = NewsService.getInstance().getUnreadNews();
+      if (news.length > 0) {
+        await this.currentWebView?.webview.postMessage({
+          type: "news-update",
+          payload: { news },
+        });
+      }
     } catch (error: any) {
-        this.logger.error('Failed to synchronize news', error);
+      this.logger.error("Failed to synchronize news", error);
     }
   }
 
@@ -673,11 +672,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "webview-ready":
               await this.publishWorkSpace();
               await this.synchronizeNews();
+              await this.synchronizeChatHistoryFromDatabase();
               break;
             case "news-mark-read": {
               const { ids } = message;
               if (ids && Array.isArray(ids)) {
-                  NewsService.getInstance().markAsRead(ids);
+                NewsService.getInstance().markAsRead(ids);
               }
               break;
             }
