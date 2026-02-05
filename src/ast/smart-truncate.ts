@@ -408,14 +408,21 @@ export function truncateForLLM(
   analysisOutput: string,
   maxTokens = 25000,
 ): string {
+  const logger = Logger.initialize("SmartTruncate", {
+    minLevel: LogLevel.DEBUG,
+    enableConsole: true,
+    enableFile: true,
+    enableTelemetry: true,
+  });
   const truncator = new LLMOutputTruncator();
   const result = truncator.truncate(analysisOutput, { maxTokens });
 
   if (result.truncated) {
-    console.log(
+    logger.info(
       `Truncated from ${result.originalCount} to ${result.finalCount} elements`,
     );
-    console.log(`Estimated tokens: ${result.estimatedTokens}`);
+    logger.info;
+    logger.info(`Estimated tokens: ${result.estimatedTokens}`);
   }
 
   return result.summary;

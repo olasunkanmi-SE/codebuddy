@@ -1,4 +1,5 @@
 import { SqliteDatabaseService } from "../../services/sqlite-database.service";
+import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 
 /**
  * Persistent chat history repository using SQLite
@@ -7,9 +8,16 @@ import { SqliteDatabaseService } from "../../services/sqlite-database.service";
 export class ChatHistoryRepository {
   private static instance: ChatHistoryRepository;
   private readonly dbService: SqliteDatabaseService;
+  private readonly logger: Logger;
 
   private constructor() {
     this.dbService = SqliteDatabaseService.getInstance();
+    this.logger = Logger.initialize("ChatHistoryRepository", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
     // this.initializeSchema();
   }
 
@@ -20,8 +28,9 @@ export class ChatHistoryRepository {
   /**
    * Get chat history for a specific agent
    */
-  public get(agentId: string): any[] {
+  public async get(agentId: string): Promise<any[]> {
     try {
+      await this.dbService.ensureInitialized();
       const results = this.dbService.executeSqlAll(
         "SELECT * FROM chat_history WHERE agent_id = ? ORDER BY timestamp ASC",
         [agentId],
@@ -36,7 +45,10 @@ export class ChatHistoryRepository {
         metadata: row.metadata ? JSON.parse(row.metadata) : null,
       }));
     } catch (error: any) {
-      console.warn(`Failed to get chat history for agent ${agentId}:`, error);
+      this.logger.warn(
+        `Failed to get chat history for agent ${agentId}:`,
+        error,
+      );
       return [];
     }
   }
@@ -44,10 +56,11 @@ export class ChatHistoryRepository {
   /**
    * Set/replace chat history for a specific agent
    */
-  public set(agentId: string, history: any[]): void {
+  public async set(agentId: string, history: any[]): Promise<void> {
     try {
+      await this.dbService.ensureInitialized();
       // Clear existing history first to avoid duplication
-      this.clear(agentId);
+      await this.clear(agentId);
 
       // Insert new history
       const insertStmt = `
@@ -65,14 +78,17 @@ export class ChatHistoryRepository {
         ]);
       }
     } catch (error: any) {
-      console.warn(`Failed to set chat history for agent ${agentId}:`, error);
+      this.logger.warn(
+        `Failed to set chat history for agent ${agentId}:`,
+        error,
+      );
     }
   }
 
   /**
    * Add a single message to chat history
    */
-  public addMessage(
+  public async addMessage(
     agentId: string,
     message: {
       content: string;
@@ -80,8 +96,9 @@ export class ChatHistoryRepository {
       sessionId?: string;
       metadata?: any;
     },
-  ): void {
+  ): Promise<void> {
     try {
+      await this.dbService.ensureInitialized();
       const insertStmt = `
         INSERT INTO chat_history (agent_id, message_content, message_type, session_id, metadata)
         VALUES (?, ?, ?, ?, ?)
@@ -95,30 +112,32 @@ export class ChatHistoryRepository {
         message.metadata ? JSON.stringify(message.metadata) : null,
       ]);
     } catch (error: any) {
-      console.warn(`Failed to add message for agent ${agentId}:`, error);
+      this.logger.warn(`Failed to add message for agent ${agentId}:`, error);
     }
   }
 
   /**
    * Save chat summary for a specific agent
    */
-  public saveSummary(agentId: string, summary: string): void {
+  public async saveSummary(agentId: string, summary: string): Promise<void> {
     try {
+      await this.dbService.ensureInitialized();
       const insertStmt = `
         INSERT INTO chat_summaries (agent_id, summary)
         VALUES (?, ?)
       `;
       this.dbService.executeSqlCommand(insertStmt, [agentId, summary]);
     } catch (error: any) {
-      console.warn(`Failed to save summary for agent ${agentId}:`, error);
+      this.logger.warn(`Failed to save summary for agent ${agentId}:`, error);
     }
   }
 
   /**
    * Get the latest chat summary for a specific agent
    */
-  public getSummary(agentId: string): string | null {
+  public async getSummary(agentId: string): Promise<string | null> {
     try {
+      await this.dbService.ensureInitialized();
       const results = this.dbService.executeSqlAll(
         "SELECT summary FROM chat_summaries WHERE agent_id = ? ORDER BY timestamp DESC LIMIT 1",
         [agentId],
@@ -129,7 +148,7 @@ export class ChatHistoryRepository {
       }
       return null;
     } catch (error: any) {
-      console.warn(`Failed to get summary for agent ${agentId}:`, error);
+      this.logger.warn(`Failed to get summary for agent ${agentId}:`, error);
       return null;
     }
   }
@@ -137,33 +156,39 @@ export class ChatHistoryRepository {
   /**
    * Clear chat history for a specific agent
    */
-  public clear(agentId: string): void {
+  public async clear(agentId: string): Promise<void> {
     try {
+      await this.dbService.ensureInitialized();
       this.dbService.executeSqlCommand(
         "DELETE FROM chat_history WHERE agent_id = ?",
         [agentId],
       );
     } catch (error: any) {
-      console.warn(`Failed to clear chat history for agent ${agentId}:`, error);
+      this.logger.warn(
+        `Failed to clear chat history for agent ${agentId}:`,
+        error,
+      );
     }
   }
 
   /**
    * Clear all chat history
    */
-  public clearAll(): void {
+  public async clearAll(): Promise<void> {
     try {
+      await this.dbService.ensureInitialized();
       this.dbService.executeSqlCommand("DELETE FROM chat_history");
     } catch (error: any) {
-      console.warn("Failed to clear all chat history:", error);
+      this.logger.warn("Failed to clear all chat history:", error);
     }
   }
 
   /**
    * Get recent chat history with limit
    */
-  public getRecent(agentId: string, limit = 50): any[] {
+  public async getRecent(agentId: string, limit = 50): Promise<any[]> {
     try {
+      await this.dbService.ensureInitialized();
       const results = this.dbService.executeSqlAll(
         "SELECT * FROM chat_history WHERE agent_id = ? ORDER BY timestamp DESC LIMIT ?",
         [agentId, limit],
@@ -179,7 +204,7 @@ export class ChatHistoryRepository {
         metadata: row.metadata ? JSON.parse(row.metadata) : null,
       }));
     } catch (error: any) {
-      console.warn(
+      this.logger.warn(
         `Failed to get recent chat history for agent ${agentId}:`,
         error,
       );
@@ -190,8 +215,9 @@ export class ChatHistoryRepository {
   /**
    * Delete old chat history to manage storage size
    */
-  public cleanup(daysToKeep = 30): void {
+  public async cleanup(daysToKeep = 30): Promise<void> {
     try {
+      await this.dbService.ensureInitialized();
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
@@ -200,7 +226,7 @@ export class ChatHistoryRepository {
         [cutoffDate.toISOString()],
       );
     } catch (error: any) {
-      console.warn("Failed to cleanup old chat history:", error);
+      this.logger.warn("Failed to cleanup old chat history:", error);
     }
   }
 }

@@ -5,6 +5,7 @@ import { GitActions } from "../../services/git-actions";
 import { ChangeDetector } from "./change-detector.service";
 import { formatText } from "../../utils/utils";
 import { GitCliProvider } from "./git-cli.provider";
+import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { PRPromptBuilder } from "./pr-prompt-builder.service";
 
 export class ReviewPR extends CodeCommandHandler {
@@ -14,6 +15,12 @@ export class ReviewPR extends CodeCommandHandler {
 
   constructor(action: string, context: vscode.ExtensionContext) {
     super(action, context);
+    this.logger = Logger.initialize("ReviewPR", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
 
     // Dependency Injection: Compose services here
     const gitActions = new GitActions();
@@ -65,7 +72,7 @@ export class ReviewPR extends CodeCommandHandler {
       // 3. Prompt Construction (Delegated)
       return this.promptBuilder.build(changeDetails);
     } catch (error) {
-      console.error("Error generating PR review prompt:", error);
+      this.logger.error("Error generating PR review prompt:", error);
       vscode.window.showErrorMessage(
         error instanceof Error ? error.message : "An unknown error occurred.",
       );

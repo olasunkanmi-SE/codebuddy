@@ -59,7 +59,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   private readonly qwenModel: string;
   private readonly glmApiKey: string;
   private readonly glmModel: string;
-  protected readonly logger: Logger;
+  protected logger: Logger;
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,

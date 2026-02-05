@@ -6,6 +6,7 @@ import {
 } from "./../application/constant";
 import { AgentService } from "./agent-state";
 import { getConfigValue } from "../utils/utils";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 interface ChatMessage {
   type: "bot" | "user";
@@ -46,6 +47,7 @@ interface IPruningConfig {
 export class ChatHistoryManager {
   private readonly agentService: AgentService;
   private static instance: ChatHistoryManager;
+  private readonly logger: Logger;
   chatHistory: IChatHistory[] = [];
 
   // Default pruning configuration
@@ -58,10 +60,16 @@ export class ChatHistoryManager {
 
   constructor() {
     this.agentService = AgentService.getInstance();
+    this.logger = Logger.initialize("ChatHistoryManager", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
 
     // Log auto-pruning status on initialization
     const autoPruningStatus = this.isAutoPruningEnabled();
-    console.log(
+    this.logger.info(
       `ChatHistoryManager initialized with auto-pruning: ${autoPruningStatus ? "ENABLED" : "DISABLED"}`,
     );
   }
@@ -164,7 +172,7 @@ export class ChatHistoryManager {
 
       // Log pruning activity if data was removed
       if (prunedRawHistory.length < originalCount) {
-        console.log(
+        this.logger.info(
           `Auto-pruning: Reduced history from ${originalCount} to ${prunedRawHistory.length} messages`,
         );
       }
@@ -407,17 +415,17 @@ export class ChatHistoryManager {
   // Enable auto-pruning (default behavior)
   enableAutoPruning(): void {
     // This would typically be set via VS Code settings, but we can update the default
-    console.log(
+    this.logger.info(
       "Auto-pruning is enabled by default. Configure via VS Code settings: chatHistory.enableAutoPruning",
     );
   }
 
   // Disable auto-pruning (not recommended for performance)
   disableAutoPruning(): void {
-    console.log(
+    this.logger.info(
       "To disable auto-pruning, set chatHistory.enableAutoPruning to false in VS Code settings",
     );
-    console.warn(
+    this.logger.warn(
       "Warning: Disabling auto-pruning may lead to memory and performance issues",
     );
   }

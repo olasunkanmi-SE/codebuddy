@@ -3,7 +3,7 @@ import axios from "axios";
 import { JSDOM } from "jsdom";
 import { Orchestrator } from "../orchestrator";
 import { PRIORITY_URLS, WEB_SEARCH_CONFIG } from "../application/constant";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { generateQueryString } from "../utils/utils";
 import { UrlReranker } from "./url-reranker";
 
@@ -39,7 +39,12 @@ export class WebSearchService {
   public static getInstance(): WebSearchService {
     if (!WebSearchService.instance) {
       WebSearchService.instance = new WebSearchService(
-        new Logger("WebSearchService"),
+        Logger.initialize("WebSearchService", {
+          minLevel: LogLevel.DEBUG,
+          enableConsole: true,
+          enableFile: true,
+          enableTelemetry: true,
+        }),
       );
     }
     return WebSearchService.instance;

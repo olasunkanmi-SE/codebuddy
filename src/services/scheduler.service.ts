@@ -60,34 +60,25 @@ export class SchedulerService {
         // First time running, create the task entry
         this.dbService.executeSqlCommand(
           `INSERT INTO scheduled_tasks (name, cron_expression, command, status) 
-                     VALUES ('daily_news', '0 10 * * *', 'news:fetch', 'active')`,
+                     VALUES ('daily_news', '0 9 * * *', 'news:fetch', 'active')`,
         );
-      }
-
-      // Determine the last run time (if any)
-      const lastRun =
-        lastRunResults.length > 0 && lastRunResults[0].last_run
+        shouldRun = true;
+      } else {
+        const lastRun = lastRunResults[0].last_run
           ? new Date(lastRunResults[0].last_run)
           : null;
-
-      // Logic: Run only if it's past 10 AM local time AND it hasn't run today
-      if (now.getHours() >= 10) {
         if (!lastRun) {
           shouldRun = true;
         } else {
-          const isSameDay =
-            lastRun.getDate() === now.getDate() &&
-            lastRun.getMonth() === now.getMonth() &&
-            lastRun.getFullYear() === now.getFullYear();
-
-          if (!isSameDay) {
+          // Check if last run was on a previous day
+          if (
+            lastRun.getDate() !== now.getDate() ||
+            lastRun.getMonth() !== now.getMonth() ||
+            lastRun.getFullYear() !== now.getFullYear()
+          ) {
             shouldRun = true;
           }
         }
-      } else {
-        this.logger.debug(
-          `Skipping daily_news: Current hour ${now.getHours()} is before 10 AM`,
-        );
       }
 
       if (shouldRun) {

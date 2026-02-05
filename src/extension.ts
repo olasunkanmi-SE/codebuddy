@@ -214,7 +214,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const databaseService: SqliteDatabaseService =
       SqliteDatabaseService.getInstance();
-    databaseService.initialize();
+    await databaseService.initialize();
 
     // Start Scheduler Service
     SchedulerService.getInstance().start();
@@ -256,7 +256,12 @@ export async function activate(context: vscode.ExtensionContext) {
     projectRulesService.initialize();
     context.subscriptions.push(projectRulesService);
 
-    const mainLogger = new Logger("activate");
+    const mainLogger = Logger.initialize("activate", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
     mainLogger.info("CodeBuddy extension is now active!");
     logger.info("🚀 CodeBuddy: Starting fast activation...");
 

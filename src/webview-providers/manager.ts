@@ -20,6 +20,7 @@ import { Terminal } from "../utils/terminal";
 export class WebViewProviderManager implements vscode.Disposable {
   private static instance: WebViewProviderManager;
   private currentProvider: BaseWebViewProvider | undefined;
+  private activeProviderName: string | undefined;
   private readonly providerRegistry: Map<
     string,
     new (
@@ -250,6 +251,7 @@ export class WebViewProviderManager implements vscode.Disposable {
         this.currentProvider.dispose();
       }
       this.currentProvider = newProvider;
+      this.activeProviderName = modelName;
       if (this.webviewView) {
         await this.currentProvider.resolveWebviewView(this.webviewView);
       }
@@ -357,6 +359,10 @@ export class WebViewProviderManager implements vscode.Disposable {
 
   getCurrentProvider(): BaseWebViewProvider | undefined {
     return this.currentProvider;
+  }
+
+  public getActiveModelName(): string | undefined {
+    return this.activeProviderName;
   }
 
   private async handleStreamStart(event: IEventPayload) {

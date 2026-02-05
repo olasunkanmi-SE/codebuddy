@@ -92,10 +92,10 @@ export class Logger {
     }
     Logger.telemetry = telemetry;
     Logger.setTraceId(Logger.generateId());
-    if (!Logger.instance) {
-      Logger.instance = new Logger(module);
-    }
-    return Logger.instance;
+
+    // Always return a new instance to ensure correct module name mapping
+    // The configuration is shared statically
+    return new Logger(module);
   }
 
   public static setTraceId(traceId: string): void {

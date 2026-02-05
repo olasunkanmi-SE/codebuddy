@@ -30,8 +30,13 @@ export class NewsService {
     return NewsService.instance;
   }
 
+  private async ensureInitialized(): Promise<void> {
+    await this.dbService.ensureInitialized();
+  }
+
   public async fetchAndStoreNews(): Promise<void> {
     try {
+      await this.ensureInitialized();
       this.logger.info("Fetching news from Hacker News...");
 
       // Get top stories IDs
@@ -61,7 +66,7 @@ export class NewsService {
       this.logger.info(`Storing ${newsItems.length} news items...`);
       for (const item of newsItems) {
         // Check for duplicates based on URL
-        const existing = this.dbService.executeSqlAll(
+        const existing = this.dbService.executeSql(
           `SELECT id FROM news_items WHERE url = ?`,
           [item.url],
         );
@@ -81,19 +86,16 @@ export class NewsService {
     }
   }
 
-  public getUnreadNews(): NewsItem[] {
-    // Cleanup invalid items first
-    this.dbService.executeSqlCommand(
-      `DELETE FROM news_items WHERE title IS NULL OR title = '' OR url IS NULL`,
-    );
-
-    const results = this.dbService.executeSqlAll(
+  public async getUnreadNews(): Promise<NewsItem[]> {
+    await this.ensureInitialized();
+    const results = this.dbService.executeSql(
       `SELECT * FROM news_items WHERE read_status = 0 ORDER BY fetched_at DESC LIMIT 10`,
     );
     return results as NewsItem[];
   }
 
-  public markAsRead(ids: number[]): void {
+  public async markAsRead(ids: number[]): Promise<void> {
+    await this.ensureInitialized();
     if (ids.length === 0) return;
     const placeholders = ids.map(() => "?").join(",");
     this.dbService.executeSqlCommand(

@@ -189,16 +189,19 @@ export class MessageHandler {
     }
   }
 
-  cancelRequest(requestId: string) {
+  cancelRequest(requestId: string, threadId?: string) {
     const requestInfo = this.activeRequests.get(requestId);
-    if (requestInfo?.threadId) {
-      this.agentService.cancelStream(requestInfo.threadId);
-      this.activeRequests.delete(requestId);
+    const resolvedThreadId = requestInfo?.threadId ?? threadId;
+
+    if (resolvedThreadId) {
+      this.agentService.cancelStream(resolvedThreadId);
       this.logger.log(
         LogLevel.INFO,
-        `Request ${requestId} (thread: ${requestInfo.threadId}) cancelled`,
+        `Request ${requestId} (thread: ${resolvedThreadId}) cancelled`,
       );
     }
+
+    this.activeRequests.delete(requestId);
   }
 
   dispose() {

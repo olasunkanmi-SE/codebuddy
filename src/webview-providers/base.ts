@@ -70,6 +70,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly codebaseUnderstanding: CodebaseUnderstandingService;
   private readonly inputValidator: InputValidator;
   protected readonly MAX_HISTORY_MESSAGES = 3;
+  private chatHistorySyncPromise: Promise<void> | null = null;
 
   // Vector database services
   protected vectorConfigManager?: VectorDbConfigurationManager;
@@ -201,7 +202,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   /**
    * Gets the current model name for token budget calculation
    */
-  protected getCurrentModelName(): string {
+  public getCurrentModelName(): string {
     return this.generativeAiModel || "default";
   }
 
@@ -254,52 +255,93 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
    * This ensures the provider has immediate access to persistent chat data
    */
   protected async synchronizeChatHistoryFromDatabase(): Promise<void> {
-    try {
-      // Get chat history from database via AgentService
+    if (this.chatHistorySyncPromise) {
+      return this.chatHistorySyncPromise;
+    }
+
+    this.chatHistorySyncPromise = (async () => {
       const agentId = "agentId"; // Using the same hardcoded ID as WebViewProviderManager
-      const persistentHistory =
-        (await this.agentService.getChatHistory(agentId)) || [];
-      const persistentSummary = await this.agentService.getChatSummary(agentId);
+      const maxAttempts = 2;
+      const retryDelayMs = 150;
 
-      if (persistentHistory.length > 0 || persistentSummary) {
-        // Convert database format to provider's IMessageInput format
-        const providerHistory = persistentHistory.map((msg: any) => ({
-          type: msg.type === "user" ? "user" : "bot",
-          content: msg.content,
-          timestamp: msg.timestamp || Date.now(),
-          metadata: msg.metadata,
-          alias: msg.metadata?.alias,
-        }));
+      this.logger.info("Starting chat history sync for webview");
 
-        // Prepend summary if it exists
-        if (persistentSummary) {
-          providerHistory.unshift({
-            type: "user",
-            content: `[System Note: This is a summary of our earlier conversation to preserve context]:\n${persistentSummary}`,
-            timestamp: Date.now(),
-            metadata: { isSummary: true },
-            alias: undefined,
-          });
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const persistentHistory =
+            (await this.agentService.getChatHistory(agentId)) || [];
+          const persistentSummary =
+            await this.agentService.getChatSummary(agentId);
+
+          this.logger.info(
+            `Chat history fetch attempt ${attempt}: ${persistentHistory.length} messages${persistentSummary ? " + summary" : ""}`,
+          );
+
+          if (persistentHistory.length > 0 || persistentSummary) {
+            // Convert database format to provider's IMessageInput format
+            const providerHistory = persistentHistory.map((msg: any) => ({
+              type: msg.type === "user" ? "user" : "bot",
+              content: msg.content,
+              timestamp: msg.timestamp || Date.now(),
+              alias: msg.metadata?.alias || "O",
+              language: msg.metadata?.language || "text",
+              metadata: msg.metadata,
+            }));
+
+            // Prepend summary if it exists
+            if (persistentSummary) {
+              providerHistory.unshift({
+                type: "user",
+                content: `[System Note: This is a summary of our earlier conversation to preserve context]:\n${persistentSummary}`,
+                timestamp: Date.now(),
+                alias: "O",
+                language: "text",
+                metadata: { isSummary: true },
+              });
+            }
+
+            this.logger.debug(
+              `Synchronized ${persistentHistory.length} chat messages from database${persistentSummary ? " + summary" : ""}`,
+            );
+
+            // Send history to webview
+            await this.currentWebView?.webview.postMessage({
+              type: "chat-history",
+              message: JSON.stringify(providerHistory),
+            });
+          } else {
+            this.logger.debug(
+              "No chat history found in database to synchronize",
+            );
+          }
+
+          return; // Success path exits the loop
+        } catch (error: any) {
+          const isBusy =
+            typeof error?.message === "string" &&
+            error.message.includes("Worker is busy");
+
+          if (isBusy && attempt < maxAttempts) {
+            this.logger.debug(
+              "Chat history worker busy, retrying synchronization",
+            );
+            await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+            continue;
+          }
+
+          this.logger.warn(
+            "Failed to synchronize chat history from database:",
+            error,
+          );
+          return;
         }
-
-        this.logger.debug(
-          `Synchronized ${persistentHistory.length} chat messages from database${persistentSummary ? " + summary" : ""}`,
-        );
-
-        // Send history to webview
-        await this.currentWebView?.webview.postMessage({
-          type: "chat-history",
-          message: JSON.stringify(providerHistory),
-        });
-      } else {
-        this.logger.debug("No chat history found in database to synchronize");
       }
-    } catch (error: any) {
-      this.logger.warn(
-        "Failed to synchronize chat history from database:",
-        error,
-      );
-      // Don't throw - this is not critical for provider initialization
+    })();
+
+    try {
+      await this.chatHistorySyncPromise;
+    } finally {
+      this.chatHistorySyncPromise = null;
     }
   }
 
@@ -438,7 +480,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   private async synchronizeNews(): Promise<void> {
     try {
-      const news = NewsService.getInstance().getUnreadNews();
+      const news = await NewsService.getInstance().getUnreadNews();
       if (news.length > 0) {
         await this.currentWebView?.webview.postMessage({
           type: "news-update",
@@ -462,6 +504,24 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               );
               break;
             }
+            case "cancel-request": {
+              try {
+                this.codeBuddyAgent.cancelRequest(
+                  message.requestId,
+                  message.threadId,
+                );
+                await this.currentWebView?.webview.postMessage({
+                  type: "onStreamError",
+                  payload: {
+                    requestId: message.requestId,
+                    error: "Stopped by user",
+                  },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to cancel request", error);
+              }
+              break;
+            }
             case "index-workspace": {
               vscode.commands.executeCommand("codebuddy.indexWorkspace");
               break;
@@ -471,7 +531,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               const selectedGenerativeAiModel = getConfigValue(
                 "generativeAi.option",
               );
-              console.log(selectedGenerativeAiModel);
+              this.logger.info(
+                `Selected Generative AI Model: ${selectedGenerativeAiModel}`,
+              );
 
               // Validate user input for security
               const validation = this.inputValidator.validateInput(
@@ -671,13 +733,18 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             }
             case "webview-ready":
               await this.publishWorkSpace();
+              await this.synchronizeChatHistoryFromDatabase();
               await this.synchronizeNews();
               await this.synchronizeChatHistoryFromDatabase();
               break;
+            case "request-chat-history": {
+              await this.synchronizeChatHistoryFromDatabase();
+              break;
+            }
             case "news-mark-read": {
               const { ids } = message;
               if (ids && Array.isArray(ids)) {
-                NewsService.getInstance().markAsRead(ids);
+                await NewsService.getInstance().markAsRead(ids);
               }
               break;
             }

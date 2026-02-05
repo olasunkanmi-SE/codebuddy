@@ -183,9 +183,9 @@ export class ChatHistoryWorker {
    */
   private async saveSummary(agentId: string, summary: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          this.chatHistoryRepo.saveSummary(agentId, summary);
+          await this.chatHistoryRepo.saveSummary(agentId, summary);
           resolve();
         } catch (error: any) {
           const errorMessage =
@@ -202,9 +202,9 @@ export class ChatHistoryWorker {
    */
   private async getSummary(agentId: string): Promise<string | null> {
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          const summary = this.chatHistoryRepo.getSummary(agentId);
+          const summary = await this.chatHistoryRepo.getSummary(agentId);
           resolve(summary);
         } catch (error: any) {
           const errorMessage =
@@ -221,9 +221,9 @@ export class ChatHistoryWorker {
    */
   private async getChatHistory(agentId: string): Promise<any[]> {
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          const history = this.chatHistoryRepo.get(agentId);
+          const history = await this.chatHistoryRepo.get(agentId);
           resolve(history || []);
         } catch (error: any) {
           const errorMessage =
@@ -243,7 +243,7 @@ export class ChatHistoryWorker {
     history: any[],
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
           // Convert to the format expected by ChatHistoryRepository
           const formattedHistory = history.map((message, index) => ({
@@ -258,7 +258,7 @@ export class ChatHistoryWorker {
             },
           }));
 
-          this.chatHistoryRepo.set(agentId, formattedHistory);
+          await this.chatHistoryRepo.set(agentId, formattedHistory);
           resolve();
         } catch (error: any) {
           const errorMessage =
@@ -275,9 +275,9 @@ export class ChatHistoryWorker {
    */
   private async clearChatHistory(agentId: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          this.chatHistoryRepo.clear(agentId);
+          await this.chatHistoryRepo.clear(agentId);
           resolve();
         } catch (error: any) {
           const errorMessage =
@@ -303,9 +303,9 @@ export class ChatHistoryWorker {
     },
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          this.chatHistoryRepo.addMessage(agentId, {
+          await this.chatHistoryRepo.addMessage(agentId, {
             content: message.content,
             type: message.type,
             sessionId: message.sessionId,
@@ -334,9 +334,9 @@ export class ChatHistoryWorker {
     limit: number,
   ): Promise<any[]> {
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          const history = this.chatHistoryRepo.getRecent(agentId, limit);
+          const history = await this.chatHistoryRepo.getRecent(agentId, limit);
           resolve(history || []);
         } catch (error: any) {
           const errorMessage =
@@ -357,9 +357,9 @@ export class ChatHistoryWorker {
    */
   private async cleanupOldHistory(daysToKeep: number): Promise<void> {
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          this.chatHistoryRepo.cleanup(daysToKeep);
+          await this.chatHistoryRepo.cleanup(daysToKeep);
           resolve();
         } catch (error: any) {
           const errorMessage =
@@ -394,7 +394,7 @@ export class ChatHistoryWorker {
    */
   cancel(): void {
     if (this.isProcessing) {
-      console.warn(
+      this.logger.warn(
         `Cancelling chat history operation: ${this.currentRequestId}`,
       );
       this.isProcessing = false;

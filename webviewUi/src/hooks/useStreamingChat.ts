@@ -1,5 +1,54 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityItem } from "../components/AgentActivityFeed";
+
+type TimelineStatus = "active" | "completed" | "failed";
+
+export interface AgentTimelineThinking {
+  content: string;
+  status: TimelineStatus;
+  timestamp: number;
+}
+
+export interface AgentTimelinePlan {
+  raw: string;
+  steps: string[];
+  status: TimelineStatus;
+  timestamp: number;
+}
+
+export type AgentTimelineActionType =
+  | "tool"
+  | "decision"
+  | "reading"
+  | "searching"
+  | "reviewing"
+  | "analyzing"
+  | "executing"
+  | "working"
+  | "summarizing";
+
+export interface AgentTimelineAction {
+  id: string;
+  type: AgentTimelineActionType;
+  label: string;
+  status: TimelineStatus;
+  detail?: string;
+  result?: string;
+  toolName?: string;
+  terminalOutput?: string;
+  timestamp: number;
+  duration?: number;
+  progress?: number;
+}
+
+export interface AgentTimelineState {
+  thinking?: AgentTimelineThinking;
+  plan?: AgentTimelinePlan;
+  actions: AgentTimelineAction[];
+  summarizing?: boolean;
+  result?: { summary?: string };
+}
+
+export interface AgentTimelineSnapshot extends AgentTimelineState {}
 
 export interface IWebviewMessage {
   id: string;
@@ -10,7 +59,7 @@ export interface IWebviewMessage {
   senderInitial?: string;
   isStreaming?: boolean;
   timestamp?: number;
-  activities?: ActivityItem[];
+  timelineSnapshot?: AgentTimelineSnapshot;
 }
 
 interface UseStreamingChatOptions {
@@ -57,38 +106,25 @@ export const useStreamingChat = (
   const [streamingMessage, setStreamingMessage] =
     useState<IWebviewMessage | null>(null);
   const [isLegacyLoading, setIsLegacyLoading] = useState(false);
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [timeline, setTimeline] = useState<AgentTimelineState>({
+    actions: [],
+  });
   const [pendingApproval, setPendingApproval] = useState<{
     toolName?: string;
     description?: string;
   } | null>(null);
 
   const currentRequestIdRef = useRef<string | null>(null);
+  const threadIdRef = useRef<string>(
+    `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  );
 
   // Combine completed and streaming messages
   const streamedMessages = useMemo(() => {
-    const messages = streamingMessage
+    return streamingMessage
       ? [...completedMessages, streamingMessage]
       : completedMessages;
-
-    if (messages.length === 0) return messages;
-
-    const lastIdx = messages.length - 1;
-
-    return messages.map((msg, idx) => {
-      // Prefer live activities on the active bot message
-      if (idx === lastIdx && msg.type === "bot" && activities.length > 0) {
-        return { ...msg, activities };
-      }
-
-      // Otherwise, preserve any activities already stored on the message (from prior runs)
-      if (msg.type === "bot" && msg.activities && msg.activities.length > 0) {
-        return msg;
-      }
-
-      return msg;
-    });
-  }, [completedMessages, streamingMessage, activities]);
+  }, [completedMessages, streamingMessage]);
 
   // Add a message directly (for legacy or manual additions)
   const addMessage = useCallback(
@@ -108,7 +144,7 @@ export const useStreamingChat = (
   const clearMessages = useCallback(() => {
     setCompletedMessages([]);
     setStreamingMessage(null);
-    setActivities([]);
+    setTimeline({ actions: [] });
     currentRequestIdRef.current = null;
   }, []);
 
@@ -121,7 +157,7 @@ export const useStreamingChat = (
       const tempId = `temp-${payload.requestId || Date.now()}`;
       currentRequestIdRef.current = payload.requestId;
       setIsLegacyLoading(false);
-      setActivities([]); // Clear activities for new stream
+      setTimeline({ actions: [] }); // Clear timeline for new stream
       setPendingApproval(null); // Reset pending approvals for new requests
       setStreamingMessage({
         id: tempId,
@@ -143,8 +179,7 @@ export const useStreamingChat = (
 
       setStreamingMessage((prev) => {
         if (!prev) return null;
-        const newContent =
-          payload.accumulated ?? prev.content + payload.content;
+        const newContent = prev.content + payload.content;
         return { ...prev, content: newContent };
       });
     },
@@ -164,7 +199,6 @@ export const useStreamingChat = (
           id: `bot-${Date.now()}`,
           isStreaming: false,
           content: finalContent,
-          activities: [...activities], // Include activities in final message
         };
         setCompletedMessages((prevCompleted) => [
           ...prevCompleted,
@@ -173,14 +207,9 @@ export const useStreamingChat = (
         return null;
       });
 
-      // Clear activities after a delay to allow user to see the final state
-      setTimeout(() => {
-        setActivities([]);
-      }, 2000);
-
       currentRequestIdRef.current = null;
     },
-    [enableStreaming, activities],
+    [enableStreaming, timeline],
   );
 
   const handleStreamError = useCallback(
@@ -188,18 +217,27 @@ export const useStreamingChat = (
       if (!enableStreaming) return;
       if (payload.requestId !== currentRequestIdRef.current) return;
 
-      // Mark all active activities as failed
-      setActivities((prev) =>
-        prev.map((a) =>
+      // Mark all active actions as failed
+      setTimeline((prev) => ({
+        ...prev,
+        actions: prev.actions.map((a) =>
           a.status === "active" ? { ...a, status: "failed" as const } : a,
         ),
-      );
+      }));
 
       const errorContent =
         payload.error || "An error occurred during streaming";
 
       // Always create an error message, even if no streaming message exists
       setStreamingMessage((prev) => {
+        const snapshot: AgentTimelineSnapshot = {
+          ...timeline,
+          result: { summary: errorContent },
+          summarizing: false,
+          actions: timeline.actions.map((a) =>
+            a.status === "active" ? { ...a, status: "failed" as const } : a,
+          ),
+        };
         const errorMessage: IWebviewMessage = {
           id: `error-${Date.now()}`,
           type: "bot",
@@ -208,6 +246,7 @@ export const useStreamingChat = (
           timestamp: Date.now(),
           language: prev?.language || "text",
           alias: prev?.alias || "O",
+          timelineSnapshot: snapshot,
         };
         setCompletedMessages((prevCompleted) => [
           ...prevCompleted,
@@ -215,11 +254,6 @@ export const useStreamingChat = (
         ]);
         return null;
       });
-
-      // Clear activities after showing error
-      setTimeout(() => {
-        setActivities([]);
-      }, 3000);
 
       currentRequestIdRef.current = null;
       setIsLegacyLoading(false);
@@ -256,95 +290,125 @@ export const useStreamingChat = (
       ? `${description} (${argSummary})`
       : description;
 
-    const activity: ActivityItem = {
-      id: payload.toolId || `activity-${Date.now()}`,
-      type: "tool_start",
+    const action: AgentTimelineAction = {
+      id: payload.toolId || `action-${Date.now()}`,
+      type: "tool",
       toolName: payload.toolName,
-      description: annotatedDescription,
+      label: payload.toolName || "Tool",
+      detail: annotatedDescription,
       status: "active",
       timestamp: Date.now(),
     };
-    setActivities((prev) => [...prev, activity]);
+
+    setTimeline((prev) => ({
+      ...prev,
+      plan:
+        prev.plan && prev.plan.status === "active"
+          ? { ...prev.plan, status: "completed" }
+          : prev.plan,
+      actions: [...prev.actions, action],
+    }));
   }, []);
 
   const handleToolEnd = useCallback((payload: any) => {
-    setActivities((prev) =>
-      prev.map((activity) =>
-        (activity.toolName === payload.toolName ||
-          activity.id === payload.toolId) &&
-        activity.status === "active"
+    setTimeline((prev) => ({
+      ...prev,
+      actions: prev.actions.map((action) =>
+        (action.toolName === payload.toolName ||
+          action.id === payload.toolId) &&
+        action.status === "active"
           ? {
-              ...activity,
+              ...action,
               status: payload.status === "failed" ? "failed" : "completed",
-              result: payload.result,
+              result:
+                typeof payload.result === "string"
+                  ? payload.result
+                  : payload.result?.summary,
               duration: payload.duration,
+              progress: 100,
             }
-          : activity,
+          : action,
       ),
-    );
+    }));
   }, []);
 
   const handleToolProgress = useCallback((payload: any) => {
-    setActivities((prev) =>
-      prev.map((activity) =>
-        activity.toolName === payload.toolName && activity.status === "active"
+    const progressValue =
+      typeof payload.progress === "number"
+        ? Math.max(0, Math.min(100, payload.progress))
+        : undefined;
+
+    setTimeline((prev) => ({
+      ...prev,
+      actions: prev.actions.map((action) =>
+        action.toolName === payload.toolName && action.status === "active"
           ? {
-              ...activity,
-              description: payload.message || activity.description,
+              ...action,
+              detail: payload.message || action.detail,
+              progress: progressValue ?? action.progress,
             }
-          : activity,
+          : action,
       ),
-    );
+    }));
   }, []);
 
   const handlePlanning = useCallback((payload: any) => {
-    const activity: ActivityItem = {
-      id: `planning-${Date.now()}`,
-      type: "planning",
-      toolName: "planning",
-      description: payload.content || "Analyzing your request...",
-      status: "active",
-      timestamp: Date.now(),
-    };
-    setActivities((prev) => {
-      // Replace existing planning activity or add new
-      const filtered = prev.filter((a) => a.type !== "planning");
-      return [...filtered, activity];
-    });
+    const raw = payload.content || "Analyzing your request...";
+    const steps = raw
+      .split(/\n|•|-\s/)
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.length > 0);
 
-    // Mark planning as complete after a brief delay
-    setTimeout(() => {
-      setActivities((prev) =>
-        prev.map((a) =>
-          a.type === "planning" && a.status === "active"
-            ? { ...a, status: "completed" as const }
-            : a,
-        ),
-      );
-    }, 1500);
+    setTimeline((prev) => ({
+      ...prev,
+      plan: {
+        raw,
+        steps,
+        status: "active",
+        timestamp: Date.now(),
+      },
+    }));
   }, []);
 
-  const handleSummarizing = useCallback((payload: any) => {
-    const activity: ActivityItem = {
-      id: `summarizing-${Date.now()}`,
-      type: "summarizing",
-      toolName: "summarizing",
-      description: payload.content || "Preparing response...",
-      status: "active",
-      timestamp: Date.now(),
-    };
-    setActivities((prev) => [...prev, activity]);
+  const handleSummarizing = useCallback(() => {
+    setTimeline((prev) => ({
+      ...prev,
+      summarizing: true,
+      plan:
+        prev.plan && prev.plan.status === "active"
+          ? { ...prev.plan, status: "completed" }
+          : prev.plan,
+    }));
+  }, []);
 
-    // Mark as complete shortly after
-    setTimeout(() => {
-      setActivities((prev) =>
-        prev.map((a) =>
-          a.type === "summarizing" && a.status === "active"
-            ? { ...a, status: "completed" as const }
-            : a,
-        ),
-      );
-    }, 1000);
+  const handleThinkingStart = useCallback((payload: any) => {
+    const content = payload.content || "Thinking...";
+    setTimeline((prev) => ({
+      ...prev,
+      thinking: {
+        content,
+        status: "active",
+        timestamp: Date.now(),
+      },
+    }));
+  }, []);
+
+  const handleThinkingUpdate = useCallback((payload: any) => {
+    const content = payload.content;
+    if (!content) return;
+    setTimeline((prev) =>
+      prev.thinking
+        ? { ...prev, thinking: { ...prev.thinking, content } }
+        : prev,
+    );
+  }, []);
+
+  const handleThinkingEnd = useCallback(() => {
+    setTimeline((prev) =>
+      prev.thinking
+        ? { ...prev, thinking: { ...prev.thinking, status: "completed" } }
+        : prev,
+    );
   }, []);
 
   const handleMetadata = useCallback((payload: any) => {
@@ -372,51 +436,67 @@ export const useStreamingChat = (
 
   const handleActivityEvent = useCallback(
     (
-      type: ActivityItem["type"],
+      type: AgentTimelineActionType,
       payload: any,
-      status: ActivityItem["status"] = "active",
+      status: TimelineStatus = "active",
     ) => {
-      // De-duplicate working events if they are identical to the last one
+      const detail = payload.content || `Agent is ${type}...`;
+      const label = payload.toolName || type;
+      // De-duplicate consecutive working updates with the same detail
       if (type === "working") {
-        setActivities((prev) => {
-          const last = prev[prev.length - 1];
-          if (
-            last &&
-            last.type === "working" &&
-            last.description === payload.content
-          ) {
+        setTimeline((prev) => {
+          const last = prev.actions[prev.actions.length - 1];
+          if (last && last.type === "working" && last.detail === detail) {
             return prev;
           }
-          return [
+          return {
             ...prev,
-            {
-              id: payload.id || `activity-${Date.now()}`,
-              type,
-              description: payload.content || "Working...",
-              status,
-              timestamp: Date.now(),
-            },
-          ];
+            actions: [
+              ...prev.actions,
+              {
+                id: payload.id || `action-${Date.now()}`,
+                type,
+                label,
+                detail,
+                status,
+                timestamp: Date.now(),
+              },
+            ],
+            plan:
+              prev.plan && prev.plan.status === "active"
+                ? { ...prev.plan, status: "completed" as const }
+                : prev.plan,
+            summarizing: false,
+          };
         });
         return;
       }
 
-      const activity: ActivityItem = {
-        id: payload.id || `activity-${Date.now()}`,
+      const action: AgentTimelineAction = {
+        id: payload.id || `action-${Date.now()}`,
         type,
-        description: payload.content || `Agent is ${type}...`,
+        label,
+        detail,
         status,
         timestamp: Date.now(),
       };
-      setActivities((prev) => [...prev, activity]);
+
+      setTimeline((prev) => ({
+        ...prev,
+        actions: [...prev.actions, action],
+        plan:
+          prev.plan && prev.plan.status === "active"
+            ? { ...prev.plan, status: "completed" as const }
+            : prev.plan,
+        summarizing: false,
+      }));
     },
     [],
   );
 
   const handleTerminalOutput = useCallback((payload: any) => {
-    setActivities((prev) => {
-      // Find the last active activity that is likely a command execution
-      const lastActiveIndex = prev.findLastIndex(
+    setTimeline((prev) => {
+      const lastActiveIndex = prev.actions.findLastIndex(
         (a) =>
           a.status === "active" &&
           (a.type === "executing" ||
@@ -424,16 +504,18 @@ export const useStreamingChat = (
             a.toolName === "command"),
       );
 
-      if (lastActiveIndex !== -1) {
-        const newActivities = [...prev];
-        const activity = newActivities[lastActiveIndex];
-        newActivities[lastActiveIndex] = {
-          ...activity,
-          terminalOutput: (activity.terminalOutput || "") + payload.content,
-        };
-        return newActivities;
+      if (lastActiveIndex === -1) {
+        return prev;
       }
-      return prev;
+
+      const actions = [...prev.actions];
+      const action = actions[lastActiveIndex];
+      actions[lastActiveIndex] = {
+        ...action,
+        terminalOutput: (action.terminalOutput || "") + payload.content,
+      };
+
+      return { ...prev, actions };
     });
   }, []);
 
@@ -476,11 +558,39 @@ export const useStreamingChat = (
       vscodeApi.postMessage({
         command: "user-input",
         message: content,
-        metaData: metadata,
+        metaData: {
+          ...metadata,
+          threadId: metadata?.threadId ?? threadIdRef.current,
+        },
       });
     },
     [vscodeApi],
   );
+
+  const cancelCurrentRequest = useCallback(() => {
+    const requestId = currentRequestIdRef.current;
+    if (!requestId) return;
+
+    setPendingApproval(null);
+    setTimeline((prev) => ({
+      ...prev,
+      actions: prev.actions.map((a) =>
+        a.status === "active" ? { ...a, status: "failed" as const } : a,
+      ),
+      plan:
+        prev.plan && prev.plan.status === "active"
+          ? { ...prev.plan, status: "completed" as const }
+          : prev.plan,
+      summarizing: false,
+      result: { summary: "Stopped by user" },
+    }));
+
+    vscodeApi.postMessage({
+      command: "cancel-request",
+      requestId,
+      threadId: threadIdRef.current,
+    });
+  }, [vscodeApi]);
 
   // Message event listener
   useEffect(() => {
@@ -530,38 +640,23 @@ export const useStreamingChat = (
           break;
         case StreamEventType.SUMMARIZING:
           console.log("[useStreamingChat] SUMMARIZING:", message.payload);
-          handleSummarizing(message.payload);
+          handleSummarizing();
           break;
         case StreamEventType.THINKING:
           console.log("[useStreamingChat] THINKING:", message.payload);
-          handleActivityEvent("thinking", message.payload);
+          handleThinkingStart(message.payload);
           break;
         case StreamEventType.THINKING_START:
           console.log("[useStreamingChat] THINKING_START:", message.payload);
-          handleActivityEvent("thinking", message.payload, "active");
+          handleThinkingStart(message.payload);
           break;
         case StreamEventType.THINKING_UPDATE:
           console.log("[useStreamingChat] THINKING_UPDATE:", message.payload);
-          setActivities((prev) => {
-            const idx = prev.findLastIndex((a) => a.type === "thinking");
-            if (idx === -1) return prev;
-            const updated = [...prev];
-            updated[idx] = {
-              ...updated[idx],
-              description: message.payload.content || updated[idx].description,
-            };
-            return updated;
-          });
+          handleThinkingUpdate(message.payload);
           break;
         case StreamEventType.THINKING_END:
           console.log("[useStreamingChat] THINKING_END:", message.payload);
-          setActivities((prev) =>
-            prev.map((a) =>
-              a.type === "thinking" && a.status === "active"
-                ? { ...a, status: "completed" as const }
-                : a,
-            ),
-          );
+          handleThinkingEnd();
           break;
         case StreamEventType.METADATA:
           console.log("[useStreamingChat] METADATA:", message.payload);
@@ -633,7 +728,7 @@ export const useStreamingChat = (
 
   return {
     messages: streamedMessages,
-    activities,
+    timeline,
     isStreaming: !!streamingMessage,
     isLoading: isLegacyLoading || !!streamingMessage,
     sendMessage,
@@ -641,5 +736,7 @@ export const useStreamingChat = (
     clearMessages,
     setMessages: setCompletedMessages,
     pendingApproval,
+    cancelCurrentRequest,
+    threadId: threadIdRef.current,
   };
 };

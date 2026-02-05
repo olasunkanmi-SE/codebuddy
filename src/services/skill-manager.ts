@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export interface Skill {
   name: string;
@@ -9,9 +10,17 @@ export interface Skill {
 
 export class SkillManager {
   private static instance: SkillManager;
+  private readonly logger: Logger;
   private skills: Skill[] = [];
 
-  private constructor() {}
+  private constructor() {
+    this.logger = Logger.initialize("SkillManager", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
+  }
 
   public static getInstance(): SkillManager {
     if (!SkillManager.instance) {
@@ -38,7 +47,7 @@ export class SkillManager {
         }
       }
     } catch (error) {
-      console.error("Error loading skills:", error);
+      this.logger.error("Error loading skills:", error);
     }
   }
 
