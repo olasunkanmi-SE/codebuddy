@@ -6,6 +6,9 @@ import { z } from "zod";
 import * as vscode from "vscode";
 import { DiffReviewService } from "../services/diff-review.service";
 import * as path from "path";
+import { TodoTool } from "./todo";
+import { MemoryTool } from "./memory";
+export { TodoTool, MemoryTool };
 
 export class SearchTool {
   constructor(private readonly contextRetriever?: ContextRetriever) {}
@@ -793,4 +796,6 @@ export const TOOL_CONFIGS = {
   ListFilesTool: { tool: ListFilesTool, useContextRetriever: false },
   EditFileTool: { tool: EditFileTool, useContextRetriever: false },
   WebPreviewTool: { tool: WebPreviewTool, useContextRetriever: false },
+  TodoTool: { tool: TodoTool, useContextRetriever: false },
+  MemoryTool: { tool: MemoryTool, useContextRetriever: false },
 };

@@ -19,6 +19,7 @@ import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { Memory } from "../../memory/base";
 import { Orchestrator } from "../../orchestrator";
 import { ProjectRulesService } from "../../services/project-rules.service";
+import { MemoryTool } from "../../tools/memory";
 import { SkillManager } from "../../services/skill-manager";
 import { getAPIKeyAndModel } from "../../utils/utils";
 import { createVscodeFsBackendFactory } from "../backends/filesystem";
@@ -208,6 +209,9 @@ export class DeveloperAgent {
     if (customSystemPrompt) {
       prompt += `\n\n## 📋 Additional Instructions:\n${customSystemPrompt}`;
     }
+
+    // Add core memories
+    prompt += MemoryTool.getFormattedMemories();
 
     // Add skills prompt
     prompt += SkillManager.getInstance().getSkillsPrompt();

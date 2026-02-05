@@ -263,6 +263,30 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       const agentId = "agentId"; // Using the same hardcoded ID as WebViewProviderManager
       const maxAttempts = 2;
       const retryDelayMs = 150;
+      const persistentHistory =
+        (await this.agentService.getChatHistory(agentId)) || [];
+      const persistentSummary = await this.agentService.getChatSummary(agentId);
+
+      if (persistentHistory.length > 0 || persistentSummary) {
+        // Convert database format to provider's IMessageInput format
+        const providerHistory = persistentHistory.map((msg: any) => ({
+          type: msg.type === "user" ? "user" : "bot",
+          content: msg.content,
+          timestamp: msg.timestamp || Date.now(),
+          metadata: msg.metadata,
+          alias: msg.metadata?.alias,
+        }));
+
+        // Prepend summary if it exists
+        if (persistentSummary) {
+          providerHistory.unshift({
+            type: "user",
+            content: `[System Note: This is a summary of our earlier conversation to preserve context]:\n${persistentSummary}`,
+            timestamp: Date.now(),
+            metadata: { isSummary: true },
+            alias: undefined,
+          });
+        }
 
       this.logger.info("Starting chat history sync for webview");
 
@@ -735,6 +759,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               await this.publishWorkSpace();
               await this.synchronizeChatHistoryFromDatabase();
               await this.synchronizeNews();
+              await this.synchronizeChatHistoryFromDatabase();
               break;
             case "request-chat-history": {
               await this.synchronizeChatHistoryFromDatabase();

@@ -17,12 +17,9 @@ export class NewsService {
   private static instance: NewsService;
   private dbService: SqliteDatabaseService;
   private logger: Logger;
-  private initPromise: Promise<void>;
 
   private constructor() {
     this.dbService = SqliteDatabaseService.getInstance();
-    // Kick off DB initialization early; awaited in every public method
-    this.initPromise = this.dbService.ensureInitialized();
     this.logger = Logger.initialize("NewsService", {});
   }
 

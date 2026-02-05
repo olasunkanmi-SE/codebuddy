@@ -65,6 +65,16 @@ const TOOL_DESCRIPTIONS: Record<
     description: "Searching the codebase...",
     activityType: "searching",
   },
+  manage_tasks: {
+    name: "Task Manager",
+    description: "Managing tasks...",
+    activityType: "working",
+  },
+  manage_core_memory: {
+    name: "Core Memory",
+    description: "Managing memory...",
+    activityType: "working",
+  },
   git_diff: {
     name: "Git Diff",
     description: "Checking file changes...",
