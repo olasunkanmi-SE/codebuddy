@@ -320,5 +320,10 @@ export const generateUUID = () => {
 };
 
 export const isWebSearchConfigured = (): boolean => {
-  return Boolean(getAPIKeyAndModel("tavily").apiKey);
+  try {
+    const key = getAPIKeyAndModel("tavily").apiKey;
+    return Boolean(key) && key !== "apiKey";
+  } catch (error) {
+    return false;
+  }
 };

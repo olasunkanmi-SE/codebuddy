@@ -89,6 +89,7 @@ export const WebviewUI = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [enableStreaming, setEnableStreaming] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [newsItems, setNewsItems] = useState<any[]>([]);
   
   // Rules & Subagents state
   const [customRules, setCustomRules] = useState<CustomRule[]>([]);
@@ -152,6 +153,12 @@ export const WebviewUI = () => {
 
       case "bootstrap":
         setFolders(message);
+        break;
+
+      case "news-update":
+        if (message.payload && message.payload.news) {
+          setNewsItems(message.payload.news);
+        }
         break;
 
       case "chat-history":
@@ -277,6 +284,12 @@ export const WebviewUI = () => {
       setCommandDescription("");
     }
   }, [isStreaming, isBotLoading]);
+
+  const handleDismissNews = useCallback(() => {
+    const ids = newsItems.map((item: any) => item.id);
+    vsCode.postMessage({ command: "news-mark-read", ids });
+    setNewsItems([]);
+  }, [newsItems]);
 
   const handleClearHistory = useCallback(() => {
     clearMessages();
@@ -479,9 +492,64 @@ export const WebviewUI = () => {
         <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
           <div className="chat-content" style={{ maxWidth: "1100px", margin: "0 auto" }}>
             <div className="dropdown-container">
+              {newsItems.length > 0 && (
+                <div style={{
+                  margin: "16px 20px",
+                  backgroundColor: "var(--vscode-sideBar-background)",
+                  border: "1px solid var(--vscode-widget-border)",
+                  borderRadius: "8px",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
+                  overflow: "hidden"
+                }}>
+                  <div style={{
+                    padding: "10px 16px",
+                    borderBottom: "1px solid var(--vscode-widget-border)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    backgroundColor: "var(--vscode-editor-inactiveSelectionBackground)"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span className="codicon codicon-bell" style={{ fontSize: "14px" }}></span>
+                      <h3 style={{ margin: 0, fontSize: "12px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Daily Briefing
+                      </h3>
+                    </div>
+                    <VSCodeButton appearance="icon" aria-label="Dismiss" onClick={handleDismissNews}>
+                      <span className="codicon codicon-close"></span>
+                    </VSCodeButton>
+                  </div>
+                  <div style={{ padding: "0" }}>
+                    {newsItems.map((item: any, index: number) => (
+                      <div key={index} style={{
+                        padding: "12px 16px",
+                        borderBottom: index < newsItems.length - 1 ? "1px solid var(--vscode-input-border)" : "none",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px"
+                      }}>
+                        <a href={item.url} style={{
+                          color: "var(--vscode-textLink-foreground)",
+                          textDecoration: "none",
+                          fontSize: "14px",
+                          fontWeight: "500",
+                          lineHeight: "1.4"
+                        }}>
+                          {item.title}
+                        </a>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", opacity: 0.7 }}>
+                          <span style={{ fontWeight: "600" }}>{item.source}</span>
+                          <span>•</span>
+                          <span>{item.published_at ? new Date(item.published_at).toLocaleDateString() : 'Just now'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
-                {/* Show welcome screen when there are no messages */}
-                {streamedMessages.length === 0 && !isBotLoading && !isCommandExecuting ? (
+                {/* Show welcome screen when there are no messages and no news items */}
+                {streamedMessages.length === 0 && !isBotLoading && !isCommandExecuting && newsItems.length === 0 ? (
                   <WelcomeScreen
                     username={username}
                     onGetStarted={() => {

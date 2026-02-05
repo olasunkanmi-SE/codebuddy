@@ -176,9 +176,49 @@ export class ContextRetriever {
     };
     try {
       const result = await this.tavilySearch.search(query, defaults);
+
+      // Fallback if Tavily key is missing/invalid
+      if (
+        result.results.length === 0 &&
+        result.answer &&
+        result.answer.includes("Tavily API key is missing")
+      ) {
+        this.logger.warn(
+          "Tavily API key missing, falling back to WebSearchService (Startpage)",
+        );
+        try {
+          const webResult = await this.webSearchService.run(query);
+          if (
+            typeof webResult === "string" &&
+            webResult.length > 0 &&
+            !webResult.includes("No web results found") &&
+            !webResult.includes("Query too short")
+          ) {
+            return `(Fallback Results from Startpage - Please configure 'tavily.apiKey' for better results)\n\n${webResult}`;
+          }
+        } catch (fallbackError) {
+          this.logger.error("Fallback search failed", fallbackError);
+        }
+      }
+
       return SearchResponseFormatter.format(result);
     } catch (error: any) {
       this.logger.error("[WebSearch] Execution Error:", error);
+
+      // Fallback on error
+      try {
+        const webResult = await this.webSearchService.run(query);
+        if (
+          typeof webResult === "string" &&
+          webResult.length > 0 &&
+          !webResult.includes("No web results found")
+        ) {
+          return `(Fallback Results from Startpage - Error: ${error.message})\n\n${webResult}`;
+        }
+      } catch (fallbackError) {
+        this.logger.error("Fallback search failed", fallbackError);
+      }
+
       return `Error performing web search: ${error.message}`;
     }
   }

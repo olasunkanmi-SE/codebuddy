@@ -35,14 +35,11 @@ export class DiffReviewService implements vscode.TextDocumentContentProvider {
     return DiffReviewService.instance;
   }
 
-  public addPendingChange(
-    filePath: string,
-    newContent: string,
-  ): PendingChange {
+  public addPendingChange(filePath: string, newContent: string): PendingChange {
     const id = this.generateId();
     // Ideally we read the original content now, but for the diff provider we just need the new content.
     // The "original" side of the diff will be the actual file on disk.
-    
+
     const change: PendingChange = {
       id,
       filePath,
@@ -103,6 +100,9 @@ export class DiffReviewService implements vscode.TextDocumentContentProvider {
   }
 
   private generateId(): string {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    return (
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15)
+    );
   }
 }

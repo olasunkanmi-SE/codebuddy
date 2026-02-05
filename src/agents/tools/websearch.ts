@@ -30,7 +30,6 @@ export interface SearchOptions {
 export class TavilySearchProvider implements ISearchProvider {
   private readonly API_URL = "https://api.tavily.com/search";
   private static instance: TavilySearchProvider;
-  private readonly apiKey = getAPIKeyAndModel("tavily").apiKey;
 
   static getInstance(): TavilySearchProvider {
     return (TavilySearchProvider.instance ??= new TavilySearchProvider());
@@ -40,6 +39,22 @@ export class TavilySearchProvider implements ISearchProvider {
     query: string,
     options?: SearchOptions,
   ): Promise<SearchResponse> {
+    let apiKey: string;
+    try {
+      const config = getAPIKeyAndModel("tavily");
+      apiKey = config.apiKey;
+      if (!apiKey || apiKey === "apiKey") {
+        throw new Error("Tavily API key is not configured or is invalid.");
+      }
+    } catch (e: any) {
+      return {
+        query,
+        answer:
+          "Unable to search: Tavily API key is missing or invalid. Please configure 'tavily.apiKey' in VS Code settings.",
+        results: [],
+      };
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), options?.timeout);
 
@@ -48,7 +63,7 @@ export class TavilySearchProvider implements ISearchProvider {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          api_key: this.apiKey,
+          api_key: apiKey,
           query: query,
           max_results: options?.maxResults,
           include_answer: true,

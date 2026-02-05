@@ -16,6 +16,8 @@ import {
   WebPreviewTool,
   SearchTool,
   DeepTerminalTool,
+  TodoTool,
+  MemoryTool,
 } from "../../../tools/tools";
 import { ContextRetriever } from "./../../../services/context-retriever";
 import { LangChainFileTool } from "./file";
@@ -32,6 +34,8 @@ import { LangChainListFilesTool } from "./list_files";
 import { LangChainEditFileTool } from "./edit_file";
 import { LangChainWebPreviewTool } from "./web_preview";
 import { LangChainSearchTool } from "./search";
+import { LangChainTodoTool } from "./todo";
+import { LangChainMemoryTool } from "./memory";
 
 const logger = Logger.initialize("ToolProvider", {
   minLevel: LogLevel.DEBUG,
@@ -127,6 +131,18 @@ class WebPreviewToolFactory implements IToolFactory {
   }
 }
 
+class TodoToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainTodoTool(new TodoTool());
+  }
+}
+
+class MemoryToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainMemoryTool(new MemoryTool());
+  }
+}
+
 class SearchToolFactory implements IToolFactory {
   constructor(private contextRetriever: ContextRetriever) {}
   createTool(): StructuredTool<any> {
@@ -172,6 +188,8 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "search_symbols",
     "list_files",
     "search_vector_db",
+    "manage_tasks",
+    "manage_core_memory",
   ],
   "doc-writer": [
     "search",
@@ -226,6 +244,8 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "list_files",
     "open_web_preview",
     "search_vector_db",
+    "manage_core_memory",
+    "manage_tasks",
   ],
   reviewer: [
     "analyze",
@@ -279,7 +299,7 @@ export class ToolProvider {
     this.mcpService = MCPService.getInstance();
     this.toolFactories = [
       new FileToolFactory(this.contextRetriever),
-      // new WebToolFactory(this.contextRetriever),
+      new WebToolFactory(this.contextRetriever),
       new ThinkToolFactory(),
       new TerminalToolFactory(),
       new DeepTerminalToolFactory(),
@@ -291,6 +311,8 @@ export class ToolProvider {
       // new EditFileToolFactory(), // Provided by DeepAgent backend
       new WebPreviewToolFactory(),
       new SearchToolFactory(this.contextRetriever),
+      new TodoToolFactory(),
+      new MemoryToolFactory(),
     ];
 
     // Deduplicate tools during initialization
