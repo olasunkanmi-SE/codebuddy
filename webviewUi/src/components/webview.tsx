@@ -349,7 +349,7 @@ export const WebviewUI = () => {
 
   // Highlight code blocks when messages update
   useEffect(() => {
-    highlightCodeBlocks(hljsApi, streamedMessages);
+    highlightCodeBlocks(hljsApi, streamedMessages, vsCode);
   }, [streamedMessages]);
 
   // Clear command execution state when streaming completes

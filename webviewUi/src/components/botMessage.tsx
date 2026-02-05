@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import DOMPurify from "dompurify";
 import React from "react";
-import { BotIcon } from "./botIcon";
 import { DownloadIcon } from "./downloadIcon";
 import { IParseURL, parseUrl } from "../utils/parseUrl";
 import UrlCardList from "./urlCardList";
@@ -15,7 +14,6 @@ interface BotMessageProps {
 
 export const BotMessage: React.FC<BotMessageProps> = ({ 
   content, 
-  isStreaming = false 
 }) => {
   const sanitizedContent = DOMPurify.sanitize(content);
   // const action = "Researching...";
@@ -113,36 +111,20 @@ export const BotMessage: React.FC<BotMessageProps> = ({
   };
 
   // Show streaming indicator
-  if (isStreaming && !content) {
-    return (
-      <div className="doc-content">
-        <span style={{ display: "flex", alignItems: "center" }}>
-          <small>Generating response...</small> <BotIcon isBlinking={true} />
-        </span>
-      </div>
-    );
-  }
-
-  // Show thinking state
-  // if (content.includes("thinking")) {
+  // if (isStreaming && !content) {
   //   return (
   //     <div className="doc-content">
   //       <span style={{ display: "flex", alignItems: "center" }}>
-  //         <small>{action}</small> <BotIcon isBlinking={true} />
+  //         <small>Generating response...</small> <BotIcon isBlinking={true} />
   //       </span>
   //     </div>
   //   );
   // }
-
+  
   // Show normal message with streaming cursor if applicable
   return (
     <div className="bot-message">
       <div className="bot-message-actions">
-        {/* {isStreaming && (
-          <span className="streaming-status">
-            Generating...
-          </span>
-        )} */}
         <div className="action-buttons">
           <DownloadIcon onClick={handleCopyMarkdown} />
         </div>
@@ -155,19 +137,6 @@ export const BotMessage: React.FC<BotMessageProps> = ({
       ) : (
         <div style={{ position: "relative" }}>
           <ThinkingComponent content={content} />
-          {/* {isStreaming && (
-            <span 
-              className="streaming-cursor"
-              style={{
-                display: "inline-block",
-                width: "8px",
-                height: "16px",
-                backgroundColor: "currentColor",
-                marginLeft: "2px",
-                animation: "blink 1s infinite",
-              }}
-            />
-          )} */}
         </div>
       )}
     </div>

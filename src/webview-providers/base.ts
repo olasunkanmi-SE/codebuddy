@@ -779,6 +779,30 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 vscode.env.openExternal(vscode.Uri.parse(message.text));
               }
               break;
+            case "insertCode":
+              {
+                const editor = vscode.window.activeTextEditor;
+                if (editor) {
+                  editor.edit((editBuilder) => {
+                    editBuilder.insert(editor.selection.active, message.text);
+                  });
+                } else {
+                  vscode.window.showErrorMessage(
+                    "No active editor to insert code into.",
+                  );
+                }
+              }
+              break;
+            case "runInTerminal":
+              {
+                let terminal = vscode.window.activeTerminal;
+                if (!terminal) {
+                  terminal = vscode.window.createTerminal("CodeBuddy");
+                }
+                terminal.show();
+                terminal.sendText(message.text);
+              }
+              break;
             case "update-model-event":
               await this.orchestrator.publish("onModelChange", message);
               break;
