@@ -31,7 +31,7 @@ export class NewsService {
   }
 
   private async ensureInitialized(): Promise<void> {
-    await this.initPromise;
+    await this.dbService.ensureInitialized();
   }
 
   public async fetchAndStoreNews(): Promise<void> {
