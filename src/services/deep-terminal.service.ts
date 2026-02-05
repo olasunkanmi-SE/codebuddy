@@ -42,16 +42,21 @@ export class DeepTerminalService extends EventEmitter {
       return `Session ${id} already exists.`;
     }
 
-    const shell = shellPath || (process.platform === "win32" ? "powershell.exe" : "/bin/zsh");
-    const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+    const shell =
+      shellPath ||
+      (process.platform === "win32" ? "powershell.exe" : "/bin/zsh");
+    const cwd =
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
 
-    this.logger.info(`Starting terminal session ${id} with shell ${shell} in ${cwd}`);
+    this.logger.info(
+      `Starting terminal session ${id} with shell ${shell} in ${cwd}`,
+    );
 
     try {
       const childProcess = cp.spawn(shell, [], {
         cwd,
         env: { ...process.env, TERM: "xterm-256color" }, // Better output formatting
-        shell: false // We are spawning the shell directly
+        shell: false, // We are spawning the shell directly
       });
 
       const session: TerminalSession = {
@@ -59,7 +64,7 @@ export class DeepTerminalService extends EventEmitter {
         process: childProcess,
         outputBuffer: [],
         lastReadIndex: 0,
-        createdAt: Date.now()
+        createdAt: Date.now(),
       };
 
       this.setupListeners(session);
@@ -78,7 +83,7 @@ export class DeepTerminalService extends EventEmitter {
   public async executeCommand(id: string, command: string): Promise<string> {
     const session = this.sessions.get(id);
     if (!session) {
-      // Auto-create session if it doesn't exist? 
+      // Auto-create session if it doesn't exist?
       // For now, let's auto-create "default" session if requested
       if (id === "default") {
         await this.startSession("default");
@@ -115,7 +120,7 @@ export class DeepTerminalService extends EventEmitter {
 
     const newLines = session.outputBuffer.slice(session.lastReadIndex);
     session.lastReadIndex = session.outputBuffer.length;
-    
+
     if (newLines.length === 0) {
       return "";
     }
@@ -168,39 +173,39 @@ export class DeepTerminalService extends EventEmitter {
       this.emit("close", { id, code });
       // Don't delete immediately so user can read final output
     });
-    
+
     process.on("error", (err) => {
-        const msg = `\n[Session error: ${err.message}]\n`;
-        this.appendToBuffer(session, msg);
-        this.logger.error(`Session ${id} error: ${err.message}`);
+      const msg = `\n[Session error: ${err.message}]\n`;
+      this.appendToBuffer(session, msg);
+      this.logger.error(`Session ${id} error: ${err.message}`);
     });
   }
 
   private appendToBuffer(session: TerminalSession, text: string) {
     // We store raw chunks, or maybe split by lines?
-    // Splitting by lines is better for "read last N lines" logic, 
+    // Splitting by lines is better for "read last N lines" logic,
     // but chunks are more faithful to stream.
     // Let's just store chunks but ensure we don't grow forever.
-    
+
     // For simplicity in this "Deep" implementation, let's just push chunks.
     // But readOutput needs to be careful.
-    
+
     session.outputBuffer.push(text);
-    
+
     // Simple pruning if too large (naive approach)
     if (session.outputBuffer.length > this.MAX_BUFFER_LINES) {
-        // Keep last 1000 chunks
-        session.outputBuffer = session.outputBuffer.slice(-1000);
-        // Reset read index if it falls behind (which means we skipped data)
-        if (session.lastReadIndex > 1000) {
-            session.lastReadIndex = 0; // Force re-read of what's left? Or point to end?
-            // Pointing to end might miss context. Let's set to 0 (start of current buffer).
-            session.lastReadIndex = 0; 
-        } else {
-             // Adjust index because we removed N items from front
-             const removed = this.MAX_BUFFER_LINES - 1000;
-             session.lastReadIndex = Math.max(0, session.lastReadIndex - removed);
-        }
+      // Keep last 1000 chunks
+      session.outputBuffer = session.outputBuffer.slice(-1000);
+      // Reset read index if it falls behind (which means we skipped data)
+      if (session.lastReadIndex > 1000) {
+        session.lastReadIndex = 0; // Force re-read of what's left? Or point to end?
+        // Pointing to end might miss context. Let's set to 0 (start of current buffer).
+        session.lastReadIndex = 0;
+      } else {
+        // Adjust index because we removed N items from front
+        const removed = this.MAX_BUFFER_LINES - 1000;
+        session.lastReadIndex = Math.max(0, session.lastReadIndex - removed);
+      }
     }
   }
 }

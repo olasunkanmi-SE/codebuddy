@@ -10,7 +10,7 @@ import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
 import { FAQAccordion } from "./accordion";
-import { AgentActivityFeed } from "./AgentActivityFeed";
+import { AgentTimeline } from "./AgentTimeline";
 import AttachmentIcon from "./attachmentIcon";
 import ChatInput from "./ChatInput";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
@@ -101,13 +101,15 @@ export const WebviewUI = () => {
   // Initialize streaming chat hook
   const {
     messages: streamedMessages,
-    activities,
+    timeline,
     isStreaming,
     isLoading: isBotLoading,
     sendMessage,
     clearMessages,
     setMessages,
     pendingApproval,
+    cancelCurrentRequest,
+    threadId,
   } = useStreamingChat(vsCode, {
     enableStreaming,
     onLegacyMessage: (messages) => {
@@ -157,6 +159,7 @@ export const WebviewUI = () => {
       case "chat-history":
         try {
           const parsedMessages = JSON.parse(message.message);
+          console.log("chat-history received", parsedMessages?.length);
           const formattedMessages: IWebviewMessage[] = parsedMessages.map((msg: any) => ({
             id: `history-${Date.now()}-${Math.random()}`,
             type: msg.type,
@@ -264,6 +267,11 @@ export const WebviewUI = () => {
     vsCode.postMessage({ command: "webview-ready" });
   }, []);
 
+  // Request chat history on mount (in case the initial push was missed)
+  useEffect(() => {
+    vsCode.postMessage({ command: "request-chat-history" });
+  }, []);
+
   // Highlight code blocks when messages update
   useEffect(() => {
     highlightCodeBlocks(hljsApi, streamedMessages);
@@ -317,9 +325,10 @@ export const WebviewUI = () => {
         mode: selectedCodeBuddyMode || "Agent",
         context: selectedContext.split("@"),
         alias: "O",
+        threadId,
       });
     },
-    [sendMessage, selectedCodeBuddyMode, selectedContext]
+    [sendMessage, selectedCodeBuddyMode, selectedContext, threadId]
   );
 
   const handleGetContext = useCallback(() => {
@@ -332,6 +341,10 @@ export const WebviewUI = () => {
   const handleApproveAction = useCallback(() => {
     vsCode.postMessage({ command: "user-consent", message: "granted" });
   }, []);
+
+  const handleStop = useCallback(() => {
+    cancelCurrentRequest();
+  }, [cancelCurrentRequest]);
 
   const processedContext = useMemo(() => {
     const contextArray = Array.from(new Set(selectedContext.split("@").join(", ").split(", ")));
@@ -492,13 +505,28 @@ export const WebviewUI = () => {
                 ) : (
                   <>
                     {memoizedMessages}
-                    {/* Show activity feed when agent is working */}
-                    {(isStreaming || isBotLoading) && activities.length > 0 && (
-                      <AgentActivityFeed
-                        activities={activities}
+                    {/* Show Agent timeline when streaming/working */}
+                    {(isStreaming || isBotLoading) && (
+                      <AgentTimeline
+                        timeline={timeline}
                         isActive={isStreaming || isBotLoading}
+                        pendingApproval={pendingApproval}
+                        onApprove={handleApproveAction}
+                        onDeny={() => vsCode.postMessage({ command: "user-consent", message: "denied" })}
+                        isLive
                       />
                     )}
+                    {/* Render timeline snapshots for completed bot messages */}
+                    {streamedMessages
+                      .filter((m) => m.type === "bot" && m.timelineSnapshot)
+                      .map((m) => (
+                        <AgentTimeline
+                          key={`timeline-${m.id}`}
+                          timeline={m.timelineSnapshot!}
+                          isActive={false}
+                          isLive={false}
+                        />
+                      ))}
                     {isCommandExecuting && (
                       <CommandFeedbackLoader
                         commandAction={commandAction}
@@ -506,7 +534,13 @@ export const WebviewUI = () => {
                       />
                     )}
                     {/* Show skeleton only if no activities are being tracked */}
-                    {isBotLoading && !isCommandExecuting && !isStreaming && activities.length === 0 && <SkeletonLoader />}
+                    {isBotLoading &&
+                      !isCommandExecuting &&
+                      !isStreaming &&
+                      !timeline.thinking &&
+                      !timeline.plan &&
+                      timeline.actions.length === 0 &&
+                      !timeline.summarizing && <SkeletonLoader />}
                   </>
                 )}
               </div>
@@ -632,6 +666,27 @@ export const WebviewUI = () => {
         </div>
         <div className="horizontal-stack">
           <AttachmentIcon onClick={handleGetContext} disabled={true} />
+          <svg
+            className={`attachment-icon${isStreaming || isBotLoading ? " active" : ""}`}
+            onClick={isStreaming || isBotLoading ? handleStop : undefined}
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              opacity: isStreaming || isBotLoading ? 1 : 0.4,
+              cursor: isStreaming || isBotLoading ? "pointer" : "default",
+            }}
+            role="button"
+            aria-label="Stop run"
+          >
+            <title>{isStreaming || isBotLoading ? "Stop run" : "Stop (no active run)"}</title>
+            <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
+          </svg>
         </div>
       </div>
     </div>

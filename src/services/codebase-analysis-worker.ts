@@ -19,6 +19,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { AnalyzerFactory } from "./analyzers/analyzer-factory";
 import { AnalysisResult as FileAnalysisResult } from "./analyzers/index";
 
@@ -140,6 +141,17 @@ export interface AnalysisResult {
  * @class CodebaseAnalysisWorker
  */
 export class CodebaseAnalysisWorker {
+  private readonly logger: Logger;
+
+  constructor() {
+    this.logger = Logger.initialize("CodebaseAnalysisWorker", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
+  }
+
   /** Flag indicating if analysis is currently running */
   private isRunning = false;
 
@@ -343,7 +355,7 @@ export class CodebaseAnalysisWorker {
           await new Promise((resolve) => setTimeout(resolve, 1));
         }
       } catch (error: any) {
-        console.warn(`Failed to analyze file ${file}:`, error);
+        this.logger.warn(`Failed to analyze file ${file}:`, error);
       }
     }
 
@@ -378,7 +390,7 @@ export class CodebaseAnalysisWorker {
           analysis = analyzer.analyze(content, filePath);
         }
       } catch (error: any) {
-        console.warn(
+        this.logger.warn(
           `Failed to run structured analysis on ${filePath}:`,
           error,
         );
@@ -391,7 +403,7 @@ export class CodebaseAnalysisWorker {
       try {
         endpoints = this.extractApiEndpoints(filePath, content);
       } catch (error: any) {
-        console.warn(
+        this.logger.warn(
           `Failed to extract API endpoints from ${filePath}:`,
           error,
         );
@@ -400,7 +412,10 @@ export class CodebaseAnalysisWorker {
       try {
         models = this.extractDataModels(filePath, content);
       } catch (error: any) {
-        console.warn(`Failed to extract data models from ${filePath}:`, error);
+        this.logger.warn(
+          `Failed to extract data models from ${filePath}:`,
+          error,
+        );
       }
 
       return {
@@ -525,7 +540,10 @@ export class CodebaseAnalysisWorker {
 
         files.push(...uris.map((uri) => uri.fsPath));
       } catch (error: any) {
-        console.warn(`Failed to find files with pattern ${pattern}:`, error);
+        this.logger.warn(
+          `Failed to find files with pattern ${pattern}:`,
+          error,
+        );
       }
     }
 
@@ -551,7 +569,7 @@ export class CodebaseAnalysisWorker {
         Object.assign(dependencies, packageJson.dependencies || {});
         Object.assign(dependencies, packageJson.devDependencies || {});
       } catch (error: any) {
-        console.warn("Failed to analyze package.json:", error);
+        this.logger.warn("Failed to analyze package.json:", error);
       }
     }
 
@@ -570,7 +588,7 @@ export class CodebaseAnalysisWorker {
           }
         }
       } catch (error: any) {
-        console.warn("Failed to analyze requirements.txt:", error);
+        this.logger.warn("Failed to analyze requirements.txt:", error);
       }
     }
 

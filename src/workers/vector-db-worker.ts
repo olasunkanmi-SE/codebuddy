@@ -3,6 +3,8 @@
  * Simplified stub implementation during migration from ChromaDB
  */
 
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
+
 // Simple stub implementation during migration
 export const WORKER_DISABLED = true;
 
@@ -26,8 +28,16 @@ export interface VectorDbWorkerResponse {
 // Placeholder worker manager during migration
 export class VectorDbWorkerManager {
   private isInitialized = false;
+  private readonly logger: Logger;
 
-  constructor(private extensionPath: string) {}
+  constructor(private extensionPath: string) {
+    this.logger = Logger.initialize("VectorDbWorkerManager", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
+  }
 
   async initialize(): Promise<void> {
     // TODO: Implement LanceDB worker initialization
@@ -37,7 +47,9 @@ export class VectorDbWorkerManager {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async indexFiles(files: string[], options?: any): Promise<void> {
     // TODO: Implement LanceDB file indexing
-    console.log("Stub: Would index " + files.length + " files with LanceDB");
+    this.logger.info(
+      "Stub: Would index " + files.length + " files with LanceDB",
+    );
   }
 
   async indexFunctionData(
@@ -45,7 +57,7 @@ export class VectorDbWorkerManager {
     progressCallback?: (progress: number) => void,
   ): Promise<void> {
     // TODO: Implement LanceDB function indexing
-    console.log(
+    this.logger.info(
       "Stub: Would index " + functionData.length + " functions with LanceDB",
     );
     if (progressCallback) {
@@ -56,18 +68,20 @@ export class VectorDbWorkerManager {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async searchSemantic(query: string, limit = 10): Promise<any[]> {
     // TODO: Implement LanceDB semantic search
-    console.log("Stub: Would search for '" + query + "' with LanceDB");
+    this.logger.info("Stub: Would search for '" + query + "' with LanceDB");
     return [];
   }
 
   async deleteByFile(filePath: string): Promise<void> {
     // TODO: Implement LanceDB file deletion
-    console.log("Stub: Would delete vectors for " + filePath + " with LanceDB");
+    this.logger.info(
+      "Stub: Would delete vectors for " + filePath + " with LanceDB",
+    );
   }
 
   async clearAll(): Promise<void> {
     // TODO: Implement LanceDB clear all
-    console.log("Stub: Would clear all vectors with LanceDB");
+    this.logger.info("Stub: Would clear all vectors with LanceDB");
   }
 
   async getStats(): Promise<any> {

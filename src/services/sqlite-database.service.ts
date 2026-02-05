@@ -34,6 +34,8 @@ export class SqliteDatabaseService {
   private readonly logger: Logger;
   private dbPath = "";
   private SQL: any = null; // sql.js instance
+  private initialized = false;
+  private initPromise: Promise<void> | null = null;
 
   private constructor() {
     this.logger = Logger.initialize("SqliteDatabaseService", {
@@ -52,78 +54,94 @@ export class SqliteDatabaseService {
    * Initialize the database connection and create tables
    */
   async initialize(): Promise<void> {
-    try {
-      this.logger.info("Starting SQLite database initialization...");
-
-      // Initialize sql.js
-      this.logger.info("Initializing sql.js...");
-      const initSqlJs = (await import("sql.js")).default;
-
-      // Configure sql.js with the WASM file location
-      // In the bundled extension, the WASM file is in the same directory as extension.js
-      const wasmPath = path.join(__dirname, "grammars", "sql-wasm.wasm");
-      this.logger.info(`Looking for WASM file at: ${wasmPath}`);
-
-      this.SQL = await initSqlJs({
-        locateFile: (file: string) => {
-          if (file.endsWith(".wasm")) {
-            return wasmPath;
-          }
-          return file;
-        },
-      });
-
-      // Create database in workspace or extension global storage
-      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (workspaceRoot) {
-        this.logger.info(`Using workspace root: ${workspaceRoot}`);
-        const codebuddyDir = path.join(workspaceRoot, ".codebuddy");
-        if (!fs.existsSync(codebuddyDir)) {
-          this.logger.info(`Creating .codebuddy directory: ${codebuddyDir}`);
-          fs.mkdirSync(codebuddyDir, { recursive: true });
-        }
-        this.dbPath = path.join(codebuddyDir, "codebase_analysis.db");
-      } else {
-        this.logger.info("No workspace root, using extension global storage");
-        // Fallback to extension global storage
-        const dbDir = path.join(__dirname, "..", "..", "database");
-        if (!fs.existsSync(dbDir)) {
-          this.logger.info(`Creating database directory: ${dbDir}`);
-          fs.mkdirSync(dbDir, { recursive: true });
-        }
-        this.dbPath = path.join(dbDir, "codebase_analysis.db");
-      }
-
-      this.logger.info(`Database path: ${this.dbPath}`);
-
-      // Initialize SQLite database
-      this.logger.info("Creating Database instance with sql.js...");
-
-      // Load existing database if it exists
-      let data: Uint8Array | undefined = undefined;
-      if (fs.existsSync(this.dbPath)) {
-        this.logger.info("Loading existing database file...");
-        const buffer = fs.readFileSync(this.dbPath);
-        data = new Uint8Array(buffer);
-      }
-
-      this.db = new this.SQL.Database(data);
-
-      // Create tables and indexes
-      this.logger.info("Creating database tables...");
-      await this.createTables();
-
-      this.logger.info(
-        `SQLite database initialized successfully at: ${this.dbPath}`,
-      );
-    } catch (error: any) {
-      this.logger.error("Failed to initialize database", error);
-      if (error instanceof Error) {
-        this.logger.error(`Error message: ${error.message}`);
-        this.logger.error(`Error stack: ${error.stack}`);
-      }
-      throw error;
+    if (this.initialized) {
+      return;
     }
+
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    this.initPromise = (async () => {
+      try {
+        this.logger.info("Starting SQLite database initialization...");
+
+        // Initialize sql.js
+        this.logger.info("Initializing sql.js...");
+        const initSqlJs = (await import("sql.js")).default;
+
+        // Configure sql.js with the WASM file location
+        // In the bundled extension, the WASM file is in the same directory as extension.js
+        const wasmPath = path.join(__dirname, "grammars", "sql-wasm.wasm");
+        this.logger.info(`Looking for WASM file at: ${wasmPath}`);
+
+        this.SQL = await initSqlJs({
+          locateFile: (file: string) => {
+            if (file.endsWith(".wasm")) {
+              return wasmPath;
+            }
+            return file;
+          },
+        });
+
+        // Create database in workspace or extension global storage
+        const workspaceRoot =
+          vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (workspaceRoot) {
+          this.logger.info(`Using workspace root: ${workspaceRoot}`);
+          const codebuddyDir = path.join(workspaceRoot, ".codebuddy");
+          if (!fs.existsSync(codebuddyDir)) {
+            this.logger.info(`Creating .codebuddy directory: ${codebuddyDir}`);
+            fs.mkdirSync(codebuddyDir, { recursive: true });
+          }
+          this.dbPath = path.join(codebuddyDir, "codebase_analysis.db");
+        } else {
+          this.logger.info("No workspace root, using extension global storage");
+          const dbDir = path.join(__dirname, "..", "..", "database");
+          if (!fs.existsSync(dbDir)) {
+            this.logger.info(`Creating database directory: ${dbDir}`);
+            fs.mkdirSync(dbDir, { recursive: true });
+          }
+          this.dbPath = path.join(dbDir, "codebase_analysis.db");
+        }
+
+        this.logger.info(`Database path: ${this.dbPath}`);
+
+        // Initialize SQLite database
+        this.logger.info("Creating Database instance with sql.js...");
+
+        // Load existing database if it exists
+        let data: Uint8Array | undefined = undefined;
+        if (fs.existsSync(this.dbPath)) {
+          this.logger.info("Loading existing database file...");
+          const buffer = fs.readFileSync(this.dbPath);
+          data = new Uint8Array(buffer);
+        }
+
+        this.db = new this.SQL.Database(data);
+
+        // Create tables and indexes
+        this.logger.info("Creating database tables...");
+        await this.createTables();
+
+        this.initialized = true;
+        this.logger.info(
+          `SQLite database initialized successfully at: ${this.dbPath}`,
+        );
+      } catch (error: any) {
+        this.initPromise = null;
+        this.logger.error("Failed to initialize database", error);
+        if (error instanceof Error) {
+          this.logger.error(`Error message: ${error.message}`);
+          this.logger.error(`Error stack: ${error.stack}`);
+        }
+        throw error;
+      } finally {
+        this.saveToDisk();
+      }
+    })();
+
+    return this.initPromise;
   }
 
   /**
@@ -248,7 +266,7 @@ export class SqliteDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_news_read_status ON news_items(read_status)
       `);
     } catch (error: any) {
-      console.warn("Failed to initialize chat history schema:", error);
+      this.logger.warn("Failed to initialize chat history schema:", error);
     }
   }
 
@@ -256,7 +274,7 @@ export class SqliteDatabaseService {
    * Save the in-memory database to disk
    */
   private saveToDisk(): void {
-    if (!this.db) {
+    if (!this.db || !this.dbPath) {
       return;
     }
 
@@ -268,69 +286,14 @@ export class SqliteDatabaseService {
     }
   }
 
-  /**
-   * Get current git state for the workspace
-   */
-  async getCurrentGitState(): Promise<GitState | null> {
-    try {
-      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      this.logger.info(`Workspace root: ${workspaceRoot}`);
-      if (!workspaceRoot) {
-        return null;
-      }
-
-      // Use VS Code's git extension API if available
-      const gitExtension =
-        vscode.extensions.getExtension("vscode.git")?.exports;
-      const git = gitExtension?.getAPI(1);
-
-      if (git && git.repositories.length > 0) {
-        const repo = git.repositories[0];
-        const branch = repo.state.HEAD?.name || "main";
-        const commitHash = repo.state.HEAD?.commit || "";
-
-        this.logger.info(`Git branch: ${branch}, commit: ${commitHash}`);
-
-        // Get file count and create a simple diff hash
-        const files = await vscode.workspace.findFiles(
-          "**/*.{ts,js,tsx,jsx,json,py,java,cs,php,md}",
-          "**/node_modules/**",
-          1000,
-        );
-
-        const fileCount = files.length;
-        const diffHash = await this.createDiffHash(files);
-
-        this.logger.info(`File count: ${fileCount}, diff hash: ${diffHash}`);
-
-        const gitState = {
-          branch,
-          commitHash,
-          diffHash,
-          fileCount,
-          workspacePath: workspaceRoot,
-        };
-
-        this.logger.info(`Generated git state: ${JSON.stringify(gitState)}`);
-        return gitState;
-      }
-
-      // Fallback without git extension
-      this.logger.warn("Git extension not available, using fallback git state");
-      const fallbackState = {
-        branch: "unknown",
-        commitHash: "unknown",
-        diffHash: await this.createSimpleDiffHash(),
-        fileCount: 0,
-        workspacePath: workspaceRoot,
-      };
-
-      this.logger.info(`Fallback git state: ${JSON.stringify(fallbackState)}`);
-      return fallbackState;
-    } catch (error: any) {
-      this.logger.error("Failed to get git state", error);
-      return null;
+  async ensureInitialized(): Promise<void> {
+    if (this.initialized) {
+      return;
     }
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+    return this.initialize();
   }
 
   /**
@@ -369,6 +332,41 @@ export class SqliteDatabaseService {
    */
   private async createSimpleDiffHash(): Promise<string> {
     return Date.now().toString();
+  }
+
+  async getCurrentGitState(): Promise<GitState | null> {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+      return null;
+    }
+
+    try {
+      const files = await vscode.workspace.findFiles(
+        "**/*",
+        "**/node_modules/**",
+        5000,
+      );
+      const fileCount = files.length;
+      const diffHash = await this.createDiffHash(files);
+
+      // Branch/commit are not tracked here; provide placeholders
+      return {
+        workspacePath: workspaceRoot,
+        branch: "workspace",
+        commitHash: "local",
+        diffHash,
+        fileCount,
+      };
+    } catch (error: any) {
+      this.logger.warn("Failed to compute git state, using fallback", error);
+      return {
+        workspacePath: workspaceRoot,
+        branch: "workspace",
+        commitHash: "local",
+        diffHash: await this.createSimpleDiffHash(),
+        fileCount: 0,
+      };
+    }
   }
 
   /**
@@ -700,12 +698,19 @@ export class SqliteDatabaseService {
 
     try {
       const stmt = this.db.prepare(query);
-      const results = stmt.getAsObject(params);
+      stmt.bind(params);
+      const results: any[] = [];
+      while (stmt.step()) {
+        results.push(stmt.getAsObject());
+      }
       stmt.free();
       this.saveToDisk();
-      return Array.isArray(results) ? results : [results];
+      return results;
     } catch (error: any) {
-      this.logger.error(`SQL execution failed: ${query}`, error);
+      this.logger.error(`SQL execution failed: ${query}`, {
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
@@ -728,7 +733,10 @@ export class SqliteDatabaseService {
       this.saveToDisk();
       return result;
     } catch (error: any) {
-      this.logger.error(`SQL command execution failed: ${query}`, error);
+      this.logger.error(`SQL command execution failed: ${query}`, {
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
@@ -743,11 +751,18 @@ export class SqliteDatabaseService {
 
     try {
       const stmt = this.db.prepare(query);
-      const results = stmt.all(params);
+      stmt.bind(params);
+      const results: any[] = [];
+      while (stmt.step()) {
+        results.push(stmt.getAsObject());
+      }
       stmt.free();
       return results;
     } catch (error: any) {
-      this.logger.error(`SQL query execution failed: ${query}`, error);
+      this.logger.error(`SQL query execution failed: ${query}`, {
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }

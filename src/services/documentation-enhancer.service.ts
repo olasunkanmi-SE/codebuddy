@@ -1,3 +1,4 @@
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { GeminiLLM } from "../llms/gemini/gemini";
 import { getAPIKeyAndModel } from "../utils/utils";
 
@@ -7,15 +8,22 @@ import { getAPIKeyAndModel } from "../utils/utils";
  */
 export class DocumentationEnhancerService {
   private readonly gemini: GeminiLLM | null = null;
+  private readonly logger: Logger;
 
   constructor() {
+    this.logger = Logger.initialize("DocumentationEnhancerService", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
     try {
       const { apiKey, model } = getAPIKeyAndModel("gemini");
       if (apiKey && model) {
         this.gemini = new GeminiLLM({ apiKey, model });
       }
     } catch (error: any) {
-      console.warn(
+      this.logger.warn(
         "Failed to initialize Gemini for documentation enhancement:",
         error,
       );
@@ -39,7 +47,7 @@ export class DocumentationEnhancerService {
         return await this.llmExtractAPIs(codebaseContext);
       }
     } catch (error: any) {
-      console.warn(
+      this.logger.warn(
         "LLM API extraction failed, falling back to pattern-based:",
         error,
       );
@@ -64,7 +72,7 @@ export class DocumentationEnhancerService {
         return await this.llmAnalyzeArchitecture(codebaseContext);
       }
     } catch (error: any) {
-      console.warn(
+      this.logger.warn(
         "LLM architecture analysis failed, falling back to pattern-based:",
         error,
       );

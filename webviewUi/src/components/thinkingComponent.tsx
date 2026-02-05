@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import DOMPurify from "dompurify";
 import styled from "styled-components";
+import { marked } from "marked";
 import { MermaidDiagram } from "./MermaidDiagram";
 
 interface ThinkingComponentProps {
@@ -336,7 +337,10 @@ export const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ content })
 
   // Render regular content with Mermaid support
   const renderedRegularContent = useMemo(() => {
-    return parseMermaidContent(regularContent);
+    // Parse markdown to HTML before processing Mermaid diagrams
+    // marked.parse is synchronous by default
+    const htmlContent = marked.parse(regularContent) as string;
+    return parseMermaidContent(htmlContent);
   }, [regularContent, parseMermaidContent]);
 
   if (!hasThinking) {

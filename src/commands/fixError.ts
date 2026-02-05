@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { CodeCommandHandler } from "./handler";
 import { CodebuddyAgentService } from "../agents/agentService";
 import { WebViewProviderManager } from "../webview-providers/manager";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export class FixError extends CodeCommandHandler {
   constructor(action: string, context: vscode.ExtensionContext, error: string) {
@@ -11,7 +11,12 @@ export class FixError extends CodeCommandHandler {
   }
 
   async execute(action?: string, message?: string): Promise<void> {
-    const logger = new Logger("FixError");
+    const logger = Logger.initialize("FixError", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
     logger.info("Starting Auto-Fix execution");
 
     const selectedCode = this.getSelectedWindowArea();

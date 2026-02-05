@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { CompletionConfigService } from "./completion-config.service";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export class CompletionStatusBarService {
   private statusBarItem: vscode.StatusBarItem;
@@ -8,7 +8,12 @@ export class CompletionStatusBarService {
   private logger: Logger;
 
   constructor(context: vscode.ExtensionContext) {
-    this.logger = new Logger("CompletionStatusBarService");
+    this.logger = Logger.initialize("CompletionStatusBarService", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
     this.configService = CompletionConfigService.getInstance();
 
     this.statusBarItem = vscode.window.createStatusBarItem(

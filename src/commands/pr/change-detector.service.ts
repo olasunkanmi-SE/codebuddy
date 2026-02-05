@@ -1,20 +1,32 @@
 // src/services/change-detection/change-detector.service.ts
 import * as vscode from "vscode";
+import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { IChangeProvider, ChangeDetails } from "./types";
 
 export class ChangeDetector {
-  constructor(private readonly providers: IChangeProvider[]) {}
+  private readonly logger: Logger;
+
+  constructor(private readonly providers: IChangeProvider[]) {
+    this.logger = Logger.initialize("ChangeDetector", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
+  }
 
   async findChanges(targetBranch: string): Promise<ChangeDetails> {
     for (const provider of this.providers) {
       try {
         const result = await provider.getChanges(targetBranch);
         if (result) {
-          console.log(`Successfully found changes using: ${provider.name}`);
+          this.logger.info(
+            `Successfully found changes using: ${provider.name}`,
+          );
           return result;
         }
       } catch (error) {
-        console.warn(`Provider ${provider.name} failed:`, error);
+        this.logger.warn(`Provider ${provider.name} failed:`, error);
       }
     }
 

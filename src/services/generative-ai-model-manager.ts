@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { getConfigValue } from "../utils/utils";
 import { EventEmitter } from "../emitter/publisher";
 
@@ -11,6 +12,12 @@ export const initializeGenerativeAiEnvironment = async (
   quickFixCodeAction: vscode.Disposable,
   agentEventEmmitter: EventEmitter,
 ) => {
+  const logger = Logger.initialize("GenerativeAIModelManager", {
+    minLevel: LogLevel.DEBUG,
+    enableConsole: true,
+    enableFile: true,
+    enableTelemetry: true,
+  });
   try {
     const apiKey = getConfigValue(key);
     const apiModel = getConfigValue(model);
@@ -37,6 +44,6 @@ export const initializeGenerativeAiEnvironment = async (
     vscode.window.showErrorMessage(
       "An Error occured while registering event subscriptions",
     );
-    console.log(error);
+    logger.error("Error registering subscriptions", error);
   }
 };

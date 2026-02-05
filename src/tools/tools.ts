@@ -242,7 +242,7 @@ export class EditFileTool {
       // Format link so VS Code command handler receives the ID string
       // Note: command args in markdown links are JSON encoded
       const args = encodeURIComponent(JSON.stringify(change.id));
-      
+
       return `I have prepared changes for **${fileName}**. [Review & Apply](command:codebuddy.reviewChange?${args})`;
     } catch (e: any) {
       return `Error editing file: ${e.message}`;
@@ -456,7 +456,8 @@ export class DeepTerminalTool {
           },
           command: {
             type: SchemaType.STRING,
-            description: "The shell command to execute (required for 'execute').",
+            description:
+              "The shell command to execute (required for 'execute').",
           },
           waitMs: {
             type: SchemaType.INTEGER,

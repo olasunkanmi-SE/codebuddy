@@ -2,6 +2,7 @@ import { AgentState } from "../agents/langgraph/interface";
 import { COMMON } from "../application/constant";
 import { GeminiLLMSnapShot } from "../llms/interface";
 import { FileStorage, IStorage } from "./file-storage";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import {
   ChatHistoryWorker,
   ChatHistoryWorkerOperation,
@@ -11,10 +12,17 @@ export class AgentService {
   private static instance: AgentService;
   private readonly storage: IStorage;
   private readonly chatHistoryWorker: ChatHistoryWorker;
+  private readonly logger: Logger;
 
   private constructor(storage: IStorage) {
     this.storage = storage;
     this.chatHistoryWorker = new ChatHistoryWorker();
+    this.logger = Logger.initialize("AgentService", {
+      minLevel: LogLevel.DEBUG,
+      enableConsole: true,
+      enableFile: true,
+      enableTelemetry: true,
+    });
   }
 
   public static getInstance(): AgentService {
@@ -35,24 +43,41 @@ export class AgentService {
   }
 
   async getChatHistory(agentId: string): Promise<any[]> {
-    try {
-      // Use the chat history worker for async operations
-      const requestId = `get-${agentId}-${Date.now()}`;
-      const history = await this.chatHistoryWorker.processRequest(
-        ChatHistoryWorkerOperation.GET_CHAT_HISTORY,
-        { agentId },
-        requestId,
-      );
-      return history || [];
-    } catch (error: any) {
-      console.warn(`Failed to get chat history for agent ${agentId}:`, error);
-      // Fallback to file storage for backward compatibility
-      return (
-        (await this.storage.get<any[]>(
-          `${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`,
-        )) || []
-      );
+    const maxAttempts = 3;
+    const retryDelayMs = 150;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const requestId = `get-${agentId}-${Date.now()}-${attempt}`;
+        const history = await this.chatHistoryWorker.processRequest(
+          ChatHistoryWorkerOperation.GET_CHAT_HISTORY,
+          { agentId },
+          requestId,
+        );
+        return history || [];
+      } catch (error: any) {
+        const isBusy =
+          typeof error?.message === "string" &&
+          error.message.includes("Worker is busy");
+
+        if (isBusy && attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+          continue;
+        }
+
+        this.logger.warn(
+          `Failed to get chat history for agent ${agentId}:`,
+          error,
+        );
+        return (
+          (await this.storage.get<any[]>(
+            `${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`,
+          )) || []
+        );
+      }
     }
+
+    return [];
   }
 
   // Save chat history using chat history worker
@@ -66,7 +91,10 @@ export class AgentService {
         requestId,
       );
     } catch (error: any) {
-      console.warn(`Failed to save chat history for agent ${agentId}:`, error);
+      this.logger.warn(
+        `Failed to save chat history for agent ${agentId}:`,
+        error,
+      );
       // Fallback to file storage only for catastrophic database failures
       await this.storage.set(
         `${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`,
@@ -88,7 +116,10 @@ export class AgentService {
         requestId,
       );
     } catch (error: any) {
-      console.warn(`Failed to clear chat history for agent ${agentId}:`, error);
+      this.logger.warn(
+        `Failed to clear chat history for agent ${agentId}:`,
+        error,
+      );
       // Fallback to file storage only for catastrophic database failures
       await this.storage.delete(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`);
     }
@@ -116,7 +147,10 @@ export class AgentService {
         requestId,
       );
     } catch (error: any) {
-      console.warn(`Failed to add chat message for agent ${agentId}:`, error);
+      this.logger.warn(
+        `Failed to add chat message for agent ${agentId}:`,
+        error,
+      );
     }
   }
 
@@ -132,7 +166,10 @@ export class AgentService {
         requestId,
       );
     } catch (error: any) {
-      console.warn(`Failed to save chat summary for agent ${agentId}:`, error);
+      this.logger.warn(
+        `Failed to save chat summary for agent ${agentId}:`,
+        error,
+      );
     }
   }
 
@@ -149,7 +186,10 @@ export class AgentService {
       );
       return result.summary || null;
     } catch (error: any) {
-      console.warn(`Failed to get chat summary for agent ${agentId}:`, error);
+      this.logger.warn(
+        `Failed to get chat summary for agent ${agentId}:`,
+        error,
+      );
       return null;
     }
   }
@@ -168,7 +208,7 @@ export class AgentService {
       );
       return history || [];
     } catch (error: any) {
-      console.warn(
+      this.logger.warn(
         `Failed to get recent chat history for agent ${agentId}:`,
         error,
       );
@@ -191,7 +231,7 @@ export class AgentService {
         requestId,
       );
     } catch (error: any) {
-      console.warn("Failed to cleanup old chat history:", error);
+      this.logger.warn("Failed to cleanup old chat history:", error);
     }
   }
 
@@ -217,7 +257,7 @@ export class AgentService {
         requestId,
       );
     } catch (error: any) {
-      console.warn(
+      this.logger.warn(
         `Failed to clear chat history from SQLite for agent ${agentId}:`,
         error,
       );
