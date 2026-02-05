@@ -56,6 +56,7 @@ import { DeveloperAgent } from "./agents/developer/agent";
 import { AgentRunningGuardService } from "./services/agent-running-guard.service";
 
 import { DiffReviewService } from "./services/diff-review.service";
+import { SecretStorageService } from "./services/secret-storage";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -218,6 +219,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Start Scheduler Service
     SchedulerService.getInstance().start();
+
+    // Initialize Secret Storage Service for user preferences
+    const secretStorageService = new SecretStorageService(context);
+    context.subscriptions.push(secretStorageService);
 
     // Initialize ContextRetriever for semantic search
     const contextRetriever = ContextRetriever.initialize(context);

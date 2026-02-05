@@ -103,4 +103,22 @@ export class NewsService {
       ids,
     );
   }
+
+  public async cleanupOldNews(retentionDays: number): Promise<void> {
+    await this.ensureInitialized();
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+    const cutoffISO = cutoffDate.toISOString();
+
+    this.logger.info(
+      `Cleaning up news older than ${retentionDays} days (before ${cutoffISO})...`,
+    );
+
+    const result = this.dbService.executeSqlCommand(
+      `DELETE FROM news_items WHERE fetched_at < ?`,
+      [cutoffISO],
+    );
+
+    this.logger.info(`Deleted ${result.changes} old news items.`);
+  }
 }

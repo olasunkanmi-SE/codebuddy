@@ -1,9 +1,11 @@
 #root {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 16px 12px 120px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   text-align: left;
-  background-color: rgb(22, 22, 30);
+  background-color: transparent;
+  min-height: 100vh;
+  width: 100%;
 }
 
 .logo {

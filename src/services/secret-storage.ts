@@ -68,9 +68,14 @@ export class SecretStorageService implements vscode.Disposable {
   async publishPreferences() {
     const username = await this.get("codebuddy-username");
     const theme = await this.get("codebuddy-theme");
+    const config = vscode.workspace.getConfiguration();
+    const fontFamily = config.get<string>("font.family") || "JetBrains Mono";
+    const fontSize = config.get<number>("chatview.font.size") || 16;
     const preferences = {
       username,
       theme: theme || "tokyo night", // default theme
+      fontFamily,
+      fontSize,
     };
     this.orchestrator.publish(
       "onGetUserPreferences",

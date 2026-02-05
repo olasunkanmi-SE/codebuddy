@@ -745,11 +745,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               const { ids } = message;
               if (ids && Array.isArray(ids)) {
                 await NewsService.getInstance().markAsRead(ids);
+                await this.synchronizeNews();
               }
               break;
             }
+            case "news-refresh":
+              await this.synchronizeNews();
+              break;
             case "upload-file":
               await this.fileManager.uploadFileHandler();
+              break;
+            case "openExternal":
+              if (message.text) {
+                vscode.env.openExternal(vscode.Uri.parse(message.text));
+              }
               break;
             case "update-model-event":
               await this.orchestrator.publish("onModelChange", message);
@@ -776,6 +785,30 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   theme: message.message,
                 },
               );
+              break;
+
+            case "font-family-change-event":
+              // Handle font family change and update VS Code settings
+              this.logger.info(`Font family changed to: ${message.message}`);
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "font.family",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "font-size-change-event":
+              // Handle font size change and update VS Code settings
+              this.logger.info(`Font size changed to: ${message.message}`);
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "chatview.font.size",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
               break;
 
             case "open-codebuddy-settings":

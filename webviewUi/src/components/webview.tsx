@@ -20,9 +20,10 @@ import { FutureFeatures } from "./futureFeatures";
 import MessageRenderer from "./MessageRenderer";
 import { UserMessage } from "./personMessage";
 import { Settings } from "./settings";
-import { SettingsPanel, SettingsGearIcon, SettingsValues, SettingsOptions, SettingsHandlers, DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS, CustomRule, SubagentConfig } from "./settings/index";
+import { SettingsPanel, SettingsGearIcon, SettingsValues, SettingsOptions, SettingsHandlers, DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS, DEFAULT_FONT_FAMILY_OPTIONS, DEFAULT_FONT_SIZE_OPTIONS, CustomRule, SubagentConfig } from "./settings/index";
 import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
+import { News } from "./news/News";
 
 // Styled components for settings toggle
 const SettingsToggleButton = styled.button`
@@ -70,6 +71,8 @@ interface ConfigData {
   username?: string;
   theme?: string;
   enableStreaming?: boolean;
+  fontFamily?: string;
+  fontSize?: number;
 }
 
 export const WebviewUI = () => {
@@ -81,13 +84,14 @@ export const WebviewUI = () => {
   const [commandAction, setCommandAction] = useState<string>("");
   const [commandDescription, setCommandDescription] = useState<string>("");
   const [isCommandExecuting, setIsCommandExecuting] = useState(false);
-  const [activeTab, setActiveTab] = useState("tab-1");
   const [selectedContext, setSelectedContext] = useState("");
   const [folders, setFolders] = useState<any>("");
   const [activeEditor, setActiveEditor] = useState("");
   const [username, setUsername] = useState("");
   const [darkMode, setDarkMode] = useState(false);
   const [enableStreaming, setEnableStreaming] = useState(true);
+  const [fontFamily, setFontFamily] = useState("JetBrains Mono");
+  const [fontSize, setFontSize] = useState(16);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [newsItems, setNewsItems] = useState<any[]>([]);
   
@@ -219,6 +223,12 @@ export const WebviewUI = () => {
         if (data.enableStreaming !== undefined) {
           setEnableStreaming(data.enableStreaming);
         }
+        if (data.fontFamily) {
+          setFontFamily(data.fontFamily);
+        }
+        if (data.fontSize !== undefined) {
+          setFontSize(data.fontSize);
+        }
         break;
       }
 
@@ -261,6 +271,12 @@ export const WebviewUI = () => {
     updateStyles(chatCss);
   }, [chatCss]);
 
+  // Apply font settings to CSS variables
+  useEffect(() => {
+    document.documentElement.style.setProperty('--codebuddy-font-family', `"${fontFamily}", "Fira Code", monospace`);
+    document.documentElement.style.setProperty('--codebuddy-font-size', `${fontSize}px`);
+  }, [fontFamily, fontSize]);
+
   // Initialize legacy event listener
   useEffect(() => {
     window.addEventListener("message", legacyMessageHandler);
@@ -293,11 +309,14 @@ export const WebviewUI = () => {
     }
   }, [isStreaming, isBotLoading]);
 
-  const handleDismissNews = useCallback(() => {
-    const ids = newsItems.map((item: any) => item.id);
-    vsCode.postMessage({ command: "news-mark-read", ids });
-    setNewsItems([]);
-  }, [newsItems]);
+  const handleMarkAsRead = useCallback((id: number) => {
+    vsCode.postMessage({ command: "news-mark-read", ids: [id] });
+    setNewsItems(prev => prev.filter(item => item.id !== id));
+  }, []);
+
+  const handleRefreshNews = useCallback(() => {
+    vsCode.postMessage({ command: "news-refresh" });
+  }, []);
 
   const handleClearHistory = useCallback(() => {
     clearMessages();
@@ -305,6 +324,10 @@ export const WebviewUI = () => {
 
   const handleIndexWorkspace = useCallback(() => {
     vsCode.postMessage({ command: "index-workspace" });
+  }, []);
+
+  const handleOpenUrl = useCallback((url: string) => {
+    vsCode.postMessage({ command: "openExternal", text: url });
   }, []);
 
   const handleUserPreferences = useCallback(() => {
@@ -391,13 +414,15 @@ export const WebviewUI = () => {
     nickname: username,
     codeBuddyMode: selectedCodeBuddyMode,
     enableStreaming: enableStreaming,
+    fontFamily: fontFamily,
+    fontSize: fontSize,
     selectedModel: selectedModel,
     username: username,
     accountType: 'Free',
     customRules: customRules,
     customSystemPrompt: customSystemPrompt,
     subagents: subagents,
-  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, selectedModel, customRules, customSystemPrompt, subagents]);
+  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, selectedModel, customRules, customSystemPrompt, subagents]);
 
   const settingsOptions = useMemo<SettingsOptions>(() => ({
     themeOptions: themeOptions,
@@ -405,6 +430,8 @@ export const WebviewUI = () => {
     codeBuddyModeOptions: codeBuddyMode,
     keymapOptions: DEFAULT_KEYMAP_OPTIONS,
     languageOptions: DEFAULT_LANGUAGE_OPTIONS,
+    fontFamilyOptions: DEFAULT_FONT_FAMILY_OPTIONS,
+    fontSizeOptions: DEFAULT_FONT_SIZE_OPTIONS,
   }), []);
 
   const settingsHandlers = useMemo<SettingsHandlers>(() => ({
@@ -427,6 +454,14 @@ export const WebviewUI = () => {
     },
     onStreamingChange: (enabled: boolean) => {
       setEnableStreaming(enabled);
+    },
+    onFontFamilyChange: (value: string) => {
+      setFontFamily(value);
+      vsCode.postMessage({ command: "font-family-change-event", message: value });
+    },
+    onFontSizeChange: (value: number) => {
+      setFontSize(value);
+      vsCode.postMessage({ command: "font-size-change-event", message: value });
     },
     onModelChange: (value: string) => {
       setSelectedModel(value);
@@ -465,7 +500,7 @@ export const WebviewUI = () => {
   }), []);
 
   return (
-    <div style={{ overflow: "hidden", width: "100%" }}>
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Settings Toggle Button */}
       <SettingsToggleButton
         onClick={() => setIsSettingsOpen(true)}
@@ -486,201 +521,146 @@ export const WebviewUI = () => {
         settingsHandlers={settingsHandlers}
       />
 
-      <VSCodePanels className="vscodePanels" activeid={activeTab}>
-        <VSCodePanelTab id="tab-1" onClick={() => setActiveTab("tab-1")}>
-          CHAT
-        </VSCodePanelTab>
-        <VSCodePanelTab id="tab-2" onClick={() => setActiveTab("tab-2")}>
-          SETTINGS
-        </VSCodePanelTab>
-        <VSCodePanelTab id="tab-3" onClick={() => setActiveTab("tab-3")}>
-          EXTENSIONS
-        </VSCodePanelTab>
-        <VSCodePanelTab id="tab-4" onClick={() => setActiveTab("tab-4")}>
-          FAQ
-        </VSCodePanelTab>
-        <VSCodePanelTab id="tab-5" onClick={() => setActiveTab("tab-5")}>
-          FUTURE
-        </VSCodePanelTab>
-        <VSCodePanelView id="view-1" style={{ height: "calc(100vh - 55px)", position: "relative" }}>
-          <div className="chat-content" style={{ maxWidth: "1100px", margin: "0 auto" }}>
-            <div className="dropdown-container">
-              {newsItems.length > 0 && (
-                <div style={{
-                  margin: "16px 20px",
-                  backgroundColor: "var(--vscode-sideBar-background)",
-                  border: "1px solid var(--vscode-widget-border)",
-                  borderRadius: "8px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
-                  overflow: "hidden"
-                }}>
-                  <div style={{
-                    padding: "10px 16px",
-                    borderBottom: "1px solid var(--vscode-widget-border)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    backgroundColor: "var(--vscode-editor-inactiveSelectionBackground)"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span className="codicon codicon-bell" style={{ fontSize: "14px" }}></span>
-                      <h3 style={{ margin: 0, fontSize: "12px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                        Daily Briefing
-                      </h3>
-                    </div>
-                    <VSCodeButton appearance="icon" aria-label="Dismiss" onClick={handleDismissNews}>
-                      <span className="codicon codicon-close"></span>
-                    </VSCodeButton>
-                  </div>
-                  <div style={{ padding: "0" }}>
-                    {newsItems.map((item: any, index: number) => (
-                      <div key={index} style={{
-                        padding: "12px 16px",
-                        borderBottom: index < newsItems.length - 1 ? "1px solid var(--vscode-input-border)" : "none",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "6px"
-                      }}>
-                        <a href={item.url} style={{
-                          color: "var(--vscode-textLink-foreground)",
-                          textDecoration: "none",
-                          fontSize: "14px",
-                          fontWeight: "500",
-                          lineHeight: "1.4"
-                        }}>
-                          {item.title}
-                        </a>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", opacity: 0.7 }}>
-                          <span style={{ fontWeight: "600" }}>{item.source}</span>
-                          <span>•</span>
-                          <span>{item.published_at ? new Date(item.published_at).toLocaleDateString() : 'Just now'}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div>
-                {/* Show welcome screen when there are no messages and no news items */}
-                {streamedMessages.length === 0 && !isBotLoading && !isCommandExecuting && newsItems.length === 0 ? (
-                  <WelcomeScreen
-                    username={username}
-                    onGetStarted={() => {
-                      // Optional: Focus on the input or trigger a sample prompt
-                      console.log("User is ready to start!");
-                    }}
-                  />
-                ) : (
-                  <>
-                    {memoizedMessages}
-                    {/* Show Agent timeline when streaming/working */}
-                    {(isStreaming || isBotLoading) && (
-                      <AgentTimeline
-                        timeline={timeline}
-                        isActive={isStreaming || isBotLoading}
-                        pendingApproval={pendingApproval}
-                        onApprove={handleApproveAction}
-                        onDeny={() => vsCode.postMessage({ command: "user-consent", message: "denied" })}
-                        isLive
-                      />
-                    )}
-                    {/* Render timeline snapshots for completed bot messages */}
-                    {streamedMessages
-                      .filter((m) => m.type === "bot" && m.timelineSnapshot)
-                      .map((m) => (
+      <VSCodePanels className="vscodePanels" activeid="tab-1">
+        <VSCodePanelTab id="tab-1">CHAT</VSCodePanelTab>
+        <VSCodePanelTab id="tab-2">SETTINGS</VSCodePanelTab>
+        <VSCodePanelTab id="tab-3">EXTENSIONS</VSCodePanelTab>
+        <VSCodePanelTab id="tab-4">FAQ</VSCodePanelTab>
+        <VSCodePanelTab id="tab-5">FUTURE</VSCodePanelTab>
+        <VSCodePanelTab id="tab-6">NEWS</VSCodePanelTab>
+        <VSCodePanelView id="view-1">
+          <div className="panel-body-scroll">
+            <div className="chat-content">
+              <div className="dropdown-container">
+                <div style={{ minWidth: 0, maxWidth: "100%" }}>
+                  {/* Show welcome screen when there are no messages */}
+                  {streamedMessages.length === 0 && !isBotLoading && !isCommandExecuting ? (
+                    <WelcomeScreen
+                      username={username}
+                      onGetStarted={() => {
+                        // Optional: Focus on the input or trigger a sample prompt
+                        console.log("User is ready to start!");
+                      }}
+                    />
+                  ) : (
+                    <>
+                      {memoizedMessages}
+                      {/* Show Agent timeline when streaming/working */}
+                      {(isStreaming || isBotLoading) && (
                         <AgentTimeline
-                          key={`timeline-${m.id}`}
-                          timeline={m.timelineSnapshot!}
-                          isActive={false}
-                          isLive={false}
+                          timeline={timeline}
+                          isActive={isStreaming || isBotLoading}
+                          pendingApproval={pendingApproval}
+                          onApprove={handleApproveAction}
+                          onDeny={() => vsCode.postMessage({ command: "user-consent", message: "denied" })}
+                          isLive
                         />
-                      ))}
-                    {isCommandExecuting && (
-                      <CommandFeedbackLoader
-                        commandAction={commandAction}
-                        commandDescription={commandDescription}
-                      />
-                    )}
-                    {/* Show skeleton only if no activities are being tracked */}
-                    {isBotLoading &&
-                      !isCommandExecuting &&
-                      !isStreaming &&
-                      !timeline.thinking &&
-                      !timeline.plan &&
-                      timeline.actions.length === 0 &&
-                      !timeline.summarizing && <SkeletonLoader />}
-                  </>
-                )}
+                      )}
+                      {/* Render timeline snapshots for completed bot messages */}
+                      {streamedMessages
+                        .filter((m) => m.type === "bot" && m.timelineSnapshot)
+                        .map((m) => (
+                          <AgentTimeline
+                            key={`timeline-${m.id}`}
+                            timeline={m.timelineSnapshot!}
+                            isActive={false}
+                            isLive={false}
+                          />
+                        ))}
+                      {isCommandExecuting && (
+                        <CommandFeedbackLoader
+                          commandAction={commandAction}
+                          commandDescription={commandDescription}
+                        />
+                      )}
+                      {/* Show skeleton only if no activities are being tracked */}
+                      {isBotLoading &&
+                        !isCommandExecuting &&
+                        !isStreaming &&
+                        !timeline.thinking &&
+                        !timeline.plan &&
+                        timeline.actions.length === 0 &&
+                        !timeline.summarizing && <SkeletonLoader />}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </VSCodePanelView>
 
         <VSCodePanelView id="view-2">
-          <Settings
-            username={username}
-            selectedTheme={selectedTheme}
-            selectedModel={selectedModel}
-            selectedCodeBuddyMode={selectedCodeBuddyMode}
-            enableStreaming={enableStreaming}
-            darkMode={darkMode}
-            themeOptions={themeOptions}
-            modelOptions={modelOptions}
-            codeBuddyMode={codeBuddyMode}
-            onUsernameChange={setUsername}
-            onThemeChange={(value) => {
-              setSelectedTheme(value);
-              vsCode.postMessage({ command: "theme-change-event", message: value });
-            }}
-            onModelChange={(value) => {
-              setSelectedModel(value);
-              vsCode.postMessage({ command: "update-model-event", message: value });
-            }}
-            onCodeBuddyModeChange={(value) => {
-              setSelectedCodeBuddyMode(value);
-              vsCode.postMessage({ command: "codebuddy-model-change-event", message: value });
-            }}
-            onStreamingChange={setEnableStreaming}
-            onDarkModeChange={handleToggle}
-            onClearHistory={handleClearHistory}
-            onIndexWorkspace={handleIndexWorkspace}
-            onSavePreferences={handleUserPreferences}
-          />
+          <div className="panel-body-scroll">
+            <Settings
+              username={username}
+              selectedTheme={selectedTheme}
+              selectedModel={selectedModel}
+              selectedCodeBuddyMode={selectedCodeBuddyMode}
+              enableStreaming={enableStreaming}
+              darkMode={darkMode}
+              themeOptions={themeOptions}
+              modelOptions={modelOptions}
+              codeBuddyMode={codeBuddyMode}
+              onUsernameChange={setUsername}
+              onThemeChange={(value) => {
+                setSelectedTheme(value);
+                vsCode.postMessage({ command: "theme-change-event", message: value });
+              }}
+              onModelChange={(value) => {
+                setSelectedModel(value);
+                vsCode.postMessage({ command: "update-model-event", message: value });
+              }}
+              onCodeBuddyModeChange={(value) => {
+                setSelectedCodeBuddyMode(value);
+                vsCode.postMessage({ command: "codebuddy-model-change-event", message: value });
+              }}
+              onStreamingChange={setEnableStreaming}
+              onDarkModeChange={handleToggle}
+              onClearHistory={handleClearHistory}
+              onIndexWorkspace={handleIndexWorkspace}
+              onSavePreferences={handleUserPreferences}
+            />
+          </div>
         </VSCodePanelView>
 
         <VSCodePanelView id="view-3">
-          <Extensions
-            onAddMCPServer={(server) => console.log('Add server:', server)}
-            onAddAgent={(agent) => console.log('Add agent:', agent)}
-          />
+          <div className="panel-body-scroll">
+            <Extensions
+              onAddMCPServer={(server) => console.log('Add server:', server)}
+              onAddAgent={(agent) => console.log('Add agent:', agent)}
+            />
+          </div>
         </VSCodePanelView>
 
         <VSCodePanelView id="view-4">
-          <div>
-            <VSCodePanelView id="view-4">
-              <div>
-                <VSCodePanelView id="view-4">
-                  <div>
-                    <FAQAccordion items={faqItems} />
-                  </div>
-                </VSCodePanelView>
-              </div>
-            </VSCodePanelView>
+          <div className="panel-body-scroll">
+            <FAQAccordion items={faqItems} />
           </div>
         </VSCodePanelView>
         <VSCodePanelView id="view-5">
-          <FutureFeatures />
+          <div className="panel-body-scroll">
+            <FutureFeatures />
+          </div>
+        </VSCodePanelView>
+        
+        <VSCodePanelView id="view-6">
+          <div className="panel-body-scroll">
+            <News 
+              newsItems={newsItems} 
+              onMarkAsRead={handleMarkAsRead}
+              onRefresh={handleRefreshNews}
+              onOpenUrl={handleOpenUrl}
+            />
+          </div>
         </VSCodePanelView>
       </VSCodePanels>
 
       <div
         className="business"
         style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
           padding: "10px",
           backgroundColor: "#16161e",
+          flexShrink: 0,
         }}
       >
         <div className="textarea-container">

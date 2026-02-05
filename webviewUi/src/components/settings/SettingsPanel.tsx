@@ -112,6 +112,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     nickname: username,
     codeBuddyMode: 'Agent',
     enableStreaming: true,
+    fontFamily: 'JetBrains Mono',
+    fontSize: 16,
     selectedModel: 'Gemini',
     username: username,
     accountType: accountType,
@@ -126,6 +128,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     codeBuddyModeOptions: [],
     keymapOptions: [],
     languageOptions: [],
+    fontFamilyOptions: [],
+    fontSizeOptions: [],
   };
 
   const defaultHandlers: SettingsHandlers = {
@@ -135,6 +139,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     onNicknameChange: () => {},
     onCodeBuddyModeChange: () => {},
     onStreamingChange: () => {},
+    onFontFamilyChange: () => {},
+    onFontSizeChange: () => {},
     onModelChange: () => {},
     onUsernameChange: () => {},
     postMessage: () => {},

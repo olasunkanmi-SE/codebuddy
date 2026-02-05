@@ -28,6 +28,8 @@ export interface SettingsValues {
   nickname: string;
   codeBuddyMode: string;
   enableStreaming: boolean;
+  fontFamily: string;
+  fontSize: number;
   
   // Models
   selectedModel: string;
@@ -54,6 +56,8 @@ export interface SettingsOptions {
   codeBuddyModeOptions: SelectOption[];
   keymapOptions: SelectOption[];
   languageOptions: SelectOption[];
+  fontFamilyOptions: SelectOption[];
+  fontSizeOptions: SelectOption[];
 }
 
 // Change handlers
@@ -64,6 +68,8 @@ export interface SettingsHandlers {
   onNicknameChange: (value: string) => void;
   onCodeBuddyModeChange: (value: string) => void;
   onStreamingChange: (enabled: boolean) => void;
+  onFontFamilyChange: (value: string) => void;
+  onFontSizeChange: (value: number) => void;
   onModelChange: (value: string) => void;
   onUsernameChange: (value: string) => void;
   postMessage: (message: { command: string; message?: any }) => void;
@@ -98,6 +104,31 @@ const DEFAULT_KEYMAP_OPTIONS: SelectOption[] = [
   { value: 'vim', label: 'Vim' },
   { value: 'emacs', label: 'Emacs' },
   { value: 'sublime', label: 'Sublime Text' },
+];
+
+const DEFAULT_FONT_FAMILY_OPTIONS: SelectOption[] = [
+  { value: 'Montserrat', label: 'Montserrat' },
+  { value: 'SF Mono', label: 'SF Mono' },
+  { value: 'Space Mono', label: 'Space Mono' },
+  { value: 'Fira Code', label: 'Fira Code' },
+  { value: 'Source Code Pro', label: 'Source Code Pro' },
+  { value: 'JetBrains Mono', label: 'JetBrains Mono' },
+  { value: 'Roboto Mono', label: 'Roboto Mono' },
+  { value: 'Ubuntu Mono', label: 'Ubuntu Mono' },
+  { value: 'IBM Plex Mono', label: 'IBM Plex Mono' },
+  { value: 'Inconsolata', label: 'Inconsolata' },
+];
+
+const DEFAULT_FONT_SIZE_OPTIONS: SelectOption[] = [
+  { value: '12', label: '12px' },
+  { value: '13', label: '13px' },
+  { value: '14', label: '14px' },
+  { value: '15', label: '15px' },
+  { value: '16', label: '16px' },
+  { value: '18', label: '18px' },
+  { value: '20', label: '20px' },
+  { value: '22', label: '22px' },
+  { value: '24', label: '24px' },
 ];
 
 // Default subagents matching the ToolProvider TOOL_ROLE_MAPPING
@@ -141,6 +172,8 @@ const defaultContextValue: SettingsContextType = {
     nickname: '',
     codeBuddyMode: 'Agent',
     enableStreaming: true,
+    fontFamily: 'JetBrains Mono',
+    fontSize: 16,
     selectedModel: 'Gemini',
     username: '',
     accountType: 'Free',
@@ -154,6 +187,8 @@ const defaultContextValue: SettingsContextType = {
     codeBuddyModeOptions: [],
     keymapOptions: DEFAULT_KEYMAP_OPTIONS,
     languageOptions: DEFAULT_LANGUAGE_OPTIONS,
+    fontFamilyOptions: DEFAULT_FONT_FAMILY_OPTIONS,
+    fontSizeOptions: DEFAULT_FONT_SIZE_OPTIONS,
   },
   handlers: {
     onThemeChange: () => {},
@@ -162,6 +197,8 @@ const defaultContextValue: SettingsContextType = {
     onNicknameChange: () => {},
     onCodeBuddyModeChange: () => {},
     onStreamingChange: () => {},
+    onFontFamilyChange: () => {},
+    onFontSizeChange: () => {},
     onModelChange: () => {},
     onUsernameChange: () => {},
     postMessage: () => {},
@@ -197,6 +234,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
       ...options,
       keymapOptions: options.keymapOptions || DEFAULT_KEYMAP_OPTIONS,
       languageOptions: options.languageOptions || DEFAULT_LANGUAGE_OPTIONS,
+      fontFamilyOptions: options.fontFamilyOptions || DEFAULT_FONT_FAMILY_OPTIONS,
+      fontSizeOptions: options.fontSizeOptions || DEFAULT_FONT_SIZE_OPTIONS,
     },
     handlers,
   };
@@ -218,4 +257,4 @@ export const useSettings = (): SettingsContextType => {
 };
 
 // Export default options for reuse
-export { DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS };
+export { DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS, DEFAULT_FONT_FAMILY_OPTIONS, DEFAULT_FONT_SIZE_OPTIONS };
