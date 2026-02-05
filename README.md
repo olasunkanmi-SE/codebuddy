@@ -1,144 +1,202 @@
 # CodeBuddy
 
-An AI-powered coding assistant for Visual Studio Code featuring agentic architecture, multi-model support, local model integration, and intelligent codebase understanding.
+CodeBuddy is an AI-powered coding assistant for Visual Studio Code featuring multi-agent architecture, nine AI provider integrations, local model support, and intelligent codebase understanding. It functions as an autonomous pair programmer capable of planning, executing, and debugging complex development tasks.
 
-**CodeBuddy** is an advanced AI-powered VS Code extension featuring a **Multi-Agent System**, **Terminal Integration**, and **Local LLM Support**. It transforms your development workflow by acting as a full-fledged autonomous pair programmer that can plan, execute, test, and debug complex tasks.
+## Overview
 
-## What's New in v3.8.x
+CodeBuddy enhances developer productivity through AI-powered code assistance, providing intelligent code review, refactoring suggestions, optimization recommendations, and interactive chat capabilities. The extension supports both cloud-based and local AI models, enabling developers to choose the right balance of capability, speed, and privacy for their workflow.
 
-- **Terminal Integration** - Agents can now execute shell commands (builds, tests, git) with real-time output streaming and safety guards.
-- **Expanded Agent Team** - New specialized agents: **Architect**, **Reviewer**, and **Tester** join the existing team.
-- **Collaboration Protocols** - Agents follow structured playbooks for New Features, Bug Fixes, and Refactoring.
-- **Local LLM Support** - Full support for Ollama and LM Studio (OpenAI-compatible endpoints).
-- **New Model Support** - Added support for Qwen, GLM-4, and DeepSeek-R1/V3.
+## Key Features
 
-The extension supports nine AI providers including cloud-based models (Gemini, Anthropic Claude, OpenAI, Groq, DeepSeek, Qwen, GLM) and local models via Ollama, giving developers flexibility in choosing the right model for their privacy and performance requirements.
+### Multi-Agent System
 
-### The Agent Team
+CodeBuddy employs specialized agents that collaborate on complex tasks:
 
-- **Project Manager (Main Agent)**: Orchestrates the workflow and delegates tasks.
-- **Architect**: Designs scalable systems, selects patterns, and creates ADRs.
-- **Reviewer**: Enforces code quality, security standards, and best practices.
-- **Tester**: Writes and executes unit/integration tests to ensure stability.
-- **Debugger**: Investigates root causes of errors and proposes fixes.
-- **Code Analyzer**: Deeply scans codebase for anti-patterns and complexity.
-- **Doc Writer**: Generates comprehensive documentation and API references.
-- **File Organizer**: Refactors directory structures and cleans up projects.
+- **Project Manager**: Orchestrates workflow and delegates tasks to specialized agents
+- **Architect**: Designs scalable systems, selects patterns, and creates architecture decision records
+- **Reviewer**: Enforces code quality, security standards, and best practices
+- **Tester**: Writes and validates unit and integration tests
+- **Debugger**: Investigates root causes and proposes fixes
+- **Code Analyzer**: Scans codebase for anti-patterns and complexity issues
+- **Documentation Writer**: Generates comprehensive documentation and API references
+- **File Organizer**: Refactors directory structures and manages project organization
 
-### Smart Context Selection
+### Dual Operating Modes
 
-## Core Features
+**Chat Mode**: Traditional question-and-answer interaction for quick queries, code explanations, and getting code snippets without file modifications.
 
-### Terminal Integration (New!)
-CodeBuddy can now **run commands directly in your terminal**.
-- **Execution**: Run `npm test`, `git status`, `docker build`, or any shell command.
-- **Visibility**: Watch real-time output in the dedicated "CodeBuddy Terminal" channel.
-- **Safety First**: Every command requires **explicit user confirmation** via a modal dialog before running.
-- **Feedback Loop**: Agents read command output (e.g., build errors) to self-correct.
+**Agent Mode**: Autonomous execution with full tool access including file operations, terminal commands, web search, and codebase analysis. Changes can be reviewed before application.
 
-### Collaboration Playbooks
-Agents don't just work in isolation; they follow strict protocols:
-1.  **New Feature**: Architect designs -> Developer implements -> Tester verifies -> Reviewer approves.
-2.  **Bug Fix**: Debugger finds cause -> Developer fixes -> Tester prevents regression.
-3.  **Refactoring**: Analyzer identifies issues -> Architect plans -> File Organizer executes -> Tester validates.
+### AI Provider Support
 
-### Local LLM Privacy
-Run completely offline with local models:
-- **Ollama / LM Studio**: Point CodeBuddy to your local server (e.g., `http://localhost:11434/v1`).
-- **Privacy**: Your code never leaves your machine when using local models.
-- **Zero Cost**: No API fees when running Llama 3, Qwen, or DeepSeek locally.
+CodeBuddy supports nine AI providers:
 
-### Deep Code Understanding
-- **RAG & Embeddings**: Vector-based search for semantic understanding of your codebase.
-- **Hybrid Storage**:
-    - `/workspace/`: Real-time file operations.
-    - `/docs/`: Persistent long-term memory (SQLite).
-    - `/`: Ephemeral session context.
+| Provider  | Default Model           | Capabilities                      |
+| --------- | ----------------------- | --------------------------------- |
+| Gemini    | gemini-2.5-pro          | Long context, general coding      |
+| Anthropic | claude-sonnet-4-5       | Complex architecture, refactoring |
+| OpenAI    | gpt-4o                  | Reasoning, planning               |
+| DeepSeek  | deepseek-chat           | Cost-effective coding             |
+| Qwen      | qwen-max                | Strong open-weight performance    |
+| Groq      | llama-3.1-70b-versatile | Ultra-fast inference              |
+| GLM       | glm-4                   | Chinese and English support       |
+| XGrok     | grok                    | Alternative reasoning             |
+| Local     | qwen2.5-coder           | Privacy-first, offline capable    |
 
-### Model Context Protocol (Beta)
-Connect CodeBuddy to external tools and data sources using the open standard **MCP**.
-- **Unified Tooling**: Access database, git, and other tools through a single protocol.
-- **Extensibility**: Add any MCP-compliant server to extend CodeBuddy's capabilities.
-- **Future-Proof**: Ready for the next generation of AI-tool integration.
+### Local Model Integration
 
----
+Run completely offline with local models via Ollama or LM Studio:
 
-## Quick Start
+- Full Agent mode support with local models
+- Zero API costs for unlimited usage
+- Code never leaves your machine
+- Supports Qwen 2.5 Coder, Llama 3.2, DeepSeek Coder, and other OpenAI-compatible models
 
-### Installation
-You can install **CodeBuddy** from your preferred registry:
-- [**VS Code Marketplace**](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
-- [**Open VSX Registry**](https://open-vsx.org/extension/fiatinnovations/ola-code-buddy)
+### Terminal Integration
 
-Alternatively, search for "CodeBuddy" in your editor's extension manager.
+Agents can execute shell commands directly:
 
-### Configuration
-Configure your preferred AI provider in VS Code Settings:
+- Run builds, tests, git operations, and any shell command
+- Real-time output streaming in dedicated terminal channel
+- Safety guards with user confirmation before execution
+- Feedback loop for self-correction based on command output
 
-**1. Cloud Providers (Recommended for best performance)**
-- **Gemini**: `gemini-2.5-pro` (Great balance of speed/quality)
-- **Anthropic**: `claude-3-5-sonnet` (Top-tier coding capability)
-- **Groq**: `llama-3.1-70b` (Insanely fast)
-- **DeepSeek**: `deepseek-chat` (Cost-effective)
+### Diff Review System
 
-**2. Local LLMs (Ollama/LM Studio)**
-Set the following in your `settings.json`:
+File changes made by the agent are tracked and reviewable:
+
+- Side-by-side diff viewer in VS Code
+- Apply or reject individual changes
+- Recent changes history panel
+- Optional approval mode requiring explicit confirmation before file writes
+
+### Model Context Protocol (MCP)
+
+Extend CodeBuddy's capabilities through the open MCP standard:
+
+- Connect external tools and data sources
+- Add custom MCP servers for specialized functionality
+- Unified protocol for AI-tool integration
+
+### Project Rules
+
+Customize agent behavior with project-specific rules:
+
+- Define coding conventions and guidelines in `.codebuddy/rules.md`
+- Create custom rules via the Settings UI
+- Toggle rules on/off without deletion
+- Rules are appended to the agent's system prompt
+
+### Inline Completions
+
+Ghost text suggestions as you type:
+
+- Configurable completion provider (can differ from chat provider)
+- Debounce and token limit controls
+- Manual or automatic trigger modes
+
+### Context Management
+
+Intelligent context handling for relevant responses:
+
+- Automatic active file inclusion
+- @ mention syntax for adding specific files
+- Token budget awareness based on model limits
+- Semantic search over indexed codebase
+- Priority system: @mentioned files, active file, auto-gathered context
+
+## Installation
+
+Install from your preferred registry:
+
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=fiatinnovations.ola-code-buddy)
+- [Open VSX Registry](https://open-vsx.org/extension/fiatinnovations/ola-code-buddy)
+
+Alternatively, search for "CodeBuddy" in the VS Code extension manager.
+
+## Configuration
+
+### Cloud Providers
+
+1. Open VS Code Settings (File > Preferences > Settings)
+2. Search for "CodeBuddy"
+3. Select your preferred AI provider from the dropdown
+4. Enter your API key in the appropriate field
+
+### Local Models
+
+Configure for Ollama or LM Studio:
+
 ```json
 {
-  "codebuddy.local.baseUrl": "http://localhost:11434/v1", // Default for Ollama
-  "codebuddy.local.model": "qwen2.5-coder:latest",
-  "codebuddy.generativeAi.option": "Local"
+  "generativeAi.option": "Local",
+  "local.baseUrl": "http://localhost:11434/v1",
+  "local.model": "qwen2.5-coder"
 }
 ```
 
----
+For Docker-based Ollama:
 
-## Capabilities & Commands
+```
+docker compose -f docker-compose.yml up -d
+docker exec -it ollama ollama pull qwen2.5-coder
+```
 
-### Shortcuts
-| Command | Shortcut | Description |
-| :--- | :--- | :--- |
-| **Inline Chat** | `Cmd+I` / `Ctrl+I` | Ask questions about selected code |
-| **Review Code** | `Cmd+Shift+R` | Deep quality & security review |
-| **Explain** | `Cmd+Shift+E` | Explain complex logic |
-| **Add Tests** | `Cmd+Shift+T` | Generate unit tests |
-| **Fix Bugs** | `Cmd+Shift+F` | Analyze and fix selected error |
+## Settings Panel
 
-### Supported Models
-| Provider | Models | Best For |
-| :--- | :--- | :--- |
-| **Anthropic** | Claude 3.5 Sonnet, Opus | Complex Architecture, Refactoring |
-| **Gemini** | Gemini 1.5 Pro/Flash | Long Context, General Coding |
-| **OpenAI** | GPT-4o, o1-preview | Reasoning, Planning |
-| **DeepSeek** | DeepSeek-V3, R1 | Cost-Efficiency |
-| **Qwen** | Qwen 2.5 Coder | Open Source Leader |
-| **Local** | Llama 3, Mistral, etc. | Privacy, Offline |
+Access comprehensive settings via the gear icon in the sidebar:
 
----
+- **Account**: Profile and account information
+- **General**: Theme, language, font settings, nickname, streaming preferences
+- **Agents**: Auto-approve actions, file/terminal permissions, verbose logging
+- **MCP**: Model Context Protocol server management
+- **Conversation**: Chat display preferences and history management
+- **Models**: AI model selection and configuration
+- **Context**: Workspace indexing, context window size, file inclusion settings
+- **Rules and Subagents**: Custom rules and specialized agent configuration
+- **Privacy**: Data privacy settings and clear data options
+- **Beta**: Experimental features
+- **About**: Version information and links
+
+## Data Storage
+
+CodeBuddy stores data locally in a `.codebuddy` folder at your workspace root:
+
+- Chat history in JSON format
+- Codebase analysis database (SQLite)
+- Project rules and configuration
+- Logs and session data
+
+This folder is automatically added to `.gitignore` to prevent committing sensitive data.
 
 ## Troubleshooting
 
-**"Command Execution Failed"**
-- Ensure you approved the command in the popup modal.
-- Check the "CodeBuddy Terminal" output channel for stderr details.
+**Connection Issues with Local Models**
 
-**Local LLM Connection Refused**
-- Ensure Ollama/LM Studio is running.
-- Verify the port (default `11434` for Ollama, `1234` for LM Studio).
-- Check `codebuddy.local.baseUrl` setting.
+- Verify Ollama or LM Studio is running
+- Check the port configuration (default: 11434 for Ollama, 1234 for LM Studio)
+- Confirm the `local.baseUrl` setting matches your server
 
-**Agent Loop / Getting Stuck**
-- Use the "Stop" button in the chat interface.
-- Clear context using the broom icon.
+**Agent Not Responding**
 
----
+- Use the Stop button in the chat interface
+- Clear chat history via Settings > Privacy
+- Check the CodeBuddy output channel (View > Output > CodeBuddy)
+
+**API Key Errors**
+
+- Verify your API key is correctly entered in settings
+- Ensure the selected model matches your API key provider
+- Check for network connectivity for cloud providers
 
 ## Contributing
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Contributions are welcome. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
-MIT License - see [LICENSE](LICENSE).
+
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
-**Made with by [Olasunkanmi Raymond](https://olasunkanmi.app)**
-_CodeBuddy: Your AI Pair Programmer._
+
+**Repository**: [github.com/olasunkanmi-SE/codebuddy](https://github.com/olasunkanmi-SE/codebuddy)
