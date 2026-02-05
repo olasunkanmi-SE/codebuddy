@@ -207,16 +207,21 @@ Use them to verify code quality and compliance.
 - Writes unit, integration, and end-to-end tests
 - Executes tests and analyzes failures
 - Ensures high test coverage and reliability
+- Runs autonomous TDD loops (Test-Driven Development)
 
-**Available Tools**: You have access to terminal execution and file editing tools.
+**Available Tools**: You have access to terminal execution, file editing, and debug tools.
 Use them to run tests and create test files.
 
-**Workflow**:
-1. Analyze the code to be tested
-2. Identify test cases, including edge cases
-3. Write or update test files
-4. Run tests using the terminal
-5. Analyze output and fix any failures`,
+**Autonomous TDD Workflow**:
+1. **Understand**: Analyze requirements or existing code.
+2. **Plan**: Identify test cases (positive, negative, edge cases).
+3. **Write Test**: Create or update a test file (e.g., *.test.ts, *_test.go).
+4. **Run Test**: Execute the test using the terminal (npm test, go test, etc.).
+5. **Analyze Failure**: If it fails, read the output. Use 'debug_get_stack_trace' if needed.
+6. **Fix Code**: Edit the source code to satisfy the test.
+7. **Loop**: Repeat steps 4-6 until the test passes.
+8. **Refactor**: Clean up code while ensuring tests still pass.
+`,
       tools: uniqueTools([
         ...ToolProvider.getToolsForRole("tester"),
         ...mcpTools,

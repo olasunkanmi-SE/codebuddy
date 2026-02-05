@@ -405,6 +405,10 @@ export class ToolProvider {
     return ToolProvider.instance;
   }
 
+  public getTools(): StructuredTool<any>[] {
+    return this.tools;
+  }
+
   /**
    * Phase 1: Non-blocking MCP tool loading
    * Loads MCP tools in background without blocking extension startup

@@ -656,7 +656,8 @@
     "test": "vscode-test",
     "format": "prettier --write \"**/*.ts\"",
     "fix-chromadb": "npm uninstall chromadb && npm install chromadb@1.8.1",
-    "setup-chromadb-server": "echo 'Install ChromaDB server: pip install chromadb' && echo 'Start server: chroma run --host localhost --port 8000'"
+    "setup-chromadb-server": "echo 'Install ChromaDB server: pip install chromadb' && echo 'Start server: chroma run --host localhost --port 8000'",
+    "mcp-server": "node dist/MCP/server.js"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",

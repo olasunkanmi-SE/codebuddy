@@ -254,24 +254,51 @@ async function main() {
     metafile: true,
   });
 
+  // MCP Server bundle
+  const serverCtx = await esbuild.context({
+    entryPoints: ["src/MCP/server.ts"],
+    bundle: true,
+    external: [
+      "vscode",
+      "better-sqlite3",
+      "electron",
+      "@lancedb/lancedb",
+      "apache-arrow",
+      "web-tree-sitter",
+      "@vscode/ripgrep",
+    ],
+    format: "cjs",
+    target: "node16",
+    platform: "node",
+    minify: production,
+    sourcemap: !production,
+    outfile: "dist/MCP/server.js",
+    metafile: true,
+    logLevel: "info",
+    plugins: [nodeModulesPlugin, treeShakingPlugin],
+  });
+
   try {
     if (watch) {
       console.log("👀 Watching for changes...");
       await mainCtx.watch();
       await webviewCtx.watch();
+      await serverCtx.watch();
     } else {
       console.log("🚀 Building...");
       const startTime = Date.now();
-      const [mainResult, workerResult, webviewResult] = await Promise.all([
+      const [mainResult, workerResult, webviewResult, serverResult] = await Promise.all([
         mainCtx.rebuild(),
         workerCtx.rebuild(),
         webviewCtx.rebuild(),
+        serverCtx.rebuild(),
       ]);
       const duration = Date.now() - startTime;
       console.log(`\n✨ Build completed in ${duration}ms`);
       if (production) {
         const mainSize = fs.statSync("dist/extension.js").size / 1024;
         const workerSize = fs.statSync("dist/workers/ast-analyzer.worker.js").size / 1024;
+        const serverSize = fs.statSync("dist/MCP/server.js").size / 1024;
         const webviewSize = fs
           .readdirSync("dist/webview")
           .filter((f) => f.endsWith(".js"))
@@ -283,11 +310,13 @@ async function main() {
         console.log("\n📦 Bundle sizes:");
         console.log(`   Extension: ${mainSize.toFixed(2)}KB`);
         console.log(`   Worker:    ${workerSize.toFixed(2)}KB`);
+        console.log(`   Server:    ${serverSize.toFixed(2)}KB`);
         console.log(`   Webview:   ${webviewSize.toFixed(2)}KB`);
       }
       await mainCtx.dispose();
       await workerCtx.dispose();
       await webviewCtx.dispose();
+      await serverCtx.dispose();
     }
   } catch (error) {
     console.error("\n❌ Build failed:");
