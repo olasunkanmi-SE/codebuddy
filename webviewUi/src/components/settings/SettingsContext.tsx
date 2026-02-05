@@ -42,6 +42,7 @@ export interface SettingsValues {
   contextWindow: string;
   includeHidden: boolean;
   maxFileSize: string;
+  compactMode: boolean;
   
   // Models
   selectedModel: string;
@@ -90,6 +91,7 @@ export interface SettingsHandlers {
   onContextWindowChange: (value: string) => void;
   onIncludeHiddenChange: (enabled: boolean) => void;
   onMaxFileSizeChange: (value: string) => void;
+  onCompactModeChange: (enabled: boolean) => void;
   onReindexWorkspace: () => void;
   onModelChange: (value: string) => void;
   onUsernameChange: (value: string) => void;
@@ -203,6 +205,7 @@ const defaultContextValue: SettingsContextType = {
     contextWindow: '16k',
     includeHidden: false,
     maxFileSize: '1',
+    compactMode: false,
     selectedModel: 'Gemini',
     username: '',
     accountType: 'Free',
@@ -236,6 +239,7 @@ const defaultContextValue: SettingsContextType = {
     onContextWindowChange: () => {},
     onIncludeHiddenChange: () => {},
     onMaxFileSizeChange: () => {},
+    onCompactModeChange: () => {},
     onReindexWorkspace: () => {},
     onModelChange: () => {},
     onUsernameChange: () => {},

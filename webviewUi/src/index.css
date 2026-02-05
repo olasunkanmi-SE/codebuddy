@@ -1378,3 +1378,48 @@ vscode-panel-view[hidden] {
     transform: scale(1.2);
   }
 }
+
+
+/* Compact Mode Styles */
+.compact-mode .message-container {
+  margin-bottom: 8px;
+  padding: 10px;
+}
+
+.compact-mode .container {
+  gap: 8px;
+}
+
+.compact-mode .doc-content {
+  padding: 4px 0 12px;
+}
+
+.compact-mode .doc-content p {
+  margin: 6px 0;
+}
+
+.compact-mode .doc-content pre {
+  margin: 8px 0;
+  padding: 10px;
+}
+
+.compact-mode .code-block {
+  margin: 8px 0;
+}
+
+.compact-mode .code-header {
+  padding: 4px 12px;
+}
+
+.compact-mode .code-content {
+  padding: 10px;
+}
+
+.compact-mode .thinking-container {
+  margin: 8px 0;
+}
+
+.compact-mode .url-container {
+  padding: 10px;
+  grid-gap: 12px;
+}

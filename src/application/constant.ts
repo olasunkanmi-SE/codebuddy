@@ -71,6 +71,7 @@ export const APP_CONFIG = {
   chatview: "chatview.theme",
   chatviewFont: "chatview.font.size",
   tavilyApiKey: "tavily.apiKey",
+  compactMode: "codebuddy.compactMode",
 };
 
 export enum generativeAiModels {

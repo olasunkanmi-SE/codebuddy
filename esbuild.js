@@ -184,6 +184,30 @@ async function main() {
     plugins: [nodeModulesPlugin, treeShakingPlugin],
   });
 
+  // Worker bundle
+  const workerCtx = await esbuild.context({
+    entryPoints: ["src/workers/ast-analyzer.worker.ts"],
+    bundle: true,
+    external: [
+      "vscode",
+      "better-sqlite3",
+      "electron",
+      "@lancedb/lancedb",
+      "apache-arrow",
+      "web-tree-sitter",
+      "@vscode/ripgrep",
+    ],
+    format: "cjs",
+    target: "node16",
+    platform: "node",
+    minify: production,
+    sourcemap: !production,
+    outfile: "dist/workers/ast-analyzer.worker.js",
+    metafile: true,
+    logLevel: "info",
+    plugins: [nodeModulesPlugin, treeShakingPlugin],
+  });
+
   // Webview bundle
   const webviewCtx = await esbuild.context({
     entryPoints: ["webviewUi/src/main.tsx"],
@@ -238,14 +262,16 @@ async function main() {
     } else {
       console.log("🚀 Building...");
       const startTime = Date.now();
-      const [mainResult, webviewResult] = await Promise.all([
+      const [mainResult, workerResult, webviewResult] = await Promise.all([
         mainCtx.rebuild(),
+        workerCtx.rebuild(),
         webviewCtx.rebuild(),
       ]);
       const duration = Date.now() - startTime;
       console.log(`\n✨ Build completed in ${duration}ms`);
       if (production) {
         const mainSize = fs.statSync("dist/extension.js").size / 1024;
+        const workerSize = fs.statSync("dist/workers/ast-analyzer.worker.js").size / 1024;
         const webviewSize = fs
           .readdirSync("dist/webview")
           .filter((f) => f.endsWith(".js"))
@@ -256,9 +282,11 @@ async function main() {
           );
         console.log("\n📦 Bundle sizes:");
         console.log(`   Extension: ${mainSize.toFixed(2)}KB`);
+        console.log(`   Worker:    ${workerSize.toFixed(2)}KB`);
         console.log(`   Webview:   ${webviewSize.toFixed(2)}KB`);
       }
       await mainCtx.dispose();
+      await workerCtx.dispose();
       await webviewCtx.dispose();
     }
   } catch (error) {

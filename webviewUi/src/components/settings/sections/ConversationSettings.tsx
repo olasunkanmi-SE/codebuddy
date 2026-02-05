@@ -9,25 +9,17 @@ import {
   SettingControl,
   Toggle,
   Button,
-  Select,
 } from '../ui';
+import { useSettings } from '../SettingsContext';
 
 interface ConversationSettingsProps {
   searchQuery: string;
 }
 
-const fontSizeOptions = [
-  { value: 'small', label: 'Small' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'large', label: 'Large' },
-];
-
 export const ConversationSettings: React.FC<ConversationSettingsProps> = ({ searchQuery: _searchQuery }) => {
-  const [enableStreaming, setEnableStreaming] = useState(true);
+  const { values, handlers } = useSettings();
   const [saveHistory, setSaveHistory] = useState(true);
   const [showTimestamps, setShowTimestamps] = useState(false);
-  const [fontSize, setFontSize] = useState('medium');
-  const [compactMode, setCompactMode] = useState(false);
 
   return (
     <>
@@ -42,7 +34,10 @@ export const ConversationSettings: React.FC<ConversationSettingsProps> = ({ sear
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Toggle checked={enableStreaming} onChange={setEnableStreaming} />
+            <Toggle 
+              checked={values.enableStreaming} 
+              onChange={(checked) => handlers.onStreamingChange(checked)} 
+            />
           </SettingControl>
         </SettingsRow>
 
@@ -54,7 +49,7 @@ export const ConversationSettings: React.FC<ConversationSettingsProps> = ({ sear
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Toggle checked={saveHistory} onChange={setSaveHistory} />
+            <Toggle checked={saveHistory} onChange={setSaveHistory} disabled title="Coming soon" />
           </SettingControl>
         </SettingsRow>
 
@@ -66,7 +61,7 @@ export const ConversationSettings: React.FC<ConversationSettingsProps> = ({ sear
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Toggle checked={showTimestamps} onChange={setShowTimestamps} />
+            <Toggle checked={showTimestamps} onChange={setShowTimestamps} disabled title="Coming soon" />
           </SettingControl>
         </SettingsRow>
       </SettingsSection>
@@ -76,31 +71,16 @@ export const ConversationSettings: React.FC<ConversationSettingsProps> = ({ sear
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>Font Size</SettingLabel>
-            <SettingDescription>
-              Adjust the font size for chat messages
-            </SettingDescription>
-          </SettingInfo>
-          <SettingControl>
-            <Select value={fontSize} onChange={(e) => setFontSize(e.target.value)} disabled>
-              {fontSizeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </SettingControl>
-        </SettingsRow>
-
-        <SettingsRow>
-          <SettingInfo>
             <SettingLabel>Compact Mode</SettingLabel>
             <SettingDescription>
               Reduce spacing between messages for a denser view
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Toggle checked={compactMode} onChange={setCompactMode} disabled />
+            <Toggle 
+              checked={values.compactMode} 
+              onChange={(checked) => handlers.onCompactModeChange(checked)} 
+            />
           </SettingControl>
         </SettingsRow>
       </SettingsSection>
