@@ -31,6 +31,18 @@ export interface SettingsValues {
   fontFamily: string;
   fontSize: number;
   
+  // Agent settings
+  autoApprove: boolean;
+  allowFileEdits: boolean;
+  allowTerminal: boolean;
+  verboseLogging: boolean;
+  
+  // Context settings
+  indexCodebase: boolean;
+  contextWindow: string;
+  includeHidden: boolean;
+  maxFileSize: string;
+  
   // Models
   selectedModel: string;
   
@@ -70,6 +82,15 @@ export interface SettingsHandlers {
   onStreamingChange: (enabled: boolean) => void;
   onFontFamilyChange: (value: string) => void;
   onFontSizeChange: (value: number) => void;
+  onAutoApproveChange: (enabled: boolean) => void;
+  onAllowFileEditsChange: (enabled: boolean) => void;
+  onAllowTerminalChange: (enabled: boolean) => void;
+  onVerboseLoggingChange: (enabled: boolean) => void;
+  onIndexCodebaseChange: (enabled: boolean) => void;
+  onContextWindowChange: (value: string) => void;
+  onIncludeHiddenChange: (enabled: boolean) => void;
+  onMaxFileSizeChange: (value: string) => void;
+  onReindexWorkspace: () => void;
   onModelChange: (value: string) => void;
   onUsernameChange: (value: string) => void;
   postMessage: (message: { command: string; message?: any }) => void;
@@ -174,6 +195,14 @@ const defaultContextValue: SettingsContextType = {
     enableStreaming: true,
     fontFamily: 'JetBrains Mono',
     fontSize: 16,
+    autoApprove: false,
+    allowFileEdits: true,
+    allowTerminal: true,
+    verboseLogging: false,
+    indexCodebase: false,
+    contextWindow: '16k',
+    includeHidden: false,
+    maxFileSize: '1',
     selectedModel: 'Gemini',
     username: '',
     accountType: 'Free',
@@ -199,6 +228,15 @@ const defaultContextValue: SettingsContextType = {
     onStreamingChange: () => {},
     onFontFamilyChange: () => {},
     onFontSizeChange: () => {},
+    onAutoApproveChange: () => {},
+    onAllowFileEditsChange: () => {},
+    onAllowTerminalChange: () => {},
+    onVerboseLoggingChange: () => {},
+    onIndexCodebaseChange: () => {},
+    onContextWindowChange: () => {},
+    onIncludeHiddenChange: () => {},
+    onMaxFileSizeChange: () => {},
+    onReindexWorkspace: () => {},
     onModelChange: () => {},
     onUsernameChange: () => {},
     postMessage: () => {},

@@ -165,7 +165,7 @@ export const BetaSettings: React.FC<BetaSettingsProps> = ({ searchQuery: _search
           </SettingInfo>
           <SettingControl>
             <a
-              href="https://github.com/codebuddy/codebuddy/issues"
+              href="https://github.com/olasunkanmi-SE/codebuddy/issues"
               target="_blank"
               rel="noopener noreferrer"
               style={{ textDecoration: 'none' }}

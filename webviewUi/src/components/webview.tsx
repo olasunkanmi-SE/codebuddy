@@ -15,11 +15,8 @@ import AttachmentIcon from "./attachmentIcon";
 import ChatInput from "./ChatInput";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 import FileMention from "./FileMention";
-import { Extensions } from "./extensions";
-import { FutureFeatures } from "./futureFeatures";
 import MessageRenderer from "./MessageRenderer";
 import { UserMessage } from "./personMessage";
-import { Settings } from "./settings";
 import { SettingsPanel, SettingsGearIcon, SettingsValues, SettingsOptions, SettingsHandlers, DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS, DEFAULT_FONT_FAMILY_OPTIONS, DEFAULT_FONT_SIZE_OPTIONS, CustomRule, SubagentConfig } from "./settings/index";
 import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
@@ -73,6 +70,14 @@ interface ConfigData {
   enableStreaming?: boolean;
   fontFamily?: string;
   fontSize?: number;
+  autoApprove?: boolean;
+  allowFileEdits?: boolean;
+  allowTerminal?: boolean;
+  verboseLogging?: boolean;
+  indexCodebase?: boolean;
+  contextWindow?: string;
+  includeHidden?: boolean;
+  maxFileSize?: string;
 }
 
 export const WebviewUI = () => {
@@ -88,10 +93,17 @@ export const WebviewUI = () => {
   const [folders, setFolders] = useState<any>("");
   const [activeEditor, setActiveEditor] = useState("");
   const [username, setUsername] = useState("");
-  const [darkMode, setDarkMode] = useState(false);
   const [enableStreaming, setEnableStreaming] = useState(true);
   const [fontFamily, setFontFamily] = useState("JetBrains Mono");
   const [fontSize, setFontSize] = useState(16);
+  const [autoApprove, setAutoApprove] = useState(false);
+  const [allowFileEdits, setAllowFileEdits] = useState(true);
+  const [allowTerminal, setAllowTerminal] = useState(true);
+  const [verboseLogging, setVerboseLogging] = useState(false);
+  const [indexCodebase, setIndexCodebase] = useState(false);
+  const [contextWindow, setContextWindow] = useState("16k");
+  const [includeHidden, setIncludeHidden] = useState(false);
+  const [maxFileSize, setMaxFileSize] = useState("1");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [newsItems, setNewsItems] = useState<any[]>([]);
   
@@ -229,6 +241,30 @@ export const WebviewUI = () => {
         if (data.fontSize !== undefined) {
           setFontSize(data.fontSize);
         }
+        if (data.autoApprove !== undefined) {
+          setAutoApprove(data.autoApprove);
+        }
+        if (data.allowFileEdits !== undefined) {
+          setAllowFileEdits(data.allowFileEdits);
+        }
+        if (data.allowTerminal !== undefined) {
+          setAllowTerminal(data.allowTerminal);
+        }
+        if (data.verboseLogging !== undefined) {
+          setVerboseLogging(data.verboseLogging);
+        }
+        if (data.indexCodebase !== undefined) {
+          setIndexCodebase(data.indexCodebase);
+        }
+        if (data.contextWindow) {
+          setContextWindow(data.contextWindow);
+        }
+        if (data.includeHidden !== undefined) {
+          setIncludeHidden(data.includeHidden);
+        }
+        if (data.maxFileSize) {
+          setMaxFileSize(data.maxFileSize);
+        }
         break;
       }
 
@@ -260,11 +296,16 @@ export const WebviewUI = () => {
         }
         break;
 
+      case "history-cleared":
+        // Clear local messages when history is cleared on backend
+        clearMessages();
+        break;
+
       default:
         // Ignore unknown message types
         break;
     }
-  }, [setMessages]);
+  }, [setMessages, clearMessages]);
 
   // Update CSS whenever theme changes
   useEffect(() => {
@@ -318,38 +359,12 @@ export const WebviewUI = () => {
     vsCode.postMessage({ command: "news-refresh" });
   }, []);
 
-  const handleClearHistory = useCallback(() => {
-    clearMessages();
-  }, [clearMessages]);
-
-  const handleIndexWorkspace = useCallback(() => {
-    vsCode.postMessage({ command: "index-workspace" });
-  }, []);
-
   const handleOpenUrl = useCallback((url: string) => {
     vsCode.postMessage({ command: "openExternal", text: url });
   }, []);
 
-  const handleUserPreferences = useCallback(() => {
-    vsCode.postMessage({
-      command: "update-user-info",
-      message: JSON.stringify({
-        username,
-      }),
-    });
-  }, [username]);
-
   const handleContextChange = useCallback((value: string) => {
     setSelectedContext(value);
-  }, []);
-
-  // const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-  //   setUsername(e.target.value);
-  // }, []);
-
-  const handleToggle = useCallback((isActive: boolean) => {
-    setDarkMode(isActive);
-    document.body.classList.toggle("dark-mode", isActive);
   }, []);
 
   const handleSend = useCallback(
@@ -416,13 +431,21 @@ export const WebviewUI = () => {
     enableStreaming: enableStreaming,
     fontFamily: fontFamily,
     fontSize: fontSize,
+    autoApprove: autoApprove,
+    allowFileEdits: allowFileEdits,
+    allowTerminal: allowTerminal,
+    verboseLogging: verboseLogging,
+    indexCodebase: indexCodebase,
+    contextWindow: contextWindow,
+    includeHidden: includeHidden,
+    maxFileSize: maxFileSize,
     selectedModel: selectedModel,
     username: username,
     accountType: 'Free',
     customRules: customRules,
     customSystemPrompt: customSystemPrompt,
     subagents: subagents,
-  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, selectedModel, customRules, customSystemPrompt, subagents]);
+  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, selectedModel, customRules, customSystemPrompt, subagents]);
 
   const settingsOptions = useMemo<SettingsOptions>(() => ({
     themeOptions: themeOptions,
@@ -447,6 +470,7 @@ export const WebviewUI = () => {
     },
     onNicknameChange: (value: string) => {
       setUsername(value);
+      vsCode.postMessage({ command: "nickname-change-event", message: value });
     },
     onCodeBuddyModeChange: (value: string) => {
       setSelectedCodeBuddyMode(value);
@@ -454,6 +478,7 @@ export const WebviewUI = () => {
     },
     onStreamingChange: (enabled: boolean) => {
       setEnableStreaming(enabled);
+      vsCode.postMessage({ command: "streaming-change-event", message: enabled });
     },
     onFontFamilyChange: (value: string) => {
       setFontFamily(value);
@@ -462,6 +487,41 @@ export const WebviewUI = () => {
     onFontSizeChange: (value: number) => {
       setFontSize(value);
       vsCode.postMessage({ command: "font-size-change-event", message: value });
+    },
+    onAutoApproveChange: (enabled: boolean) => {
+      setAutoApprove(enabled);
+      vsCode.postMessage({ command: "auto-approve-change-event", message: enabled });
+    },
+    onAllowFileEditsChange: (enabled: boolean) => {
+      setAllowFileEdits(enabled);
+      vsCode.postMessage({ command: "allow-file-edits-change-event", message: enabled });
+    },
+    onAllowTerminalChange: (enabled: boolean) => {
+      setAllowTerminal(enabled);
+      vsCode.postMessage({ command: "allow-terminal-change-event", message: enabled });
+    },
+    onVerboseLoggingChange: (enabled: boolean) => {
+      setVerboseLogging(enabled);
+      vsCode.postMessage({ command: "verbose-logging-change-event", message: enabled });
+    },
+    onIndexCodebaseChange: (enabled: boolean) => {
+      setIndexCodebase(enabled);
+      vsCode.postMessage({ command: "index-codebase-change-event", message: enabled });
+    },
+    onContextWindowChange: (value: string) => {
+      setContextWindow(value);
+      vsCode.postMessage({ command: "context-window-change-event", message: value });
+    },
+    onIncludeHiddenChange: (enabled: boolean) => {
+      setIncludeHidden(enabled);
+      vsCode.postMessage({ command: "include-hidden-change-event", message: enabled });
+    },
+    onMaxFileSizeChange: (value: string) => {
+      setMaxFileSize(value);
+      vsCode.postMessage({ command: "max-file-size-change-event", message: value });
+    },
+    onReindexWorkspace: () => {
+      vsCode.postMessage({ command: "reindex-workspace-event" });
     },
     onModelChange: (value: string) => {
       setSelectedModel(value);
@@ -523,11 +583,8 @@ export const WebviewUI = () => {
 
       <VSCodePanels className="vscodePanels" activeid="tab-1">
         <VSCodePanelTab id="tab-1">CHAT</VSCodePanelTab>
-        <VSCodePanelTab id="tab-2">SETTINGS</VSCodePanelTab>
-        <VSCodePanelTab id="tab-3">EXTENSIONS</VSCodePanelTab>
-        <VSCodePanelTab id="tab-4">FAQ</VSCodePanelTab>
-        <VSCodePanelTab id="tab-5">FUTURE</VSCodePanelTab>
-        <VSCodePanelTab id="tab-6">NEWS</VSCodePanelTab>
+        <VSCodePanelTab id="tab-2">FAQ</VSCodePanelTab>
+        <VSCodePanelTab id="tab-3">NEWS</VSCodePanelTab>
         <VSCodePanelView id="view-1">
           <div className="panel-body-scroll">
             <div className="chat-content">
@@ -591,59 +648,11 @@ export const WebviewUI = () => {
 
         <VSCodePanelView id="view-2">
           <div className="panel-body-scroll">
-            <Settings
-              username={username}
-              selectedTheme={selectedTheme}
-              selectedModel={selectedModel}
-              selectedCodeBuddyMode={selectedCodeBuddyMode}
-              enableStreaming={enableStreaming}
-              darkMode={darkMode}
-              themeOptions={themeOptions}
-              modelOptions={modelOptions}
-              codeBuddyMode={codeBuddyMode}
-              onUsernameChange={setUsername}
-              onThemeChange={(value) => {
-                setSelectedTheme(value);
-                vsCode.postMessage({ command: "theme-change-event", message: value });
-              }}
-              onModelChange={(value) => {
-                setSelectedModel(value);
-                vsCode.postMessage({ command: "update-model-event", message: value });
-              }}
-              onCodeBuddyModeChange={(value) => {
-                setSelectedCodeBuddyMode(value);
-                vsCode.postMessage({ command: "codebuddy-model-change-event", message: value });
-              }}
-              onStreamingChange={setEnableStreaming}
-              onDarkModeChange={handleToggle}
-              onClearHistory={handleClearHistory}
-              onIndexWorkspace={handleIndexWorkspace}
-              onSavePreferences={handleUserPreferences}
-            />
-          </div>
-        </VSCodePanelView>
-
-        <VSCodePanelView id="view-3">
-          <div className="panel-body-scroll">
-            <Extensions
-              onAddMCPServer={(server) => console.log('Add server:', server)}
-              onAddAgent={(agent) => console.log('Add agent:', agent)}
-            />
-          </div>
-        </VSCodePanelView>
-
-        <VSCodePanelView id="view-4">
-          <div className="panel-body-scroll">
             <FAQAccordion items={faqItems} />
           </div>
         </VSCodePanelView>
-        <VSCodePanelView id="view-5">
-          <div className="panel-body-scroll">
-            <FutureFeatures />
-          </div>
-        </VSCodePanelView>
         
-        <VSCodePanelView id="view-6">
+        <VSCodePanelView id="view-3">
           <div className="panel-body-scroll">
             <News 
               newsItems={newsItems} 

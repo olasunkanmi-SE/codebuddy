@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import styled from 'styled-components';
 import { SettingsCategory, SETTINGS_CATEGORIES } from './types';
 import { SettingsIcon } from './icons';
@@ -146,6 +146,13 @@ const NavSection = styled.nav`
   }
 `;
 
+const NoResults = styled.div`
+  padding: 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+`;
+
 const NavItem = styled.button<{ $active: boolean }>`
   width: calc(100% - 16px);
   margin: 2px 8px;
@@ -214,6 +221,18 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
     return name.charAt(0).toUpperCase();
   };
 
+  // Filter categories based on search query
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return SETTINGS_CATEGORIES;
+    }
+    const query = searchQuery.toLowerCase();
+    return SETTINGS_CATEGORIES.filter(category => 
+      category.label.toLowerCase().includes(query) ||
+      (category.description?.toLowerCase().includes(query))
+    );
+  }, [searchQuery]);
+
   return (
     <SidebarContainer>
       <UserSection>
@@ -251,7 +270,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
       </SearchSection>
 
       <NavSection>
-        {SETTINGS_CATEGORIES.map((category) => (
+        {filteredCategories.map((category) => (
           <NavItem
             key={category.id}
             $active={activeCategory === category.id}
@@ -267,6 +286,9 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             {activeCategory === category.id && <ActiveIndicator />}
           </NavItem>
         ))}
+        {filteredCategories.length === 0 && searchQuery.trim() && (
+          <NoResults>No settings found</NoResults>
+        )}
       </NavSection>
     </SidebarContainer>
   );

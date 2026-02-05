@@ -119,7 +119,7 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ searchQuery: _sear
         <SectionTitle>Resources</SectionTitle>
 
         <LinkList>
-          <LinkItem href="https://github.com/codebuddy/codebuddy" target="_blank" rel="noopener noreferrer">
+          <LinkItem href="https://github.com/olasunkanmi-SE/codebuddy" target="_blank" rel="noopener noreferrer">
             <span>GitHub Repository</span>
             <SettingsIcon name="externalLink" size={16} />
           </LinkItem>
@@ -131,7 +131,7 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ searchQuery: _sear
             <span>Changelog</span>
             <SettingsIcon name="externalLink" size={16} />
           </LinkItem>
-          <LinkItem href="https://github.com/codebuddy/codebuddy/issues" target="_blank" rel="noopener noreferrer">
+          <LinkItem href="https://github.com/olasunkanmi-SE/codebuddy/issues" target="_blank" rel="noopener noreferrer">
             <span>Report an Issue</span>
             <SettingsIcon name="externalLink" size={16} />
           </LinkItem>

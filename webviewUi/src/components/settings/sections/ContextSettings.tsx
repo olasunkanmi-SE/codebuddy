@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   SettingsSection,
   SectionTitle,
@@ -13,6 +13,7 @@ import {
   Badge,
   Input,
 } from '../ui';
+import { useSettings } from '../SettingsContext';
 
 interface ContextSettingsProps {
   searchQuery: string;
@@ -27,10 +28,9 @@ const contextWindowOptions = [
 ];
 
 export const ContextSettings: React.FC<ContextSettingsProps> = ({ searchQuery: _searchQuery }) => {
-  const [indexCodebase, setIndexCodebase] = useState(false);
-  const [contextWindow, setContextWindow] = useState('16k');
-  const [includeHidden, setIncludeHidden] = useState(false);
-  const [maxFileSize, setMaxFileSize] = useState('1');
+  const { values, handlers } = useSettings();
+  const { indexCodebase, contextWindow, includeHidden, maxFileSize } = values;
+  const { onIndexCodebaseChange, onContextWindowChange, onIncludeHiddenChange, onMaxFileSizeChange, onReindexWorkspace } = handlers;
 
   return (
     <>
@@ -45,7 +45,7 @@ export const ContextSettings: React.FC<ContextSettingsProps> = ({ searchQuery: _
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Toggle checked={indexCodebase} onChange={setIndexCodebase} />
+            <Toggle checked={indexCodebase} onChange={onIndexCodebaseChange} />
           </SettingControl>
         </SettingsRow>
 
@@ -71,7 +71,7 @@ export const ContextSettings: React.FC<ContextSettingsProps> = ({ searchQuery: _
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Button disabled={!indexCodebase}>Re-index</Button>
+            <Button onClick={onReindexWorkspace}>Re-index</Button>
           </SettingControl>
         </SettingsRow>
       </SettingsSection>
@@ -87,7 +87,7 @@ export const ContextSettings: React.FC<ContextSettingsProps> = ({ searchQuery: _
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Select value={contextWindow} onChange={(e) => setContextWindow(e.target.value)}>
+            <Select value={contextWindow} onChange={(e) => onContextWindowChange(e.target.value)}>
               {contextWindowOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -105,7 +105,7 @@ export const ContextSettings: React.FC<ContextSettingsProps> = ({ searchQuery: _
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Toggle checked={includeHidden} onChange={setIncludeHidden} />
+            <Toggle checked={includeHidden} onChange={onIncludeHiddenChange} />
           </SettingControl>
         </SettingsRow>
 
@@ -120,7 +120,7 @@ export const ContextSettings: React.FC<ContextSettingsProps> = ({ searchQuery: _
             <Input
               type="number"
               value={maxFileSize}
-              onChange={(e) => setMaxFileSize(e.target.value)}
+              onChange={(e) => onMaxFileSizeChange(e.target.value)}
               min="0.1"
               max="10"
               step="0.1"

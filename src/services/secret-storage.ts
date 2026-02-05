@@ -71,11 +71,37 @@ export class SecretStorageService implements vscode.Disposable {
     const config = vscode.workspace.getConfiguration();
     const fontFamily = config.get<string>("font.family") || "JetBrains Mono";
     const fontSize = config.get<number>("chatview.font.size") || 16;
+    const enableStreaming =
+      config.get<boolean>("codebuddy.enableStreaming") ?? true;
+    const nickname = config.get<string>("codebuddy.nickname") || username || "";
+    const autoApprove = config.get<boolean>("codebuddy.autoApprove") ?? false;
+    const allowFileEdits =
+      config.get<boolean>("codebuddy.allowFileEdits") ?? true;
+    const allowTerminal =
+      config.get<boolean>("codebuddy.allowTerminal") ?? true;
+    const verboseLogging =
+      config.get<boolean>("codebuddy.verboseLogging") ?? false;
+    const indexCodebase =
+      config.get<boolean>("codebuddy.indexCodebase") ?? false;
+    const contextWindow =
+      config.get<string>("codebuddy.contextWindow") || "16k";
+    const includeHidden =
+      config.get<boolean>("codebuddy.includeHidden") ?? false;
+    const maxFileSize = config.get<string>("codebuddy.maxFileSize") || "1";
     const preferences = {
-      username,
+      username: nickname || username,
       theme: theme || "tokyo night", // default theme
       fontFamily,
       fontSize,
+      enableStreaming,
+      autoApprove,
+      allowFileEdits,
+      allowTerminal,
+      verboseLogging,
+      indexCodebase,
+      contextWindow,
+      includeHidden,
+      maxFileSize,
     };
     this.orchestrator.publish(
       "onGetUserPreferences",
