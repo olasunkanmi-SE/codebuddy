@@ -16,6 +16,7 @@ import ChatInput from "./ChatInput";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 import FileMention from "./FileMention";
 import MessageRenderer from "./MessageRenderer";
+import { PendingChangesPanel } from "./PendingChangesPanel";
 import { UserMessage } from "./personMessage";
 import { SettingsPanel, SettingsGearIcon, SettingsValues, SettingsOptions, SettingsHandlers, DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS, DEFAULT_FONT_FAMILY_OPTIONS, DEFAULT_FONT_SIZE_OPTIONS, CustomRule, SubagentConfig } from "./settings/index";
 import { SkeletonLoader } from "./skeletonLoader";
@@ -105,6 +106,7 @@ export const WebviewUI = () => {
   const [includeHidden, setIncludeHidden] = useState(false);
   const [maxFileSize, setMaxFileSize] = useState("1");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [fileChangesPanelCollapsed, setFileChangesPanelCollapsed] = useState(true);
   const [newsItems, setNewsItems] = useState<any[]>([]);
   
   // Rules & Subagents state
@@ -643,6 +645,11 @@ export const WebviewUI = () => {
                 </div>
               </div>
             </div>
+            {/* File Changes Panel - shows pending and recent file modifications */}
+            <PendingChangesPanel 
+              collapsed={fileChangesPanelCollapsed}
+              onToggle={() => setFileChangesPanelCollapsed(!fileChangesPanelCollapsed)}
+            />
           </div>
         </VSCodePanelView>
 

@@ -236,7 +236,7 @@ export class EditFileTool {
       }
 
       // Safe Apply: Create a pending change instead of writing directly
-      const change = DiffReviewService.getInstance().addPendingChange(
+      const change = await DiffReviewService.getInstance().addPendingChange(
         filePath,
         newContent,
       );

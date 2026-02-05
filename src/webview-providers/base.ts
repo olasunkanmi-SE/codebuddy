@@ -179,6 +179,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onUpdateThemePreferences(
         this.handleThemePreferences.bind(this),
       ),
+      // Listen for diff review events
+      this.orchestrator.onPendingChange(this.handleDiffChangeEvent.bind(this)),
+      this.orchestrator.onChangeApplied(this.handleDiffChangeEvent.bind(this)),
+      this.orchestrator.onChangeRejected(this.handleDiffChangeEvent.bind(this)),
       // Listen for workspace folder changes and update active workspace
       vscode.workspace.onDidChangeWorkspaceFolders(async () => {
         this.logger.info(
@@ -378,6 +382,21 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       });
     } catch (error: any) {
       this.logger.info(error);
+    }
+  }
+
+  /**
+   * Handles diff change events (pending, applied, rejected) and forwards to webview
+   */
+  public async handleDiffChangeEvent({ type, message }: IEventPayload) {
+    try {
+      return await this.currentWebView?.webview.postMessage({
+        type: "diff-change-event",
+        eventType: message?.type,
+        change: message?.change,
+      });
+    } catch (error: any) {
+      this.logger.error("Error forwarding diff change event", error);
     }
   }
 
@@ -947,6 +966,87 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               // Trigger workspace reindexing
               vscode.commands.executeCommand("codebuddy.indexWorkspace");
               break;
+
+            // Diff Review Commands
+            case "get-pending-changes": {
+              const { DiffReviewService } =
+                await import("../services/diff-review.service");
+              const diffService = DiffReviewService.getInstance();
+              const pendingChanges = diffService.getAllPendingChanges();
+              await this.currentWebView?.webview.postMessage({
+                type: "pending-changes",
+                changes: pendingChanges.map((c) => ({
+                  id: c.id,
+                  filePath: c.filePath,
+                  timestamp: c.timestamp,
+                  status: c.status,
+                  isNewFile: c.isNewFile,
+                })),
+              });
+              break;
+            }
+
+            case "get-recent-changes": {
+              const { DiffReviewService } =
+                await import("../services/diff-review.service");
+              const diffService = DiffReviewService.getInstance();
+              const recentChanges = diffService.getRecentChanges();
+              await this.currentWebView?.webview.postMessage({
+                type: "recent-changes",
+                changes: recentChanges.map((c) => ({
+                  id: c.id,
+                  filePath: c.filePath,
+                  timestamp: c.timestamp,
+                  status: c.status,
+                  isNewFile: c.isNewFile,
+                })),
+              });
+              break;
+            }
+
+            case "apply-change": {
+              const { DiffReviewService } =
+                await import("../services/diff-review.service");
+              const diffService = DiffReviewService.getInstance();
+              try {
+                const success = await diffService.applyChange(message.id);
+                await this.currentWebView?.webview.postMessage({
+                  type: "change-applied",
+                  id: message.id,
+                  success,
+                });
+              } catch (error: any) {
+                await this.currentWebView?.webview.postMessage({
+                  type: "change-applied",
+                  id: message.id,
+                  success: false,
+                  error: error.message,
+                });
+              }
+              break;
+            }
+
+            case "reject-change": {
+              const { DiffReviewService } =
+                await import("../services/diff-review.service");
+              const diffService = DiffReviewService.getInstance();
+              diffService.removePendingChange(message.id);
+              await this.currentWebView?.webview.postMessage({
+                type: "change-rejected",
+                id: message.id,
+              });
+              break;
+            }
+
+            case "view-change-diff": {
+              // Open the VS Code diff view for a pending change
+              vscode.commands.executeCommand(
+                "codebuddy.reviewChange",
+                message.id,
+                message.filePath,
+              );
+              break;
+            }
 
             case "open-codebuddy-settings":
               // Open VS Code settings filtered to CodeBuddy settings

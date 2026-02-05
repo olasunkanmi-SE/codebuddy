@@ -1,0 +1,234 @@
+.pending-changes-panel {
+  background: var(--vscode-sideBar-background, #252526);
+  border: 1px solid var(--vscode-panel-border, #3c3c3c);
+  border-radius: 6px;
+  margin: 8px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.pending-changes-panel.collapsed {
+  margin-bottom: 4px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--vscode-sideBarSectionHeader-background, #333333);
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-header:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+.panel-title {
+  font-weight: 600;
+  color: var(--vscode-sideBarTitle-foreground, #cccccc);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pending-badge {
+  background: var(--vscode-badge-background, #007acc);
+  color: var(--vscode-badge-foreground, #ffffff);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.refresh-btn {
+  background: none;
+  border: none;
+  color: var(--vscode-foreground, #cccccc);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 14px;
+}
+
+.refresh-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, #5a5a5a);
+}
+
+.collapse-icon {
+  color: var(--vscode-foreground, #cccccc);
+  font-size: 10px;
+}
+
+.panel-content {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--vscode-panel-border, #3c3c3c);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--vscode-foreground, #cccccc);
+  cursor: pointer;
+  font-size: 11px;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-btn:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+.tab-btn.active {
+  border-bottom-color: var(--vscode-activityBar-activeBorder, #007acc);
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.changes-list {
+  padding: 4px 0;
+}
+
+.file-change-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border, #3c3c3c);
+}
+
+.file-change-item:last-child {
+  border-bottom: none;
+}
+
+.file-change-item:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+.change-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.change-status {
+  font-size: 12px;
+  width: 16px;
+  text-align: center;
+}
+
+.change-status-pending {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.change-status-applied {
+  color: var(--vscode-testing-iconPassed, #73c991);
+}
+
+.change-status-rejected {
+  color: var(--vscode-testing-iconFailed, #f14c4c);
+}
+
+.change-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.file-name {
+  color: var(--vscode-foreground, #cccccc);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.new-badge {
+  background: var(--vscode-testing-iconPassed, #73c991);
+  color: #000000;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.file-path {
+  color: var(--vscode-descriptionForeground, #8b8b8b);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.change-time {
+  color: var(--vscode-descriptionForeground, #8b8b8b);
+  font-size: 10px;
+}
+
+.change-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.action-btn {
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  opacity: 0.7;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.action-btn:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, #5a5a5a);
+}
+
+.view-btn {
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.apply-btn {
+  color: var(--vscode-testing-iconPassed, #73c991);
+}
+
+.apply-btn:hover {
+  background: rgba(115, 201, 145, 0.2);
+}
+
+.reject-btn {
+  color: var(--vscode-testing-iconFailed, #f14c4c);
+}
+
+.reject-btn:hover {
+  background: rgba(241, 76, 76, 0.2);
+}
+
+.loading,
+.empty-state {
+  padding: 16px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground, #8b8b8b);
+  font-style: italic;
+}
