@@ -51,6 +51,44 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
 
         <SettingsRow>
           <SettingInfo>
+            <SettingLabel>Font Family</SettingLabel>
+            <SettingDescription>Select your preferred font for the chat interface</SettingDescription>
+          </SettingInfo>
+          <SettingControl>
+            <Select 
+              value={values.fontFamily} 
+              onChange={(e) => handlers.onFontFamilyChange(e.target.value)}
+            >
+              {options.fontFamilyOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </SettingControl>
+        </SettingsRow>
+
+        <SettingsRow>
+          <SettingInfo>
+            <SettingLabel>Font Size</SettingLabel>
+            <SettingDescription>Select your preferred font size for the chat interface</SettingDescription>
+          </SettingInfo>
+          <SettingControl>
+            <Select 
+              value={String(values.fontSize)} 
+              onChange={(e) => handlers.onFontSizeChange(Number(e.target.value))}
+            >
+              {options.fontSizeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </SettingControl>
+        </SettingsRow>
+
+        <SettingsRow>
+          <SettingInfo>
             <SettingLabel>Language</SettingLabel>
             <SettingDescription>Select the language for button labels and other in-app text</SettingDescription>
           </SettingInfo>

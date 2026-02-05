@@ -10,6 +10,8 @@ export {
   DEFAULT_LANGUAGE_OPTIONS,
   DEFAULT_KEYMAP_OPTIONS,
   DEFAULT_SUBAGENTS,
+  DEFAULT_FONT_FAMILY_OPTIONS,
+  DEFAULT_FONT_SIZE_OPTIONS,
 } from "./SettingsContext";
 export type {
   SettingsValues,

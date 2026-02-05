@@ -745,11 +745,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               const { ids } = message;
               if (ids && Array.isArray(ids)) {
                 await NewsService.getInstance().markAsRead(ids);
+                await this.synchronizeNews();
               }
               break;
             }
+            case "news-refresh":
+              await this.synchronizeNews();
+              break;
             case "upload-file":
               await this.fileManager.uploadFileHandler();
+              break;
+            case "openExternal":
+              if (message.text) {
+                vscode.env.openExternal(vscode.Uri.parse(message.text));
+              }
               break;
             case "update-model-event":
               await this.orchestrator.publish("onModelChange", message);
@@ -761,6 +770,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "clear-history":
               await this.chatHistoryManager.clearHistory("agentId");
               this.orchestrator.publish("onClearHistory", message);
+              // Notify webview that history has been cleared
+              this.currentWebView?.webview.postMessage({
+                command: "history-cleared",
+              });
+              this.logger.info("Chat history cleared");
               break;
             case "update-user-info":
               // In the future update to updateUserPreferences
@@ -776,6 +790,162 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   theme: message.message,
                 },
               );
+              break;
+
+            case "font-family-change-event":
+              // Handle font family change and update VS Code settings
+              this.logger.info(`Font family changed to: ${message.message}`);
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "font.family",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "font-size-change-event":
+              // Handle font size change and update VS Code settings
+              this.logger.info(`Font size changed to: ${message.message}`);
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "chatview.font.size",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "nickname-change-event":
+              // Handle nickname change and store in secret storage
+              this.logger.info(`Nickname changed to: ${message.message}`);
+              this.orchestrator.publish("onUpdateUserPreferences", {
+                message: JSON.stringify({ username: message.message }),
+              });
+              break;
+
+            case "streaming-change-event":
+              // Handle streaming preference change
+              this.logger.info(
+                `Streaming preference changed to: ${message.message}`,
+              );
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.enableStreaming",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "auto-approve-change-event":
+              this.logger.info(
+                `Auto-approve preference changed to: ${message.message}`,
+              );
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.autoApprove",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "allow-file-edits-change-event":
+              this.logger.info(
+                `Allow file edits preference changed to: ${message.message}`,
+              );
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.allowFileEdits",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "allow-terminal-change-event":
+              this.logger.info(
+                `Allow terminal preference changed to: ${message.message}`,
+              );
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.allowTerminal",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "verbose-logging-change-event":
+              this.logger.info(
+                `Verbose logging preference changed to: ${message.message}`,
+              );
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.verboseLogging",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "index-codebase-change-event":
+              this.logger.info(
+                `Index codebase preference changed to: ${message.message}`,
+              );
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.indexCodebase",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "context-window-change-event":
+              this.logger.info(
+                `Context window preference changed to: ${message.message}`,
+              );
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.contextWindow",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "include-hidden-change-event":
+              this.logger.info(
+                `Include hidden preference changed to: ${message.message}`,
+              );
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.includeHidden",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "max-file-size-change-event":
+              this.logger.info(
+                `Max file size preference changed to: ${message.message}`,
+              );
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.maxFileSize",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
+            case "reindex-workspace-event":
+              this.logger.info("Reindexing workspace...");
+              // Trigger workspace reindexing
+              vscode.commands.executeCommand("codebuddy.indexWorkspace");
               break;
 
             case "open-codebuddy-settings":

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   SettingsSection,
   SectionTitle,
@@ -11,6 +11,7 @@ import {
   Toggle,
   Badge,
 } from '../ui';
+import { useSettings } from '../SettingsContext';
 
 interface AgentsSettingsProps {
   searchQuery: string;
@@ -22,16 +23,12 @@ const agentModeOptions = [
 ];
 
 export const AgentsSettings: React.FC<AgentsSettingsProps> = ({ searchQuery: _searchQuery }) => {
-  const [agentMode, setAgentMode] = useState('Agent');
-  const [autoApprove, setAutoApprove] = useState(false);
-  const [verboseLogging, setVerboseLogging] = useState(false);
-  const [allowFileEdits, setAllowFileEdits] = useState(true);
-  const [allowTerminal, setAllowTerminal] = useState(true);
+  const { values, handlers } = useSettings();
+  const { codeBuddyMode, autoApprove, allowFileEdits, allowTerminal, verboseLogging } = values;
+  const { onCodeBuddyModeChange, onAutoApproveChange, onAllowFileEditsChange, onAllowTerminalChange, onVerboseLoggingChange } = handlers;
 
   const handleModeChange = (value: string) => {
-    setAgentMode(value);
-    const vsCode = (window as any).acquireVsCodeApi?.() || { postMessage: () => {} };
-    vsCode.postMessage({ command: 'codebuddy-model-change-event', message: value });
+    onCodeBuddyModeChange(value);
   };
 
   return (
@@ -47,7 +44,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({ searchQuery: _se
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Select value={agentMode} onChange={(e) => handleModeChange(e.target.value)}>
+            <Select value={codeBuddyMode} onChange={(e) => handleModeChange(e.target.value)}>
               {agentModeOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -79,7 +76,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({ searchQuery: _se
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Toggle checked={autoApprove} onChange={setAutoApprove} />
+            <Toggle checked={autoApprove} onChange={onAutoApproveChange} />
           </SettingControl>
         </SettingsRow>
 
@@ -91,7 +88,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({ searchQuery: _se
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Toggle checked={allowFileEdits} onChange={setAllowFileEdits} />
+            <Toggle checked={allowFileEdits} onChange={onAllowFileEditsChange} />
           </SettingControl>
         </SettingsRow>
 
@@ -103,7 +100,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({ searchQuery: _se
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Toggle checked={allowTerminal} onChange={setAllowTerminal} />
+            <Toggle checked={allowTerminal} onChange={onAllowTerminalChange} />
           </SettingControl>
         </SettingsRow>
       </SettingsSection>
@@ -119,7 +116,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({ searchQuery: _se
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Toggle checked={verboseLogging} onChange={setVerboseLogging} />
+            <Toggle checked={verboseLogging} onChange={onVerboseLoggingChange} />
           </SettingControl>
         </SettingsRow>
       </SettingsSection>

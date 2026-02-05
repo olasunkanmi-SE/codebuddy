@@ -479,6 +479,57 @@
             "default": 16,
             "description": "Enter your preferred font size (default is 16)"
           },
+          "codebuddy.enableStreaming": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable streaming responses from AI models"
+          },
+          "codebuddy.nickname": {
+            "type": "string",
+            "default": "",
+            "description": "Your display name shown in chat conversations"
+          },
+          "codebuddy.autoApprove": {
+            "type": "boolean",
+            "default": false,
+            "description": "Automatically approve agent actions without confirmation"
+          },
+          "codebuddy.allowFileEdits": {
+            "type": "boolean",
+            "default": true,
+            "description": "Allow the agent to create, modify, and delete files"
+          },
+          "codebuddy.allowTerminal": {
+            "type": "boolean",
+            "default": true,
+            "description": "Allow the agent to execute terminal commands"
+          },
+          "codebuddy.verboseLogging": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show detailed agent activity logs for debugging"
+          },
+          "codebuddy.indexCodebase": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable vector database indexing for semantic code search"
+          },
+          "codebuddy.contextWindow": {
+            "type": "string",
+            "enum": ["4k", "8k", "16k", "32k", "128k"],
+            "default": "16k",
+            "description": "Maximum context window size for AI requests"
+          },
+          "codebuddy.includeHidden": {
+            "type": "boolean",
+            "default": false,
+            "description": "Include hidden files (starting with .) in context gathering"
+          },
+          "codebuddy.maxFileSize": {
+            "type": "string",
+            "default": "1",
+            "description": "Maximum file size in MB for context gathering"
+          },
           "codebuddy.completion.enabled": {
             "type": "boolean",
             "default": true,

@@ -61,7 +61,7 @@ export const faqItems: FAQItem[] = [
     question: "HOW DO I SET UP CODEBUDDY?",
     answer: `<p>Setting up CodeBuddy is simple:</p>
       <ol>
-          <li>Obtain API keys for one of the supported LLMs: Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, or use a Local model</li>
+          <li>Obtain API keys for one of the supported LLMs: Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, XGrok, or use a Local model</li>
           <li>Open VS Code settings (File > Preferences > Settings)</li>
           <li>Search for "CodeBuddy" in the settings search bar</li>
           <li>Select your preferred AI model from the dropdown</li>
@@ -75,12 +75,14 @@ export const faqItems: FAQItem[] = [
     answer: `<p>For optimal performance with CodeBuddy, we recommend:</p>
         <h3>Cloud Models:</h3>
         <ul>
-            <li><strong>Gemini:</strong> Gemini-2.0-flash or higher versions provide excellent results</li>
+            <li><strong>Gemini:</strong> Gemini 2.5 Pro (default) provides excellent reasoning and coding results</li>
+            <li><strong>Anthropic:</strong> Claude Sonnet 4.5 (default) is excellent for complex architectural reasoning</li>
             <li><strong>Deepseek:</strong> DeepSeek-V3 or R1 models are highly capable for coding tasks</li>
-            <li><strong>Anthropic:</strong> Claude 3.5 Sonnet is excellent for complex architectural reasoning</li>
             <li><strong>OpenAI:</strong> GPT-4o offers robust general-purpose coding assistance</li>
-            <li><strong>Qwen:</strong> Qwen 2.5 Coder is a strong open-weight contender</li>
-            <li><strong>Groq:</strong> Offers ultra-fast inference with Llama models</li>
+            <li><strong>Qwen:</strong> Qwen-Max and Qwen3-Coder models are strong contenders</li>
+            <li><strong>Groq:</strong> Offers ultra-fast inference with Llama 3.1 70B</li>
+            <li><strong>GLM:</strong> GLM-4 from Zhipu AI for Chinese and English support</li>
+            <li><strong>XGrok:</strong> xAI's Grok models for alternative reasoning</li>
         </ul>
         <h3>Local Models (Privacy-First):</h3>
         <ul>
@@ -98,7 +100,7 @@ export const faqItems: FAQItem[] = [
     answer: `<p>To use CodeBuddy's Agent Mode:</p>
       <ol>
           <li>Ensure you've selected a model in the settings</li>
-          <li>Agent mode works with all supported models: Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, and <strong>Local models</strong></li>
+          <li>Agent mode works with all supported models: Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, XGrok, and <strong>Local models</strong></li>
           <li>Open the CodeBuddy sidebar in VS Code</li>
           <li>Select "Agent" mode from the mode switcher at the top</li>
       </ol>
@@ -217,12 +219,158 @@ export const faqItems: FAQItem[] = [
         </li>
       </ol>
       <p>The CodeBuddy Agent is specifically designed to function as your intelligent coding companion, helping you write better, more efficient code while saving time on research and debugging.</p>
-      <p><strong>Supported Models:</strong> Agent mode works with Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, and <strong>Local models</strong> (like Qwen 2.5 Coder via Ollama).</p>`,
+      <p><strong>Supported Models:</strong> Agent mode works with Gemini, Anthropic, Deepseek, OpenAI, Qwen, GLM, Groq, XGrok, and <strong>Local models</strong> (like Qwen 2.5 Coder via Ollama).</p>`,
   },
 
   {
     question: "CAN I DOWNLOAD MY CHAT HISTORY",
-    answer: `Yes you can. This version of codebuddy give the data back to the user by creating a gitignored file called .codebuddy. This file can be found at the root level of your application. It houses your chatHistory and in the future, your logs.`,
+    answer: `<p>Yes you can! CodeBuddy gives you full control over your data:</p>
+    <ul>
+      <li><strong>Local Storage:</strong> All chat history is stored in a <code>.codebuddy</code> folder at the root of your workspace</li>
+      <li><strong>Gitignored:</strong> This folder is automatically added to .gitignore to prevent accidentally committing sensitive conversations</li>
+      <li><strong>JSON Format:</strong> Chat history is stored in JSON format, making it easy to read, parse, or migrate</li>
+      <li><strong>Future Features:</strong> Logs and additional data will also be stored here</li>
+    </ul>
+    <p>To clear your history, go to Settings (gear icon) → Privacy → Clear Chat History.</p>`,
+  },
+  {
+    question: "HOW DO I ACCESS SETTINGS?",
+    answer: `<p>CodeBuddy offers a comprehensive settings panel accessed via the <strong>gear icon (⚙️)</strong> in the sidebar:</p>
+    <h3>Settings Panel Categories:</h3>
+    <ul>
+      <li><strong>Account:</strong> Your profile and account information</li>
+      <li><strong>General:</strong> Theme, language, font settings, nickname, and streaming preferences</li>
+      <li><strong>Agents:</strong> Configure Agent mode behavior, auto-approve actions, file/terminal permissions</li>
+      <li><strong>MCP:</strong> Add and manage Model Context Protocol servers</li>
+      <li><strong>Conversation:</strong> Chat display preferences and history management</li>
+      <li><strong>Models:</strong> AI model selection and configuration</li>
+      <li><strong>Context:</strong> Workspace indexing and context window settings</li>
+      <li><strong>Rules & Subagents:</strong> Custom rules and specialized subagent configuration</li>
+      <li><strong>Privacy:</strong> Data privacy settings and clear data options</li>
+      <li><strong>Beta:</strong> Experimental features</li>
+      <li><strong>About:</strong> Version info and links</li>
+    </ul>
+    <p><strong>Tip:</strong> Use the search bar at the top of the settings panel to quickly find specific settings!</p>`,
+  },
+  {
+    question: "WHAT ARE MCP SERVERS?",
+    answer: `<p><strong>MCP (Model Context Protocol)</strong> servers extend CodeBuddy's capabilities by providing additional tools and context sources:</p>
+    <h3>What MCP Servers Do:</h3>
+    <ul>
+      <li><strong>Add New Tools:</strong> Connect external services like databases, APIs, or specialized tools</li>
+      <li><strong>Extend Context:</strong> Provide additional context from external sources</li>
+      <li><strong>Custom Integrations:</strong> Build your own MCP servers for proprietary systems</li>
+    </ul>
+    <h3>How to Add an MCP Server:</h3>
+    <ol>
+      <li>Go to Settings (gear icon) → MCP</li>
+      <li>Click "Add Server"</li>
+      <li>Enter the server name and configuration</li>
+      <li>The server's tools become available to the Agent</li>
+    </ol>
+    <p>MCP follows an open protocol, allowing community-created servers to integrate seamlessly with CodeBuddy.</p>`,
+  },
+  {
+    question: "WHAT ARE CUSTOM RULES AND SUBAGENTS?",
+    answer: `<p>Custom Rules and Subagents help you tailor CodeBuddy to your specific workflow:</p>
+    <h3>Custom Rules:</h3>
+    <ul>
+      <li><strong>Project-Specific Guidelines:</strong> Define coding conventions for your project (e.g., "Always use TypeScript strict mode")</li>
+      <li><strong>Appended to System Prompt:</strong> Rules are added to the AI's instructions, influencing all responses</li>
+      <li><strong>Toggleable:</strong> Enable/disable rules as needed without deleting them</li>
+      <li><strong>Examples:</strong>
+        <ul>
+          <li>"Use functional components over class components"</li>
+          <li>"Follow our internal naming conventions: camelCase for variables, PascalCase for components"</li>
+          <li>"Always add error handling with try/catch blocks"</li>
+        </ul>
+      </li>
+    </ul>
+    <h3>Subagents:</h3>
+    <p>Subagents are specialized AI agents that can be delegated specific tasks:</p>
+    <ul>
+      <li><strong>Code Analyzer:</strong> Deep code analysis, security scanning, architecture review</li>
+      <li><strong>Documentation Writer:</strong> Generate comprehensive documentation and API references</li>
+      <li><strong>Debugger:</strong> Find and fix bugs with full tool access</li>
+      <li><strong>File Organizer:</strong> Restructure and organize project files</li>
+    </ul>
+    <p>Configure both in Settings (gear icon) → Rules & Subagents.</p>`,
+  },
+  {
+    question: "WHAT COMMANDS ARE AVAILABLE?",
+    answer: `<p>CodeBuddy provides many commands accessible via the Command Palette (Cmd/Ctrl+Shift+P):</p>
+    <h3>Code Actions (require text selection):</h3>
+    <ul>
+      <li><strong>Add Comment:</strong> Add intelligent comments to selected code</li>
+      <li><strong>Review Code:</strong> Get code review feedback and suggestions</li>
+      <li><strong>Refactor:</strong> Intelligent code refactoring suggestions</li>
+      <li><strong>Optimize:</strong> Performance optimization recommendations</li>
+      <li><strong>Explain Code:</strong> Get detailed explanations of selected code</li>
+      <li><strong>Generate Architectural Diagram:</strong> Create Mermaid diagrams from code</li>
+      <li><strong>Interview Me:</strong> Practice coding interviews</li>
+    </ul>
+    <h3>Global Commands:</h3>
+    <ul>
+      <li><strong>Generate Commit Message:</strong> AI-powered commit message from staged changes</li>
+      <li><strong>Inline Chat:</strong> Quick AI chat without leaving your editor</li>
+      <li><strong>Analyze Codebase:</strong> Get answers about your entire codebase</li>
+      <li><strong>Review Pull Request:</strong> AI-powered PR review</li>
+      <li><strong>Index Workspace:</strong> Index your codebase for semantic search</li>
+      <li><strong>Toggle Inline Completions:</strong> Enable/disable ghost text suggestions</li>
+    </ul>
+    <h3>Project Rules Commands:</h3>
+    <ul>
+      <li><strong>Open Project Rules:</strong> View/edit .codebuddy/rules.md</li>
+      <li><strong>Initialize Project Rules:</strong> Create rules.md template</li>
+      <li><strong>Reload Project Rules:</strong> Refresh rules from file</li>
+    </ul>
+    <p>Search for "CodeBuddy" in the Command Palette to see all available commands.</p>`,
+  },
+  {
+    question: "WHAT KEYBOARD SHORTCUTS ARE AVAILABLE?",
+    answer: `<p>CodeBuddy provides keyboard shortcuts for quick access to common features:</p>
+    <h3>Code Actions (require text selection):</h3>
+    <ul>
+      <li><strong>Add Comment:</strong> <code>Cmd+Shift+J</code> (Mac) / <code>Ctrl+Shift+J</code> (Win)</li>
+      <li><strong>Review Code:</strong> <code>Cmd+Shift+R</code> (Mac) / <code>Ctrl+Shift+R</code> (Win)</li>
+      <li><strong>Refactor:</strong> <code>Cmd+Shift+;</code> (Mac) / <code>Ctrl+Shift+;</code> (Win)</li>
+      <li><strong>Optimize:</strong> <code>Cmd+Shift+0</code> (Mac) / <code>Ctrl+Shift+0</code> (Win)</li>
+      <li><strong>Explain Code:</strong> <code>Cmd+Shift+1</code> (Mac) / <code>Ctrl+Shift+1</code> (Win)</li>
+      <li><strong>Generate Diagram:</strong> <code>Cmd+Shift+7</code> (Mac) / <code>Ctrl+Shift+7</code> (Win)</li>
+    </ul>
+    <h3>Global Shortcuts:</h3>
+    <ul>
+      <li><strong>Generate Commit:</strong> <code>Cmd+Shift+2</code> (Mac) / <code>Ctrl+Shift+2</code> (Win)</li>
+      <li><strong>Codebase Analysis:</strong> <code>Cmd+Shift+6</code> (Mac) / <code>Ctrl+Shift+6</code> (Win)</li>
+      <li><strong>Inline Chat:</strong> <code>Cmd+Shift+8</code> (Mac) / <code>Ctrl+Shift+8</code> (Win)</li>
+      <li><strong>Open Project Rules:</strong> <code>Cmd+Shift+9</code> (Mac) / <code>Ctrl+Shift+9</code> (Win)</li>
+    </ul>
+    <p><strong>Tip:</strong> You can also access all commands from the right-click context menu when you have code selected!</p>`,
+  },
+  {
+    question: "CHAT MODE VS AGENT MODE - WHAT'S THE DIFFERENCE?",
+    answer: `<p>CodeBuddy offers two distinct modes for different use cases:</p>
+    <h3>Chat Mode (Ask Mode):</h3>
+    <ul>
+      <li><strong>Simple Q&A:</strong> Ask coding questions and get responses</li>
+      <li><strong>No File Modifications:</strong> The AI cannot directly edit files</li>
+      <li><strong>Faster Responses:</strong> Less overhead, quicker for simple questions</li>
+      <li><strong>Best For:</strong> Quick questions, learning concepts, getting code snippets</li>
+    </ul>
+    <h3>Agent Mode:</h3>
+    <ul>
+      <li><strong>Autonomous Execution:</strong> The AI can read/write files, run commands, search the web</li>
+      <li><strong>Multi-Step Tasks:</strong> Can complete complex tasks involving multiple files</li>
+      <li><strong>Tool Access:</strong> Full access to CodeBuddy's tool suite</li>
+      <li><strong>Approval System:</strong> You can review and approve actions before execution</li>
+      <li><strong>Best For:</strong> Refactoring, implementing features, debugging, project-wide changes</li>
+    </ul>
+    <h3>When to Use Each:</h3>
+    <ul>
+      <li><strong>Use Chat Mode</strong> when you need quick answers or want to stay in control of all edits</li>
+      <li><strong>Use Agent Mode</strong> when you want the AI to actively help implement changes</li>
+    </ul>
+    <p>Switch between modes using the dropdown at the top of the sidebar or in Settings → Agents.</p>`,
   },
   {
     question: "WHAT IS THE ACTIVE WORKSPACE",
@@ -291,7 +439,17 @@ export const faqItems: FAQItem[] = [
 
   {
     question: "APPLICATION GIVES CONTINUOUS ERROR",
-    answer: "Clear your History.",
+    answer: `<p>If you're experiencing continuous errors, try these troubleshooting steps:</p>
+    <ol>
+      <li><strong>Clear Chat History:</strong> Go to Settings (gear icon) → Conversation or Privacy → Clear Chat History</li>
+      <li><strong>Check API Key:</strong> Ensure your API key is correctly entered in VS Code settings</li>
+      <li><strong>Verify Model Selection:</strong> Make sure you've selected a model that matches your API key</li>
+      <li><strong>Check Connection:</strong> For cloud models, ensure you have internet connectivity</li>
+      <li><strong>Local Model Issues:</strong> Verify Ollama/LM Studio is running and the model is loaded</li>
+      <li><strong>Restart VS Code:</strong> Sometimes a fresh restart resolves connection issues</li>
+      <li><strong>Check Output Panel:</strong> View → Output → Select "CodeBuddy" to see detailed error logs</li>
+    </ol>
+    <p>If issues persist, please report them on our <a href="https://github.com/olasunkanmi-SE/codebuddy/issues">GitHub Issues</a> page with the error details.</p>`,
   },
   {
     question: "DATA PRIVACY",

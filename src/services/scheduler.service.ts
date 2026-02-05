@@ -60,15 +60,20 @@ export class SchedulerService {
         // First time running, create the task entry
         this.dbService.executeSqlCommand(
           `INSERT INTO scheduled_tasks (name, cron_expression, command, status) 
-                     VALUES ('daily_news', '0 9 * * *', 'news:fetch', 'active')`,
+                     VALUES ('daily_news', '0 10 * * *', 'news:fetch', 'active')`,
         );
-        shouldRun = true;
+        // Only run if it's past 10 AM
+        if (now.getHours() >= 10) {
+          shouldRun = true;
+        }
       } else {
         const lastRun = lastRunResults[0].last_run
           ? new Date(lastRunResults[0].last_run)
           : null;
         if (!lastRun) {
-          shouldRun = true;
+          if (now.getHours() >= 10) {
+            shouldRun = true;
+          }
         } else {
           // Check if last run was on a previous day
           if (
@@ -76,14 +81,19 @@ export class SchedulerService {
             lastRun.getMonth() !== now.getMonth() ||
             lastRun.getFullYear() !== now.getFullYear()
           ) {
-            shouldRun = true;
+            // Only run if it's past 10 AM
+            if (now.getHours() >= 10) {
+              shouldRun = true;
+            }
           }
         }
       }
 
       if (shouldRun) {
         this.logger.info("Executing scheduled task: daily_news");
-        await NewsService.getInstance().fetchAndStoreNews();
+        const newsService = NewsService.getInstance();
+        await newsService.fetchAndStoreNews();
+        await newsService.cleanupOldNews(7);
 
         // Update last_run
         this.dbService.executeSqlCommand(
