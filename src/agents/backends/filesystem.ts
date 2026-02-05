@@ -41,6 +41,8 @@ import type {
   EditResult,
 } from "deepagents";
 
+import { DiffReviewService } from "../../services/diff-review.service";
+
 type StateAndStore = Parameters<BackendFactory>[0];
 
 /** Type for a JS wrapper that runs ripgrep and returns stdout (string). */
@@ -457,13 +459,19 @@ class VscodeFsBackend implements BackendProtocol {
             throw error;
           }
         }
+
+        // Ensure parent directory exists
         await fsp.mkdir(path.dirname(abs), { recursive: true });
-        const tmp = `${abs}.tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-        await fsp.writeFile(tmp, content, { encoding: "utf-8" });
-        await fsp.rename(tmp, abs);
+        // Track change through DiffReviewService (auto-applies by default)
+        const diffService = DiffReviewService.getInstance();
+        const change = await diffService.addPendingChange(abs, content);
 
-        return { path: filePath, filesUpdate: null };
+        return {
+          path: filePath,
+          filesUpdate: null,
+          pendingChangeId: change.id,
+        } as WriteResult;
       } catch (err: any) {
         return { error: String(err?.message ?? err) };
       }
@@ -511,10 +519,16 @@ class VscodeFsBackend implements BackendProtocol {
             current.slice(idx + oldString.length);
         }
 
-        const tmp = `${abs}.tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        await fsp.writeFile(tmp, newContent, { encoding: "utf-8" });
-        await fsp.rename(tmp, abs);
-        return { path: filePath, filesUpdate: null, occurrences };
+        // Track change through DiffReviewService (auto-applies by default)
+        const diffService = DiffReviewService.getInstance();
+        const change = await diffService.addPendingChange(abs, newContent);
+
+        return {
+          path: filePath,
+          filesUpdate: null,
+          occurrences,
+          pendingChangeId: change.id,
+        } as EditResult;
       } catch (err: any) {
         return { error: String(err?.message ?? err) };
       }

@@ -313,6 +313,51 @@ export async function activate(context: vscode.ExtensionContext) {
       ),
     );
 
+    // Wire DiffReviewService events to Orchestrator
+    context.subscriptions.push(
+      diffReviewService.onChangeEvent((event) => {
+        const orchestrator = Orchestrator.getInstance();
+        switch (event.type) {
+          case "added":
+            orchestrator.publish("onPendingChange", {
+              type: "added",
+              change: {
+                id: event.change.id,
+                filePath: event.change.filePath,
+                timestamp: event.change.timestamp,
+                status: event.change.status,
+                isNewFile: event.change.isNewFile,
+              },
+            });
+            break;
+          case "applied":
+            orchestrator.publish("onChangeApplied", {
+              type: "applied",
+              change: {
+                id: event.change.id,
+                filePath: event.change.filePath,
+                timestamp: event.change.timestamp,
+                status: event.change.status,
+                isNewFile: event.change.isNewFile,
+              },
+            });
+            break;
+          case "rejected":
+            orchestrator.publish("onChangeRejected", {
+              type: "rejected",
+              change: {
+                id: event.change.id,
+                filePath: event.change.filePath,
+                timestamp: event.change.timestamp,
+                status: event.change.status,
+                isNewFile: event.change.isNewFile,
+              },
+            });
+            break;
+        }
+      }),
+    );
+
     // Register Review Commands
     context.subscriptions.push(
       vscode.commands.registerCommand(

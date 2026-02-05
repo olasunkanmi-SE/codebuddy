@@ -81,6 +81,14 @@ export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
   onExecuting: vscode.Event<IEventPayload> = this.createEvent("onExecuting");
   onWorking: vscode.Event<IEventPayload> = this.createEvent("onWorking");
 
+  // Diff review events for file change tracking
+  onPendingChange: vscode.Event<IEventPayload> =
+    this.createEvent("onPendingChange");
+  onChangeApplied: vscode.Event<IEventPayload> =
+    this.createEvent("onChangeApplied");
+  onChangeRejected: vscode.Event<IEventPayload> =
+    this.createEvent("onChangeRejected");
+
   /**
    * Emits a generic event with specified status, message, and optional data.
    *

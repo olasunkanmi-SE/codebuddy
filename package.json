@@ -530,6 +530,11 @@
             "default": "1",
             "description": "Maximum file size in MB for context gathering"
           },
+          "codebuddy.requireDiffApproval": {
+            "type": "boolean",
+            "default": false,
+            "description": "Require manual approval before agent file changes are applied"
+          },
           "codebuddy.completion.enabled": {
             "type": "boolean",
             "default": true,

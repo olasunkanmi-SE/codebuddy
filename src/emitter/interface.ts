@@ -52,7 +52,11 @@ type AgentEventKeys =
   | "onSearching"
   | "onAnalyzing"
   | "onExecuting"
-  | "onWorking";
+  | "onWorking"
+  // Diff review events
+  | "onPendingChange"
+  | "onChangeApplied"
+  | "onChangeRejected";
 export type IAgentEventMap = Record<AgentEventKeys, IEventPayload>;
 
 export interface IEventPayload {
