@@ -73,6 +73,58 @@ export class PersistentCodebaseUnderstandingService {
   // }
 
   /**
+   * Initialize the service and set up watchers
+   */
+  public initializeWatcher(context: vscode.ExtensionContext): void {
+    // Watch for .git/HEAD changes to detect branch switches
+    const gitHeadWatcher =
+      vscode.workspace.createFileSystemWatcher("**/.git/HEAD");
+
+    gitHeadWatcher.onDidChange(() => {
+      this.logger.info("Detected git branch change");
+      this.handleGitBranchChange();
+    });
+
+    context.subscriptions.push(gitHeadWatcher);
+  }
+
+  /**
+   * Handle git branch change
+   */
+  private async handleGitBranchChange(): Promise<void> {
+    try {
+      const gitState = await this.databaseService.getCurrentGitState();
+      if (!gitState) return;
+
+      // Check if we have a cache for this new state
+      const cached =
+        await this.databaseService.getCachedCodebaseAnalysis(gitState);
+
+      if (!cached) {
+        // Option 1: Silent auto-analysis
+        // this.performFreshAnalysis(gitState);
+
+        // Option 2: Notify user (less intrusive than auto-running heavy task)
+        const choice = await vscode.window.showInformationMessage(
+          `CodeBuddy: Detected branch switch to '${gitState.branch}'. No cached analysis found.`,
+          "Analyze Now",
+          "Later",
+        );
+
+        if (choice === "Analyze Now") {
+          vscode.commands.executeCommand("CodeBuddy.codebaseAnalysis");
+        }
+      } else {
+        this.logger.info(
+          `Switched to branch '${gitState.branch}', found valid cache.`,
+        );
+      }
+    } catch (error) {
+      this.logger.error("Error handling git branch change", error);
+    }
+  }
+
+  /**
    * Get comprehensive codebase analysis with intelligent caching
    */
   async getComprehensiveAnalysis(

@@ -12,12 +12,12 @@ const ThinkingContainer = styled.div`
   margin: 16px 0;
   border-radius: 8px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.2);
+    border-color: var(--vscode-focusBorder, rgba(255, 255, 255, 0.2));
   }
 `;
 
@@ -70,8 +70,8 @@ const ThinkingChevron = styled.span<{ $isExpanded: boolean }>`
 `;
 
 const ThinkingContent = styled.div`
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(0, 0, 0, 0.1);
+  border-top: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.05));
+  background: transparent;
 `;
 
 const ThinkingContentHeader = styled.div`
@@ -79,8 +79,8 @@ const ThinkingContentHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.02);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.05));
 `;
 
 const ThinkingExpandText = styled.div`

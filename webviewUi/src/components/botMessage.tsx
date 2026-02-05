@@ -138,11 +138,11 @@ export const BotMessage: React.FC<BotMessageProps> = ({
   return (
     <div className="bot-message">
       <div className="bot-message-actions">
-        {isStreaming && (
+        {/* {isStreaming && (
           <span className="streaming-status">
             Generating...
           </span>
-        )}
+        )} */}
         <div className="action-buttons">
           <DownloadIcon onClick={handleCopyMarkdown} />
         </div>
@@ -155,7 +155,7 @@ export const BotMessage: React.FC<BotMessageProps> = ({
       ) : (
         <div style={{ position: "relative" }}>
           <ThinkingComponent content={content} />
-          {isStreaming && (
+          {/* {isStreaming && (
             <span 
               className="streaming-cursor"
               style={{
@@ -167,7 +167,7 @@ export const BotMessage: React.FC<BotMessageProps> = ({
                 animation: "blink 1s infinite",
               }}
             />
-          )}
+          )} */}
         </div>
       )}
     </div>
