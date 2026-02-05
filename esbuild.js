@@ -186,7 +186,7 @@ async function main() {
 
   // Worker bundle
   const workerCtx = await esbuild.context({
-    entryPoints: ["src/workers/ast-analyzer.worker.ts"],
+    entryPoints: ["src/workers/ast-analyzer.worker.ts", "src/workers/codebase-analysis.worker.ts"],
     bundle: true,
     external: [
       "vscode",
@@ -202,7 +202,7 @@ async function main() {
     platform: "node",
     minify: production,
     sourcemap: !production,
-    outfile: "dist/workers/ast-analyzer.worker.js",
+    outdir: "dist/workers",
     metafile: true,
     logLevel: "info",
     plugins: [nodeModulesPlugin, treeShakingPlugin],

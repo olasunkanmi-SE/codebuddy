@@ -2,16 +2,19 @@ import * as vscode from "vscode";
 import { SqliteDatabaseService } from "./sqlite-database.service";
 import { NewsService } from "./news.service";
 import { Logger } from "../infrastructure/logger/logger";
+import { CodeHealthTask } from "./tasks/code-health.task"; // Import the new task
 
 export class SchedulerService {
   private static instance: SchedulerService;
   private dbService: SqliteDatabaseService;
   private logger: Logger;
   private intervalId: NodeJS.Timeout | undefined;
+  private codeHealthTask: CodeHealthTask;
 
   private constructor() {
     this.dbService = SqliteDatabaseService.getInstance();
     this.logger = Logger.initialize("SchedulerService", {});
+    this.codeHealthTask = new CodeHealthTask();
   }
 
   public static getInstance(): SchedulerService {
@@ -68,6 +71,14 @@ export class SchedulerService {
           vscode.window.showInformationMessage(
             "CodeBuddy: Afternoon tech news update! 🌇",
           );
+        });
+      }
+
+      // --- Task 3: Code Health Check (9 AM - Daily Standup) ---
+      if (currentHour >= 9) {
+        await this.tryRunTask("code_health_daily", async () => {
+          this.logger.info("Executing scheduled task: code_health_daily");
+          await this.codeHealthTask.execute();
         });
       }
     } catch (error) {

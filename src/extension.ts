@@ -232,6 +232,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize ContextRetriever for semantic search
     const contextRetriever = ContextRetriever.initialize(context);
 
+    // Initialize Persistent Codebase Service and Git Watcher
+    const persistentCodebaseService =
+      PersistentCodebaseUnderstandingService.getInstance();
+    persistentCodebaseService.initializeWatcher(context);
+
     // Auto-index files on save using the optimized Worker Service
     context.subscriptions.push(
       vscode.workspace.onDidSaveTextDocument((document) => {

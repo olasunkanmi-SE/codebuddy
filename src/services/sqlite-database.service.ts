@@ -1,6 +1,7 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import * as fs from "fs";
+import simpleGit from "simple-git";
 import { Logger } from "../infrastructure/logger/logger";
 import { LogLevel } from "./telemetry";
 import { PersistentCodebaseAnalysis } from "./persistent-codebase-understanding.service";
@@ -340,6 +341,24 @@ export class SqliteDatabaseService {
       return null;
     }
 
+    let branch = "workspace";
+    let commitHash = "local";
+
+    try {
+      const git = simpleGit(workspaceRoot);
+      const isRepo = await git.checkIsRepo();
+      if (isRepo) {
+        const status = await git.status();
+        branch = status.current || "detached";
+        const log = await git.log({ maxCount: 1 });
+        if (log.latest) {
+          commitHash = log.latest.hash;
+        }
+      }
+    } catch (error) {
+      this.logger.warn("Failed to get git details via simple-git", error);
+    }
+
     try {
       const files = await vscode.workspace.findFiles(
         "**/*",
@@ -349,11 +368,10 @@ export class SqliteDatabaseService {
       const fileCount = files.length;
       const diffHash = await this.createDiffHash(files);
 
-      // Branch/commit are not tracked here; provide placeholders
       return {
         workspacePath: workspaceRoot,
-        branch: "workspace",
-        commitHash: "local",
+        branch,
+        commitHash,
         diffHash,
         fileCount,
       };
@@ -361,8 +379,8 @@ export class SqliteDatabaseService {
       this.logger.warn("Failed to compute git state, using fallback", error);
       return {
         workspacePath: workspaceRoot,
-        branch: "workspace",
-        commitHash: "local",
+        branch,
+        commitHash,
         diffHash: await this.createSimpleDiffHash(),
         fileCount: 0,
       };
