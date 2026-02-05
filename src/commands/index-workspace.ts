@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { ContextRetriever } from "../services/context-retriever";
+import { AstIndexingService } from "../services/ast-indexing.service";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 const logger = Logger.initialize("IndexWorkspace", {
@@ -10,11 +10,11 @@ const logger = Logger.initialize("IndexWorkspace", {
 });
 
 export async function indexWorkspaceCommand(): Promise<void> {
-  const contextRetriever = ContextRetriever.initialize();
+  const astIndexer = AstIndexingService.getInstance(); // Singleton already initialized
 
   // Find all files, excluding common ignored folders
   const files = await vscode.workspace.findFiles(
-    "**/*",
+    "**/*.{ts,js,tsx,jsx,py,java,go,rs,cpp,h,c}", // Limit to code files for AST analysis
     "**/{node_modules,.git,dist,out,build,coverage,.codebuddy}/**",
   );
 
@@ -26,7 +26,7 @@ export async function indexWorkspaceCommand(): Promise<void> {
   vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: "Indexing Workspace",
+      title: "Indexing Workspace (Background Worker)",
       cancellable: true,
     },
     async (progress, token) => {
@@ -34,31 +34,26 @@ export async function indexWorkspaceCommand(): Promise<void> {
       const total = files.length;
 
       for (const file of files) {
-        if (token.isCancellationRequested) {
-          break;
-        }
+        if (token.isCancellationRequested) break;
 
         try {
           progress.report({
-            message: `Indexing ${processed}/${total}: ${vscode.workspace.asRelativePath(file)}`,
+            message: `Queueing ${processed}/${total}: ${vscode.workspace.asRelativePath(file)}`,
             increment: (1 / total) * 100,
           });
+
           const document = await vscode.workspace.openTextDocument(file);
-          // Skip very large files or binary files if possible (openTextDocument handles binary check implicitly by failing or returning weird stuff, but we can check languageId?)
-          if (document.lineCount > 5000) {
-            logger.warn(`Skipping large file: ${file.fsPath}`);
-            continue;
-          }
-          await contextRetriever.indexFile(file.fsPath, document.getText());
+          // Offload to worker
+          astIndexer.indexFile(file.fsPath, document.getText());
         } catch (error) {
-          logger.error(`Failed to index file: ${file.fsPath}`, error);
+          logger.error(`Failed to queue file: ${file.fsPath}`, error);
         }
 
         processed++;
       }
 
       vscode.window.showInformationMessage(
-        `Workspace indexing complete. Indexed ${processed} files.`,
+        `Workspace indexing queued for ${processed} files. Check logs for completion.`,
       );
     },
   );

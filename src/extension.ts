@@ -57,6 +57,7 @@ import { AgentRunningGuardService } from "./services/agent-running-guard.service
 
 import { DiffReviewService } from "./services/diff-review.service";
 import { SecretStorageService } from "./services/secret-storage";
+import { AstIndexingService } from "./services/ast-indexing.service";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -207,6 +208,10 @@ export async function activate(context: vscode.ExtensionContext) {
     const terminal = Terminal.getInstance();
     terminal.setExtensionPath(context.extensionPath);
 
+    // Initialize AST Indexing Service (Worker Thread Manager)
+    AstIndexingService.getInstance(context);
+    logger.info("AST Indexing Service initialized");
+
     new DeveloperAgent({});
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
     // setConfigValue("generativeAi.option", "Gemini");
@@ -227,9 +232,9 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize ContextRetriever for semantic search
     const contextRetriever = ContextRetriever.initialize(context);
 
-    // Auto-index files on save
+    // Auto-index files on save using the optimized Worker Service
     context.subscriptions.push(
-      vscode.workspace.onDidSaveTextDocument(async (document) => {
+      vscode.workspace.onDidSaveTextDocument((document) => {
         // Skip irrelevant files
         if (
           document.languageId === "git-commit" ||
@@ -242,8 +247,8 @@ export async function activate(context: vscode.ExtensionContext) {
         }
 
         try {
-          // Index the updated file content
-          await contextRetriever.indexFile(
+          // Offload indexing to the worker thread
+          AstIndexingService.getInstance().indexFile(
             document.fileName,
             document.getText(),
           );

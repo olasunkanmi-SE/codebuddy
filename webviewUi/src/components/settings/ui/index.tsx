@@ -129,10 +129,11 @@ interface ToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  title?: string;
 }
 
-export const Toggle: React.FC<ToggleProps> = ({ checked, onChange, disabled }) => (
-  <ToggleSwitchContainer>
+export const Toggle: React.FC<ToggleProps> = ({ checked, onChange, disabled, title }) => (
+  <ToggleSwitchContainer title={title}>
     <ToggleInput
       type="checkbox"
       checked={checked}

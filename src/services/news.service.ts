@@ -37,28 +37,43 @@ export class NewsService {
   public async fetchAndStoreNews(): Promise<void> {
     try {
       await this.ensureInitialized();
-      this.logger.info("Fetching news from Hacker News...");
+      this.logger.info("Fetching curated news from Dev.to...");
 
-      // Get top stories IDs
-      const { data: topStories } = await axios.get<number[]>(
-        "https://hacker-news.firebaseio.com/v0/topstories.json",
-      );
+      // Define interests and distribution for 5 items
+      // 2 AI/Agents, 2 Architecture, 1 Leadership
+      const categories = [
+        { tag: "ai", count: 2 },
+        { tag: "architecture", count: 2 },
+        { tag: "leadership", count: 1 },
+      ];
 
-      // Get details for top 5 stories
-      const top5 = topStories.slice(0, 5);
       const newsItems: NewsItem[] = [];
 
-      for (const id of top5) {
-        const { data: story } = await axios.get(
-          `https://hacker-news.firebaseio.com/v0/item/${id}.json`,
-        );
-        if (story && story.url) {
-          newsItems.push({
-            title: story.title,
-            url: story.url,
-            source: "Hacker News",
-            published_at: new Date(story.time * 1000).toISOString(),
+      for (const cat of categories) {
+        try {
+          const { data } = await axios.get("https://dev.to/api/articles", {
+            params: {
+              tag: cat.tag,
+              per_page: cat.count,
+              // 'fresh' ensures we get new articles, or we can use default (hot/rising)
+              // using default to ensure quality
+            },
+            timeout: 5000,
           });
+
+          if (Array.isArray(data)) {
+            data.forEach((article: any) => {
+              newsItems.push({
+                title: article.title,
+                url: article.url,
+                source: "Dev.to", // or `Dev.to (${cat.tag})`
+                published_at: article.published_at || new Date().toISOString(),
+                summary: article.description,
+              });
+            });
+          }
+        } catch (err) {
+          this.logger.error(`Failed to fetch articles for tag ${cat.tag}`, err);
         }
       }
 
@@ -73,9 +88,15 @@ export class NewsService {
 
         if (existing.length === 0) {
           this.dbService.executeSqlCommand(
-            `INSERT INTO news_items (title, url, source, published_at, read_status) 
-                         VALUES (?, ?, ?, ?, 0)`,
-            [item.title, item.url, item.source, item.published_at],
+            `INSERT INTO news_items (title, url, source, published_at, read_status, summary) 
+                         VALUES (?, ?, ?, ?, 0, ?)`,
+            [
+              item.title,
+              item.url,
+              item.source,
+              item.published_at,
+              item.summary || "",
+            ],
           );
         }
       }

@@ -44,70 +44,81 @@ export class SchedulerService {
 
   private async checkTasks(): Promise<void> {
     try {
-      // For now, we'll hardcode the "Morning News" task logic
-      // In a full implementation, we would query the `scheduled_tasks` table
-      // and parse cron expressions.
-
-      // Check if we fetched news today
-      const lastRunResults = this.dbService.executeSql(
-        `SELECT last_run FROM scheduled_tasks WHERE name = 'daily_news'`,
-      );
-
+      const newsService = NewsService.getInstance();
       const now = new Date();
-      let shouldRun = false;
+      const currentHour = now.getHours();
 
-      if (lastRunResults.length === 0) {
-        // First time running, create the task entry
-        this.dbService.executeSqlCommand(
-          `INSERT INTO scheduled_tasks (name, cron_expression, command, status) 
-                     VALUES ('daily_news', '0 10 * * *', 'news:fetch', 'active')`,
-        );
-        // Only run if it's past 10 AM
-        if (now.getHours() >= 10) {
-          shouldRun = true;
-        }
-      } else {
-        const lastRun = lastRunResults[0].last_run
-          ? new Date(lastRunResults[0].last_run)
-          : null;
-        if (!lastRun) {
-          if (now.getHours() >= 10) {
-            shouldRun = true;
-          }
-        } else {
-          // Check if last run was on a previous day
-          if (
-            lastRun.getDate() !== now.getDate() ||
-            lastRun.getMonth() !== now.getMonth() ||
-            lastRun.getFullYear() !== now.getFullYear()
-          ) {
-            // Only run if it's past 10 AM
-            if (now.getHours() >= 10) {
-              shouldRun = true;
-            }
-          }
-        }
+      // --- Task 1: Morning News (10 AM) ---
+      if (currentHour >= 10) {
+        await this.tryRunTask("news_morning", async () => {
+          this.logger.info("Executing scheduled task: news_morning");
+          await newsService.fetchAndStoreNews();
+          await newsService.cleanupOldNews(7);
+          vscode.window.showInformationMessage(
+            "CodeBuddy: Morning tech news arrived! ☕",
+          );
+        });
       }
 
-      if (shouldRun) {
-        this.logger.info("Executing scheduled task: daily_news");
-        const newsService = NewsService.getInstance();
-        await newsService.fetchAndStoreNews();
-        await newsService.cleanupOldNews(7);
-
-        // Update last_run
-        this.dbService.executeSqlCommand(
-          `UPDATE scheduled_tasks SET last_run = ? WHERE name = 'daily_news'`,
-          [now.toISOString()],
-        );
-
-        // Notify user
-        vscode.window.showInformationMessage(
-          "CodeBuddy: Daily software news fetched!",
-        );
+      // --- Task 2: Afternoon News (3 PM) ---
+      if (currentHour >= 15) {
+        await this.tryRunTask("news_afternoon", async () => {
+          this.logger.info("Executing scheduled task: news_afternoon");
+          await newsService.fetchAndStoreNews();
+          vscode.window.showInformationMessage(
+            "CodeBuddy: Afternoon tech news update! 🌇",
+          );
+        });
       }
     } catch (error) {
       this.logger.error("Error in Scheduler Service", error);
+    }
+  }
+
+  private async tryRunTask(
+    taskName: string,
+    action: () => Promise<void>,
+  ): Promise<void> {
+    const lastRunResults = this.dbService.executeSql(
+      `SELECT last_run FROM scheduled_tasks WHERE name = ?`,
+      [taskName],
+    );
+
+    let shouldRun = false;
+    const now = new Date();
+
+    if (lastRunResults.length === 0) {
+      // Initialize task entry
+      this.dbService.executeSqlCommand(
+        `INSERT INTO scheduled_tasks (name, cron_expression, command, status, last_run) 
+         VALUES (?, '', 'news:fetch', 'active', NULL)`,
+        [taskName],
+      );
+      shouldRun = true;
+    } else {
+      const lastRunStr = lastRunResults[0].last_run;
+      if (!lastRunStr) {
+        shouldRun = true;
+      } else {
+        const lastRun = new Date(lastRunStr);
+        // Run if last run was on a different day
+        if (
+          lastRun.getDate() !== now.getDate() ||
+          lastRun.getMonth() !== now.getMonth() ||
+          lastRun.getFullYear() !== now.getFullYear()
+        ) {
+          shouldRun = true;
+        }
+      }
+    }
+
+    if (shouldRun) {
+      await action();
+      // Update last_run
+      this.dbService.executeSqlCommand(
+        `UPDATE scheduled_tasks SET last_run = ? WHERE name = ?`,
+        [now.toISOString(), taskName],
+      );
     }
   }
 }

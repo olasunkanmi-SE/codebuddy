@@ -79,6 +79,7 @@ interface ConfigData {
   contextWindow?: string;
   includeHidden?: boolean;
   maxFileSize?: string;
+  compactMode?: boolean;
 }
 
 export const WebviewUI = () => {
@@ -105,6 +106,7 @@ export const WebviewUI = () => {
   const [contextWindow, setContextWindow] = useState("16k");
   const [includeHidden, setIncludeHidden] = useState(false);
   const [maxFileSize, setMaxFileSize] = useState("1");
+  const [compactMode, setCompactMode] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [fileChangesPanelCollapsed, setFileChangesPanelCollapsed] = useState(true);
   const [newsItems, setNewsItems] = useState<any[]>([]);
@@ -223,6 +225,10 @@ export const WebviewUI = () => {
         if (data.enableStreaming !== undefined) {
           setEnableStreaming(data.enableStreaming);
         }
+        // Handle configuration changes for compact mode
+        if (data["codebuddy.compactMode"] !== undefined) {
+          setCompactMode(data["codebuddy.compactMode"]);
+        }
         break;
       }
 
@@ -266,6 +272,9 @@ export const WebviewUI = () => {
         }
         if (data.maxFileSize) {
           setMaxFileSize(data.maxFileSize);
+        }
+        if (data.compactMode !== undefined) {
+          setCompactMode(data.compactMode);
         }
         break;
       }
@@ -441,13 +450,14 @@ export const WebviewUI = () => {
     contextWindow: contextWindow,
     includeHidden: includeHidden,
     maxFileSize: maxFileSize,
+    compactMode: compactMode,
     selectedModel: selectedModel,
     username: username,
     accountType: 'Free',
     customRules: customRules,
     customSystemPrompt: customSystemPrompt,
     subagents: subagents,
-  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, selectedModel, customRules, customSystemPrompt, subagents]);
+  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents]);
 
   const settingsOptions = useMemo<SettingsOptions>(() => ({
     themeOptions: themeOptions,
@@ -522,6 +532,10 @@ export const WebviewUI = () => {
       setMaxFileSize(value);
       vsCode.postMessage({ command: "max-file-size-change-event", message: value });
     },
+    onCompactModeChange: (enabled: boolean) => {
+      setCompactMode(enabled);
+      vsCode.postMessage({ command: "compact-mode-change-event", message: enabled });
+    },
     onReindexWorkspace: () => {
       vsCode.postMessage({ command: "reindex-workspace-event" });
     },
@@ -589,7 +603,7 @@ export const WebviewUI = () => {
         <VSCodePanelTab id="tab-3">NEWS</VSCodePanelTab>
         <VSCodePanelView id="view-1">
           <div className="panel-body-scroll">
-            <div className="chat-content">
+            <div className={`chat-content ${compactMode ? 'compact-mode' : ''}`}>
               <div className="dropdown-container">
                 <div style={{ minWidth: 0, maxWidth: "100%" }}>
                   {/* Show welcome screen when there are no messages */}

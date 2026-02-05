@@ -484,6 +484,11 @@
             "default": true,
             "description": "Enable streaming responses from AI models"
           },
+          "codebuddy.compactMode": {
+            "type": "boolean",
+            "default": false,
+            "description": "Reduce spacing between messages for a denser view"
+          },
           "codebuddy.nickname": {
             "type": "string",
             "default": "",

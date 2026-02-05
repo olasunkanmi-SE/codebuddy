@@ -857,6 +857,19 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 );
               break;
 
+            case "compact-mode-change-event":
+              this.logger.info(
+                `Compact mode preference changed to: ${message.message}`,
+              );
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.compactMode",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              break;
+
             case "auto-approve-change-event":
               this.logger.info(
                 `Auto-approve preference changed to: ${message.message}`,
