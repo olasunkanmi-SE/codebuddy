@@ -36,6 +36,13 @@ import { LangChainWebPreviewTool } from "./web_preview";
 import { LangChainSearchTool } from "./search";
 import { LangChainTodoTool } from "./todo";
 import { LangChainMemoryTool } from "./memory";
+import {
+  DebugControlTool,
+  DebugEvaluateTool,
+  DebugGetStackTraceTool,
+  DebugGetStateTool,
+  DebugGetVariablesTool,
+} from "./debugger";
 
 const logger = Logger.initialize("ToolProvider", {
   minLevel: LogLevel.DEBUG,
@@ -147,6 +154,36 @@ class SearchToolFactory implements IToolFactory {
   constructor(private contextRetriever: ContextRetriever) {}
   createTool(): StructuredTool<any> {
     return new LangChainSearchTool(new SearchTool(this.contextRetriever));
+  }
+}
+
+class DebugGetStateToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new DebugGetStateTool();
+  }
+}
+
+class DebugGetStackTraceToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new DebugGetStackTraceTool();
+  }
+}
+
+class DebugGetVariablesToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new DebugGetVariablesTool();
+  }
+}
+
+class DebugEvaluateToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new DebugEvaluateTool();
+  }
+}
+
+class DebugControlToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new DebugControlTool();
   }
 }
 
@@ -282,6 +319,23 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "search_vector_db",
     "manage_terminal",
   ],
+  debugger: [
+    "debug_get_state",
+    "debug_get_stack_trace",
+    "debug_get_variables",
+    "debug_evaluate",
+    "debug_control",
+    "analyze",
+    "read",
+    "search",
+    "terminal",
+    "run",
+    "command",
+    "list_files",
+    "edit_file",
+    "ripgrep_search",
+    "get_diagnostics",
+  ],
 };
 
 export class ToolProvider {
@@ -313,6 +367,11 @@ export class ToolProvider {
       new SearchToolFactory(this.contextRetriever),
       new TodoToolFactory(),
       new MemoryToolFactory(),
+      new DebugGetStateToolFactory(),
+      new DebugGetStackTraceToolFactory(),
+      new DebugGetVariablesToolFactory(),
+      new DebugEvaluateToolFactory(),
+      new DebugControlToolFactory(),
     ];
 
     // Deduplicate tools during initialization

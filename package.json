@@ -291,7 +291,7 @@
               "GLM",
               "Local"
             ],
-            "default": "Gemini",
+            "default": "Groq",
             "description": "Select Model"
           },
           "tavily.apiKey": {

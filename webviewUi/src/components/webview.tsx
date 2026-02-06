@@ -85,9 +85,9 @@ interface ConfigData {
 export const WebviewUI = () => {
   // State variables
   const [selectedTheme, setSelectedTheme] = useState("tokyo night");
-  const [selectedModel, setSelectedModel] = useState("Gemini");
-  // Default to Agent so the streaming pipeline is used during testing
-  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Agent");
+  const [selectedModel, setSelectedModel] = useState("Groq");
+  // Default to Ask mode for conversational interactions
+  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Ask");
   const [commandAction, setCommandAction] = useState<string>("");
   const [commandDescription, setCommandDescription] = useState<string>("");
   const [isCommandExecuting, setIsCommandExecuting] = useState(false);
