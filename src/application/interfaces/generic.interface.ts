@@ -86,7 +86,9 @@ export interface ICodebaseKnowledgeExtractor {}
 export interface IFileUploader {
   uploadFile(file: vscode.Uri): Promise<void>;
   getFiles(): Promise<string[]>;
-  uploadFileHandler(): Promise<void>;
+  uploadFileHandler(): Promise<
+    { fileName: string; filePath: string } | undefined
+  >;
 }
 
 export interface IWorkspaceInfo {

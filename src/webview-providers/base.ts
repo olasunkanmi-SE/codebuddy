@@ -438,7 +438,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private async publishActiveWorkspace(): Promise<void> {
     try {
       const activeEditor = vscode.window.activeTextEditor;
-      let displayName: string = "";
+      let displayName = "";
 
       // Reset the tracked active file path
       this.currentActiveFilePath = undefined;
@@ -771,9 +771,37 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "news-refresh":
               await this.synchronizeNews();
               break;
-            case "upload-file":
-              await this.fileManager.uploadFileHandler();
+            case "upload-file": {
+              const fileInfo = await this.fileManager.uploadFileHandler();
+              if (fileInfo) {
+                const ext = fileInfo.fileName.split(".").pop()?.toLowerCase();
+                const isImage = ["png", "jpg", "jpeg", "webp", "heic"].includes(
+                  ext || "",
+                );
+
+                let base64Data = "";
+                let mimeType = "";
+
+                if (isImage) {
+                  base64Data = await this.fileManager.readFileAsBase64(
+                    fileInfo.filePath,
+                  );
+                  mimeType = ext === "jpg" ? "jpeg" : ext || "png";
+                }
+
+                await this.currentWebView?.webview.postMessage({
+                  type: "onFileUploaded",
+                  payload: {
+                    ...fileInfo,
+                    isImage,
+                    data: isImage
+                      ? `data:image/${mimeType};base64,${base64Data}`
+                      : undefined,
+                  },
+                });
+              }
               break;
+            }
             case "openExternal":
               if (message.text) {
                 vscode.env.openExternal(vscode.Uri.parse(message.text));

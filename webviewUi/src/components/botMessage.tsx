@@ -6,6 +6,24 @@ import { IParseURL, parseUrl } from "../utils/parseUrl";
 import UrlCardList from "./urlCardList";
 import { ThinkingComponent } from "./thinkingComponent";
 
+const SpeakIcon = ({ onClick, speaking }: { onClick: () => void, speaking: boolean }) => (
+  <svg
+    onClick={onClick}
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ cursor: "pointer", marginLeft: "8px", color: speaking ? "var(--vscode-textLink-activeForeground)" : "inherit" }}
+  >
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+  </svg>
+);
+
 interface BotMessageProps {
   content: string;
   language?: string;
@@ -15,10 +33,34 @@ interface BotMessageProps {
 export const BotMessage: React.FC<BotMessageProps> = ({ 
   content, 
 }) => {
+  const [speaking, setSpeaking] = React.useState(false);
   const sanitizedContent = DOMPurify.sanitize(content);
   // const action = "Researching...";
   let parsedUrls: IParseURL[] = [];
   
+  const handleSpeak = () => {
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+
+    // Clean content for speech (remove thinking tags and html)
+    const textToSpeak = content
+      .replace(/<think>[\s\S]*?<\/think>/gi, "") // Remove think blocks
+      .replace(/&lt;think&gt;[\s\S]*?&lt;\/think&gt;/gi, "")
+      .replace(/<[^>]*>?/gm, '') // Remove HTML tags
+      .replace(/```[\s\S]*?```/g, "Code block skipped.") // Skip code blocks for brevity? Or read them.
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+    setSpeaking(true);
+  };
+
   if (sanitizedContent.includes("favicon")) {
     parsedUrls = parseUrl(sanitizedContent);
   }
@@ -127,6 +169,7 @@ export const BotMessage: React.FC<BotMessageProps> = ({
       <div className="bot-message-actions">
         <div className="action-buttons">
           <DownloadIcon onClick={handleCopyMarkdown} />
+          <SpeakIcon onClick={handleSpeak} speaking={speaking} />
         </div>
       </div>
       

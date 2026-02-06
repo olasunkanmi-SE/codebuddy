@@ -42,9 +42,17 @@ export class FileManager implements IFileUploader {
    * */
   async uploadFile(file: vscode.Uri): Promise<void> {
     try {
-      const content = await fs.promises.readFile(file.fsPath, "utf8");
+      const ext = path.extname(file.fsPath).toLowerCase();
+      const isImage = [".png", ".jpg", ".jpeg", ".webp", ".heic"].includes(ext);
+
+      let content: string | Buffer;
+      if (isImage) {
+        content = await fs.promises.readFile(file.fsPath);
+      } else {
+        content = await fs.promises.readFile(file.fsPath, "utf8");
+      }
+
       const fileName = path.basename(file.fsPath);
-      const files = await this.getFiles();
       // if (files.length > 0) {
       //   await this.deleteFiles(files);
       // }
@@ -55,7 +63,12 @@ export class FileManager implements IFileUploader {
         return;
       }
 
-      await fs.promises.writeFile(filePath, content);
+      if (isImage) {
+        await fs.promises.writeFile(filePath, content as any);
+      } else {
+        await fs.promises.writeFile(filePath, content as any);
+      }
+
       vscode.window.showInformationMessage(`File uploaded successfully`);
       this.orchestrator.publish(
         "onFileUpload",
@@ -84,6 +97,11 @@ export class FileManager implements IFileUploader {
       this.logger.info(`Error reading while file`);
       throw error;
     }
+  }
+
+  async readFileAsBase64(filePath: string): Promise<string> {
+    const content = await fs.promises.readFile(filePath);
+    return content.toString("base64");
   }
 
   /**
@@ -127,14 +145,16 @@ export class FileManager implements IFileUploader {
    * @returns A Promise that resolves when the upload is complete or rejected with an error
    * */
 
-  async uploadFileHandler(): Promise<void> {
-    const MAX_FILE_SIZE = 40 * 1024 * 1024; // 5MB, adjust as needed
+  async uploadFileHandler(): Promise<
+    { fileName: string; filePath: string } | undefined
+  > {
+    const MAX_FILE_SIZE = 40 * 1024 * 1024; // 40MB
     const file: vscode.Uri[] | undefined = await vscode.window.showOpenDialog({
       canSelectFiles: true,
       canSelectFolders: false,
       canSelectMany: false,
       filters: {
-        files: ["pdf", "txt", "csv"],
+        files: ["pdf", "txt", "csv", "png", "jpg", "jpeg", "webp", "heic"],
       },
     });
 
@@ -149,6 +169,10 @@ export class FileManager implements IFileUploader {
       }
 
       await this.uploadFile(file[0]);
+      return {
+        fileName: path.basename(file[0].fsPath),
+        filePath: path.join(this.fileDir, path.basename(file[0].fsPath)),
+      };
     }
   }
 

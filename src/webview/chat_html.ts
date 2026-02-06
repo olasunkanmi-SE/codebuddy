@@ -40,7 +40,8 @@ export const chartComponent = (webview: Webview, extensionUri: Uri) => {
       script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com; 
       font-src 'self' ${webview.cspSource} https://fonts.gstatic.com data:; 
       connect-src https:; 
-      img-src 'self' ${webview.cspSource} vscode-resource: https: data:;">
+      img-src 'self' ${webview.cspSource} vscode-resource: https: data:;
+      media-src 'self' ${webview.cspSource} https: data: blob:;">
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300..700&family=Space+Mono:wght@400;700&family=Fira+Code:wght@300..700&family=Source+Code+Pro:wght@300..700&family=JetBrains+Mono:wght@300..700&family=Roboto+Mono:wght@300..700&family=Ubuntu+Mono:wght@400;700&family=IBM+Plex+Mono:wght@300..700&family=Inconsolata:wght@300..700&display=swap" rel="stylesheet" />

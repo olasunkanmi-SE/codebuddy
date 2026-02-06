@@ -126,9 +126,29 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       const msg = userMessage?.length ? userMessage : message;
       const messageWithContext = `${msg} \n context: ${context ?? ""}`;
 
+      const images = metaData?.images || [];
+      const parts: any[] = [{ text: messageWithContext }];
+
+      if (images.length > 0) {
+        images.forEach((img: any) => {
+          if (img.data) {
+            const base64Data = img.data.split(",")[1] || img.data;
+            parts.push({
+              inlineData: {
+                mimeType:
+                  img.fileName.endsWith("jpg") || img.fileName.endsWith("jpeg")
+                    ? "image/jpeg"
+                    : "image/png",
+                data: base64Data,
+              },
+            });
+          }
+        });
+      }
+
       const currentMessage = Message.of({
         role: "user",
-        parts: [{ text: messageWithContext }],
+        parts: parts,
       });
 
       this.chatHistory = [...this.chatHistory, currentMessage];
@@ -152,7 +172,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         },
       });
 
-      const result = await chat.sendMessageStream(userMessage ?? message);
+      const result = await chat.sendMessageStream(parts);
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
         if (chunkText) {

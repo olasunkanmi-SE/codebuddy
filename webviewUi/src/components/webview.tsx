@@ -11,7 +11,6 @@ import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
 import { FAQAccordion } from "./accordion";
 import { AgentTimeline } from "./AgentTimeline";
-import AttachmentIcon from "./attachmentIcon";
 import ChatInput from "./ChatInput";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 import FileMention from "./FileMention";
@@ -115,6 +114,7 @@ export const WebviewUI = () => {
   const [customRules, setCustomRules] = useState<CustomRule[]>([]);
   const [customSystemPrompt, setCustomSystemPrompt] = useState("");
   const [subagents, setSubagents] = useState<SubagentConfig[]>(DEFAULT_SUBAGENTS);
+  const [images, setImages] = useState<any[]>([]);
 
   // Ref for username input element
   // const nameInputRef = useRef<HTMLInputElement>(null);
@@ -175,6 +175,12 @@ export const WebviewUI = () => {
 
       case "bootstrap":
         setFolders(message);
+        break;
+
+      case "onFileUploaded":
+        if (message.payload) {
+          setImages((prev) => [...prev, message.payload]);
+        }
         break;
 
       case "news-update":
@@ -378,9 +384,13 @@ export const WebviewUI = () => {
     setSelectedContext(value);
   }, []);
 
+  const handleRemoveImage = useCallback((index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   const handleSend = useCallback(
     (message: string) => {
-      if (!message.trim()) return;
+      if (!message.trim() && images.length === 0) return;
 
       sendMessage(message, {
         // Force Agent mode during testing to ensure langgraph/deepagent streaming path runs
@@ -388,9 +398,11 @@ export const WebviewUI = () => {
         context: selectedContext.split("@"),
         alias: "O",
         threadId,
+        images: images,
       });
+      setImages([]);
     },
-    [sendMessage, selectedCodeBuddyMode, selectedContext, threadId]
+    [sendMessage, selectedCodeBuddyMode, selectedContext, threadId, images]
   );
 
   const handleGetContext = useCallback(() => {
@@ -719,6 +731,49 @@ export const WebviewUI = () => {
             </span>
           </div>
           <FileMention activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
+          {images.length > 0 && (
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+              {images.map((img, index) => (
+                <div
+                  key={index}
+                  style={{
+                    position: "relative",
+                    width: "60px",
+                    height: "60px",
+                    borderRadius: "4px",
+                    overflow: "hidden",
+                    border: "1px solid #333",
+                  }}
+                >
+                  <img
+                    src={img.data}
+                    alt={img.fileName}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                  <div
+                    onClick={() => handleRemoveImage(index)}
+                    style={{
+                      position: "absolute",
+                      top: "2px",
+                      right: "2px",
+                      background: "rgba(0,0,0,0.6)",
+                      borderRadius: "50%",
+                      width: "16px",
+                      height: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      color: "white",
+                      fontSize: "12px",
+                    }}
+                  >
+                    ×
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {pendingApproval && (
             <div
               style={{
@@ -740,31 +795,12 @@ export const WebviewUI = () => {
               </VSCodeButton>
             </div>
           )}
-          <ChatInput onSendMessage={handleSend} disabled={isStreaming || isBotLoading} />
-        </div>
-        <div className="horizontal-stack">
-          <AttachmentIcon onClick={handleGetContext} disabled={true} />
-          <svg
-            className={`attachment-icon${isStreaming || isBotLoading ? " active" : ""}`}
-            onClick={isStreaming || isBotLoading ? handleStop : undefined}
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{
-              opacity: isStreaming || isBotLoading ? 1 : 0.4,
-              cursor: isStreaming || isBotLoading ? "pointer" : "default",
-            }}
-            role="button"
-            aria-label="Stop run"
-          >
-            <title>{isStreaming || isBotLoading ? "Stop run" : "Stop (no active run)"}</title>
-            <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
-          </svg>
+          <ChatInput
+            onSendMessage={handleSend}
+            disabled={isStreaming || isBotLoading}
+            onStop={handleStop}
+            onAttachmentClick={handleGetContext}
+          />
         </div>
       </div>
     </div>
