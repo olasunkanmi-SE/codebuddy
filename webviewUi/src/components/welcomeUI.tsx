@@ -118,16 +118,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ username }) => {
       <WelcomeTitle>{displayedText}</WelcomeTitle>
 
       <WelcomeSubtitle>
-        Your AI coding assistant ready to help you build better software
+        AI-powered multi-agent coding assistant with different LLM providers, local model support, and autonomous task execution
       </WelcomeSubtitle>
 
       <TipsContainer>
-        <TipsTitle>Quick Tips</TipsTitle>
+        <TipsTitle>What You Can Do</TipsTitle>
         <TipsList>
           <TipItem>Check out the FAQ and SETTINGS section to configure your AI assistant</TipItem>
-          <TipItem>Select code in editor to ask questions about it</TipItem>
-          <TipItem>Use context selector to include multiple files</TipItem>
-          <TipItem>Switch modes for different assistance types</TipItem>
+          <TipItem><strong>Agent Mode</strong> — Autonomous execution with file edits, terminal commands, and web search</TipItem>
+          <TipItem><strong>Ask Mode</strong> — Quick Q&A without modifying files</TipItem>
+          <TipItem><strong>9 AI Providers</strong> — Groq, Gemini, Claude, GPT-4, DeepSeek, Qwen, and local models via Ollama</TipItem>
+          <TipItem><strong>Diff Review</strong> — Review and approve/reject changes before they're applied</TipItem>
+          <TipItem><strong>MCP Tools</strong> — Extend with GitHub, GitLab, and custom integrations</TipItem>
+          <TipItem><strong>@ Mentions</strong> — Use @filename to include specific files as context</TipItem>
         </TipsList>
       </TipsContainer>
     </WelcomeContainer>
