@@ -38,20 +38,35 @@ export class FixError extends CodeCommandHandler {
         try {
           const agentService = CodebuddyAgentService.getInstance();
 
+          // Check for active debug session
+          const activeSession = vscode.debug.activeDebugSession;
+          let debugContext = "";
+          if (activeSession) {
+            debugContext = `
+ACTIVE DEBUG SESSION DETECTED:
+Session Name: ${activeSession.name}
+ID: ${activeSession.id}
+
+You have access to Debugger Tools (debug_get_state, debug_get_stack_trace, debug_get_variables, debug_evaluate, debug_control).
+Use them to inspect the running application state to better understand the error.
+`;
+          }
+
           const prompt = `Task: Fix the following error in the current file.
 
 Error Message:
 ${errorMsg}
-
+${debugContext}
 Code Context:
 ${selectedCode}
 
 Instructions:
 1. Analyze the error and the code.
-2. If you can fix it confidently, use the 'edit_file' tool to apply the fix directly.
-3. If you apply a fix, verify it if possible (or at least ensure syntax is correct).
-4. If you cannot fix it, or if it requires user input, provide a detailed explanation.
-5. End your response with a summary of what you did.
+2. If a debug session is active, use debug tools to inspect variables and stack trace.
+3. If you can fix it confidently, use the 'edit_file' tool to apply the fix directly.
+4. If you apply a fix, verify it if possible (or at least ensure syntax is correct).
+5. If you cannot fix it, or if it requires user input, provide a detailed explanation.
+6. End your response with a summary of what you did.
 `;
 
           let toolUsed = false;
