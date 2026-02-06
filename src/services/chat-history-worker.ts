@@ -30,6 +30,14 @@ export enum ChatHistoryWorkerOperation {
   CLEANUP_OLD_HISTORY = "CLEANUP_OLD_HISTORY",
   SAVE_SUMMARY = "SAVE_SUMMARY",
   GET_SUMMARY = "GET_SUMMARY",
+  // Session management operations
+  GET_SESSIONS = "GET_SESSIONS",
+  CREATE_SESSION = "CREATE_SESSION",
+  GET_CURRENT_SESSION = "GET_CURRENT_SESSION",
+  SWITCH_SESSION = "SWITCH_SESSION",
+  UPDATE_SESSION_TITLE = "UPDATE_SESSION_TITLE",
+  DELETE_SESSION = "DELETE_SESSION",
+  GET_SESSION_HISTORY = "GET_SESSION_HISTORY",
 }
 
 /**
@@ -64,6 +72,10 @@ export interface ChatHistoryWorkerData {
   };
   /** Summary data (for summary operations) */
   summary?: string;
+  /** Session ID for session operations */
+  sessionId?: string;
+  /** Session title for create/update operations */
+  title?: string;
   /** Configuration parameters */
   config?: {
     /** Number of recent messages to retrieve */
@@ -164,6 +176,70 @@ export class ChatHistoryWorker {
         case ChatHistoryWorkerOperation.GET_SUMMARY: {
           const summary = await this.getSummary(data.agentId);
           result = { summary };
+          break;
+        }
+
+        // Session management operations
+        case ChatHistoryWorkerOperation.GET_SESSIONS: {
+          result = await this.getSessions(data.agentId);
+          break;
+        }
+
+        case ChatHistoryWorkerOperation.CREATE_SESSION: {
+          const sessionId = await this.createSession(data.agentId, data.title);
+          result = { sessionId };
+          break;
+        }
+
+        case ChatHistoryWorkerOperation.GET_CURRENT_SESSION: {
+          const currentSessionId = await this.getCurrentSession(data.agentId);
+          result = { sessionId: currentSessionId };
+          break;
+        }
+
+        case ChatHistoryWorkerOperation.SWITCH_SESSION: {
+          if (!data.sessionId) {
+            throw new Error("Session ID is required for switch operation");
+          }
+          const switched = await this.switchSession(
+            data.agentId,
+            data.sessionId,
+          );
+          result = { success: switched };
+          break;
+        }
+
+        case ChatHistoryWorkerOperation.UPDATE_SESSION_TITLE: {
+          if (!data.sessionId || !data.title) {
+            throw new Error(
+              "Session ID and title are required for update operation",
+            );
+          }
+          await this.updateSessionTitle(
+            data.agentId,
+            data.sessionId,
+            data.title,
+          );
+          result = { success: true };
+          break;
+        }
+
+        case ChatHistoryWorkerOperation.DELETE_SESSION: {
+          if (!data.sessionId) {
+            throw new Error("Session ID is required for delete operation");
+          }
+          await this.deleteSession(data.agentId, data.sessionId);
+          result = { success: true };
+          break;
+        }
+
+        case ChatHistoryWorkerOperation.GET_SESSION_HISTORY: {
+          if (!data.sessionId) {
+            throw new Error(
+              "Session ID is required for get session history operation",
+            );
+          }
+          result = await this.getSessionHistory(data.agentId, data.sessionId);
           break;
         }
 
@@ -370,6 +446,171 @@ export class ChatHistoryWorker {
           reject(
             new Error(`Failed to cleanup old chat history: ${errorMessage}`),
           );
+        }
+      }, 0);
+    });
+  }
+
+  // Session management methods
+
+  /**
+   * Get all sessions for an agent
+   */
+  private async getSessions(agentId: string): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          const sessions = await this.chatHistoryRepo.getSessions(agentId);
+          resolve(sessions || []);
+        } catch (error: any) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to get sessions: ${errorMessage}`);
+          reject(new Error(`Failed to get sessions: ${errorMessage}`));
+        }
+      }, 0);
+    });
+  }
+
+  /**
+   * Create a new session
+   */
+  private async createSession(
+    agentId: string,
+    title?: string,
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          const sessionId = await this.chatHistoryRepo.createSession(
+            agentId,
+            title,
+          );
+          resolve(sessionId);
+        } catch (error: any) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to create session: ${errorMessage}`);
+          reject(new Error(`Failed to create session: ${errorMessage}`));
+        }
+      }, 0);
+    });
+  }
+
+  /**
+   * Get the current active session for an agent
+   */
+  private async getCurrentSession(agentId: string): Promise<string | null> {
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          const sessionId =
+            await this.chatHistoryRepo.getCurrentSession(agentId);
+          resolve(sessionId);
+        } catch (error: any) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to get current session: ${errorMessage}`);
+          reject(new Error(`Failed to get current session: ${errorMessage}`));
+        }
+      }, 0);
+    });
+  }
+
+  /**
+   * Switch to a different session
+   */
+  private async switchSession(
+    agentId: string,
+    sessionId: string,
+  ): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          const success = await this.chatHistoryRepo.switchSession(
+            agentId,
+            sessionId,
+          );
+          resolve(success);
+        } catch (error: any) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to switch session: ${errorMessage}`);
+          reject(new Error(`Failed to switch session: ${errorMessage}`));
+        }
+      }, 0);
+    });
+  }
+
+  /**
+   * Update session title
+   */
+  private async updateSessionTitle(
+    agentId: string,
+    sessionId: string,
+    title: string,
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          await this.chatHistoryRepo.updateSessionTitle(
+            agentId,
+            sessionId,
+            title,
+          );
+          resolve();
+        } catch (error: any) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to update session title: ${errorMessage}`);
+          reject(new Error(`Failed to update session title: ${errorMessage}`));
+        }
+      }, 0);
+    });
+  }
+
+  /**
+   * Delete a session
+   */
+  private async deleteSession(
+    agentId: string,
+    sessionId: string,
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          await this.chatHistoryRepo.deleteSession(agentId, sessionId);
+          resolve();
+        } catch (error: any) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to delete session: ${errorMessage}`);
+          reject(new Error(`Failed to delete session: ${errorMessage}`));
+        }
+      }, 0);
+    });
+  }
+
+  /**
+   * Get session history
+   */
+  private async getSessionHistory(
+    agentId: string,
+    sessionId: string,
+  ): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          const history = await this.chatHistoryRepo.getSessionHistory(
+            agentId,
+            sessionId,
+          );
+          resolve(history || []);
+        } catch (error: any) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(`Failed to get session history: ${errorMessage}`);
+          reject(new Error(`Failed to get session history: ${errorMessage}`));
         }
       }, 0);
     });

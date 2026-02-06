@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "CodeBuddy is a Visual Studio Code extension that enhances developer productivity through AI-powered code assistance. It provides intelligent code review, refactoring suggestions, optimization tips, and interactive chat capabilities powered by multiple AI models including Gemini, Groq, Anthropic, and Deepseek.",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "engines": {
     "vscode": "^1.78.0"
   },
@@ -521,7 +521,13 @@
           },
           "codebuddy.contextWindow": {
             "type": "string",
-            "enum": ["4k", "8k", "16k", "32k", "128k"],
+            "enum": [
+              "4k",
+              "8k",
+              "16k",
+              "32k",
+              "128k"
+            ],
             "default": "16k",
             "description": "Maximum context window size for AI requests"
           },
@@ -566,7 +572,10 @@
             "description": "Model to use for completions (e.g., qwen2.5-coder, deepseek-coder)"
           },
           "codebuddy.completion.apiKey": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "default": "",
             "description": "API key for completion provider (optional, falls back to main key if empty)"
           },
@@ -583,7 +592,10 @@
           },
           "codebuddy.completion.triggerMode": {
             "type": "string",
-            "enum": ["automatic", "manual"],
+            "enum": [
+              "automatic",
+              "manual"
+            ],
             "default": "automatic",
             "description": "How completions are triggered (automatic on type, or manual hotkey)"
           },
@@ -614,12 +626,24 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
-                "name": { "type": "string" },
-                "description": { "type": "string" },
-                "content": { "type": "string" },
-                "enabled": { "type": "boolean" },
-                "createdAt": { "type": "number" }
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "number"
+                }
               }
             }
           },
@@ -635,7 +659,9 @@
             "additionalProperties": {
               "type": "object",
               "properties": {
-                "enabled": { "type": "boolean" }
+                "enabled": {
+                  "type": "boolean"
+                }
               }
             }
           }
@@ -711,6 +737,7 @@
     "openai": "^4.28.0",
     "prettier": "^3.2.5",
     "readable-stream": "^4.5.2",
+    "rss-parser": "^3.13.0",
     "simple-git": "^3.25.0",
     "sinon": "^17.0.1",
     "sql.js": "^1.13.0",

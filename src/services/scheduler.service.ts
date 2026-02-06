@@ -63,8 +63,8 @@ export class SchedulerService {
         });
       }
 
-      // --- Task 2: Afternoon News (3 PM) ---
-      if (currentHour >= 15) {
+      // --- Task 2: Afternoon News (2 PM) ---
+      if (currentHour >= 14) {
         await this.tryRunTask("news_afternoon", async () => {
           this.logger.info("Executing scheduled task: news_afternoon");
           await newsService.fetchAndStoreNews();
@@ -74,7 +74,18 @@ export class SchedulerService {
         });
       }
 
-      // --- Task 3: Code Health Check (9 AM - Daily Standup) ---
+      // --- Task 3: Evening News (6 PM) ---
+      if (currentHour >= 18) {
+        await this.tryRunTask("news_evening", async () => {
+          this.logger.info("Executing scheduled task: news_evening");
+          await newsService.fetchAndStoreNews();
+          vscode.window.showInformationMessage(
+            "CodeBuddy: Evening tech news update! 🌙",
+          );
+        });
+      }
+
+      // --- Task 4: Code Health Check (9 AM - Daily Standup) ---
       if (currentHour >= 9) {
         await this.tryRunTask("code_health_daily", async () => {
           this.logger.info("Executing scheduled task: code_health_daily");
