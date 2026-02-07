@@ -1,5 +1,6 @@
 import Groq from "groq-sdk";
-import * as vscode from "vscode";
+import { IExtensionContext } from "../interfaces/editor-host";
+import { EditorHostService } from "../services/editor-host.service";
 import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { Memory } from "../memory/base";
 import { BaseWebViewProvider, LLMMessage } from "./base";
@@ -11,10 +12,10 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
   readonly model: Groq;
   private static instance: GroqWebViewProvider;
   constructor(
-    extensionUri: vscode.Uri,
+    extensionUri: any,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: IExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.model = new Groq({
@@ -47,10 +48,10 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
   }
 
   static initialize(
-    extensionUri: vscode.Uri,
+    extensionUri: any,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: IExtensionContext,
   ) {
     if (!GroqWebViewProvider.instance) {
       GroqWebViewProvider.instance = new GroqWebViewProvider(
@@ -172,14 +173,18 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
       Memory.set("chatHistory", this.chatHistory);
 
       if (error.status === 401) {
-        vscode.window.showErrorMessage(
-          "Invalid Groq API key. Please check your settings.",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid Groq API key. Please check your settings.",
+          );
         this.logger.error("Invalid Groq API key.", error);
       } else if (error.status === 503 || error.status === 429) {
-        vscode.window.showErrorMessage(
-          "Groq API rate limit reached or service unavailable. Please try again later.",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Groq API rate limit reached or service unavailable. Please try again later.",
+          );
         this.logger.error(
           "Groq API rate limiting or availability error.",
           error,
@@ -280,14 +285,18 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
 
       // Improved error handling and logging
       if (error.status === 401) {
-        vscode.window.showErrorMessage(
-          "Invalid Groq API key. Please check your settings.",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid Groq API key. Please check your settings.",
+          );
         this.logger.error("Invalid Groq API key.", error);
       } else if (error.status === 503 || error.status === 429) {
-        vscode.window.showErrorMessage(
-          "Groq API rate limit reached or service unavailable. Please try again later.",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Groq API rate limit reached or service unavailable. Please try again later.",
+          );
         this.logger.error(
           "Groq API rate limiting or availability error.",
           error,

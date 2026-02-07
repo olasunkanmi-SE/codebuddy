@@ -1,6 +1,4 @@
 import * as path from "path";
-import { TextDecoder } from "util";
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { generateId } from "../../utils/utils";
 import { IAnalysisOutput, ICodeElement } from "../query-types";
@@ -8,9 +6,16 @@ import { LairExtractor } from "./../query-extractor";
 import { CodeSearch } from "./code.search";
 import { FileParser } from "./file.parser";
 import { RelevanceScorer } from "./relevance.scrorer";
+import { IOutputChannel } from "../../interfaces/output-channel";
+import { IProgress } from "../../interfaces/progress";
+import {
+  CancellationError,
+  ICancellationToken,
+} from "../../interfaces/cancellation";
+import { EditorHostService } from "../../services/editor-host.service";
+import { TextDecoder } from "util";
 
 export class CodeAnalyzer {
-  private readonly textDecoder = new TextDecoder();
   private readonly lairExtractor: LairExtractor;
   private readonly logger: Logger;
   private static instance: CodeAnalyzer;
@@ -19,7 +24,7 @@ export class CodeAnalyzer {
   constructor(
     private codeSearcher: CodeSearch,
     private readonly fileParser: FileParser,
-    private outputChannel: vscode.OutputChannel,
+    private outputChannel: IOutputChannel,
   ) {
     this.logger = Logger.initialize("QueryExecutor", {
       minLevel: LogLevel.DEBUG,
@@ -34,7 +39,7 @@ export class CodeAnalyzer {
   static getInstance(
     codeSearcher: CodeSearch,
     fileParser: FileParser,
-    outputChannel: vscode.OutputChannel,
+    outputChannel: IOutputChannel,
   ) {
     return (CodeAnalyzer.instance ??= new CodeAnalyzer(
       codeSearcher,
@@ -45,8 +50,8 @@ export class CodeAnalyzer {
 
   async analyze(
     workspaceRoot: string,
-    progress: vscode.Progress<{ message?: string; increment?: number }>,
-    cancellationToken: vscode.CancellationToken,
+    progress: IProgress<{ message?: string; increment?: number }>,
+    cancellationToken: ICancellationToken,
     keywords: string[],
   ) {
     progress.report({
@@ -74,7 +79,7 @@ export class CodeAnalyzer {
       }
       relevantFiles = result.split("\n");
     } catch (error: any) {
-      if (error instanceof vscode.CancellationError) {
+      if (error instanceof CancellationError) {
         return null;
       }
       this.logger.error(
@@ -174,14 +179,15 @@ export class CodeAnalyzer {
     const elements: ICodeElement[] = [];
 
     try {
-      const content = this.textDecoder.decode(
-        await vscode.workspace.fs.readFile(vscode.Uri.file(filePath)),
-      );
+      const contentBytes = await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.readFile(filePath);
+      const content = new TextDecoder().decode(contentBytes);
 
       const lines = content.split("\n");
       const lowerKeywords = keywords.map((k) => k.toLowerCase());
 
-      lines.forEach((line, index) => {
+      lines.forEach((line: string, index: number) => {
         if (lowerKeywords.some((kw) => line.toLowerCase().includes(kw))) {
           elements.push({
             id: generateId(),

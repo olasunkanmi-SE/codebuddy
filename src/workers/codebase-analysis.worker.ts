@@ -1,13 +1,20 @@
-import { parentPort, isMainThread } from "worker_threads";
-import * as fs from "fs";
+import { parentPort, isMainThread, MessagePort } from "worker_threads";
 import * as path from "path";
 import { AnalyzerFactory } from "../services/analyzers/analyzer-factory";
 import { AnalysisResult as FileAnalysisResult } from "../services/analyzers/index";
+import { randomUUID } from "crypto";
 
 // Types matching the ones in the service, but adapted for Worker context
 export interface WorkerInputData {
   workspacePath: string;
   files: string[];
+}
+
+interface WorkerMessage {
+  type: string;
+  payload?: any;
+  error?: string;
+  requestId?: string;
 }
 
 export interface AnalysisResult {
@@ -52,6 +59,91 @@ class CodebaseAnalysisTask {
   private readonly logger = new WorkerLogger();
   private readonly analyzerFactory = new AnalyzerFactory();
   private isCancelled = false;
+
+  private pendingFileReads = new Map<
+    string,
+    { resolve: (content: string) => void; reject: (err: Error) => void }
+  >();
+  private pendingFileExists = new Map<
+    string,
+    { resolve: (exists: boolean) => void; reject: (err: Error) => void }
+  >();
+
+  constructor() {
+    if (parentPort) {
+      parentPort.on("message", this.handleMessage.bind(this));
+    }
+  }
+
+  private handleMessage(message: WorkerMessage) {
+    if (message.type === "FILE_READ_RESULT" && message.requestId) {
+      const pending = this.pendingFileReads.get(message.requestId);
+      if (pending) {
+        this.pendingFileReads.delete(message.requestId);
+        if (message.error) {
+          pending.reject(new Error(message.error));
+        } else {
+          pending.resolve(message.payload.content);
+        }
+      }
+    } else if (message.type === "FILE_EXISTS_RESULT" && message.requestId) {
+      const pending = this.pendingFileExists.get(message.requestId);
+      if (pending) {
+        this.pendingFileExists.delete(message.requestId);
+        if (message.error) {
+          // If error (e.g. timeout), assume false or reject?
+          // Usually exists check shouldn't throw, but let's handle it safely.
+          pending.resolve(false);
+        } else {
+          pending.resolve(message.payload.exists);
+        }
+      }
+    } else if (message.type === "ANALYZE_CODEBASE") {
+      this.performAnalysis(message.payload)
+        .then((result) => {
+          parentPort?.postMessage({
+            type: "ANALYSIS_COMPLETE",
+            payload: result,
+          });
+        })
+        .catch((error) => {
+          parentPort?.postMessage({
+            type: "ANALYSIS_ERROR",
+            error: error.message || String(error),
+          });
+        });
+    } else if (message.type === "CANCEL") {
+      this.cancel();
+    }
+  }
+
+  private async readFile(filePath: string): Promise<string> {
+    if (!parentPort) throw new Error("Worker disconnected");
+
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      this.pendingFileReads.set(requestId, { resolve, reject });
+      parentPort!.postMessage({
+        type: "REQUEST_FILE_READ",
+        requestId,
+        payload: { path: filePath },
+      });
+    });
+  }
+
+  private async fileExists(filePath: string): Promise<boolean> {
+    if (!parentPort) throw new Error("Worker disconnected");
+
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      this.pendingFileExists.set(requestId, { resolve, reject });
+      parentPort!.postMessage({
+        type: "REQUEST_FILE_EXISTS",
+        requestId,
+        payload: { path: filePath },
+      });
+    });
+  }
 
   async performAnalysis(data: WorkerInputData): Promise<AnalysisResult> {
     this.reportProgress(0, 100, "Starting codebase analysis...");
@@ -206,7 +298,7 @@ class CodebaseAnalysisTask {
     analysis?: FileAnalysisResult;
   }> {
     try {
-      const content = await fs.promises.readFile(filePath, "utf-8");
+      const content = await this.readFile(filePath);
       const lines = content.split("\n").length;
 
       // Use analyzer factory for structured analysis
@@ -343,11 +435,9 @@ class CodebaseAnalysisTask {
 
     // Analyze package.json
     const packageJsonPath = path.join(workspacePath, "package.json");
-    if (fs.existsSync(packageJsonPath)) {
+    if (await this.fileExists(packageJsonPath)) {
       try {
-        const packageJson = JSON.parse(
-          await fs.promises.readFile(packageJsonPath, "utf-8"),
-        );
+        const packageJson = JSON.parse(await this.readFile(packageJsonPath));
         Object.assign(dependencies, packageJson.dependencies || {});
         Object.assign(dependencies, packageJson.devDependencies || {});
       } catch (error: any) {
@@ -357,9 +447,9 @@ class CodebaseAnalysisTask {
 
     // Analyze requirements.txt (Python)
     const requirementsPath = path.join(workspacePath, "requirements.txt");
-    if (fs.existsSync(requirementsPath)) {
+    if (await this.fileExists(requirementsPath)) {
       try {
-        const content = await fs.promises.readFile(requirementsPath, "utf-8");
+        const content = await this.readFile(requirementsPath);
         const lines = content
           .split("\n")
           .filter((line) => line.trim() && !line.startsWith("#"));
@@ -602,24 +692,5 @@ class CodebaseAnalysisTask {
 
 // Logic to handle messages
 if (!isMainThread && parentPort) {
-  const task = new CodebaseAnalysisTask();
-
-  parentPort.on("message", async (message: { type: string; payload: any }) => {
-    if (message.type === "ANALYZE_CODEBASE") {
-      try {
-        const result = await task.performAnalysis(message.payload);
-        parentPort?.postMessage({
-          type: "ANALYSIS_COMPLETE",
-          payload: result,
-        });
-      } catch (error: any) {
-        parentPort?.postMessage({
-          type: "ANALYSIS_ERROR",
-          error: error.message || String(error),
-        });
-      }
-    } else if (message.type === "CANCEL") {
-      task.cancel();
-    }
-  });
+  new CodebaseAnalysisTask();
 }

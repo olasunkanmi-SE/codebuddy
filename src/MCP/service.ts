@@ -1,8 +1,11 @@
+import * as path from "path";
 import { spawn } from "child_process";
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { getConfigValue } from "../utils/utils";
 import { MCPClient } from "./client";
+import { IDisposable } from "../interfaces/disposable";
+import { EditorHostService } from "../services/editor-host.service";
+import { FileUtils } from "../utils/common-utils";
 import {
   MCPServerConfig,
   MCPServersConfig,
@@ -11,7 +14,7 @@ import {
   MCPToolResult,
 } from "./types";
 
-export class MCPService implements vscode.Disposable {
+export class MCPService implements IDisposable {
   private static instance: MCPService;
   private clients = new Map<string, MCPClient>();
   private initialized = false;
@@ -32,6 +35,7 @@ export class MCPService implements vscode.Disposable {
   private readonly IDLE_TIMEOUT_MS = 5 * 60 * 1000;
   private dockerWarningShown = false;
   private dockerRetryInProgress = false;
+  private safeMode = false;
 
   constructor() {
     this.logger = Logger.initialize("MCPService", {
@@ -40,17 +44,52 @@ export class MCPService implements vscode.Disposable {
       enableFile: true,
       enableTelemetry: true,
     });
-    this.initialize();
+    // this.initialize(); // Initialization moved to extension.ts
   }
 
   static getInstance(): MCPService {
     return (MCPService.instance ??= new MCPService());
   }
 
-  async initialize(): Promise<void> {
+  isSafeMode(): boolean {
+    return this.safeMode;
+  }
+
+  setSafeMode(enabled: boolean): void {
+    this.safeMode = enabled;
+    if (enabled) {
+      this.logger.warn(
+        "Entering Safe Mode: Internal MCP Server is unavailable.",
+      );
+    } else {
+      this.logger.info("Exiting Safe Mode: Internal MCP Server is available.");
+    }
+  }
+
+  async initialize(extensionPath?: string): Promise<void> {
     this.logger.info("Initializing MCP service...");
 
     const config = this.loadConfiguration();
+
+    if (extensionPath) {
+      const serverPath = path.join(extensionPath, "dist", "MCP", "server.js");
+      if (await FileUtils.fileExists(serverPath)) {
+        config["codebuddy-internal"] = {
+          command: "node",
+          args: [serverPath],
+          env: {
+            CODEBUDDY_MCP_SERVER: "true",
+            ...process.env, // Pass current env vars including PATH
+          },
+          enabled: true,
+          description: "CodeBuddy Internal Server",
+        };
+        this.logger.info(`Registered internal MCP server at ${serverPath}`);
+      } else {
+        this.logger.warn(`Internal MCP server not found at ${serverPath}`);
+      }
+    }
+
     this.serverConfigs = config;
 
     // Check Docker status immediately
@@ -232,6 +271,11 @@ export class MCPService implements vscode.Disposable {
     );
   }
 
+  isServerConnected(serverName: string): boolean {
+    const client = this.clients.get(serverName);
+    return !!client && client.isConnected();
+  }
+
   async ensureServerConnected(serverName: string): Promise<void> {
     if (this.clients.has(serverName)) {
       const client = this.clients.get(serverName);
@@ -381,9 +425,11 @@ export class MCPService implements vscode.Disposable {
       if (!this.dockerAvailable) {
         if (!this.dockerWarningShown) {
           this.dockerWarningShown = true;
-          vscode.window.showWarningMessage(
-            "CodeBuddy MCP: Docker MCP gateway not detected. Start Docker Desktop (with MCP enabled) or install the MCP CLI, then retry.",
-          );
+          EditorHostService.getInstance()
+            .getHost()
+            .window.showWarningMessage(
+              "CodeBuddy MCP: Docker MCP gateway not detected. Start Docker Desktop (with MCP enabled) or install the MCP CLI, then retry.",
+            );
         }
         return [];
       }
@@ -430,69 +476,61 @@ export class MCPService implements vscode.Disposable {
   }
 
   async callTool(
+    serverName: string,
     toolName: string,
     args: any,
-    preferredServer?: string,
   ): Promise<MCPToolResult> {
-    if (!this.initialized) {
-      throw new Error("MCP service not initialized");
+    const client = this.clients.get(serverName);
+    if (!client) {
+      throw new Error(`MCP Client ${serverName} not found`);
     }
-
-    // Phase 1: Ensure gateway is connected (lazy start)
-    await this.ensureGatewayConnected();
-
-    // Phase 2: Reset idle timer on every tool call
-    this.resetIdleTimer();
 
     this.invocationCount++;
-
-    // Support serverName.toolName syntax
-    let server = preferredServer;
-    let name = toolName;
-    if (toolName.includes(".")) {
-      const parts = toolName.split(".", 2);
-      server = parts[0];
-      name = parts[1];
-    }
-
-    let tools = this.toolsByName.get(name);
-
-    if (!tools || tools.length === 0) {
-      await this.getAllTools();
-      tools = this.toolsByName.get(name);
-
-      if (!tools || tools.length === 0) {
-        this.failureCount++;
-        throw new Error(`Tool "${name}" not found in any connected server`);
-      }
-    }
-
-    const candidateTools = server
-      ? tools.filter((t) => t.serverName === server)
-      : tools;
-
-    if (candidateTools.length === 0) {
-      this.failureCount++;
-      throw new Error(`Tool "${name}" not found on server "${server}"`);
-    }
-
-    const tool = candidateTools[0];
-    const client = this.clients.get(tool.serverName);
-
-    if (!client || !client.isConnected || !client.isConnected()) {
-      this.failureCount++;
-      throw new Error(`Server "${tool.serverName}" not connected`);
-    }
-
     try {
-      const result = await client.callTool(name, args);
-      if (result.isError) {
-        this.failureCount++;
-      }
-      return result;
+      this.resetIdleTimer();
+      return await client.callTool(toolName, args);
     } catch (error) {
       this.failureCount++;
       throw error;
+    }
+  }
+
+  async sendChat(
+    serverName: string,
+    message: string,
+    metadata: any,
+  ): Promise<void> {
+    const client = this.clients.get(serverName);
+    if (!client) {
+      throw new Error(`MCP Client ${serverName} not found`);
+    }
+
+    try {
+      this.resetIdleTimer();
+      await client.sendChat(message, metadata);
+    } catch (error) {
+      this.logger.error(`Failed to send chat to ${serverName}`, error);
+      throw error;
+    }
+  }
+
+  getTools(): MCPTool[] {
+    const allTools: MCPTool[] = [];
+    for (const tools of this.toolsByName.values()) {
+      allTools.push(...tools);
+    }
+    return allTools;
+  }
+
+  async subscribeToNotifications(
+    serverName: string,
+    method: string,
+    handler: (params: any) => void,
+  ): Promise<void> {
+    await this.ensureServerConnected(serverName);
+    const client = this.clients.get(serverName);
+    if (client) {
+      client.setNotificationHandler(method, handler);
     }
   }
 

@@ -1,14 +1,18 @@
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { execFile } from "child_process";
 import { rgPath } from "@vscode/ripgrep";
 import { defaultIgnorePatterns } from "../constants";
+import { IOutputChannel } from "../../interfaces/output-channel";
+import {
+  CancellationError,
+  ICancellationToken,
+} from "../../interfaces/cancellation";
 
 export class CodeSearch {
   private logger: Logger;
   private static instance: CodeSearch;
 
-  constructor(private readonly outputChannel: vscode.OutputChannel) {
+  constructor(private readonly outputChannel: IOutputChannel) {
     this.logger = Logger.initialize("QueryExecutor", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
@@ -39,7 +43,7 @@ export class CodeSearch {
     return args;
   }
 
-  static getInstance(outputChannel: vscode.OutputChannel) {
+  static getInstance(outputChannel: IOutputChannel) {
     return (CodeSearch.instance ??= new CodeSearch(outputChannel));
   }
 
@@ -50,7 +54,7 @@ export class CodeSearch {
   async search(
     patterns: string[],
     workspaceRoot: string,
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: ICancellationToken,
   ): Promise<string> {
     const escapedPatterns = patterns.map((p) => this.escapeRegex(p));
     const combinedPattern = escapedPatterns.map((p) => `(${p})`).join("|");
@@ -71,7 +75,7 @@ export class CodeSearch {
           if (cancellationToken?.isCancellationRequested) {
             this.outputChannel.appendLine("Ripgrep cancelled by user.");
             this.logger.info(`Ripgrep cancelled by user.`);
-            return reject(new vscode.CancellationError());
+            return reject(new CancellationError());
           }
 
           if (error && (error as any).code !== 1) {
@@ -101,7 +105,7 @@ export class CodeSearch {
   async searchExact(
     phrase: string,
     workspaceRoot: string,
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: ICancellationToken,
   ): Promise<string[]> {
     const args = this.buildRipgrepArgs(
       phrase,
@@ -119,7 +123,7 @@ export class CodeSearch {
         },
         (error, stdout) => {
           if (cancellationToken?.isCancellationRequested) {
-            return reject(new vscode.CancellationError());
+            return reject(new CancellationError());
           }
 
           if (error && (error as any).code !== 1) {
@@ -143,7 +147,7 @@ export class CodeSearch {
     patterns: string[],
     workspaceRoot: string,
     fileExtensions: string[],
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: ICancellationToken,
   ): Promise<string[]> {
     const combinedPattern = patterns.map((p) => `(${p})`).join("|");
 
@@ -176,7 +180,7 @@ export class CodeSearch {
         },
         (error, stdout) => {
           if (cancellationToken?.isCancellationRequested) {
-            return reject(new vscode.CancellationError());
+            return reject(new CancellationError());
           }
 
           if (error && (error as any).code !== 1) {

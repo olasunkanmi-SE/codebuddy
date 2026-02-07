@@ -1,6 +1,6 @@
 import { Logger } from "../../infrastructure/logger/logger";
 import { PersistentCodebaseUnderstandingService } from "../persistent-codebase-understanding.service";
-import * as vscode from "vscode";
+import { EditorHostService } from "../../services/editor-host.service";
 
 export class CodeHealthTask {
   private logger: Logger;
@@ -17,7 +17,8 @@ export class CodeHealthTask {
     const summary = await pcu.getAnalysisSummary();
 
     // 2. Scan for TODOs (simplified)
-    const todos = await vscode.workspace.findFiles("**/*.{ts,js,py,tsx}");
+    const editorHost = EditorHostService.getInstance().getHost();
+    const todos = await editorHost.workspace.findFiles("**/*.{ts,js,py,tsx}");
     // (This is heavy for a background task, maybe we just sample or rely on other services)
 
     // For now, let's just surface a "Daily Digest" notification if the user hasn't analyzed code recently.
@@ -26,7 +27,7 @@ export class CodeHealthTask {
       Date.now() - new Date(summary.lastAnalysis).getTime() >
         24 * 60 * 60 * 1000
     ) {
-      vscode.window
+      editorHost.window
         .showInformationMessage(
           "CodeBuddy Auto-Assist: It's been 24h since the last codebase analysis. Would you like me to refresh the index while you grab a coffee?",
           "Yes, Refresh Index",
@@ -34,7 +35,7 @@ export class CodeHealthTask {
         )
         .then((selection) => {
           if (selection === "Yes, Refresh Index") {
-            vscode.commands.executeCommand("CodeBuddy.refreshAnalysis");
+            editorHost.commands.executeCommand("CodeBuddy.refreshAnalysis");
           }
         });
     }

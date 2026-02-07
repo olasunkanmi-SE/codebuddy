@@ -1,5 +1,6 @@
-import * as vscode from "vscode";
 import { LanguageUtils } from "../utils/common-utils";
+import { EditorHostService } from "./editor-host.service";
+import { ConfigurationTarget } from "../interfaces/editor-host";
 
 export interface EmbeddingPhaseConfig {
   enabled: boolean;
@@ -126,8 +127,9 @@ export class EmbeddingConfigurationManager {
    * Check if background processing should be enabled based on workspace size
    */
   shouldEnableBackgroundProcessing(): boolean {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
+    const workspaceRoot =
+      EditorHostService.getInstance().getHost().workspace.rootPath;
+    if (!workspaceRoot) {
       return false;
     }
 
@@ -160,170 +162,149 @@ export class EmbeddingConfigurationManager {
   }
 
   private loadConfiguration(): SmartEmbeddingConfig {
-    const vsCodeConfig = vscode.workspace.getConfiguration(
-      "codebuddy.smartEmbedding",
-    );
+    const config = EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("codebuddy.smartEmbedding");
     const defaults = this.getDefaultConfiguration();
 
     return {
       immediate: {
-        enabled: vsCodeConfig.get(
-          "immediate.enabled",
-          defaults.immediate.enabled,
-        ),
-        batchSize: vsCodeConfig.get(
+        enabled: config.get("immediate.enabled", defaults.immediate.enabled),
+        batchSize: config.get(
           "immediate.batchSize",
           defaults.immediate.batchSize,
         ),
-        maxFiles: vsCodeConfig.get(
-          "immediate.maxFiles",
-          defaults.immediate.maxFiles,
-        ),
-        delayBetweenBatches: vsCodeConfig.get(
+        maxFiles: config.get("immediate.maxFiles", defaults.immediate.maxFiles),
+        delayBetweenBatches: config.get(
           "immediate.delayBetweenBatches",
           defaults.immediate.delayBetweenBatches,
         ),
-        timeoutMs: vsCodeConfig.get(
+        timeoutMs: config.get(
           "immediate.timeoutMs",
           defaults.immediate.timeoutMs,
         ),
-        retryAttempts: vsCodeConfig.get(
+        retryAttempts: config.get(
           "immediate.retryAttempts",
           defaults.immediate.retryAttempts,
         ),
-        lowPriority: vsCodeConfig.get(
+        lowPriority: config.get(
           "immediate.lowPriority",
           defaults.immediate.lowPriority,
         ),
       },
       onDemand: {
-        enabled: vsCodeConfig.get(
-          "onDemand.enabled",
-          defaults.onDemand.enabled,
-        ),
-        batchSize: vsCodeConfig.get(
+        enabled: config.get("onDemand.enabled", defaults.onDemand.enabled),
+        batchSize: config.get(
           "onDemand.batchSize",
           defaults.onDemand.batchSize,
         ),
-        maxFiles: vsCodeConfig.get(
-          "onDemand.maxFiles",
-          defaults.onDemand.maxFiles,
-        ),
-        delayBetweenBatches: vsCodeConfig.get(
+        maxFiles: config.get("onDemand.maxFiles", defaults.onDemand.maxFiles),
+        delayBetweenBatches: config.get(
           "onDemand.delayBetweenBatches",
           defaults.onDemand.delayBetweenBatches,
         ),
-        timeoutMs: vsCodeConfig.get(
+        timeoutMs: config.get(
           "onDemand.timeoutMs",
           defaults.onDemand.timeoutMs,
         ),
-        retryAttempts: vsCodeConfig.get(
+        retryAttempts: config.get(
           "onDemand.retryAttempts",
           defaults.onDemand.retryAttempts,
         ),
-        lowPriority: vsCodeConfig.get(
+        lowPriority: config.get(
           "onDemand.lowPriority",
           defaults.onDemand.lowPriority,
         ),
       },
       background: {
-        enabled: vsCodeConfig.get(
-          "background.enabled",
-          defaults.background.enabled,
-        ),
-        batchSize: vsCodeConfig.get(
+        enabled: config.get("background.enabled", defaults.background.enabled),
+        batchSize: config.get(
           "background.batchSize",
           defaults.background.batchSize,
         ),
-        maxFiles: vsCodeConfig.get(
+        maxFiles: config.get(
           "background.maxFiles",
           defaults.background.maxFiles,
         ),
-        delayBetweenBatches: vsCodeConfig.get(
+        delayBetweenBatches: config.get(
           "background.delayBetweenBatches",
           defaults.background.delayBetweenBatches,
         ),
-        timeoutMs: vsCodeConfig.get(
+        timeoutMs: config.get(
           "background.timeoutMs",
           defaults.background.timeoutMs,
         ),
-        retryAttempts: vsCodeConfig.get(
+        retryAttempts: config.get(
           "background.retryAttempts",
           defaults.background.retryAttempts,
         ),
-        lowPriority: vsCodeConfig.get(
+        lowPriority: config.get(
           "background.lowPriority",
           defaults.background.lowPriority,
         ),
       },
       bulk: {
-        enabled: vsCodeConfig.get("bulk.enabled", defaults.bulk.enabled),
-        batchSize: vsCodeConfig.get("bulk.batchSize", defaults.bulk.batchSize),
-        maxFiles: vsCodeConfig.get("bulk.maxFiles", defaults.bulk.maxFiles),
-        delayBetweenBatches: vsCodeConfig.get(
+        enabled: config.get("bulk.enabled", defaults.bulk.enabled),
+        batchSize: config.get("bulk.batchSize", defaults.bulk.batchSize),
+        maxFiles: config.get("bulk.maxFiles", defaults.bulk.maxFiles),
+        delayBetweenBatches: config.get(
           "bulk.delayBetweenBatches",
           defaults.bulk.delayBetweenBatches,
         ),
-        timeoutMs: vsCodeConfig.get("bulk.timeoutMs", defaults.bulk.timeoutMs),
-        retryAttempts: vsCodeConfig.get(
+        timeoutMs: config.get("bulk.timeoutMs", defaults.bulk.timeoutMs),
+        retryAttempts: config.get(
           "bulk.retryAttempts",
           defaults.bulk.retryAttempts,
         ),
-        lowPriority: vsCodeConfig.get(
-          "bulk.lowPriority",
-          defaults.bulk.lowPriority,
-        ),
+        lowPriority: config.get("bulk.lowPriority", defaults.bulk.lowPriority),
       },
       sync: {
-        enabled: vsCodeConfig.get("sync.enabled", defaults.sync.enabled),
-        filePatterns: vsCodeConfig.get(
+        enabled: config.get("sync.enabled", defaults.sync.enabled),
+        filePatterns: config.get(
           "sync.filePatterns",
           defaults.sync.filePatterns,
         ),
-        excludePatterns: vsCodeConfig.get(
+        excludePatterns: config.get(
           "sync.excludePatterns",
           defaults.sync.excludePatterns,
         ),
-        syncDelayMs: vsCodeConfig.get(
-          "sync.syncDelayMs",
-          defaults.sync.syncDelayMs,
-        ),
-        batchSize: vsCodeConfig.get("sync.batchSize", defaults.sync.batchSize),
-        maxBatchSize: vsCodeConfig.get(
+        syncDelayMs: config.get("sync.syncDelayMs", defaults.sync.syncDelayMs),
+        batchSize: config.get("sync.batchSize", defaults.sync.batchSize),
+        maxBatchSize: config.get(
           "sync.maxBatchSize",
           defaults.sync.maxBatchSize,
         ),
-        enableBackgroundSync: vsCodeConfig.get(
+        enableBackgroundSync: config.get(
           "sync.enableBackgroundSync",
           defaults.sync.enableBackgroundSync,
         ),
-        enableFileWatching: vsCodeConfig.get(
+        enableFileWatching: config.get(
           "sync.enableFileWatching",
           defaults.sync.enableFileWatching,
         ),
       },
       general: {
-        maxConcurrentOperations: vsCodeConfig.get(
+        maxConcurrentOperations: config.get(
           "general.maxConcurrentOperations",
           defaults.general.maxConcurrentOperations,
         ),
-        enableProgressReporting: vsCodeConfig.get(
+        enableProgressReporting: config.get(
           "general.enableProgressReporting",
           defaults.general.enableProgressReporting,
         ),
-        enableDetailedLogging: vsCodeConfig.get(
+        enableDetailedLogging: config.get(
           "general.enableDetailedLogging",
           defaults.general.enableDetailedLogging,
         ),
-        workspaceAnalysisDepth: vsCodeConfig.get(
+        workspaceAnalysisDepth: config.get(
           "general.workspaceAnalysisDepth",
           defaults.general.workspaceAnalysisDepth,
         ),
-        embeddingModel: vsCodeConfig.get(
+        embeddingModel: config.get(
           "general.embeddingModel",
           defaults.general.embeddingModel,
         ),
-        embeddingProvider: vsCodeConfig.get(
+        embeddingProvider: config.get(
           "general.embeddingProvider",
           defaults.general.embeddingProvider,
         ),
@@ -332,40 +313,40 @@ export class EmbeddingConfigurationManager {
   }
 
   private async saveConfiguration(): Promise<void> {
-    const vsCodeConfig = vscode.workspace.getConfiguration(
-      "codebuddy.smartEmbedding",
-    );
+    const config = EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("codebuddy.smartEmbedding");
 
     // Save immediate phase config
-    await vsCodeConfig.update(
+    await config.update(
       "immediate",
       this.config.immediate,
-      vscode.ConfigurationTarget.Workspace,
+      ConfigurationTarget.Workspace,
     );
-    await vsCodeConfig.update(
+    await config.update(
       "onDemand",
       this.config.onDemand,
-      vscode.ConfigurationTarget.Workspace,
+      ConfigurationTarget.Workspace,
     );
-    await vsCodeConfig.update(
+    await config.update(
       "background",
       this.config.background,
-      vscode.ConfigurationTarget.Workspace,
+      ConfigurationTarget.Workspace,
     );
-    await vsCodeConfig.update(
+    await config.update(
       "bulk",
       this.config.bulk,
-      vscode.ConfigurationTarget.Workspace,
+      ConfigurationTarget.Workspace,
     );
-    await vsCodeConfig.update(
+    await config.update(
       "sync",
       this.config.sync,
-      vscode.ConfigurationTarget.Workspace,
+      ConfigurationTarget.Workspace,
     );
-    await vsCodeConfig.update(
+    await config.update(
       "general",
       this.config.general,
-      vscode.ConfigurationTarget.Workspace,
+      ConfigurationTarget.Workspace,
     );
   }
 

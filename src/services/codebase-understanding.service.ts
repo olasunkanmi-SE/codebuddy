@@ -1,13 +1,14 @@
-import * as vscode from "vscode";
 import * as ts from "typescript";
-import { Logger } from "../infrastructure/logger/logger";
-import { LogLevel } from "./telemetry";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { WorkspaceService } from "./workspace-service";
+import { EditorHostService } from "./editor-host.service";
 import { CodebaseAnalysisCache } from "./codebase-analysis-cache";
 import {
   AnalysisStrategyFactory,
   AnalysisType,
 } from "./analysis-strategies/analysis-strategy-factory";
+import { ICancellationToken } from "../interfaces/cancellation";
+import { IProgress } from "../interfaces/progress";
 
 interface IApiEndpoint {
   method: string;
@@ -71,8 +72,8 @@ export class CodebaseUnderstandingService {
   }
 
   public async analyzeWorkspace(
-    cancellationToken?: vscode.CancellationToken,
-    progress?: vscode.Progress<{ message?: string; increment?: number }>,
+    cancellationToken?: ICancellationToken,
+    progress?: IProgress<{ message?: string; increment?: number }>,
   ): Promise<ICodebaseAnalysis | null> {
     this.logger.info("Starting comprehensive workspace analysis...");
 
@@ -99,11 +100,11 @@ export class CodebaseUnderstandingService {
 
     if (packageJsonPath) {
       try {
-        const packageJsonContent =
-          await vscode.workspace.fs.readFile(packageJsonPath);
-        const packageJsonString =
-          Buffer.from(packageJsonContent).toString("utf8");
-        const packageJson = JSON.parse(packageJsonString);
+        const contentBytes = await EditorHostService.getInstance()
+          .getHost()
+          .workspace.fs.readFile(packageJsonPath);
+        const packageJsonContent = new TextDecoder().decode(contentBytes);
+        const packageJson = JSON.parse(packageJsonContent);
         dependencies = {
           ...packageJson.dependencies,
           ...packageJson.devDependencies,
@@ -118,10 +119,7 @@ export class CodebaseUnderstandingService {
     progress?.report({ message: "Identifying frameworks...", increment: 20 });
 
     const frameworks = this.identifyFrameworks(dependencies);
-    const allFiles =
-      (await this.workspaceService.getAllFiles())?.map(
-        (file: vscode.Uri) => file.fsPath,
-      ) || [];
+    const allFiles = (await this.workspaceService.getAllFiles()) || [];
 
     // Check for cancellation before expensive operations
     if (cancellationToken?.isCancellationRequested) {
@@ -202,12 +200,10 @@ export class CodebaseUnderstandingService {
     return frameworks;
   }
 
-  private async findFile(fileName: string): Promise<vscode.Uri | undefined> {
-    const files = await vscode.workspace.findFiles(
-      `**/${fileName}`,
-      "**/node_modules/**",
-      1,
-    );
+  private async findFile(fileName: string): Promise<string | undefined> {
+    const files = await EditorHostService.getInstance()
+      .getHost()
+      .workspace.findFiles(`**/${fileName}`, "**/node_modules/**");
     return files.length > 0 ? files[0] : undefined;
   }
 
@@ -216,9 +212,10 @@ export class CodebaseUnderstandingService {
    */
   private async readFileContent(filePath: string): Promise<string> {
     try {
-      const fileUri = vscode.Uri.file(filePath);
-      const fileContent = await vscode.workspace.fs.readFile(fileUri);
-      return Buffer.from(fileContent).toString("utf8");
+      const contentBytes = await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.readFile(filePath);
+      return new TextDecoder().decode(contentBytes);
     } catch (error: any) {
       this.logger.debug(`Could not read file: ${filePath}`, error);
       throw error;
@@ -227,8 +224,8 @@ export class CodebaseUnderstandingService {
 
   public async getCodebaseContext(
     isWebview = true,
-    cancellationToken?: vscode.CancellationToken,
-    progress?: vscode.Progress<{ message?: string; increment?: number }>,
+    cancellationToken?: ICancellationToken,
+    progress?: IProgress<{ message?: string; increment?: number }>,
   ): Promise<string> {
     // Reset file reference tracking for each analysis
     this.fileReferenceIndex.clear();
@@ -241,10 +238,7 @@ export class CodebaseUnderstandingService {
       return "Could not analyze the codebase.";
     }
 
-    const allFiles =
-      (await this.workspaceService.getAllFiles())?.map(
-        (file: vscode.Uri) => file.fsPath,
-      ) || [];
+    const allFiles = (await this.workspaceService.getAllFiles()) || [];
 
     return await this.formatComprehensiveContext(analysis, allFiles);
   }
@@ -395,12 +389,14 @@ ${this.formatFileReferenceIndex()}
       return `[[${index}]](${commandUri} "Click to open ${workspaceRelativePath}")`;
     } else {
       // Use direct file URI for command palette/panels
+      // In headless mode this might just be the path, but sticking to protocol for now
       return `[[${index}]](vscode://file/${filePath} "Click to open ${workspaceRelativePath}")`;
     }
   }
 
   private getWorkspaceRelativePath(filePath: string): string {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const workspaceFolders =
+      EditorHostService.getInstance().getHost().workspace.workspaceFolders;
     if (!workspaceFolders) return filePath;
 
     for (const folder of workspaceFolders) {

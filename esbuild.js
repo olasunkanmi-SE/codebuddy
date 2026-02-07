@@ -82,6 +82,45 @@ const copyTreeSitterPlugin = {
     });
   },
 };
+
+// Plugin to copy JSDOM worker file and mark it as external
+const copyJsdomWorkerPlugin = {
+  name: "copy-jsdom-worker",
+  setup(build) {
+    // Intercept resolution of xhr-sync-worker.js
+    build.onResolve({ filter: /xhr-sync-worker\.js$/ }, (args) => {
+      // Mark as external and rewrite path to be relative to the bundle
+      return { path: "./xhr-sync-worker.js", external: true };
+    });
+
+    build.onEnd(async () => {
+      const workerSrc = path.join(
+        __dirname,
+        "node_modules",
+        "jsdom",
+        "lib",
+        "jsdom",
+        "living",
+        "xhr",
+        "xhr-sync-worker.js"
+      );
+      
+      if (fs.existsSync(workerSrc)) {
+        // Copy for extension
+        const workerDestExt = path.join(__dirname, "dist", "xhr-sync-worker.js");
+        fs.copyFileSync(workerSrc, workerDestExt);
+        
+        // Copy for MCP server
+        const workerDestMCP = path.join(__dirname, "dist", "MCP", "xhr-sync-worker.js");
+        if (!fs.existsSync(path.dirname(workerDestMCP))) {
+          fs.mkdirSync(path.dirname(workerDestMCP), { recursive: true });
+        }
+        fs.copyFileSync(workerSrc, workerDestMCP);
+      }
+    });
+  },
+};
+
 // List of Node.js built-in modules to mark as external
 const nodeBuiltins = [
   "assert",
@@ -158,7 +197,7 @@ const reactPlugin = {
 };
 
 async function main() {
-  // Extension bundle
+  // Main extension bundle
   const mainCtx = await esbuild.context({
     entryPoints: ["src/extension.ts"],
     bundle: true,
@@ -168,7 +207,7 @@ async function main() {
       "electron",
       "@lancedb/lancedb",
       "apache-arrow",
-      "./node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js",
+      // "./xhr-sync-worker.js", // Handled by copyJsdomWorkerPlugin
       "web-tree-sitter",
       "@vscode/ripgrep",
       // 'punycode' intentionally NOT external, so it is bundled
@@ -181,7 +220,13 @@ async function main() {
     outfile: "dist/extension.js",
     metafile: true,
     logLevel: "info",
-    plugins: [nodeModulesPlugin, treeShakingPlugin],
+    logOverride: { "require-resolve-not-external": "silent" },
+    plugins: [
+      nodeModulesPlugin,
+      copyTreeSitterPlugin,
+      copyJsdomWorkerPlugin,
+      treeShakingPlugin,
+    ],
   });
 
   // Worker bundle
@@ -194,6 +239,7 @@ async function main() {
       "electron",
       "@lancedb/lancedb",
       "apache-arrow",
+      // "./xhr-sync-worker.js", // Handled by copyJsdomWorkerPlugin
       "web-tree-sitter",
       "@vscode/ripgrep",
     ],
@@ -205,7 +251,36 @@ async function main() {
     outdir: "dist/workers",
     metafile: true,
     logLevel: "info",
-    plugins: [nodeModulesPlugin, treeShakingPlugin],
+    logOverride: { "require-resolve-not-external": "silent" },
+    plugins: [
+      nodeModulesPlugin,
+      copyJsdomWorkerPlugin,
+      treeShakingPlugin,
+    ],
+  });
+
+  // MCP Server bundle
+  const mcpServerCtx = await esbuild.context({
+    entryPoints: ["src/MCP/server.ts"],
+    bundle: true,
+    external: [
+      "vscode",
+      "web-tree-sitter",
+      "@vscode/ripgrep",
+    ],
+    format: "cjs",
+    target: "node16",
+    platform: "node",
+    minify: production,
+    sourcemap: !production,
+    outfile: "dist/MCP/server.js",
+    metafile: true,
+    logLevel: "info",
+    plugins: [
+      nodeModulesPlugin,
+      copyJsdomWorkerPlugin,
+      treeShakingPlugin,
+    ],
   });
 
   // Webview bundle
@@ -258,13 +333,16 @@ async function main() {
     if (watch) {
       console.log("👀 Watching for changes...");
       await mainCtx.watch();
+      await workerCtx.watch();
+      await mcpServerCtx.watch();
       await webviewCtx.watch();
     } else {
       console.log("🚀 Building...");
       const startTime = Date.now();
-      const [mainResult, workerResult, webviewResult] = await Promise.all([
+      const [mainResult, workerResult, mcpResult, webviewResult] = await Promise.all([
         mainCtx.rebuild(),
         workerCtx.rebuild(),
+        mcpServerCtx.rebuild(),
         webviewCtx.rebuild(),
       ]);
       const duration = Date.now() - startTime;
@@ -272,6 +350,7 @@ async function main() {
       if (production) {
         const mainSize = fs.statSync("dist/extension.js").size / 1024;
         const workerSize = fs.statSync("dist/workers/ast-analyzer.worker.js").size / 1024;
+        const mcpSize = fs.statSync("dist/MCP/server.js").size / 1024;
         const webviewSize = fs
           .readdirSync("dist/webview")
           .filter((f) => f.endsWith(".js"))
@@ -283,10 +362,12 @@ async function main() {
         console.log("\n📦 Bundle sizes:");
         console.log(`   Extension: ${mainSize.toFixed(2)}KB`);
         console.log(`   Worker:    ${workerSize.toFixed(2)}KB`);
+        console.log(`   MCP Server: ${mcpSize.toFixed(2)}KB`);
         console.log(`   Webview:   ${webviewSize.toFixed(2)}KB`);
       }
       await mainCtx.dispose();
       await workerCtx.dispose();
+      await mcpServerCtx.dispose();
       await webviewCtx.dispose();
     }
   } catch (error) {

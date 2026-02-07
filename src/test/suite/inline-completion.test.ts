@@ -1,7 +1,6 @@
 
 import * as assert from "assert";
 import * as sinon from "sinon";
-import * as vscode from "vscode";
 import { InlineCompletionService } from "../../services/inline-completion.service";
 import { CompletionConfigService } from "../../services/completion-config.service";
 import { ContextCompletionService } from "../../services/context-completion.service";
@@ -9,6 +8,7 @@ import { FIMPromptService } from "../../services/fim-prompt.service";
 import { LocalLLM } from "../../llms/local/local";
 import { CodeBuddyToolProvider } from "../../tools/factory/tool";
 import { Orchestrator } from "../../orchestrator";
+import { InlineCompletionTriggerKind } from "../../interfaces/editor-host";
 
 describe("InlineCompletionService", () => {
     let sandbox: sinon.SinonSandbox;
@@ -46,7 +46,7 @@ describe("InlineCompletionService", () => {
             suffix: "",
             languageId: "typescript",
             imports: [],
-            cursorPosition: new vscode.Position(0, 12)
+            cursorPosition: { line: 0, character: 12 }
         });
         sandbox.stub(ContextCompletionService, "getInstance").returns(contextServiceStub as any);
 
@@ -89,11 +89,11 @@ describe("InlineCompletionService", () => {
             getText: () => "const a = 1;",
             languageId: "typescript",
             offsetAt: () => 0,
-            positionAt: () => new vscode.Position(0, 0),
+            positionAt: () => ({ line: 0, character: 0 }),
         } as any;
-        const position = new vscode.Position(0, 12);
+        const position = { line: 0, character: 12 };
         const context = {
-            triggerKind: vscode.InlineCompletionTriggerKind.Automatic,
+            triggerKind: InlineCompletionTriggerKind.Automatic,
             selectedCompletionInfo: undefined
         } as any;
         const token = {
@@ -114,7 +114,7 @@ describe("InlineCompletionService", () => {
         configServiceStub.getConfig.returns({ enabled: false } as any);
         
         const document = {} as any;
-        const position = new vscode.Position(0, 0);
+        const position = { line: 0, character: 0 };
         const context = {} as any;
         const token = { isCancellationRequested: false } as any;
 
@@ -129,11 +129,11 @@ describe("InlineCompletionService", () => {
             getText: () => "const a = 1;",
             languageId: "typescript",
             offsetAt: () => 0,
-            positionAt: () => new vscode.Position(0, 0),
+            positionAt: () => ({ line: 0, character: 0 }),
         } as any;
-        const position = new vscode.Position(0, 12);
+        const position = { line: 0, character: 12 };
         const context = {
-            triggerKind: vscode.InlineCompletionTriggerKind.Automatic,
+            triggerKind: InlineCompletionTriggerKind.Automatic,
         } as any;
         const token = {
             isCancellationRequested: false,

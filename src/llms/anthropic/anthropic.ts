@@ -1,5 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import * as vscode from "vscode";
 import { Orchestrator } from "../../orchestrator";
 import { COMMON } from "../../application/constant";
 import { Memory } from "../../memory/base";
@@ -11,6 +10,8 @@ import {
   ILlmConfig,
 } from "../interface";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
+import { IDisposable } from "../../interfaces/disposable";
+import { EditorHostService } from "../../services/editor-host.service";
 
 interface AnthropicLLMSnapshot {
   response?: any;
@@ -22,12 +23,12 @@ interface AnthropicLLMSnapshot {
 
 export class AnthropicLLM
   extends BaseLLM<AnthropicLLMSnapshot>
-  implements vscode.Disposable, ICodeCompleter
+  implements IDisposable, ICodeCompleter
 {
   private client: Anthropic;
   private response: any;
   protected readonly orchestrator: Orchestrator;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   private static instance: AnthropicLLM | undefined;
 
   constructor(config: ILlmConfig) {
@@ -51,9 +52,11 @@ export class AnthropicLLM
 
   private initializeDisposable(): void {
     this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration(() =>
-        this.handleConfigurationChange(),
-      ),
+      EditorHostService.getInstance()
+        .getHost()
+        .workspace.onDidChangeConfiguration(() =>
+          this.handleConfigurationChange(),
+        ),
     );
   }
 

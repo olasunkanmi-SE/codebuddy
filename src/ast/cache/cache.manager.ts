@@ -6,7 +6,7 @@
 
 import { LRUCache } from "lru-cache";
 import Parser from "web-tree-sitter";
-import * as vscode from "vscode";
+import { IOutputChannel } from "../../interfaces/output-channel";
 import { IParsedFile } from "../query-types";
 
 interface CacheEntry {
@@ -20,7 +20,7 @@ export class CacheManager {
   private cache: LRUCache<string, CacheEntry>;
 
   private constructor(
-    private outputChannel: vscode.OutputChannel,
+    private outputChannel: IOutputChannel,
     maxSize = 50,
   ) {
     this.cache = new LRUCache<string, CacheEntry>({
@@ -40,7 +40,7 @@ export class CacheManager {
   }
 
   static getInstance(
-    outputChannel: vscode.OutputChannel,
+    outputChannel: IOutputChannel,
     maxSize?: number,
   ): CacheManager {
     if (!CacheManager.instance) {

@@ -1,5 +1,4 @@
 // src/commands/review-pr.ts
-import * as vscode from "vscode";
 import { CodeCommandHandler } from "../handler";
 import { GitActions } from "../../services/git-actions";
 import { ChangeDetector } from "./change-detector.service";
@@ -7,13 +6,14 @@ import { formatText } from "../../utils/utils";
 import { GitCliProvider } from "./git-cli.provider";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { PRPromptBuilder } from "./pr-prompt-builder.service";
+import { EditorHostService } from "../../services/editor-host.service";
 
 export class ReviewPR extends CodeCommandHandler {
   private readonly changeDetector: ChangeDetector;
   private readonly promptBuilder: PRPromptBuilder;
   // private readonly branchSelector: BranchSelector;
 
-  constructor(action: string, context: vscode.ExtensionContext) {
+  constructor(action: string, context: any) {
     super(action, context);
     this.logger = Logger.initialize("ReviewPR", {
       minLevel: LogLevel.DEBUG,
@@ -47,15 +47,22 @@ export class ReviewPR extends CodeCommandHandler {
       (b) => b !== currentBranch.current,
     );
     if (availableBranches.length === 0) {
-      vscode.window.showWarningMessage(
-        "No other branches found to compare against.",
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showInformationMessage(
+          "No other branches found to compare against.",
+        );
       return undefined;
     }
-    const selected = await vscode.window.showQuickPick(availableBranches, {
-      placeHolder: `Select target branch to review ${currentBranch.current} against`,
-    });
-    return selected;
+    const selected = await EditorHostService.getInstance()
+      .getHost()
+      .window.showQuickPick(availableBranches, {
+        placeHolder: `Select target branch to review ${currentBranch.current} against`,
+      });
+    if (typeof selected === "object") {
+      return selected.label;
+    }
+    return selected as string;
   }
 
   public async generatePrompt(): Promise<string> {
@@ -73,9 +80,11 @@ export class ReviewPR extends CodeCommandHandler {
       return this.promptBuilder.build(changeDetails);
     } catch (error) {
       this.logger.error("Error generating PR review prompt:", error);
-      vscode.window.showErrorMessage(
-        error instanceof Error ? error.message : "An unknown error occurred.",
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage(
+          error instanceof Error ? error.message : "An unknown error occurred.",
+        );
       return this.promptBuilder.buildErrorPrompt(error);
     }
   }

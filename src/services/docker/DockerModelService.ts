@@ -1,4 +1,4 @@
-import * as vscode from "vscode";
+import { IDisposable } from "../../interfaces/editor-host";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { Terminal } from "../../utils/terminal";
 
@@ -8,7 +8,7 @@ export interface DockerModel {
   id?: string;
 }
 
-export class DockerModelService implements vscode.Disposable {
+export class DockerModelService implements IDisposable {
   private static instance: DockerModelService;
   private readonly logger: Logger;
   private readonly terminal: Terminal;
@@ -109,7 +109,7 @@ export class DockerModelService implements vscode.Disposable {
 
   async getModels(): Promise<DockerModel[]> {
     let runnerModels: DockerModel[] = [];
-    let ollamaModels: DockerModel[] = [];
+    const ollamaModels: DockerModel[] = [];
 
     // 1. Try to get models from Docker Model Runner
     try {

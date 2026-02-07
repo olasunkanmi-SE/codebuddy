@@ -6,18 +6,18 @@ import {
   GoogleGenAI,
 } from "@google/genai";
 import * as path from "path";
-import * as vscode from "vscode";
 import { IEventPayload } from "../emitter/interface";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
+import { IDisposable } from "../interfaces/editor-host";
 
-export class FileUploadService implements vscode.Disposable {
+export class FileUploadService implements IDisposable {
   private readonly ai: GoogleGenAI;
   protected readonly orchestrator: Orchestrator;
   private static readonly PROCESSING_WAIT_TIME_MS = 6000;
   private static readonly MAX_CACHE_PAGE_SIZE = 10;
   private static readonly CACHE_MODEL = "gemini-1.5-flash-002";
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   private static instance: FileUploadService;
   private readonly logger: Logger;
   constructor(private readonly apiKey: string) {

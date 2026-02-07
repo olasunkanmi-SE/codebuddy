@@ -1,10 +1,10 @@
-import * as vscode from "vscode";
 import { IEventPayload } from "./emitter/interface";
 import { EventEmitter } from "./emitter/publisher";
+import { IDisposable } from "./interfaces/disposable";
 
-export class Orchestrator extends EventEmitter implements vscode.Disposable {
+export class Orchestrator extends EventEmitter implements IDisposable {
   private static instance: Orchestrator;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   private isInitialized = false;
 
   constructor() {

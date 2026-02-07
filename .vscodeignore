@@ -17,7 +17,6 @@ src/**
 test/**
 docs/**
 webviewUi/**
-node_modules/**
 .vscode/**
 .vscode-test/**
 .github/

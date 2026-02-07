@@ -1,15 +1,16 @@
 import { formatText } from "../utils/utils";
 import { CodeCommandHandler } from "./handler";
-import * as vscode from "vscode";
+import { EditorHostService } from "../services/editor-host.service";
 
 export class InLineChat extends CodeCommandHandler {
   selectedCode: string | undefined;
-  constructor(action: string, context: vscode.ExtensionContext) {
+  constructor(action: string, context: any) {
     super(action, context);
   }
 
   getCurrentActiveEditorCode(): string | undefined {
-    const editor = vscode.window.activeTextEditor;
+    const editor =
+      EditorHostService.getInstance().getHost().window.activeTextEditor;
     return editor ? editor?.document?.getText() : undefined;
   }
 

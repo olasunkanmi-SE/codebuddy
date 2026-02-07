@@ -1,5 +1,5 @@
-import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import * as vscode from "vscode";
 import { Orchestrator } from "./orchestrator";
 import {
@@ -41,9 +41,10 @@ import {
   getConfigValue,
   setConfigValue,
 } from "./utils/utils";
+import { FileUtils } from "./utils/common-utils";
 import { Terminal } from "./utils/terminal";
 import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
-import { CodeActionsProvider } from "./webview-providers/code-actions";
+import { CodeActionsProvider } from "./hosts/vscode-code-actions";
 import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
 import { GeminiWebViewProvider } from "./webview-providers/gemini";
 import { GroqWebViewProvider } from "./webview-providers/groq";
@@ -53,18 +54,31 @@ import { GLMWebViewProvider } from "./webview-providers/glm";
 import { LocalWebViewProvider } from "./webview-providers/local";
 import { WebViewProviderManager } from "./webview-providers/manager";
 import { DeveloperAgent } from "./agents/developer/agent";
+import { MCPService } from "./MCP/service";
 import { AgentRunningGuardService } from "./services/agent-running-guard.service";
 
 import { DiffReviewService } from "./services/diff-review.service";
 import { SecretStorageService } from "./services/secret-storage";
 import { AstIndexingService } from "./services/ast-indexing.service";
+import { EditorHostService } from "./services/editor-host.service";
+import { IExtensionContext, FileType } from "./interfaces/editor-host";
+import { VSCodeEditorHost } from "./hosts/vscode-editor-host";
+import { DiffContentProvider } from "./hosts/vscode-diff-provider";
+import { VSCodeInlineCompletionAdapter } from "./hosts/vscode-inline-completion-adapter";
+import { TelemetryService } from "./services/telemetry.service";
 
-const logger = Logger.initialize("extension-main", {
-  minLevel: LogLevel.DEBUG,
-  enableConsole: true,
-  enableFile: true,
-  enableTelemetry: true,
-});
+const telemetry = TelemetryService.getInstance();
+
+const logger = Logger.initialize(
+  "extension-main",
+  {
+    minLevel: LogLevel.DEBUG,
+    enableConsole: true,
+    enableFile: true,
+    enableTelemetry: true,
+  },
+  telemetry,
+);
 
 const {
   geminiKey,
@@ -95,7 +109,7 @@ const orchestrator = Orchestrator.getInstance();
  * Initialize WebView providers lazily for faster startup
  */
 function initializeWebViewProviders(
-  context: vscode.ExtensionContext,
+  context: IExtensionContext,
   selectedGenerativeAiModel: string,
 ): void {
   // Use setImmediate to defer until after current call stack
@@ -203,19 +217,46 @@ function initializeWebViewProviders(
 }
 
 export async function activate(context: vscode.ExtensionContext) {
+  // Configure Logger to use workspace directory if available
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (workspaceRoot) {
+    const logPath = path.join(workspaceRoot, ".codebuddy", "logs");
+    const date = new Date().toISOString();
+    const safeDate = date.replace(/[:.]/g, "-");
+    const fullLogPath = path.join(logPath, `codebuddy-${safeDate}.log`);
+
+    Logger.initialize("extension-main", {
+      enableFile: true,
+      filePath: fullLogPath,
+    });
+    logger.info(`Logging to workspace: ${fullLogPath}`);
+  }
+
+  telemetry.recordEvent("extension_activated", {
+    version: context.extension.packageJSON.version,
+  });
+  context.subscriptions.push({ dispose: () => telemetry.dispose() });
+
   try {
+    // Initialize Editor Host (Platform Abstraction)
+    const editorHost = new VSCodeEditorHost(context);
+    EditorHostService.getInstance().initialize(editorHost);
+
     // Initialize Terminal with extension path early for Docker Compose support
     const terminal = Terminal.getInstance();
     terminal.setExtensionPath(context.extensionPath);
 
     // Initialize AST Indexing Service (Worker Thread Manager)
-    AstIndexingService.getInstance(context);
+    AstIndexingService.getInstance(context as unknown as IExtensionContext);
     logger.info("AST Indexing Service initialized");
 
     new DeveloperAgent({});
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
     // setConfigValue("generativeAi.option", "Gemini");
-    initializeWebViewProviders(context, selectedGenerativeAiModel);
+    initializeWebViewProviders(
+      context as unknown as IExtensionContext,
+      selectedGenerativeAiModel,
+    );
     Logger.sessionId = Logger.generateId();
 
     const databaseService: SqliteDatabaseService =
@@ -226,16 +267,72 @@ export async function activate(context: vscode.ExtensionContext) {
     SchedulerService.getInstance().start();
 
     // Initialize Secret Storage Service for user preferences
-    const secretStorageService = new SecretStorageService(context);
+    const secretStorageService = new SecretStorageService();
     context.subscriptions.push(secretStorageService);
 
+    // Initialize MCP Service (Client-Server Integration)
+    const mcpService = MCPService.getInstance();
+    await mcpService.initialize(context.extensionPath);
+    context.subscriptions.push(mcpService);
+
+    // Spawn internal server eagerly to ensure readiness
+    try {
+      await mcpService.ensureServerConnected("codebuddy-internal");
+      logger.info("Internal MCP Server spawned successfully");
+      mcpService.setSafeMode(false);
+    } catch (err) {
+      logger.warn("Failed to spawn internal MCP server on startup:", err);
+      mcpService.setSafeMode(true);
+
+      // Create a status bar item for Safe Mode
+      const safeModeStatusBar = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Right,
+        100,
+      );
+      safeModeStatusBar.text = "$(warning) CodeBuddy: Safe Mode";
+      safeModeStatusBar.tooltip =
+        "Internal Server Unavailable - Click to retry connection";
+      safeModeStatusBar.backgroundColor = new vscode.ThemeColor(
+        "statusBarItem.warningBackground",
+      );
+      safeModeStatusBar.command = "codebuddy.retryServerConnection";
+      safeModeStatusBar.show();
+      context.subscriptions.push(safeModeStatusBar);
+
+      context.subscriptions.push(
+        vscode.commands.registerCommand(
+          "codebuddy.retryServerConnection",
+          async () => {
+            safeModeStatusBar.text = "$(loading~spin) CodeBuddy: Retrying...";
+            try {
+              await mcpService.ensureServerConnected("codebuddy-internal");
+              mcpService.setSafeMode(false);
+              safeModeStatusBar.dispose();
+              vscode.window.showInformationMessage(
+                "CodeBuddy Server Connected!",
+              );
+            } catch (error) {
+              safeModeStatusBar.text = "$(warning) CodeBuddy: Safe Mode";
+              vscode.window.showErrorMessage(
+                "Failed to reconnect to CodeBuddy Server",
+              );
+            }
+          },
+        ),
+      );
+    }
+
     // Initialize ContextRetriever for semantic search
-    const contextRetriever = ContextRetriever.initialize(context);
+    const storagePath =
+      context.storageUri?.fsPath || context.globalStorageUri.fsPath;
+    const contextRetriever = ContextRetriever.initialize(storagePath);
 
     // Initialize Persistent Codebase Service and Git Watcher
     const persistentCodebaseService =
       PersistentCodebaseUnderstandingService.getInstance();
-    persistentCodebaseService.initializeWatcher(context);
+    persistentCodebaseService.initializeWatcher(
+      context as unknown as IExtensionContext,
+    );
 
     // Auto-index files on save using the optimized Worker Service
     context.subscriptions.push(
@@ -316,10 +413,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize Diff Review Service
     const diffReviewService = DiffReviewService.getInstance();
+    const diffContentProvider = DiffContentProvider.getInstance();
     context.subscriptions.push(
       vscode.workspace.registerTextDocumentContentProvider(
         DiffReviewService.SCHEME,
-        diffReviewService,
+        diffContentProvider,
       ),
     );
 
@@ -451,10 +549,13 @@ export async function activate(context: vscode.ExtensionContext) {
       context.extensionPath,
       outputChannel,
     );
+    const inlineCompletionAdapter = new VSCodeInlineCompletionAdapter(
+      inlineCompletionService,
+    );
     const inlineCompletionProvider =
       vscode.languages.registerInlineCompletionItemProvider(
         { pattern: "**" },
-        inlineCompletionService,
+        inlineCompletionAdapter,
       );
     context.subscriptions.push(inlineCompletionProvider);
     logger.info("Inline Completion Provider registered");
@@ -867,7 +968,9 @@ export function deactivate(context: vscode.ExtensionContext) {
   agentGuard.dispose();
 
   // Dispose provider manager
-  const providerManager = WebViewProviderManager.getInstance(context);
+  const providerManager = WebViewProviderManager.getInstance(
+    context as unknown as IExtensionContext,
+  );
   providerManager.dispose();
 
   context.subscriptions.forEach((subscription) => subscription.dispose());
@@ -884,15 +987,19 @@ async function clearFileStorageData() {
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
     const codeBuddyPath = path.join(workSpaceRoot, ".codebuddy");
 
-    if (fs.existsSync(codeBuddyPath)) {
-      const files = fs.readdirSync(codeBuddyPath);
-      files.forEach((file: string) => {
-        const filePath = path.join(codeBuddyPath, file);
-        if (fs.lstatSync(filePath).isFile()) {
-          fs.unlinkSync(filePath);
+    if (await FileUtils.fileExists(codeBuddyPath)) {
+      const host = EditorHostService.getInstance().getHost();
+      const files = await host.workspace.fs.readDirectory(codeBuddyPath);
+      let deletedCount = 0;
+
+      for (const [name, type] of files) {
+        if (type === FileType.File) {
+          const filePath = path.join(codeBuddyPath, name);
+          await host.workspace.fs.delete(filePath);
+          deletedCount++;
         }
-      });
-      logger.info(`Cleared ${files.length} files from .codebuddy folder`);
+      }
+      logger.info(`Cleared ${deletedCount} files from .codebuddy folder`);
     }
   } catch (error: any) {
     logger.error("Error clearing file storage data:", error);

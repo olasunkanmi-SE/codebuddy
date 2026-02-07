@@ -1,5 +1,4 @@
-import { Logger } from "../infrastructure/logger/logger";
-import { LogLevel } from "./telemetry";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 export class InputValidator {
   private static instance: InputValidator;

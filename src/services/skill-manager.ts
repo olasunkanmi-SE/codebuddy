@@ -1,6 +1,8 @@
-import * as fs from "fs";
 import * as path from "path";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "./editor-host.service";
+import { FileUtils } from "../utils/common-utils";
+import { FileType } from "../interfaces/editor-host";
 
 export interface Skill {
   name: string;
@@ -33,14 +35,17 @@ export class SkillManager {
     this.skills = [];
     const skillsDir = path.join(rootPath, ".codebuddy", "skills");
 
-    if (!fs.existsSync(skillsDir)) {
+    if (!(await FileUtils.fileExists(skillsDir))) {
       return;
     }
 
     try {
       const files = await this.findAllSkillFiles(skillsDir);
       for (const file of files) {
-        const content = fs.readFileSync(file, "utf-8");
+        const contentBytes = await EditorHostService.getInstance()
+          .getHost()
+          .workspace.fs.readFile(file);
+        const content = new TextDecoder().decode(contentBytes);
         const skill = this.parseSkill(content);
         if (skill) {
           this.skills.push(skill);
@@ -53,13 +58,14 @@ export class SkillManager {
 
   private async findAllSkillFiles(dir: string): Promise<string[]> {
     const results: string[] = [];
-    const list = fs.readdirSync(dir);
-    for (const file of list) {
-      const filePath = path.join(dir, file);
-      const stat = fs.statSync(filePath);
-      if (stat && stat.isDirectory()) {
+    const host = EditorHostService.getInstance().getHost();
+    const entries = await host.workspace.fs.readDirectory(dir);
+
+    for (const [name, type] of entries) {
+      const filePath = path.join(dir, name);
+      if (type === FileType.Directory) {
         results.push(...(await this.findAllSkillFiles(filePath)));
-      } else if (file.toLowerCase().endsWith("skill.md")) {
+      } else if (name.toLowerCase().endsWith("skill.md")) {
         results.push(filePath);
       }
     }

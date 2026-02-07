@@ -1,12 +1,12 @@
-import * as vscode from "vscode";
 import { CodeCommandHandler } from "./handler";
 import { GitActions } from "../services/git-actions";
 import { formatText } from "../utils/utils";
+import { EditorHostService } from "../services/editor-host.service";
 
 export class GenerateCommitMessage extends CodeCommandHandler {
   private readonly gitActions: GitActions;
 
-  constructor(action: string, context: vscode.ExtensionContext) {
+  constructor(action: string, context: any) {
     super(action, context);
     this.gitActions = new GitActions();
   }
@@ -19,9 +19,11 @@ export class GenerateCommitMessage extends CodeCommandHandler {
       return await this.gitActions.getStagedDifferenceSummary();
     } catch (error: any) {
       this.logger.error("Error getting staged differences:", error);
-      vscode.window.showErrorMessage(
-        "Failed to get staged changes. Please ensure you have staged changes.",
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage(
+          "Failed to get staged changes. Please ensure you have staged changes.",
+        );
       throw error;
     }
   }

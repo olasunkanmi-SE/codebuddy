@@ -1,6 +1,5 @@
 import * as path from "path";
 import * as ts from "typescript";
-import * as vscode from "vscode";
 import { Orchestrator } from "../orchestrator";
 import { FSPROPS } from "../application/constant";
 import {
@@ -19,6 +18,7 @@ import { ITypeScriptCodeMapper } from "../application/interfaces/ts.code.mapper.
 import { handleError } from "../utils/utils";
 import { FileService } from "./file-system";
 import { Memory } from "../memory/base";
+import { EditorHostService } from "./editor-host.service";
 
 export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
   private program: ts.Program | undefined;
@@ -80,7 +80,10 @@ export class TypeScriptAtsMapper implements ITypeScriptCodeMapper {
 
   //the root folder should be relative to src folder
   getRootFolder(): string {
-    return vscode.workspace.workspaceFolders?.[0].uri.fsPath ?? process.cwd();
+    return (
+      EditorHostService.getInstance().getHost().workspace.workspaceFolders?.[0]
+        .uri.fsPath ?? process.cwd()
+    );
   }
 
   /**

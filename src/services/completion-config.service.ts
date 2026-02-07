@@ -1,10 +1,10 @@
-import * as vscode from "vscode";
 import {
   CompletionProviderType,
   CompletionTriggerMode,
   ICompletionConfig,
 } from "../interfaces/completion.interface";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "./editor-host.service";
 
 export class CompletionConfigService {
   private static instance: CompletionConfigService;
@@ -47,7 +47,8 @@ export class CompletionConfigService {
   }
 
   private loadConfig(): ICompletionConfig {
-    const config = vscode.workspace.getConfiguration(this.configSection);
+    const editorHost = EditorHostService.getInstance().getHost();
+    const config = editorHost.workspace.getConfiguration(this.configSection);
 
     return {
       enabled: config.get<boolean>("enabled", true),
@@ -69,7 +70,8 @@ export class CompletionConfigService {
   }
 
   private registerConfigurationListener(): void {
-    vscode.workspace.onDidChangeConfiguration((event) => {
+    const editorHost = EditorHostService.getInstance().getHost();
+    editorHost.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration(this.configSection)) {
         this.logger.info("Completion configuration changed, reloading...");
         this.config = this.loadConfig();

@@ -1,15 +1,31 @@
 import * as assert from "assert";
 import * as sinon from "sinon";
-import * as vscode from "vscode";
-import * as fs from "fs";
 import { CodebaseAnalysisCache } from "../../services/codebase-analysis-cache";
+import { EditorHostService } from "../../services/editor-host.service";
+import { IEditorHost, FileStat } from "../../interfaces/editor-host";
 
 suite("CodebaseAnalysisCache Tests", () => {
   let cache: CodebaseAnalysisCache;
   let sandbox: sinon.SinonSandbox;
+  let mockHost: any;
 
   setup(() => {
     sandbox = sinon.createSandbox();
+    
+    // Mock EditorHost
+    mockHost = {
+      workspace: {
+        workspaceFolders: [{ uri: { fsPath: "/root" }, name: "root", index: 0 }],
+        findFiles: sandbox.stub(),
+        fs: {
+          stat: sandbox.stub()
+        }
+      }
+    };
+
+    const editorHostService = EditorHostService.getInstance();
+    sandbox.stub(editorHostService, "getHost").returns(mockHost as unknown as IEditorHost);
+
     cache = CodebaseAnalysisCache.getInstance();
     cache.clear(); // Start with clean cache
   });
@@ -82,17 +98,17 @@ suite("CodebaseAnalysisCache Tests", () => {
   suite("Workspace Hash Dependencies", () => {
     test("should invalidate workspace-dependent cache when workspace changes", async () => {
       // Mock workspace methods
-      const mockFindFiles = sandbox.stub(vscode.workspace, "findFiles");
-      const mockStat = sandbox.stub(vscode.workspace.fs, "stat");
+      const mockFindFiles = mockHost.workspace.findFiles;
+      const mockStat = mockHost.workspace.fs.stat;
 
-      const mockUri1 = { fsPath: "/test/file1.ts" } as vscode.Uri;
-      const mockUri2 = { fsPath: "/test/file2.ts" } as vscode.Uri;
+      const mockPath1 = "/test/file1.ts";
+      const mockPath2 = "/test/file2.ts";
 
       // First call - return initial files
-      mockFindFiles.onFirstCall().resolves([mockUri1]);
+      mockFindFiles.onFirstCall().resolves([mockPath1]);
       mockStat
         .onFirstCall()
-        .resolves({ mtime: 1000, size: 100 } as vscode.FileStat);
+        .resolves({ mtime: 1000, size: 100 } as FileStat);
 
       const testData = { workspace: "dependent" };
       await cache.set("workspace-test", testData, 60000, true);
@@ -102,13 +118,13 @@ suite("CodebaseAnalysisCache Tests", () => {
       assert.deepStrictEqual(result, testData);
 
       // Second call - return changed files (different mtime)
-      mockFindFiles.onSecondCall().resolves([mockUri1, mockUri2]);
+      mockFindFiles.onSecondCall().resolves([mockPath1, mockPath2]);
       mockStat
         .onSecondCall()
-        .resolves({ mtime: 2000, size: 200 } as vscode.FileStat);
+        .resolves({ mtime: 2000, size: 200 } as FileStat);
       mockStat
         .onThirdCall()
-        .resolves({ mtime: 1500, size: 150 } as vscode.FileStat);
+        .resolves({ mtime: 1500, size: 150 } as FileStat);
 
       // Should be invalidated due to workspace change
       result = await cache.get("workspace-test");
@@ -173,7 +189,7 @@ suite("CodebaseAnalysisCache Tests", () => {
   suite("Error Handling", () => {
     test("should handle workspace hash generation errors gracefully", async () => {
       // Mock workspace methods to throw errors
-      const mockFindFiles = sandbox.stub(vscode.workspace, "findFiles");
+      const mockFindFiles = mockHost.workspace.findFiles;
       mockFindFiles.rejects(new Error("Workspace error"));
 
       const testData = { error: "handling" };
@@ -189,15 +205,16 @@ suite("CodebaseAnalysisCache Tests", () => {
     });
 
     test("should handle file stat errors during hash generation", async () => {
-      const mockFindFiles = sandbox.stub(vscode.workspace, "findFiles");
-      const mockStat = sandbox.stub(vscode.workspace.fs, "stat");
+      const mockFindFiles = mockHost.workspace.findFiles;
+      const mockStat = mockHost.workspace.fs.stat;
 
-      const mockUri = { fsPath: "/test/file.ts" } as vscode.Uri;
-      mockFindFiles.resolves([mockUri]);
+      const mockPath = "/test/file.ts";
+      mockFindFiles.resolves([mockPath]);
       mockStat.rejects(new Error("File not found"));
 
       const testData = { stat: "error" };
 
+      // Should not throw error
       await assert.doesNotReject(async () => {
         await cache.set("stat-error-test", testData, 60000, true);
       });

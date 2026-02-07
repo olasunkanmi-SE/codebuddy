@@ -1,22 +1,23 @@
 import OpenAI from "openai";
-import * as vscode from "vscode";
 import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { LocalLLM } from "../llms/local/local";
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
 import { getAPIKeyAndModel } from "../utils/utils";
 import { BaseWebViewProvider, LLMMessage } from "./base";
+import { EditorHostService } from "../services/editor-host.service";
+import { IDisposable, IExtensionContext } from "../interfaces/editor-host";
 
 export class LocalWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
   readonly llm: LocalLLM;
-  private localDisposables: vscode.Disposable[] = [];
+  private localDisposables: IDisposable[] = [];
 
   constructor(
-    extensionUri: vscode.Uri,
+    extensionUri: any,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: IExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
     // Retrieve full config including baseURL
@@ -31,17 +32,19 @@ export class LocalWebViewProvider extends BaseWebViewProvider {
 
   private registerConfigListener() {
     this.localDisposables.push(
-      vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration("local")) {
-          const { apiKey, model, baseUrl } = getAPIKeyAndModel("Local");
-          this.llm.updateConfig({
-            apiKey: apiKey || "not-needed",
-            baseUrl: baseUrl,
-            model: model || "llama3.2",
-          });
-          this.logger.debug(`LocalLLM config updated: ${model}`);
-        }
-      }),
+      EditorHostService.getInstance()
+        .getHost()
+        .workspace.onDidChangeConfiguration((e) => {
+          if (e.affectsConfiguration("codebuddy.local")) {
+            const { apiKey, model, baseUrl } = getAPIKeyAndModel("Local");
+            this.llm.updateConfig({
+              apiKey: apiKey || "not-needed",
+              baseUrl: baseUrl,
+              model: model || "llama3.2",
+            });
+            this.logger.debug(`LocalLLM config updated: ${model}`);
+          }
+        }),
     );
   }
 
@@ -166,13 +169,17 @@ export class LocalWebViewProvider extends BaseWebViewProvider {
 
       Memory.set("chatHistory", this.chatHistory);
       if (error.status === 401) {
-        vscode.window.showErrorMessage(
-          "Invalid API key. Please update your API key",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid API key. Please update your API key",
+          );
         this.logger.error("Invalid API key. Please update your API key", error);
       }
       if (error.status === 429) {
-        vscode.window.showErrorMessage("Rate limiting error, try again later");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("Rate limiting error, try again later");
       }
       this.logger.error("Error generating Local response", error.stack);
       throw error;
@@ -249,13 +256,17 @@ export class LocalWebViewProvider extends BaseWebViewProvider {
 
       Memory.set("chatHistory", this.chatHistory);
       if (error.status === 401) {
-        vscode.window.showErrorMessage(
-          "Invalid API key. Please update your API key",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid API key. Please update your API key",
+          );
         this.logger.error("Invalid API key. Please update your API key", error);
       }
       if (error.status === 429) {
-        vscode.window.showErrorMessage("Rate limiting error, try again later");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("Rate limiting error, try again later");
       }
       this.logger.error("Error generating Local response", error.stack);
       throw error;

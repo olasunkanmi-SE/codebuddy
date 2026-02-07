@@ -1,20 +1,42 @@
 import * as assert from "assert";
 import * as sinon from "sinon";
-import * as vscode from "vscode";
-import * as fs from "fs";
 import { CodebaseUnderstandingService } from "../../services/codebase-understanding.service";
 import { CodebaseAnalysisCache } from "../../services/codebase-analysis-cache";
+import { EditorHostService } from "../../services/editor-host.service";
 
 suite("CodebaseUnderstandingService Cache Integration Tests", () => {
   let service: CodebaseUnderstandingService;
   let cache: CodebaseAnalysisCache;
   let sandbox: sinon.SinonSandbox;
+  let editorHostStub: any;
 
   setup(() => {
     sandbox = sinon.createSandbox();
     service = CodebaseUnderstandingService.getInstance();
     cache = CodebaseAnalysisCache.getInstance();
     cache.clear(); // Start with clean cache
+
+    // Mock EditorHostService
+    editorHostStub = {
+      workspace: {
+        fs: {
+          readFile: sandbox.stub(),
+          stat: sandbox.stub(),
+        },
+        workspaceFolders: [{ uri: { fsPath: "/test/workspace" }, index: 0, name: "test-workspace" }],
+        findFiles: sandbox.stub(),
+      },
+    };
+    
+    // Initialize EditorHostService with mock if not already initialized
+    // Or stub getInstance/getHost if it's already initialized (singleton problem)
+    // Since EditorHostService is a singleton, we can just re-initialize it if we allow it, 
+    // or stub the getInstance method. 
+    // Looking at EditorHostService, it allows initialize() but warns if already initialized.
+    // Ideally we stub getInstance to return a service that returns our mock host.
+    
+    const editorHostService = EditorHostService.getInstance();
+    sandbox.stub(editorHostService, "getHost").returns(editorHostStub);
   });
 
   teardown(() => {
@@ -55,7 +77,7 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
         .resolves(mockAnalysis.domainRelationships);
       sandbox
         .stub(service as any, "findFile")
-        .resolves(vscode.Uri.file("/test/package.json"));
+        .resolves({ fsPath: "/test/package.json" });
 
       // First call - should perform full analysis
       const result1 = await service.analyzeWorkspace();
@@ -85,7 +107,7 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
       sandbox.stub(service as any, "mapDomainRelationships").resolves([]);
       sandbox
         .stub(service as any, "findFile")
-        .resolves(vscode.Uri.file("/test/package.json"));
+        .resolves({ fsPath: "/test/package.json" });
 
       // First call
       await service.analyzeWorkspace();
@@ -144,7 +166,7 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
       sandbox.stub(service as any, "mapDomainRelationships").resolves([]);
       sandbox
         .stub(service as any, "findFile")
-        .resolves(vscode.Uri.file("/test/package.json"));
+        .resolves({ fsPath: "/test/package.json" });
 
       // Should not throw error and should perform analysis
       const result = await service.analyzeWorkspace();
@@ -169,7 +191,7 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
       sandbox.stub(service as any, "mapDomainRelationships").resolves([]);
       sandbox
         .stub(service as any, "findFile")
-        .resolves(vscode.Uri.file("/test/package.json"));
+        .resolves({ fsPath: "/test/package.json" });
 
       // Should not throw error
       const result = await service.analyzeWorkspace();
@@ -204,7 +226,7 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
         .callsFake(createSlowAnalysis);
       sandbox
         .stub(service as any, "findFile")
-        .resolves(vscode.Uri.file("/test/package.json"));
+        .resolves({ fsPath: "/test/package.json" });
 
       // First call (should be slower)
       const start1 = Date.now();
@@ -226,32 +248,28 @@ suite("CodebaseUnderstandingService Cache Integration Tests", () => {
 
   // Helper function to mock workspace operations
   function mockWorkspaceOperations(sandbox: sinon.SinonSandbox) {
-    // Mock workspace folders
-    const mockWorkspaceFolder = {
-      uri: vscode.Uri.file("/test/workspace"),
-      name: "test-workspace",
-      index: 0,
-    };
-    sandbox
-      .stub(vscode.workspace, "workspaceFolders")
-      .value([mockWorkspaceFolder]);
+    const host = EditorHostService.getInstance().getHost();
 
-    // Mock file system operations for the native fs module
+    // Mock file system operations
     const mockPackageJson = JSON.stringify({
       dependencies: { "@nestjs/core": "^8.0.0", react: "^17.0.0" },
       devDependencies: { typescript: "^4.0.0" },
     });
 
-    // Mock native fs module used by CodebaseAnalysisWorker
-    sandbox.stub(fs.promises, "readFile").resolves(mockPackageJson);
-    sandbox.stub(fs, "existsSync").returns(true);
+    // Mock fs.readFile via EditorHost
+    // Service expects Uint8Array (Buffer satisfies this in Node)
+    if (host.workspace.fs.readFile && (host.workspace.fs.readFile as any).resolves) {
+        (host.workspace.fs.readFile as sinon.SinonStub).resolves(Buffer.from(mockPackageJson));
+    }
 
-    // Mock workspace service
+    // Mock workspace service findFiles via EditorHost
     const mockFiles = [
-      vscode.Uri.file("/test/file1.ts"),
-      vscode.Uri.file("/test/file2.ts"),
+      { fsPath: "/test/file1.ts" },
+      { fsPath: "/test/file2.ts" },
     ];
-
-    sandbox.stub(vscode.workspace, "findFiles").resolves(mockFiles);
+    
+    if (host.workspace.findFiles && (host.workspace.findFiles as any).resolves) {
+        (host.workspace.findFiles as sinon.SinonStub).resolves(mockFiles);
+    }
   }
 });

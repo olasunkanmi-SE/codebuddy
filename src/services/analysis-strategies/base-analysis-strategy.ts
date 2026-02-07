@@ -1,7 +1,6 @@
-import * as vscode from "vscode";
-import * as fs from "fs";
-import { Logger } from "../../infrastructure/logger/logger";
-import { LogLevel } from "../telemetry";
+import { Logger, LogLevel } from "../../infrastructure/logger/logger";
+import { EditorHostService } from "../editor-host.service";
+import { FileUtils } from "../../utils/common-utils";
 
 export interface IAnalysisStrategy {
   analyze(files: string[]): Promise<any>;
@@ -23,13 +22,15 @@ export abstract class BaseAnalysisStrategy implements IAnalysisStrategy {
 
   protected async readFileContent(filePath: string): Promise<string | null> {
     try {
-      if (!fs.existsSync(filePath)) {
+      if (!(await FileUtils.fileExists(filePath))) {
         return null;
       }
-      const content = await vscode.workspace.fs.readFile(
-        vscode.Uri.file(filePath),
-      );
-      return Buffer.from(content).toString("utf8");
+      // Use EditorHostService to read file content
+      // Note: fs.read returns string directly
+      const contentBytes = await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.readFile(filePath);
+      return new TextDecoder().decode(contentBytes);
     } catch (error: any) {
       this.logger.warn(`Failed to read file ${filePath}`, error);
       return null;

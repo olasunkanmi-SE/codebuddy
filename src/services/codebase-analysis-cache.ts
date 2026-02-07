@@ -1,7 +1,6 @@
-import * as vscode from "vscode";
 import * as crypto from "crypto";
-import { Logger } from "../infrastructure/logger/logger";
-import { LogLevel } from "./telemetry";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "./editor-host.service";
 
 interface CacheEntry<T> {
   data: T;
@@ -40,25 +39,30 @@ export class CodebaseAnalysisCache {
    */
   private async getWorkspaceHash(): Promise<string> {
     try {
-      const workspaceFolders = vscode.workspace.workspaceFolders;
+      const workspaceFolders =
+        EditorHostService.getInstance().getHost().workspace.workspaceFolders;
       if (!workspaceFolders) {
         return "no-workspace";
       }
 
       // Get recent file modification times as a simple hash
-      const files = await vscode.workspace.findFiles(
-        "**/*.{ts,js,tsx,jsx,json,py,java,cs,php}",
-        "**/node_modules/**",
-        100,
-      );
+      const files = await EditorHostService.getInstance()
+        .getHost()
+        .workspace.findFiles(
+          "**/*.{ts,js,tsx,jsx,json,py,java,cs,php}",
+          "**/node_modules/**",
+          100,
+        );
 
       const fileHashes = await Promise.all(
-        files.slice(0, 20).map(async (uri) => {
+        files.slice(0, 20).map(async (filePath) => {
           try {
-            const stat = await vscode.workspace.fs.stat(uri);
-            return `${uri.fsPath}:${stat.mtime}:${stat.size}`;
+            const stat = await EditorHostService.getInstance()
+              .getHost()
+              .workspace.fs.stat(filePath);
+            return `${filePath}:${stat.mtime}:${stat.size}`;
           } catch {
-            return uri.fsPath;
+            return filePath;
           }
         }),
       );

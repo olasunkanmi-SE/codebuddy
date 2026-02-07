@@ -1,5 +1,4 @@
 import Groq from "groq-sdk";
-import * as vscode from "vscode";
 import { GROQ_CONFIG } from "../../application/constant";
 import { BaseLLM } from "../base";
 import {
@@ -7,10 +6,12 @@ import {
   ICodeCompletionOptions,
   ILlmConfig,
 } from "../interface";
+import { IDisposable } from "../../interfaces/disposable";
+import { EditorHostService } from "../../services/editor-host.service";
 
 export class GroqLLM
   extends BaseLLM<any>
-  implements vscode.Disposable, ICodeCompleter
+  implements IDisposable, ICodeCompleter
 {
   private static instance: GroqLLM;
   private readonly groq: Groq;
@@ -52,9 +53,11 @@ export class GroqLLM
         error.stack,
       );
       if (error.status === "401") {
-        vscode.window.showErrorMessage(
-          "Invalid API key. Please update your API key",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid API key. Please update your API key",
+          );
       }
       throw error;
     }

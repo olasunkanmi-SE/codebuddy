@@ -6,6 +6,7 @@ import {
 import { EmbeddingsConfig } from "../application/constant";
 import { IFunctionData } from "../application/interfaces";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "./editor-host.service";
 
 interface EmbeddingServiceOptions {
   batchSize: number;
@@ -58,19 +59,16 @@ export class EmbeddingService {
   }
 
   /**
-   * Get embedding model from VS Code configuration
+   * Get embedding model from configuration
    */
   private getEmbeddingModelFromConfig(): string {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const vscode = require("vscode");
-      const config = vscode.workspace?.getConfiguration?.();
-      return (
-        (config?.get("codebuddy.embeddingModel") as string) ||
-        "gemini-2.0-flash"
-      );
+      const config = EditorHostService.getInstance()
+        .getHost()
+        .workspace.getConfiguration("codebuddy");
+      return (config.get("embeddingModel") as string) || "gemini-2.0-flash";
     } catch {
-      // Fallback if vscode module is not available (e.g., in tests)
+      // Fallback if configuration is not available
       return "gemini-2.0-flash";
     }
   }

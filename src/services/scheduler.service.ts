@@ -1,8 +1,8 @@
-import * as vscode from "vscode";
 import { SqliteDatabaseService } from "./sqlite-database.service";
 import { NewsService } from "./news.service";
 import { Logger } from "../infrastructure/logger/logger";
 import { CodeHealthTask } from "./tasks/code-health.task"; // Import the new task
+import { EditorHostService } from "./editor-host.service";
 
 export class SchedulerService {
   private static instance: SchedulerService;
@@ -50,6 +50,7 @@ export class SchedulerService {
       const newsService = NewsService.getInstance();
       const now = new Date();
       const currentHour = now.getHours();
+      const editorHost = EditorHostService.getInstance().getHost();
 
       // --- Task 1: Morning News (10 AM) ---
       if (currentHour >= 10) {
@@ -57,7 +58,7 @@ export class SchedulerService {
           this.logger.info("Executing scheduled task: news_morning");
           await newsService.fetchAndStoreNews();
           await newsService.cleanupOldNews(7);
-          vscode.window.showInformationMessage(
+          editorHost.window.showInformationMessage(
             "CodeBuddy: Morning tech news arrived! ☕",
           );
         });
@@ -68,7 +69,7 @@ export class SchedulerService {
         await this.tryRunTask("news_afternoon", async () => {
           this.logger.info("Executing scheduled task: news_afternoon");
           await newsService.fetchAndStoreNews();
-          vscode.window.showInformationMessage(
+          editorHost.window.showInformationMessage(
             "CodeBuddy: Afternoon tech news update! 🌇",
           );
         });

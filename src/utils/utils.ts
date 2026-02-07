@@ -1,5 +1,4 @@
 import markdownit from "markdown-it";
-import * as vscode from "vscode";
 import {
   APP_CONFIG,
   COMMON,
@@ -10,7 +9,7 @@ import OpenAI from "openai";
 import { Memory } from "../memory/base";
 import * as crypto from "crypto";
 import { Buffer } from "buffer";
-import { spawn } from "child_process";
+import { EditorHostService } from "../services/editor-host.service";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -108,15 +107,23 @@ export const formatText = (text?: string): string => {
 export const getConfigValue: GetConfigValueType<any> = <T>(
   key: string,
 ): T | undefined => {
-  return vscode.workspace.getConfiguration().get<T>(key);
+  return EditorHostService.getInstance()
+    .getHost()
+    .workspace.getConfiguration()
+    .get<T>(key);
 };
 
 export const setConfigValue = <T>(key: string, value: T) => {
-  vscode.workspace.getConfiguration().update(key, value);
+  EditorHostService.getInstance()
+    .getHost()
+    .workspace.getConfiguration()
+    .update(key, value);
 };
 
 export const vscodeErrorMessage = (error: string, metaData?: any) => {
-  return vscode.window.showErrorMessage(error);
+  return EditorHostService.getInstance()
+    .getHost()
+    .window.showErrorMessage(error);
 };
 
 export const getLatestChatHistory = (key: string) => {
@@ -184,14 +191,6 @@ export const getGenerativeAiModel = (): string | undefined => {
   return getConfigValue("generativeAi.option");
 };
 
-export function getUri(
-  webview: vscode.Webview,
-  extensionUri: vscode.Uri,
-  pathList: string[],
-) {
-  return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...pathList));
-}
-
 // This function generates a random 32-character string (nonce) using alphanumeric characters
 // A nonce is a unique, random value used for security purposes, typically to prevent replay attacks
 // and ensure script integrity when using Content Security Policy (CSP)
@@ -207,15 +206,21 @@ export const getNonce = () => {
 
 export const handleError = (error: unknown, message?: string): void => {
   const errorMessage = error instanceof Error ? error.message : "Unknown Error";
-  vscode.window.showErrorMessage(`${message}, ${errorMessage}`);
+  EditorHostService.getInstance()
+    .getHost()
+    .window.showErrorMessage(`${message}, ${errorMessage}`);
 };
 
 export const handleWarning = (message?: string, args?: string): void => {
-  vscode.window.showWarningMessage(`${message}, ${args}`);
+  EditorHostService.getInstance()
+    .getHost()
+    .window.showWarningMessage(`${message}, ${args}`);
 };
 
 export const showInfoMessage = (message?: string): void => {
-  vscode.window.showInformationMessage(`${message}`);
+  EditorHostService.getInstance()
+    .getHost()
+    .window.showInformationMessage(`${message}`);
 };
 
 /**

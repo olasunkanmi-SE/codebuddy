@@ -1,8 +1,8 @@
-import * as vscode from "vscode";
 import { OutputManager } from "../../services/output-manager";
 import { CacheManager } from "../cache/cache.manager";
 import { TreeSitterParser } from "../parser/tree-sitter.parser";
 import { AnalyzeCodeCommand } from "./analyze-code-command";
+import { EditorHostService } from "../../services/editor-host.service";
 
 export class AnalyzeCodeProvider {
   private readonly outputManager: OutputManager;
@@ -10,9 +10,15 @@ export class AnalyzeCodeProvider {
   private readonly cacheManager: CacheManager;
   private static instance: AnalyzeCodeProvider;
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: any) {
     this.outputManager = OutputManager.getInstance();
-    context.subscriptions.push(this.outputManager.getChannel());
+    if (
+      context &&
+      context.subscriptions &&
+      typeof context.subscriptions.push === "function"
+    ) {
+      context.subscriptions.push(this.outputManager.getChannel());
+    }
     this.parser = TreeSitterParser.getInstance(
       context.extensionPath,
       this.outputManager.getChannel(),
@@ -22,7 +28,7 @@ export class AnalyzeCodeProvider {
     );
   }
 
-  static getInstance(context: vscode.ExtensionContext) {
+  static getInstance(context: any) {
     return (AnalyzeCodeProvider.instance ??= new AnalyzeCodeProvider(context));
   }
 
@@ -34,9 +40,11 @@ export class AnalyzeCodeProvider {
       this.outputManager.appendLine(
         `Fatal: Tree-sitter initialization failed: ${error}`,
       );
-      vscode.window.showErrorMessage(
-        `CodeBuddy: Failed to initialize Tree-sitter. Extension may not work properly.`,
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage(
+          `CodeBuddy: Failed to initialize Tree-sitter. Extension may not work properly.`,
+        );
       throw error;
     });
 

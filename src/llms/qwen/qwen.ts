@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { Orchestrator } from "../../orchestrator";
 import { COMMON } from "../../application/constant";
 import { Memory } from "../../memory/base";
@@ -14,6 +13,8 @@ import { Message } from "../message";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/chat";
+import { IDisposable } from "../../interfaces/disposable";
+import { EditorHostService } from "../../services/editor-host.service";
 
 // Define interfaces for Qwen responses
 interface QwenLLMSnapshot {
@@ -26,12 +27,12 @@ interface QwenLLMSnapshot {
 
 export class QwenLLM
   extends BaseLLM<QwenLLMSnapshot>
-  implements vscode.Disposable, ICodeCompleter
+  implements IDisposable, ICodeCompleter
 {
   private readonly client: OpenAI;
   private response: any;
   protected readonly orchestrator: Orchestrator;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   private static instance: QwenLLM | undefined;
   private lastFunctionCalls: Set<string> = new Set();
   private readonly timeOutMs: number = 30000;
@@ -50,7 +51,7 @@ export class QwenLLM
     this.logger = Logger.initialize("QwenLLM", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
-      enableFile: true,
+      enableFile: false,
       enableTelemetry: true,
     });
     CodeBuddyToolProvider.initialize();
@@ -59,9 +60,11 @@ export class QwenLLM
 
   private initializeDisposable(): void {
     this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration(() =>
-        this.handleConfigurationChange(),
-      ),
+      EditorHostService.getInstance()
+        .getHost()
+        .workspace.onDidChangeConfiguration(() =>
+          this.handleConfigurationChange(),
+        ),
     );
   }
 
@@ -384,11 +387,13 @@ export class QwenLLM
                 callCount++;
               } catch (error: any) {
                 this.logger.error("Error processing function call", error);
-                const retry = await vscode.window.showErrorMessage(
-                  `Function call failed: ${error.message}. Retry or abort?`,
-                  "Retry",
-                  "Abort",
-                );
+                const retry = await EditorHostService.getInstance()
+                  .getHost()
+                  .window.showErrorMessage(
+                    `Function call failed: ${error.message}. Retry or abort?`,
+                    "Retry",
+                    "Abort",
+                  );
 
                 if (retry === "Retry") {
                   continue;
@@ -426,7 +431,9 @@ export class QwenLLM
         "onError",
         "Model not responding at this time, please try again",
       );
-      vscode.window.showErrorMessage("Error processing user query");
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage("Error processing user query");
       this.logger.error(
         "Error generating queries, thoughts from user query",
         error,

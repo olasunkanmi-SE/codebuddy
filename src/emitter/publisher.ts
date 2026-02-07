@@ -1,92 +1,76 @@
-import * as vscode from "vscode";
 import { BaseEmitter } from "./base";
 import { IAgentEventMap, IEventPayload } from "./interface";
+import { IEvent } from "../interfaces/events";
 
 export class EventEmitter extends BaseEmitter<Record<string, IEventPayload>> {
-  onStatusChange: vscode.Event<IEventPayload> = this.createEvent("onStatus");
-  onError: vscode.Event<IEventPayload> = this.createEvent("onError");
-  onUpdate: vscode.Event<IEventPayload> = this.createEvent("onUpdate");
-  onPromptGenerated: vscode.Event<IEventPayload> = this.createEvent("onQuery");
-  onThinking: vscode.Event<IEventPayload> = this.createEvent("onThinking");
-  onThinkingStart: vscode.Event<IEventPayload> =
-    this.createEvent("onThinkingStart");
-  onThinkingUpdate: vscode.Event<IEventPayload> =
+  onStatusChange: IEvent<IEventPayload> = this.createEvent("onStatus");
+  onError: IEvent<IEventPayload> = this.createEvent("onError");
+  onUpdate: IEvent<IEventPayload> = this.createEvent("onUpdate");
+  onPromptGenerated: IEvent<IEventPayload> = this.createEvent("onQuery");
+  onThinking: IEvent<IEventPayload> = this.createEvent("onThinking");
+  onThinkingStart: IEvent<IEventPayload> = this.createEvent("onThinkingStart");
+  onThinkingUpdate: IEvent<IEventPayload> =
     this.createEvent("onThinkingUpdate");
-  onThinkingEnd: vscode.Event<IEventPayload> =
-    this.createEvent("onThinkingEnd");
-  onResponse: vscode.Event<IEventPayload> = this.createEvent("onResponse");
-  onSecretChange: vscode.Event<IEventPayload> =
-    this.createEvent("onSecretChange");
-  onFileUpload: vscode.Event<IEventPayload> = this.createEvent("onFileUpload");
-  onActiveworkspaceUpdate: vscode.Event<IEventPayload> = this.createEvent(
+  onThinkingEnd: IEvent<IEventPayload> = this.createEvent("onThinkingEnd");
+  onResponse: IEvent<IEventPayload> = this.createEvent("onResponse");
+  onSecretChange: IEvent<IEventPayload> = this.createEvent("onSecretChange");
+  onFileUpload: IEvent<IEventPayload> = this.createEvent("onFileUpload");
+  onActiveworkspaceUpdate: IEvent<IEventPayload> = this.createEvent(
     "onActiveworkspaceUpdate",
   );
-  onStrategizing: vscode.Event<IEventPayload> =
-    this.createEvent("onStrategizing");
-  onModelChange: vscode.Event<IEventPayload> =
-    this.createEvent("onModelChange");
-  onConfigurationChange: vscode.Event<IEventPayload> = this.createEvent(
+  onStrategizing: IEvent<IEventPayload> = this.createEvent("onStrategizing");
+  onModelChange: IEvent<IEventPayload> = this.createEvent("onModelChange");
+  onConfigurationChange: IEvent<IEventPayload> = this.createEvent(
     "onConfigurationChange",
   );
-  onUserPrompt: vscode.Event<IEventPayload> = this.createEvent("onUserPrompt");
-  onClearHistory: vscode.Event<IEventPayload> =
-    this.createEvent("onClearHistory");
-  onInlineChat: vscode.Event<IEventPayload> = this.createEvent("onInlineChat");
-  onUpdateUserPreferences: vscode.Event<IEventPayload> = this.createEvent(
+  onUserPrompt: IEvent<IEventPayload> = this.createEvent("onUserPrompt");
+  onClearHistory: IEvent<IEventPayload> = this.createEvent("onClearHistory");
+  onInlineChat: IEvent<IEventPayload> = this.createEvent("onInlineChat");
+  onUpdateUserPreferences: IEvent<IEventPayload> = this.createEvent(
     "onUpdateUserPreferences",
   );
-  onGetUserPreferences: vscode.Event<IEventPayload> = this.createEvent(
+  onGetUserPreferences: IEvent<IEventPayload> = this.createEvent(
     "onGetUserPreferences",
   );
-  onUpdateThemePreferences: vscode.Event<IEventPayload> = this.createEvent(
+  onUpdateThemePreferences: IEvent<IEventPayload> = this.createEvent(
     "onUpdateThemePreferences",
   );
 
   // NEW: Streaming events
-  onPlanStep: vscode.Event<IEventPayload> = this.createEvent("onPlanStep");
-  onToolCall: vscode.Event<IEventPayload> = this.createEvent("onToolCall");
-  onContentDelta: vscode.Event<IEventPayload> =
-    this.createEvent("onContentDelta");
-  onComplete: vscode.Event<IEventPayload> = this.createEvent("onComplete");
-  onStreamStart: vscode.Event<IEventPayload> =
-    this.createEvent("onStreamStart");
-  onStreamChunk: vscode.Event<IEventPayload> =
-    this.createEvent("onStreamChunk");
-  onStreamEnd: vscode.Event<IEventPayload> = this.createEvent("onStreamEnd");
-  onStreamError: vscode.Event<IEventPayload> =
-    this.createEvent("onStreamError");
-  onStreamFlush: vscode.Event<IEventPayload> =
-    this.createEvent("onStreamFlush");
-  onStreamMetadata: vscode.Event<IEventPayload> =
-    this.createEvent("streamMetadata");
-  onModelChangeSuccess: vscode.Event<IEventPayload> = this.createEvent(
+  onPlanStep: IEvent<IEventPayload> = this.createEvent("onPlanStep");
+  onToolCall: IEvent<IEventPayload> = this.createEvent("onToolCall");
+  onContentDelta: IEvent<IEventPayload> = this.createEvent("onContentDelta");
+  onComplete: IEvent<IEventPayload> = this.createEvent("onComplete");
+  onStreamStart: IEvent<IEventPayload> = this.createEvent("onStreamStart");
+  onStreamChunk: IEvent<IEventPayload> = this.createEvent("onStreamChunk");
+  onStreamEnd: IEvent<IEventPayload> = this.createEvent("onStreamEnd");
+  onStreamError: IEvent<IEventPayload> = this.createEvent("onStreamError");
+  onStreamFlush: IEvent<IEventPayload> = this.createEvent("onStreamFlush");
+  onStreamMetadata: IEvent<IEventPayload> = this.createEvent("streamMetadata");
+  onModelChangeSuccess: IEvent<IEventPayload> = this.createEvent(
     "onModelChangeSuccess",
   );
 
   // Tool activity events for real-time feedback
-  onToolStart: vscode.Event<IEventPayload> = this.createEvent("onToolStart");
-  onToolEnd: vscode.Event<IEventPayload> = this.createEvent("onToolEnd");
-  onToolProgress: vscode.Event<IEventPayload> =
-    this.createEvent("onToolProgress");
-  onPlanning: vscode.Event<IEventPayload> = this.createEvent("onPlanning");
-  onSummarizing: vscode.Event<IEventPayload> =
-    this.createEvent("onSummarizing");
+  onToolStart: IEvent<IEventPayload> = this.createEvent("onToolStart");
+  onToolEnd: IEvent<IEventPayload> = this.createEvent("onToolEnd");
+  onToolProgress: IEvent<IEventPayload> = this.createEvent("onToolProgress");
+  onPlanning: IEvent<IEventPayload> = this.createEvent("onPlanning");
+  onSummarizing: IEvent<IEventPayload> = this.createEvent("onSummarizing");
 
   // New detailed activity events for streaming every decision/action
-  onDecision: vscode.Event<IEventPayload> = this.createEvent("onDecision");
-  onReading: vscode.Event<IEventPayload> = this.createEvent("onReading");
-  onSearching: vscode.Event<IEventPayload> = this.createEvent("onSearching");
-  onReviewing: vscode.Event<IEventPayload> = this.createEvent("onReviewing");
-  onAnalyzing: vscode.Event<IEventPayload> = this.createEvent("onAnalyzing");
-  onExecuting: vscode.Event<IEventPayload> = this.createEvent("onExecuting");
-  onWorking: vscode.Event<IEventPayload> = this.createEvent("onWorking");
+  onDecision: IEvent<IEventPayload> = this.createEvent("onDecision");
+  onReading: IEvent<IEventPayload> = this.createEvent("onReading");
+  onSearching: IEvent<IEventPayload> = this.createEvent("onSearching");
+  onReviewing: IEvent<IEventPayload> = this.createEvent("onReviewing");
+  onAnalyzing: IEvent<IEventPayload> = this.createEvent("onAnalyzing");
+  onExecuting: IEvent<IEventPayload> = this.createEvent("onExecuting");
+  onWorking: IEvent<IEventPayload> = this.createEvent("onWorking");
 
   // Diff review events for file change tracking
-  onPendingChange: vscode.Event<IEventPayload> =
-    this.createEvent("onPendingChange");
-  onChangeApplied: vscode.Event<IEventPayload> =
-    this.createEvent("onChangeApplied");
-  onChangeRejected: vscode.Event<IEventPayload> =
+  onPendingChange: IEvent<IEventPayload> = this.createEvent("onPendingChange");
+  onChangeApplied: IEvent<IEventPayload> = this.createEvent("onChangeApplied");
+  onChangeRejected: IEvent<IEventPayload> =
     this.createEvent("onChangeRejected");
 
   /**

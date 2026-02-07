@@ -1,5 +1,6 @@
 import { GenerativeModel } from "@google/generative-ai";
-import * as vscode from "vscode";
+import { IExtensionContext } from "../interfaces/editor-host";
+import { EditorHostService } from "../services/editor-host.service";
 import { GeminiLLM } from "../llms/gemini/gemini";
 import { ChatHistoryRepository } from "../infrastructure/repository/db-chat-history";
 import { IMessageInput, Message } from "../llms/message";
@@ -16,10 +17,10 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
   private readonly chatRepository: ChatHistoryRepository;
 
   constructor(
-    extensionUri: vscode.Uri,
+    extensionUri: any,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: IExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.gemini = GeminiLLM.getInstance({
@@ -96,6 +97,8 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     if (typeof message === "object") {
       systemInstruction = message.systemInstruction;
       userMessage = message.userMessage;
+    } else {
+      userMessage = message;
     }
 
     if (Memory.has("chatHistory")) {
@@ -123,7 +126,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         context = await this.getContext(metaData.context);
       }
 
-      const msg = userMessage?.length ? userMessage : message;
+      const msg = userMessage;
       const messageWithContext = `${msg} \n context: ${context ?? ""}`;
 
       const currentMessage = Message.of({
@@ -152,7 +155,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         },
       });
 
-      const result = await chat.sendMessageStream(userMessage ?? message);
+      const result = await chat.sendMessageStream(msg);
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
         if (chunkText) {
@@ -171,13 +174,17 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       this.logger.error(`[DEBUG] Error in streamResponse:`, error.stack);
 
       if (error.status === "401") {
-        vscode.window.showErrorMessage(
-          "Invalid API key. Please update your API key",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid API key. Please update your API key",
+          );
         this.logger.error("Invalid API key. Please update your API key", error);
       }
       if (error.status === "503") {
-        vscode.window.showErrorMessage("Rate limiting error, try again later");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("Rate limiting error, try again later");
       }
       this.logger.error("Error generating gemini response", error.stack);
       throw error;
@@ -194,6 +201,8 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
     if (typeof message === "object") {
       systemInstruction = message.systemInstruction;
       userMessage = message.userMessage;
+    } else {
+      userMessage = message;
     }
 
     if (Memory.has("chatHistory")) {
@@ -221,7 +230,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
         context = await this.getContext(metaData.context);
       }
 
-      const msg = userMessage?.length ? userMessage : message;
+      const msg = userMessage;
 
       const messageWithContext = `${msg} \n context: ${context}`;
 
@@ -258,7 +267,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       });
 
       this.logger.info(`[DEBUG] Sending message to Gemini...`);
-      const result = await chat.sendMessage(userMessage ?? message);
+      const result = await chat.sendMessage(msg);
       const response = result.response;
       const responseText = response.text();
 
@@ -282,13 +291,17 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       this.logger.error(`[DEBUG] Error in generateResponse:`, error.stack);
 
       if (error.status === "401") {
-        vscode.window.showErrorMessage(
-          "Invalid API key. Please update your API key",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid API key. Please update your API key",
+          );
         this.logger.error("Invalid API key. Please update your API key", error);
       }
       if (error.status === "503") {
-        vscode.window.showErrorMessage("Rate limiting error, try again later");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("Rate limiting error, try again later");
       }
       this.logger.error("Error generating anthropic response", error.stack);
       throw error;

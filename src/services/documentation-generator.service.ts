@@ -1,10 +1,10 @@
-import * as vscode from "vscode";
 import * as path from "path";
-import * as fs from "fs";
-import { Logger } from "../infrastructure/logger/logger";
-import { LogLevel } from "./telemetry";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { CodebaseUnderstandingService } from "./codebase-understanding.service";
 import { WorkspaceService } from "./workspace-service";
+import { EditorHostService } from "./editor-host.service";
+import { ICancellationToken } from "../interfaces/cancellation";
+import { IProgress } from "../interfaces/progress";
 
 export interface DocumentationConfig {
   includeArchitecture: boolean;
@@ -88,7 +88,8 @@ export class DocumentationGeneratorService {
     this.workspaceService = WorkspaceService.getInstance();
 
     const workspaceRoot =
-      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+      EditorHostService.getInstance().getHost().workspace.workspaceFolders?.[0]
+        ?.uri.fsPath || "";
     this.outputDir = path.join(workspaceRoot, "docs", "generated");
   }
 
@@ -97,8 +98,8 @@ export class DocumentationGeneratorService {
    */
   async generateComprehensiveDocumentation(
     config: DocumentationConfig,
-    cancellationToken?: vscode.CancellationToken,
-    progress?: vscode.Progress<{ increment?: number; message?: string }>,
+    cancellationToken?: ICancellationToken,
+    progress?: IProgress<{ increment?: number; message?: string }>,
   ): Promise<void> {
     try {
       this.logger.info("Starting comprehensive documentation generation");
@@ -170,14 +171,16 @@ export class DocumentationGeneratorService {
       await this.openGeneratedDocumentation();
 
       this.logger.info("Documentation generation completed successfully");
-      vscode.window.showInformationMessage(
-        "📚 Documentation generated successfully! Check the docs/generated folder.",
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showInformationMessage(
+          "📚 Documentation generated successfully! Check the docs/generated folder.",
+        );
     } catch (error: any) {
       this.logger.error("Error generating documentation", error);
-      vscode.window.showErrorMessage(
-        `Documentation generation failed: ${error}`,
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage(`Documentation generation failed: ${error}`);
       throw error;
     }
   }
@@ -191,7 +194,8 @@ export class DocumentationGeneratorService {
     config: DocumentationConfig,
   ): Promise<void> {
     const workspaceRoot =
-      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+      EditorHostService.getInstance().getHost().workspace.workspaceFolders?.[0]
+        ?.uri.fsPath || "";
     const packageJsonPath = path.join(workspaceRoot, "package.json");
 
     let projectInfo = {
@@ -203,21 +207,21 @@ export class DocumentationGeneratorService {
     };
 
     // Read package.json if it exists
-    if (fs.existsSync(packageJsonPath)) {
-      try {
-        const packageJson = JSON.parse(
-          fs.readFileSync(packageJsonPath, "utf8"),
-        );
-        projectInfo = {
-          name: packageJson.name || projectInfo.name,
-          description: packageJson.description || "",
-          version: packageJson.version || projectInfo.version,
-          author: packageJson.author || "",
-          license: packageJson.license || projectInfo.license,
-        };
-      } catch (error: any) {
-        this.logger.warn("Could not parse package.json", error);
-      }
+    try {
+      const contentBytes = await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.readFile(packageJsonPath);
+      const packageJsonContent = new TextDecoder().decode(contentBytes);
+      const packageJson = JSON.parse(packageJsonContent);
+      projectInfo = {
+        name: packageJson.name || projectInfo.name,
+        description: packageJson.description || "",
+        version: packageJson.version || projectInfo.version,
+        author: packageJson.author || "",
+        license: packageJson.license || projectInfo.license,
+      };
+    } catch (error: any) {
+      this.logger.warn("Could not parse package.json", error);
     }
 
     const readme = this.generateREADMEContent(
@@ -664,25 +668,30 @@ Generated on: ${new Date().toISOString()}
    * Utility methods
    */
   private async ensureOutputDirectory(): Promise<void> {
-    if (!fs.existsSync(this.outputDir)) {
-      fs.mkdirSync(this.outputDir, { recursive: true });
-    }
+    // Deprecated: fs.write handles directory creation
   }
 
   private async writeFile(filename: string, content: string): Promise<void> {
     const filePath = path.join(this.outputDir, filename);
-    fs.writeFileSync(filePath, content, "utf8");
+    await EditorHostService.getInstance().getHost().fs.write(filePath, content);
     this.logger.info(`Generated documentation file: ${filename}`);
   }
 
   private async openGeneratedDocumentation(): Promise<void> {
     const readmePath = path.join(
-      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "",
+      EditorHostService.getInstance().getHost().workspace.workspaceFolders?.[0]
+        ?.uri.fsPath || "",
       "README.md",
     );
-    if (fs.existsSync(readmePath)) {
-      const doc = await vscode.workspace.openTextDocument(readmePath);
-      await vscode.window.showTextDocument(doc);
+    try {
+      const doc = await EditorHostService.getInstance()
+        .getHost()
+        .workspace.openTextDocument(readmePath);
+      await EditorHostService.getInstance()
+        .getHost()
+        .window.showTextDocument(doc);
+    } catch (e) {
+      // Ignore if file not found
     }
   }
 }

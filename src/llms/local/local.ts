@@ -1,4 +1,4 @@
-import * as vscode from "vscode";
+import { IDisposable } from "../../interfaces/disposable";
 import { Orchestrator } from "../../orchestrator";
 import { COMMON } from "../../application/constant";
 import { Memory } from "../../memory/base";
@@ -13,6 +13,8 @@ import { Message } from "../message";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/chat";
+import { EditorHostService } from "../../services/editor-host.service";
+import { ConfigurationTarget } from "../../interfaces/editor-host";
 
 // Define interfaces for Local LLM responses
 interface LocalLLMSnapshot {
@@ -25,12 +27,12 @@ interface LocalLLMSnapshot {
 
 export class LocalLLM
   extends BaseLLM<LocalLLMSnapshot>
-  implements vscode.Disposable, ICodeCompleter
+  implements IDisposable, ICodeCompleter
 {
   private client: OpenAI;
   private response: any;
   protected readonly orchestrator: Orchestrator;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   private static instance: LocalLLM | undefined;
   private lastFunctionCalls: Set<string> = new Set();
   private readonly timeOutMs: number = 30000;
@@ -59,9 +61,11 @@ export class LocalLLM
 
   private initializeDisposable(): void {
     this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration(() =>
-        this.handleConfigurationChange(),
-      ),
+      EditorHostService.getInstance()
+        .getHost()
+        .workspace.onDidChangeConfiguration(() =>
+          this.handleConfigurationChange(),
+        ),
     );
   }
 
@@ -235,12 +239,9 @@ export class LocalLLM
         });
 
         // Update the persistent configuration so future requests succeed immediately
-        const config = vscode.workspace.getConfiguration("local");
-        await config.update(
-          "baseUrl",
-          newBaseUrl,
-          vscode.ConfigurationTarget.Global,
-        );
+        const host = EditorHostService.getInstance().getHost();
+        const config = host.workspace.getConfiguration("local");
+        await config.update("baseUrl", newBaseUrl, ConfigurationTarget.Global);
 
         // Retry the request with the new client
         try {

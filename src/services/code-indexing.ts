@@ -1,11 +1,10 @@
 import { IFunctionData } from "../application/interfaces";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { CodeRepository } from "../infrastructure/repository/code";
 import { CodeStructureMapper } from "./code-structure.mapper";
 import { EmbeddingService } from "./embedding";
 import { TypeScriptAtsMapper } from "./typescript-ats.service";
 import { getAPIKeyAndModel } from "../utils/utils";
-import { LogLevel } from "./telemetry";
 
 /**
  * Provides a centralized service for managing code indexing, including building function structure maps,

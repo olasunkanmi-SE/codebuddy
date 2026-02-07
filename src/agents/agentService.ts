@@ -1,8 +1,8 @@
 import { InMemoryStore, MemorySaver } from "@langchain/langgraph";
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
 import { createAdvancedDeveloperAgent } from "./developer/agent";
+import { EditorHostService } from "../services/editor-host.service";
 
 export class CodebuddyAgentService {
   private agent: any = null;
@@ -33,6 +33,7 @@ export class CodebuddyAgentService {
         store: this.store,
         // ✅ Disable HITL for smooth streaming
         enableHITL: false,
+        host: EditorHostService.getInstance().getHost(),
       });
       this.logger.log(LogLevel.INFO, "Agent initialized");
     }
@@ -98,9 +99,11 @@ export class CodebuddyAgentService {
         error.message?.includes("401") ||
         error.message?.includes("403")
       ) {
-        vscode.window.showErrorMessage(
-          `token usage or billing issues, kindly check your billing informationon your AI platform`,
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            `token usage or billing issues, kindly check your billing informationon your AI platform`,
+          );
         throw new Error(`Authorization or billing error: ${error.message}`);
       }
       throw error;

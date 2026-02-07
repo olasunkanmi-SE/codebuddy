@@ -3,8 +3,6 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGroq } from "@langchain/groq";
 import { ChatOpenAI } from "@langchain/openai";
 import { BaseStore } from "@langchain/langgraph";
-import { rgPath } from "@vscode/ripgrep";
-import { spawnSync } from "child_process";
 import {
   BackendProtocol,
   CompositeBackend,
@@ -13,7 +11,6 @@ import {
   StoreBackend,
 } from "deepagents";
 import { StructuredTool } from "langchain";
-import * as vscode from "vscode";
 import { IEventPayload } from "../../emitter/interface";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { Memory } from "../../memory/base";
@@ -22,7 +19,6 @@ import { ProjectRulesService } from "../../services/project-rules.service";
 import { MemoryTool } from "../../tools/memory";
 import { SkillManager } from "../../services/skill-manager";
 import { getAPIKeyAndModel } from "../../utils/utils";
-import { createVscodeFsBackendFactory } from "../backends/filesystem";
 import {
   ICodeBuddyAgentConfig,
   InterruptConfiguration,
@@ -30,13 +26,15 @@ import {
 import { ToolProvider } from "../langgraph/tools/provider";
 import { DEVELOPER_SYSTEM_PROMPT } from "./prompts";
 import { createDeveloperSubagents } from "./subagents";
+import { IEditorHost } from "../../interfaces/editor-host";
+import { IDisposable } from "../../interfaces/disposable";
 
 export class DeveloperAgent {
   private config: ICodeBuddyAgentConfig;
   private model: ChatAnthropic | ChatGroq | ChatOpenAI | undefined;
   private tools: StructuredTool[];
   private readonly logger: Logger;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   protected readonly orchestrator: Orchestrator;
 
   constructor(config: ICodeBuddyAgentConfig = {}) {
@@ -132,34 +130,10 @@ export class DeveloperAgent {
    * Creates the VSCode FileSystem Backend with Ripgrep support
    */
   private createVscodeBackend() {
-    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-
-    if (!workspacePath) {
-      console.warn("No workspace folder found for DeveloperAgent.");
+    if (this.config.host) {
+      return this.config.host.fs;
     }
-
-    return createVscodeFsBackendFactory({
-      rootDir: workspacePath || "",
-      ripgrepSearch: async (opts) => {
-        const result = spawnSync(
-          rgPath,
-          [
-            "-n",
-            "-H",
-            ...(opts.extraArgs || []),
-            ...(opts.glob ? ["-g", opts.glob] : []),
-            opts.pattern,
-            opts.cwd,
-          ],
-          { encoding: "utf-8", maxBuffer: opts.maxBuffer },
-        );
-
-        if (result.error) throw result.error;
-        return result.stdout;
-      },
-      disableSpawnFallback: false,
-      useRipgrep: true,
-    });
+    throw new Error("Host not configured for DeveloperAgent");
   }
 
   /**
@@ -194,7 +168,7 @@ export class DeveloperAgent {
   /**
    * Generates the final System Prompt
    */
-  private getSystemPrompt(): string {
+  private async getSystemPrompt(): Promise<string> {
     const { customSystemPrompt } = this.config;
     const projectRules = ProjectRulesService.getInstance().getRules();
 
@@ -211,7 +185,7 @@ export class DeveloperAgent {
     }
 
     // Add core memories
-    prompt += MemoryTool.getFormattedMemories();
+    prompt += await MemoryTool.getFormattedMemories();
 
     // Add skills prompt
     prompt += SkillManager.getInstance().getSkillsPrompt();
@@ -242,9 +216,11 @@ export class DeveloperAgent {
     const cachedModel = Memory.get("agentModel");
     if (!this.model && !cachedModel) {
       this.logger.error("Error creating DeveloperAgent: No model found");
-      vscode.window.showWarningMessage(
-        "Please make sure that you have selected a valid model with correct API key in the settings.",
-      );
+      if (this.config.host) {
+        this.config.host.window.showWarningMessage(
+          "Please make sure that you have selected a valid model with correct API key in the settings.",
+        );
+      }
       throw new Error("Error creating DeveloperAgent: No model found");
     }
 
@@ -274,7 +250,7 @@ export class DeveloperAgent {
     );
 
     // Load skills from workspace
-    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const workspacePath = this.config.host?.workspace.rootPath;
     if (workspacePath) {
       try {
         await SkillManager.getInstance().loadSkills(workspacePath);
@@ -296,7 +272,7 @@ export class DeveloperAgent {
     return createDeepAgent({
       model: this.model,
       tools: this.tools,
-      systemPrompt: this.getSystemPrompt(),
+      systemPrompt: await this.getSystemPrompt(),
       backend: this.getBackendFactory(),
       store,
       checkpointer: checkPointer,

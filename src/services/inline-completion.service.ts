@@ -1,15 +1,22 @@
-import * as vscode from "vscode";
 import { CompletionConfigService } from "./completion-config.service";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { CompletionTriggerMode } from "../interfaces/completion.interface";
 import { ContextCompletionService } from "./context-completion.service";
 import { FIMPromptService } from "./fim-prompt.service";
 import { CompletionProviderFactory } from "../llms/completion-factory";
-import { ICodeCompleter } from "../llms/interface";
+import { IOutputChannel } from "../interfaces/output-channel";
+import {
+  IInlineCompletionItemProvider,
+  ITextDocument,
+  IPosition,
+  IInlineCompletionContext,
+  ICancellationToken,
+  IInlineCompletionItem,
+  IInlineCompletionList,
+  InlineCompletionTriggerKind,
+} from "../interfaces/editor-host";
 
-export class InlineCompletionService
-  implements vscode.InlineCompletionItemProvider
-{
+export class InlineCompletionService implements IInlineCompletionItemProvider {
   private configService: CompletionConfigService;
   private contextService: ContextCompletionService;
   private fimService: FIMPromptService;
@@ -21,7 +28,7 @@ export class InlineCompletionService
   private cache: Map<string, string> = new Map();
   private readonly MAX_CACHE_SIZE = 50;
 
-  constructor(extensionPath: string, outputChannel: vscode.OutputChannel) {
+  constructor(extensionPath: string, outputChannel: IOutputChannel) {
     this.configService = CompletionConfigService.getInstance();
     this.contextService = ContextCompletionService.getInstance(
       extensionPath,
@@ -40,15 +47,12 @@ export class InlineCompletionService
   }
 
   async provideInlineCompletionItems(
-    document: vscode.TextDocument,
-    position: vscode.Position,
-    context: vscode.InlineCompletionContext,
-    token: vscode.CancellationToken,
+    document: ITextDocument,
+    position: IPosition,
+    context: IInlineCompletionContext,
+    token: ICancellationToken,
   ): Promise<
-    | vscode.InlineCompletionItem[]
-    | vscode.InlineCompletionList
-    | null
-    | undefined
+    IInlineCompletionItem[] | IInlineCompletionList | null | undefined
   > {
     const config = this.configService.getConfig();
     const startTime = Date.now();
@@ -59,7 +63,7 @@ export class InlineCompletionService
 
     if (
       config.triggerMode === CompletionTriggerMode.Manual &&
-      context.triggerKind === vscode.InlineCompletionTriggerKind.Automatic
+      context.triggerKind === InlineCompletionTriggerKind.Automatic
     ) {
       return null;
     }
@@ -106,8 +110,13 @@ export class InlineCompletionService
           latency: Date.now() - startTime,
         });
         const cachedText = this.cache.get(cacheKey)!;
-        const item = new vscode.InlineCompletionItem(cachedText);
-        item.range = new vscode.Range(position, position);
+        const item: IInlineCompletionItem = {
+          insertText: cachedText,
+          range: {
+            start: position,
+            end: position,
+          },
+        };
         return [item];
       }
       // -------------------
@@ -158,8 +167,13 @@ export class InlineCompletionService
       // -----------------
 
       // 5. Return Item
-      const item = new vscode.InlineCompletionItem(completionText);
-      item.range = new vscode.Range(position, position);
+      const item: IInlineCompletionItem = {
+        insertText: completionText,
+        range: {
+          start: position,
+          end: position,
+        },
+      };
       return [item];
     } catch (error) {
       this.logger.error("Error providing inline completion", error);

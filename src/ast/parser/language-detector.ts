@@ -1,5 +1,4 @@
 import * as path from "path";
-import * as vscode from "vscode";
 import { languageConfigs } from "../language-config";
 
 export class LanguageDetector {
@@ -12,18 +11,6 @@ export class LanguageDetector {
       }
     }
 
-    const openDoc = vscode.workspace.textDocuments.find(
-      (doc) => doc.uri.fsPath === filePath,
-    );
-    if (openDoc) {
-      for (const langId in languageConfigs) {
-        if (
-          languageConfigs[langId].languageIdMap.includes(openDoc.languageId)
-        ) {
-          return langId;
-        }
-      }
-    }
     return undefined;
   }
 

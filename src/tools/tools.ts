@@ -3,7 +3,8 @@ import { IFileToolConfig } from "../application/interfaces/agent.interface";
 import { ContextRetriever } from "../services/context-retriever";
 import { Terminal } from "../utils/terminal";
 import { z } from "zod";
-import * as vscode from "vscode";
+import { EditorHostService } from "../services/editor-host.service";
+import { FileType, SymbolKind } from "../interfaces/editor-host";
 import { DiffReviewService } from "../services/diff-review.service";
 import * as path from "path";
 import { TodoTool } from "./todo";
@@ -158,26 +159,23 @@ export class FileTool {
 export class ListFilesTool {
   public async execute(dirPath?: string): Promise<string> {
     try {
+      const host = EditorHostService.getInstance().getHost();
       const targetDir = dirPath
-        ? vscode.Uri.file(dirPath)
-        : vscode.workspace.workspaceFolders?.[0]?.uri;
+        ? dirPath
+        : host.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
       if (!targetDir) {
         return "No workspace folder open and no directory path provided.";
       }
 
-      const entries = await vscode.workspace.fs.readDirectory(targetDir);
-      const formatted = entries.map(([name, type]) => {
-        const typeName =
-          type === vscode.FileType.Directory
-            ? "DIR"
-            : type === vscode.FileType.File
-              ? "FILE"
-              : "OTHER";
+      const entries = await host.fs.lsInfo(targetDir);
+      const formatted = entries.map((info) => {
+        const typeName = info.is_dir ? "DIR" : "FILE";
+        const name = path.basename(info.path);
         return `[${typeName}] ${name}`;
       });
 
-      return `Contents of ${targetDir.fsPath}:\n` + formatted.join("\n");
+      return `Contents of ${targetDir}:\n` + formatted.join("\n");
     } catch (e: any) {
       return `Error listing files: ${e.message}`;
     }
@@ -212,7 +210,7 @@ export class EditFileTool {
     replace?: string, // For replace
   ): Promise<string> {
     try {
-      const uri = vscode.Uri.file(filePath);
+      const host = EditorHostService.getInstance().getHost();
       let newContent = "";
 
       if (mode === "overwrite") {
@@ -222,8 +220,9 @@ export class EditFileTool {
           return "Error: 'search' and 'replace' arguments are required for replace mode.";
         }
 
-        const existingData = await vscode.workspace.fs.readFile(uri);
-        const existingContent = Buffer.from(existingData).toString("utf8");
+        // Read raw content to avoid line numbers from host.fs.read()
+        const contentBytes = await host.workspace.fs.readFile(filePath);
+        const existingContent = new TextDecoder().decode(contentBytes);
 
         if (!existingContent.includes(search)) {
           return `Error: Search text not found in ${filePath}.`;
@@ -379,7 +378,9 @@ export class TerminalTool {
 export class WebPreviewTool {
   public async execute(url: string) {
     try {
-      await vscode.commands.executeCommand("simpleBrowser.show", url);
+      await EditorHostService.getInstance()
+        .getHost()
+        .commands.executeCommand("simpleBrowser.show", url);
       return `Preview opened for ${url}`;
     } catch (e: any) {
       return `Error opening preview: ${e.message}`;
@@ -419,7 +420,7 @@ export class DeepTerminalTool {
       switch (action) {
         case "start":
           return await service.startSession(sessionId);
-        case "execute":
+        case "execute": {
           if (!command) return "Error: Command required for execute action.";
           const result = await service.executeCommand(sessionId, command);
           if (waitMs && waitMs > 0) {
@@ -427,6 +428,7 @@ export class DeepTerminalTool {
             return result + "\nOutput:\n" + service.readOutput(sessionId);
           }
           return result;
+        }
         case "read":
           return service.readOutput(sessionId) || "(No new output)";
         case "terminate":
@@ -480,15 +482,17 @@ export class RipgrepSearchTool {
     const limit = 200; // Limit results to avoid context overflow
 
     try {
-      // @ts-ignore - findTextInFiles is available in newer VS Code versions
-      await vscode.workspace.findTextInFiles(
+      const host = EditorHostService.getInstance().getHost();
+      await host.workspace.findTextInFiles(
         { pattern, isRegExp: true },
         { include: glob },
         (result: any) => {
           if (results.length >= limit) return;
 
           if ("ranges" in result) {
-            const relativePath = vscode.workspace.asRelativePath(result.uri);
+            const relativePath = host.workspace.asRelativePath(
+              result.uri.fsPath,
+            );
             // result.preview.text is the line content usually
             // We strip whitespace to keep it compact
             const text = result.preview.text.trim();
@@ -537,33 +541,32 @@ export class RipgrepSearchTool {
 export class DiagnosticsTool {
   public async execute(filePath?: string): Promise<string> {
     try {
-      let diagnostics: [vscode.Uri, vscode.Diagnostic[]][];
+      const host = EditorHostService.getInstance().getHost();
+      let diagnostics: Array<{
+        uri: { fsPath: string };
+        range: {
+          start: { line: number; character: number };
+          end: { line: number; character: number };
+        };
+        message: string;
+        severity: 0 | 1 | 2 | 3;
+      }>;
 
       if (filePath) {
         // Get diagnostics for specific file
-        const uri = vscode.Uri.file(filePath);
-        const fileDiagnostics = vscode.languages.getDiagnostics(uri);
-        diagnostics = [[uri, fileDiagnostics]];
+        diagnostics = await host.languages.getDiagnostics(filePath);
       } else {
         // Get all diagnostics
-        diagnostics = vscode.languages.getDiagnostics();
+        diagnostics = await host.languages.getDiagnostics();
       }
 
       // Filter and format
-      const formatted = diagnostics.flatMap(([uri, diags]) => {
-        if (diags.length === 0) return [];
-        const relativePath = vscode.workspace.asRelativePath(uri);
-
-        return diags.map((d) => {
-          const severity =
-            d.severity === vscode.DiagnosticSeverity.Error
-              ? "Error"
-              : d.severity === vscode.DiagnosticSeverity.Warning
-                ? "Warning"
-                : "Info";
-          const line = d.range.start.line + 1;
-          return `[${severity}] ${relativePath}:${line}: ${d.message}`;
-        });
+      const formatted = diagnostics.map((d) => {
+        const relativePath = host.workspace.asRelativePath(d.uri.fsPath);
+        const severity =
+          d.severity === 0 ? "Error" : d.severity === 1 ? "Warning" : "Info";
+        const line = d.range.start.line + 1;
+        return `[${severity}] ${relativePath}:${line}: ${d.message}`;
       });
 
       if (formatted.length === 0) return "No problems found.";
@@ -608,7 +611,8 @@ export class GitTool {
 
   constructor() {
     // We'll initialize lazily or assume we can get workspace root
-    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const host = EditorHostService.getInstance().getHost();
+    const workspaceFolders = host.workspace.workspaceFolders;
     this.rootPath = workspaceFolders
       ? workspaceFolders[0].uri.fsPath
       : process.cwd();
@@ -631,9 +635,10 @@ export class GitTool {
       const git = await this.getGit();
 
       switch (operation) {
-        case "status":
+        case "status": {
           const status = await git.status();
           return JSON.stringify(status, null, 2);
+        }
 
         case "add":
           if (!args?.files)
@@ -641,13 +646,14 @@ export class GitTool {
           await git.add(args.files);
           return `Added ${args.files}`;
 
-        case "commit":
+        case "commit": {
           if (!args?.message)
             return "Error: 'message' argument required for 'commit' operation";
           const result = await git.commit(args.message);
           return `Committed ${result.summary.changes} changes. Commit: ${result.commit}`;
+        }
 
-        case "log":
+        case "log": {
           const log = await git.log({ maxCount: args?.limit || 10 });
           return JSON.stringify(
             log.all.map((l: any) => ({
@@ -659,10 +665,12 @@ export class GitTool {
             null,
             2,
           );
+        }
 
-        case "diff":
+        case "diff": {
           const diff = await git.diff(args?.staged ? ["--staged"] : []);
           return diff || "No diff found.";
+        }
 
         case "checkout":
           if (!args?.branch)
@@ -737,21 +745,24 @@ export class GitTool {
 export class SymbolSearchTool {
   public async execute(query: string): Promise<string> {
     try {
+      const host = EditorHostService.getInstance().getHost();
       // Execute workspace symbol search
-      const symbols = await vscode.commands.executeCommand<
-        vscode.SymbolInformation[]
-      >("vscode.executeWorkspaceSymbolProvider", query);
+      const symbols = await host.commands.executeCommand(
+        "vscode.executeWorkspaceSymbolProvider",
+        query,
+      );
 
-      if (!symbols || symbols.length === 0) {
+      if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
         return "No symbols found.";
       }
 
       // Format results
       const limit = 20;
-      const formatted = symbols.slice(0, limit).map((s) => {
-        const relativePath = vscode.workspace.asRelativePath(s.location.uri);
+      const formatted = symbols.slice(0, limit).map((s: any) => {
+        const uriPath = s.location.uri.fsPath || s.location.uri;
+        const relativePath = host.workspace.asRelativePath(uriPath);
         const line = s.location.range.start.line + 1;
-        const kind = vscode.SymbolKind[s.kind];
+        const kind = SymbolKind[s.kind] || "Unknown";
         return `[${kind}] ${s.name} (${relativePath}:${line})`;
       });
 

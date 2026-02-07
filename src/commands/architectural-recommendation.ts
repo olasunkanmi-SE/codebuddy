@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { PersistentCodebaseUnderstandingService } from "../services/persistent-codebase-understanding.service";
 import { GeminiLLM } from "../llms/gemini/gemini";
 import { GroqLLM } from "../llms/groq/groq";
@@ -7,11 +6,10 @@ import { LocalLLM } from "../llms/local/local";
 import { AnthropicLLM } from "../llms/anthropic/anthropic";
 import { getAPIKeyAndModel, getConfigValue } from "../utils/utils";
 import { LLMOutputSanitizer } from "../utils/llm-output-sanitizer";
-import { Logger } from "../infrastructure/logger/logger";
-import { LogLevel } from "../services/telemetry";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
 import { generativeAiModels } from "../application/constant";
-import { ILlmConfig } from "../llms/interface";
+import { EditorHostService } from "../services/editor-host.service";
 
 const orchestrator = Orchestrator.getInstance();
 
@@ -46,8 +44,10 @@ const logger = Logger.initialize("extension-main", {
 async function getUserCacheDecision(
   summary: any,
 ): Promise<"use" | "refresh" | "cancel"> {
+  const editorHost = EditorHostService.getInstance().getHost();
+
   if (!summary.hasCache) {
-    const choice = await vscode.window.showInformationMessage(
+    const choice = await editorHost.window.showInformationMessage(
       "No cached analysis found. This will take some time to analyze your codebase.",
       "Analyze Now",
       "Cancel",
@@ -61,7 +61,7 @@ async function getUserCacheDecision(
       (Date.now() - lastAnalysisDate.getTime()) / (1000 * 60 * 60);
 
     if (hoursSinceAnalysis > 24) {
-      const choice = await vscode.window.showInformationMessage(
+      const choice = await editorHost.window.showInformationMessage(
         `Cached analysis is ${Math.round(hoursSinceAnalysis)} hours old. Would you like to refresh it?`,
         "Use Cache",
         "Refresh Analysis",
@@ -222,13 +222,15 @@ export async function architecturalRecommendationCommand(): Promise<void> {
       }
     }
   } catch (error: any) {
-    vscode.window.showErrorMessage(
+    const editorHost = EditorHostService.getInstance().getHost();
+    editorHost.window.showErrorMessage(
       `Model Error (Selected: ${selectedModel}): ${error.message}. Please configure settings.`,
     );
     return;
   }
 
-  const question = await vscode.window.showInputBox({
+  const editorHost = EditorHostService.getInstance().getHost();
+  const question = await editorHost.window.showInputBox({
     prompt: "What would you like to know about this codebase?",
     placeHolder:
       "e.g., How is authentication handled? What are the API endpoints? I want to build an admin dashboard, what APIs do I need?",
@@ -247,9 +249,9 @@ export async function architecturalRecommendationCommand(): Promise<void> {
 
   const useCache = cacheDecision === "use";
 
-  await vscode.window.withProgress(
+  await editorHost.window.withProgress(
     {
-      location: vscode.ProgressLocation.Notification,
+      location: "Notification",
       title: "Analyzing codebase to answer your question...",
       cancellable: true,
     },
@@ -334,7 +336,7 @@ ${sanitizedQuestion}
 
         // 💡 CHANGE: Instead of creating a webview, we now create a new untitled markdown file.
         // This makes the content easy for the user to copy, edit, and save.
-        const doc = await vscode.workspace.openTextDocument({
+        const doc = await editorHost.workspace.openTextDocument({
           content: sanitizedContent,
           language: "markdown",
         });
@@ -342,12 +344,12 @@ ${sanitizedQuestion}
         orchestrator.publish("onQuery", String(sanitizedContent));
 
         // Show the document in a new editor tab.
-        await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
+        await editorHost.window.showTextDocument(doc, 1);
 
         progress.report({ increment: 100, message: "Done!" });
       } catch (error: any) {
         logger.error("Error in architectural recommendation:", error);
-        vscode.window.showErrorMessage(
+        editorHost.window.showErrorMessage(
           `Failed to analyze codebase (Model: ${selectedModel}): ${error instanceof Error ? error.message : "Unknown error"}`,
         );
       }

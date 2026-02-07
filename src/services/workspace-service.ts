@@ -4,12 +4,12 @@ import {
   IContextInfo,
   IWorkspaceService,
 } from "../application/interfaces/workspace.interface";
-import * as vscode from "vscode";
-import * as fs from "fs";
 import * as path from "path";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { randomUUID } from "crypto";
 import { Orchestrator } from "../orchestrator";
+import { EditorHostService } from "./editor-host.service";
+import { FileType } from "../interfaces/editor-host";
 
 export class WorkspaceService implements IWorkspaceService {
   protected readonly orchestrator: Orchestrator;
@@ -42,21 +42,9 @@ export class WorkspaceService implements IWorkspaceService {
   }
 
   // public getActiveFile(): string | undefined {
-  //   const activeEditor = vscode.window.activeTextEditor;
-  //   const fileNameWithPath = activeEditor?.document?.fileName;
-  //   if (fileNameWithPath) {
-  //     this.setUpWorkspaceListeners();
-  //     return path.basename(fileNameWithPath);
-  //   }
-  // }
-
-  // private setUpWorkspaceListeners() {
-  //   vscode.window.onDidChangeActiveTextEditor((editor) =>
-  //     this.orchestrator.publish(
-  //       "onActiveworkspaceUpdate",
-  //       this.getActiveFile(),
-  //     ),
-  //   );
+  //   const host = EditorHostService.getInstance().getHost();
+  //   // TODO: Implement getActiveTextEditor in IEditorHost if needed
+  //   return undefined;
   // }
 
   public async getWorkspaceFiles(
@@ -76,17 +64,19 @@ export class WorkspaceService implements IWorkspaceService {
     dir: string,
     workspaceFiles: Record<string, string>,
   ): Promise<void> {
-    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
+    const host = EditorHostService.getInstance().getHost();
+    const entries = await host.workspace.fs.readDirectory(dir);
+
+    for (const [name, type] of entries) {
+      const fullPath = path.join(dir, name);
       if (
-        entry.isDirectory() &&
-        !this.excludedDirectories.some((dir) => entry.name.includes(dir))
+        type === FileType.Directory &&
+        !this.excludedDirectories.some((dir) => name.includes(dir))
       ) {
         await this.traverseDirectory(fullPath, workspaceFiles);
       } else if (
-        entry.isFile() &&
-        !this.excludedFiles.some((file) => entry.name.includes(file))
+        type === FileType.File &&
+        !this.excludedFiles.some((file) => name.includes(file))
       ) {
         await this.readFileAndStore(fullPath, workspaceFiles);
       }
@@ -98,8 +88,11 @@ export class WorkspaceService implements IWorkspaceService {
     workspaceFiles: Record<string, string>,
   ): Promise<void> {
     try {
-      const fileContent = await fs.promises.readFile(fullPath, "utf8");
-      const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const host = EditorHostService.getInstance().getHost();
+      const contentBytes = await host.workspace.fs.readFile(fullPath);
+      const fileContent = new TextDecoder().decode(contentBytes);
+
+      const rootPath = host.workspace.rootPath;
       if (rootPath) {
         workspaceFiles[path.relative(rootPath, fullPath)] = fileContent;
       } else {
@@ -120,10 +113,8 @@ export class WorkspaceService implements IWorkspaceService {
     let workspaceFiles: FolderEntry | undefined;
 
     if (useWorkspaceContext) {
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      const rootPath = workspaceFolders
-        ? workspaceFolders[0].uri.fsPath
-        : undefined;
+      const host = EditorHostService.getInstance().getHost();
+      const rootPath = host.workspace.rootPath;
 
       if (rootPath) {
         workspaceFiles = await this.getFolderStructure(rootPath);
@@ -138,18 +129,18 @@ export class WorkspaceService implements IWorkspaceService {
     };
   }
 
-  public async getAllFiles(): Promise<vscode.Uri[] | undefined> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
+  public async getAllFiles(): Promise<string[] | undefined> {
+    const host = EditorHostService.getInstance().getHost();
+    const rootPath = host.workspace.rootPath;
+    if (!rootPath) {
       return undefined;
     }
-    const rootPath = workspaceFolders[0].uri;
-    const files = await vscode.workspace.findFiles(
-      new vscode.RelativePattern(rootPath, "**/*"),
-      new vscode.RelativePattern(
-        rootPath,
-        "**/{node_modules,build,dist,.git,out}/**",
-      ),
+
+    // findFiles signature in IEditorHost: findFiles(include: string, exclude?: string): Promise<string[]>
+    // VS Code implementation uses glob patterns.
+    const files = await host.workspace.findFiles(
+      "**/*",
+      "**/{node_modules,build,dist,.git,out}/**",
     );
     return files;
   }
@@ -164,7 +155,8 @@ export class WorkspaceService implements IWorkspaceService {
   }
 
   public getOpenFiles(): { path: string; language: string }[] {
-    return vscode.workspace.textDocuments.map((doc) => ({
+    const host = EditorHostService.getInstance().getHost();
+    return host.workspace.textDocuments.map((doc) => ({
       path: doc.uri.fsPath,
       language: String(doc.languageId),
     }));
@@ -187,21 +179,22 @@ export class WorkspaceService implements IWorkspaceService {
     dir: string,
     folderToFilesMap: Map<string, string[]>,
   ): Promise<void> {
-    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    const host = EditorHostService.getInstance().getHost();
+    const entries = await host.workspace.fs.readDirectory(dir);
 
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      this.logger.info("Entry Name:", entry.name);
+    for (const [name, type] of entries) {
+      const fullPath = path.join(dir, name);
+      this.logger.info("Entry Name:", name);
       if (
-        entry.isDirectory() &&
-        this.excludedDirectories.some((dir) => entry.name.includes(dir))
+        type === FileType.Directory &&
+        !this.excludedDirectories.some((excluded) => name.includes(excluded))
       ) {
         await this.traverseDirectoryForFolderMap(fullPath, folderToFilesMap);
       } else if (
-        entry.isFile() &&
-        !this.excludedFiles.some((file) => entry.name.includes(file))
+        type === FileType.File &&
+        !this.excludedFiles.some((excluded) => name.includes(excluded))
       ) {
-        const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const rootPath = host.workspace.rootPath;
         if (rootPath) {
           const relativePath = path.relative(rootPath, fullPath);
           const folderPath = path.dirname(relativePath);
@@ -231,14 +224,15 @@ export class WorkspaceService implements IWorkspaceService {
       name: folderName,
       children: [],
     };
-    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    const host = EditorHostService.getInstance().getHost();
+    const entries = await host.workspace.fs.readDirectory(dir);
 
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
+    for (const [name, type] of entries) {
+      const fullPath = path.join(dir, name);
 
       if (
-        entry.isDirectory() &&
-        !this.excludedDirectories.some((dir) => entry.name.includes(dir))
+        type === FileType.Directory &&
+        !this.excludedDirectories.some((excluded) => name.includes(excluded))
       ) {
         const childFolder = await this.traverseDirectoryForStructure(
           fullPath,
@@ -246,13 +240,13 @@ export class WorkspaceService implements IWorkspaceService {
         );
         folderEntry.children.push(childFolder);
       } else if (
-        entry.isFile() &&
-        !this.excludedFiles.some((file) => entry.name.includes(file))
+        type === FileType.File &&
+        !this.excludedFiles.some((excluded) => name.includes(excluded))
       ) {
         const fileEntry: FileEntry = {
           id: randomUUID(),
           type: "file",
-          name: entry.name,
+          name: name,
         };
         folderEntry.children.push(fileEntry);
       }

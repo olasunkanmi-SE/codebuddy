@@ -1,9 +1,9 @@
-import * as fs from "fs";
 import * as path from "path";
-import * as vscode from "vscode";
 import { Parser, Tree } from "web-tree-sitter";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { GrammarLoader } from "./grammar-loader";
+import { IOutputChannel } from "../../interfaces/output-channel";
+import { FileUtils } from "../../utils/common-utils";
 
 export class TreeSitterParser {
   private static instance: TreeSitterParser | null = null;
@@ -14,7 +14,7 @@ export class TreeSitterParser {
 
   constructor(
     private readonly extensionPath: string,
-    private readonly outputChannel: vscode.OutputChannel,
+    private readonly outputChannel: IOutputChannel,
   ) {
     this.logger = Logger.initialize("TreeSitterParser", {
       minLevel: LogLevel.DEBUG,
@@ -30,7 +30,7 @@ export class TreeSitterParser {
 
   static getInstance(
     extensionPath: string,
-    outputChannel: vscode.OutputChannel,
+    outputChannel: IOutputChannel,
   ): TreeSitterParser {
     return (TreeSitterParser.instance ??= new TreeSitterParser(
       extensionPath,
@@ -41,7 +41,7 @@ export class TreeSitterParser {
   /**
    * Find WASM file in multiple possible locations
    */
-  private findWasmPath(): string {
+  private async findWasmPath(): Promise<string> {
     const possiblePaths = [
       path.join(this.extensionPath, "dist", "grammars", "tree-sitter.wasm"),
       path.join(this.extensionPath, "grammars", "tree-sitter.wasm"),
@@ -59,7 +59,7 @@ export class TreeSitterParser {
 
     for (const wasmPath of possiblePaths) {
       this.logger.info(`Checking: ${wasmPath}`);
-      if (fs.existsSync(wasmPath)) {
+      if (await FileUtils.fileExists(wasmPath)) {
         this.logger.info(`✅ Found WASM at: ${wasmPath}`);
         return wasmPath;
       }
@@ -80,7 +80,7 @@ export class TreeSitterParser {
 
       try {
         // Find WASM file
-        const wasmPath = this.findWasmPath();
+        const wasmPath = await this.findWasmPath();
 
         this.outputChannel.appendLine(`Using WASM: ${wasmPath}`);
         this.logger.info(`Using WASM: ${wasmPath}`);
@@ -127,10 +127,6 @@ export class TreeSitterParser {
           error: errorMsg,
           stack: errorStack,
         });
-
-        vscode.window.showErrorMessage(
-          `Failed to initialize Tree-sitter: ${errorMsg}`,
-        );
 
         this.parser = null;
         this.initializationPromise = null;

@@ -1,4 +1,8 @@
-import * as vscode from "vscode";
+import {
+  ConfigurationTarget,
+  IDisposable,
+  ProgressLocation,
+} from "./editor-host";
 
 /**
  * Interface for Vector Database Service operations
@@ -251,7 +255,7 @@ export interface IUserFeedbackService {
   /**
    * Get progress notification preference
    */
-  getProgressNotificationPreference(): vscode.ProgressLocation;
+  getProgressNotificationPreference(): ProgressLocation;
 
   /**
    * Dispose of resources
@@ -274,7 +278,7 @@ export interface IConfigurationManager<T> {
   updateConfig<K extends keyof T>(
     key: K,
     value: T[K],
-    target?: vscode.ConfigurationTarget,
+    target?: ConfigurationTarget,
   ): Promise<void>;
 
   /**
@@ -285,7 +289,7 @@ export interface IConfigurationManager<T> {
   /**
    * Reset configuration to defaults
    */
-  resetToDefaults(target?: vscode.ConfigurationTarget): Promise<void>;
+  resetToDefaults(target?: ConfigurationTarget): Promise<void>;
 
   /**
    * Export configuration as JSON
@@ -297,13 +301,13 @@ export interface IConfigurationManager<T> {
    */
   importConfiguration(
     configJson: string,
-    target?: vscode.ConfigurationTarget,
+    target?: ConfigurationTarget,
   ): Promise<void>;
 
   /**
    * Listen for configuration changes
    */
-  onConfigChange(listener: (config: T) => void): vscode.Disposable;
+  onConfigChange(listener: (config: T) => void): IDisposable;
 
   /**
    * Dispose of resources

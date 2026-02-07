@@ -1,6 +1,8 @@
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { IEventPayload } from "./interface";
+import { IEvent, IEventEmitter } from "../interfaces/events";
+import { createEventEmitter } from "./factory";
+
 export class BaseEmitter<EventMap extends Record<string, IEventPayload>> {
   protected logger: Logger;
   constructor() {
@@ -11,7 +13,7 @@ export class BaseEmitter<EventMap extends Record<string, IEventPayload>> {
       enableTelemetry: true,
     });
   }
-  private readonly emitters: Map<keyof EventMap, vscode.EventEmitter<any>> =
+  private readonly emitters: Map<keyof EventMap, IEventEmitter<any>> =
     new Map();
 
   /**
@@ -21,11 +23,11 @@ export class BaseEmitter<EventMap extends Record<string, IEventPayload>> {
    */
   protected createEvent<K extends keyof EventMap>(
     name: K,
-  ): vscode.Event<EventMap[K]> {
+  ): IEvent<EventMap[K]> {
     try {
       let emitter = this.emitters.get(name);
       if (!emitter) {
-        emitter = new vscode.EventEmitter<EventMap[K]>();
+        emitter = createEventEmitter<EventMap[K]>();
         this.emitters.set(name, emitter);
       }
       return emitter.event;

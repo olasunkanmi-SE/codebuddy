@@ -1,4 +1,4 @@
-import * as vscode from "vscode";
+import { EditorHostService } from "../services/editor-host.service";
 import { getAPIKeyAndModel } from "./utils";
 
 /**
@@ -24,7 +24,9 @@ export class ConfigurationManager {
    */
   private getConfig<T>(key: string, defaultValue: T): T {
     try {
-      const config = vscode.workspace.getConfiguration();
+      const config = EditorHostService.getInstance()
+        .getHost()
+        .workspace.getConfiguration();
       return config.get<T>(key, defaultValue);
     } catch {
       return defaultValue;

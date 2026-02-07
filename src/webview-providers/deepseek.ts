@@ -1,4 +1,5 @@
-import * as vscode from "vscode";
+import { IExtensionContext } from "../interfaces/editor-host";
+import { EditorHostService } from "../services/editor-host.service";
 import { BaseWebViewProvider, LLMMessage } from "./base";
 import { COMMON } from "../application/constant";
 import { Memory } from "../memory/base";
@@ -14,10 +15,10 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
   private readonly deepseekLLM: DeepseekLLM;
 
   constructor(
-    extensionUri: vscode.Uri,
+    extensionUri: any,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: IExtensionContext,
     protected baseUrl?: string,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
@@ -192,9 +193,11 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
     } catch (error: any) {
       this.logger.error("Error generating response", error);
       Memory.set(COMMON.DEEPSEEK_CHAT_HISTORY, []);
-      vscode.window.showErrorMessage(
-        "Model not responding, please resend your question",
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage(
+          "Model not responding, please resend your question",
+        );
       return;
     }
   }

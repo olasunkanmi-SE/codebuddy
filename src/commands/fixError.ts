@@ -1,12 +1,12 @@
 import { formatText } from "../utils/utils";
-import * as vscode from "vscode";
 import { CodeCommandHandler } from "./handler";
 import { CodebuddyAgentService } from "../agents/agentService";
 import { WebViewProviderManager } from "../webview-providers/manager";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "../services/editor-host.service";
 
 export class FixError extends CodeCommandHandler {
-  constructor(action: string, context: vscode.ExtensionContext, error: string) {
+  constructor(action: string, context: any, error: string) {
     super(action, context, error);
   }
 
@@ -23,22 +23,26 @@ export class FixError extends CodeCommandHandler {
     const errorMsg = this.error || message;
 
     if (!selectedCode && !errorMsg) {
-      vscode.window.showErrorMessage("No error or code selected to fix.");
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage("No error or code selected to fix.");
       return;
     }
 
     // Notify user we are trying to fix
-    await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: "CodeBuddy: Attempting to auto-fix error...",
-        cancellable: true,
-      },
-      async (progress, token) => {
-        try {
-          const agentService = CodebuddyAgentService.getInstance();
+    await EditorHostService.getInstance()
+      .getHost()
+      .window.withProgress(
+        {
+          location: "Notification",
+          title: "CodeBuddy: Attempting to auto-fix error...",
+          cancellable: true,
+        },
+        async (progress, token) => {
+          try {
+            const agentService = CodebuddyAgentService.getInstance();
 
-          const prompt = `Task: Fix the following error in the current file.
+            const prompt = `Task: Fix the following error in the current file.
 
 Error Message:
 ${errorMsg}
@@ -54,74 +58,82 @@ Instructions:
 5. End your response with a summary of what you did.
 `;
 
-          let toolUsed = false;
-          let agentResponse = "";
+            let toolUsed = false;
+            let agentResponse = "";
 
-          // Run the agent
-          for await (const event of agentService.runx(prompt)) {
-            if (token.isCancellationRequested) {
-              logger.info("Auto-fix cancelled by user");
-              return;
-            }
+            // Run the agent
+            for await (const event of agentService.runx(prompt)) {
+              if (token.isCancellationRequested) {
+                logger.info("Auto-fix cancelled by user");
+                return;
+              }
 
-            // Check for tool usage
-            // event.node === "tools" indicates tool execution
-            // event.update?.messages?.[0]?.tool_calls indicates tool *request* (in agent node)
-            if (
-              event.node === "tools" ||
-              event.update?.messages?.[0]?.tool_calls?.length > 0
-            ) {
-              toolUsed = true;
-              progress.report({ message: "Applying fix..." });
-            }
+              // Check for tool usage
+              // event.node === "tools" indicates tool execution
+              // event.update?.messages?.[0]?.tool_calls indicates tool *request* (in agent node)
+              if (
+                event.node === "tools" ||
+                event.update?.messages?.[0]?.tool_calls?.length > 0
+              ) {
+                toolUsed = true;
+                progress.report({ message: "Applying fix..." });
+              }
 
-            // Check for reasoning/text
-            if (event.node === "agent") {
-              const content = event.update?.messages?.[0]?.content;
-              if (typeof content === "string") {
-                agentResponse += content;
-                progress.report({ message: "Analyzing..." });
+              // Check for reasoning/text
+              if (event.node === "agent") {
+                const content = event.update?.messages?.[0]?.content;
+                if (typeof content === "string") {
+                  agentResponse += content;
+                  progress.report({ message: "Analyzing..." });
+                }
               }
             }
-          }
 
-          if (toolUsed) {
-            vscode.window.showInformationMessage(
-              "CodeBuddy: Fix applied successfully!",
-            );
-          } else {
-            // If no tool was used, it means the agent couldn't fix it or just explained it.
-            // In this case, we "pass it to the webview" as requested.
-            vscode.window.showInformationMessage(
-              "CodeBuddy: Could not auto-fix. Opening chat for details.",
-            );
+            if (toolUsed) {
+              EditorHostService.getInstance()
+                .getHost()
+                .window.showInformationMessage(
+                  "CodeBuddy: Fix applied successfully!",
+                );
+            } else {
+              // If no tool was used, it means the agent couldn't fix it or just explained it.
+              // In this case, we "pass it to the webview" as requested.
+              EditorHostService.getInstance()
+                .getHost()
+                .window.showInformationMessage(
+                  "CodeBuddy: Could not auto-fix. Opening chat for details.",
+                );
 
-            // Send history/response to webview
-            const providerManager = WebViewProviderManager.getInstance(
-              this.context,
-            );
-            const provider = providerManager.getCurrentProvider();
+              // Send history/response to webview
+              const providerManager = WebViewProviderManager.getInstance(
+                this.context,
+              );
+              const provider = providerManager.getCurrentProvider();
 
-            if (provider) {
-              await vscode.commands.executeCommand("codebuddy.chatView.focus");
-              // Post the agent's explanation to the chat
-              await provider.currentWebView?.webview.postMessage({
-                type: "bot-response",
-                message:
-                  agentResponse ||
-                  "I analyzed the error but couldn't apply a fix automatically. Here is what I found...",
-              });
+              if (provider) {
+                await EditorHostService.getInstance()
+                  .getHost()
+                  .commands.executeCommand("codebuddy.chatView.focus");
+                // Post the agent's explanation to the chat
+                await provider.currentWebView?.webview.postMessage({
+                  type: "bot-response",
+                  message:
+                    agentResponse ||
+                    "I analyzed the error but couldn't apply a fix automatically. Here is what I found...",
+                });
+              }
             }
-          }
-        } catch (error: any) {
-          logger.error("Auto-fix failed", error);
-          vscode.window.showErrorMessage(`Auto-fix failed: ${error.message}`);
+          } catch (error: any) {
+            logger.error("Auto-fix failed", error);
+            EditorHostService.getInstance()
+              .getHost()
+              .window.showErrorMessage(`Auto-fix failed: ${error.message}`);
 
-          // Fallback to legacy behavior (stream to chat)
-          await super.execute(action, message);
-        }
-      },
-    );
+            // Fallback to legacy behavior (stream to chat)
+            await super.execute(action, message);
+          }
+        },
+      );
   }
 
   generatePrompt() {

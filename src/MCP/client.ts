@@ -1,6 +1,9 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ChildProcess, spawn } from "child_process";
+import { EditorHostService } from "../services/editor-host.service";
+import { IProgress } from "../interfaces/progress";
+import { z } from "zod";
 import {
   MCPClientState,
   MCPServerConfig,
@@ -20,6 +23,12 @@ export class MCPClient {
   private readonly logger: Logger;
   private reconnectAttempts = 0;
   private readonly MAX_RECONNECT_ATTEMPTS = 3;
+
+  private activeProgressResolvers = new Map<string, () => void>();
+  private activeProgressReporters = new Map<
+    string,
+    IProgress<{ message?: string; increment?: number }>
+  >();
 
   constructor(
     private readonly serverName: string,
@@ -44,6 +53,172 @@ export class MCPClient {
             resources: {},
           },
         },
+      },
+    );
+
+    this.registerRPCHandlers();
+  }
+
+  private registerRPCHandlers() {
+    // window/showInformationMessage
+    this.client.setRequestHandler(
+      z.object({
+        method: z.literal("window/showInformationMessage"),
+        params: z.object({
+          message: z.string(),
+          items: z.array(z.string()).optional(),
+        }),
+      }),
+      async (request) => {
+        const { message, items } = request.params;
+        return EditorHostService.getInstance()
+          .getHost()
+          .window.showInformationMessage(message, ...(items || [])) as any;
+      },
+    );
+
+    // window/showErrorMessage
+    this.client.setRequestHandler(
+      z.object({
+        method: z.literal("window/showErrorMessage"),
+        params: z.object({
+          message: z.string(),
+          items: z.array(z.string()).optional(),
+        }),
+      }),
+      async (request) => {
+        const { message, items } = request.params;
+        return EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(message, ...(items || [])) as any;
+      },
+    );
+
+    // window/showWarningMessage
+    this.client.setRequestHandler(
+      z.object({
+        method: z.literal("window/showWarningMessage"),
+        params: z.object({
+          message: z.string(),
+          items: z.array(z.string()).optional(),
+        }),
+      }),
+      async (request) => {
+        const { message, items } = request.params;
+        return EditorHostService.getInstance()
+          .getHost()
+          .window.showWarningMessage(message, ...(items || [])) as any;
+      },
+    );
+
+    // window/showQuickPick
+    this.client.setRequestHandler(
+      z.object({
+        method: z.literal("window/showQuickPick"),
+        params: z.object({
+          items: z.array(z.any()), // string[] or IQuickPickItem[]
+          options: z.any().optional(),
+        }),
+      }),
+      async (request) => {
+        const { items, options } = request.params;
+        return EditorHostService.getInstance()
+          .getHost()
+          .window.showQuickPick(items, options) as any;
+      },
+    );
+
+    // window/showInputBox
+    this.client.setRequestHandler(
+      z.object({
+        method: z.literal("window/showInputBox"),
+        params: z.object({
+          options: z.any().optional(),
+        }),
+      }),
+      async (request) => {
+        const { options } = request.params;
+        return EditorHostService.getInstance()
+          .getHost()
+          .window.showInputBox(options) as any;
+      },
+    );
+
+    // commands/executeCommand
+    this.client.setRequestHandler(
+      z.object({
+        method: z.literal("commands/executeCommand"),
+        params: z.object({
+          command: z.string(),
+          args: z.array(z.any()).optional(),
+        }),
+      }),
+      async (request) => {
+        const { command, args } = request.params;
+        return EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand(command, ...(args || []));
+      },
+    );
+
+    // window/progress/start
+    this.client.setNotificationHandler(
+      z.object({
+        method: z.literal("window/progress/start"),
+        params: z.object({
+          id: z.string(),
+          options: z.any(),
+        }),
+      }),
+      async (notification) => {
+        const { id, options } = notification.params;
+
+        EditorHostService.getInstance()
+          .getHost()
+          .window.withProgress(options, async (progress, token) => {
+            return new Promise<void>((resolve) => {
+              this.activeProgressResolvers.set(id, resolve);
+              this.activeProgressReporters.set(id, progress);
+            });
+          });
+      },
+    );
+
+    // window/progress/report
+    this.client.setNotificationHandler(
+      z.object({
+        method: z.literal("window/progress/report"),
+        params: z.object({
+          id: z.string(),
+          message: z.string().optional(),
+          increment: z.number().optional(),
+        }),
+      }),
+      async (notification) => {
+        const { id, message, increment } = notification.params;
+        const progress = this.activeProgressReporters.get(id);
+        if (progress) {
+          progress.report({ message, increment });
+        }
+      },
+    );
+
+    // window/progress/end
+    this.client.setNotificationHandler(
+      z.object({
+        method: z.literal("window/progress/end"),
+        params: z.object({
+          id: z.string(),
+        }),
+      }),
+      async (notification) => {
+        const { id } = notification.params;
+        const resolve = this.activeProgressResolvers.get(id);
+        if (resolve) {
+          resolve();
+          this.activeProgressResolvers.delete(id);
+          this.activeProgressReporters.delete(id);
+        }
       },
     );
   }
@@ -124,6 +299,15 @@ export class MCPClient {
           this.logger.debug(
             `Captured transport child process for ${this.serverName}: pid=${this.process.pid}`,
           );
+
+          // Capture stderr for better debugging of server issues
+          if (this.process.stderr) {
+            this.process.stderr.on("data", (data) => {
+              this.logger.error(
+                `[${this.serverName} stderr] ${data.toString()}`,
+              );
+            });
+          }
         }
       } catch (err) {
         this.logger.debug(
@@ -170,11 +354,42 @@ export class MCPClient {
     }
   }
 
+  async sendChat(message: string, metadata: any): Promise<void> {
+    if (this.state !== MCPClientState.CONNECTED) {
+      throw new Error(`MCP Client ${this.serverName} is not connected`);
+    }
+
+    return this.client.request(
+      {
+        method: "chat/send",
+        params: {
+          message,
+          metadata,
+        },
+      },
+      z.any(),
+    );
+  }
+
   private async attemptReconnect(): Promise<void> {
     if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
       this.logger.error(
         `Max reconnection attempts reached for ${this.serverName}`,
       );
+
+      // Notify user if this is the internal server
+      if (this.serverName === "codebuddy-internal") {
+        const selection = await EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "CodeBuddy Server disconnected. Features may be limited.",
+            "Retry Connection",
+          );
+        if (selection === "Retry Connection") {
+          this.reconnectAttempts = 0;
+          this.attemptReconnect();
+        }
+      }
       return;
     }
     this.reconnectAttempts++;
@@ -336,6 +551,18 @@ export class MCPClient {
         toolName,
       },
     };
+  }
+
+  public setNotificationHandler(
+    method: string,
+    handler: (params: any) => void,
+  ) {
+    this.client.setNotificationHandler(
+      { method } as any,
+      (notification: any) => {
+        handler(notification.params);
+      },
+    );
   }
 
   async disconnect(): Promise<void> {

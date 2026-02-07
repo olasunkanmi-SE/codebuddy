@@ -1,6 +1,4 @@
-import * as vscode from "vscode";
-import { Logger } from "../infrastructure/logger/logger";
-import { LogLevel } from "./telemetry";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { WorkspaceService } from "./workspace-service";
 import { SqliteDatabaseService } from "./sqlite-database.service";
 import {
@@ -9,6 +7,11 @@ import {
   AnalysisResult,
 } from "./codebase-analysis-worker";
 import { ErrorHandler } from "../utils/error-handling";
+import { EditorHostService } from "./editor-host.service";
+import { IExtensionContext } from "../interfaces/editor-host";
+import { ICancellationToken } from "../interfaces/cancellation";
+import { CancellationTokenSource } from "../utils/cancellation-token-source";
+import { IProgress } from "../interfaces/progress";
 
 export interface PersistentCodebaseAnalysis {
   frameworks: string[];
@@ -75,10 +78,11 @@ export class PersistentCodebaseUnderstandingService {
   /**
    * Initialize the service and set up watchers
    */
-  public initializeWatcher(context: vscode.ExtensionContext): void {
+  public initializeWatcher(context: IExtensionContext): void {
     // Watch for .git/HEAD changes to detect branch switches
-    const gitHeadWatcher =
-      vscode.workspace.createFileSystemWatcher("**/.git/HEAD");
+    const gitHeadWatcher = EditorHostService.getInstance()
+      .getHost()
+      .workspace.createFileSystemWatcher("**/.git/HEAD");
 
     gitHeadWatcher.onDidChange(() => {
       this.logger.info("Detected git branch change");
@@ -105,14 +109,18 @@ export class PersistentCodebaseUnderstandingService {
         // this.performFreshAnalysis(gitState);
 
         // Option 2: Notify user (less intrusive than auto-running heavy task)
-        const choice = await vscode.window.showInformationMessage(
-          `CodeBuddy: Detected branch switch to '${gitState.branch}'. No cached analysis found.`,
-          "Analyze Now",
-          "Later",
-        );
+        const choice = await EditorHostService.getInstance()
+          .getHost()
+          .window.showInformationMessage(
+            `CodeBuddy: Detected branch switch to '${gitState.branch}'. No cached analysis found.`,
+            "Analyze Now",
+            "Later",
+          );
 
         if (choice === "Analyze Now") {
-          vscode.commands.executeCommand("CodeBuddy.codebaseAnalysis");
+          EditorHostService.getInstance()
+            .getHost()
+            .commands.executeCommand("CodeBuddy.codebaseAnalysis");
         }
       } else {
         this.logger.info(
@@ -128,7 +136,7 @@ export class PersistentCodebaseUnderstandingService {
    * Get comprehensive codebase analysis with intelligent caching
    */
   async getComprehensiveAnalysis(
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: ICancellationToken,
   ): Promise<PersistentCodebaseAnalysis | null> {
     // If analysis is already in progress, wait for it
     if (this.currentAnalysisPromise) {
@@ -152,7 +160,7 @@ export class PersistentCodebaseUnderstandingService {
    * Perform analysis with intelligent caching
    */
   private async performAnalysisWithCaching(
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: ICancellationToken,
   ): Promise<PersistentCodebaseAnalysis | null> {
     try {
       // Get current git state
@@ -208,7 +216,7 @@ export class PersistentCodebaseUnderstandingService {
    */
   private async performFreshAnalysis(
     gitState: any,
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: ICancellationToken,
   ): Promise<PersistentCodebaseAnalysis | null> {
     const startTime = Date.now();
 
@@ -242,57 +250,62 @@ export class PersistentCodebaseUnderstandingService {
       };
 
       // Show progress to user
-      return await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "CodeBuddy: Analyzing codebase...",
-          cancellable: true,
-        },
-        async (progress, token) => {
-          // Combine cancellation tokens
-          const combinedToken = this.createCombinedCancellationToken(
-            cancellationToken,
-            token,
-          );
+      return await EditorHostService.getInstance()
+        .getHost()
+        .window.withProgress(
+          {
+            location: 15, // vscode.ProgressLocation.Notification
+            title: "CodeBuddy: Analyzing codebase...",
+            cancellable: true,
+          },
+          async (
+            progress: IProgress<{ message?: string; increment?: number }>,
+            token: ICancellationToken,
+          ) => {
+            // Combine cancellation tokens
+            const combinedToken = this.createCombinedCancellationToken(
+              cancellationToken,
+              token,
+            );
 
-          // Run analysis in worker
-          const analysisResult = await this.analysisWorker.analyzeCodebase(
-            workerData,
-            (progressData) => {
-              progress.report({
-                increment: progressData.current,
-                message: progressData.message,
-              });
-            },
-            combinedToken,
-          );
+            // Run analysis in worker
+            const analysisResult = await this.analysisWorker.analyzeCodebase(
+              workerData,
+              (progressData) => {
+                progress.report({
+                  increment: progressData.current,
+                  message: progressData.message,
+                });
+              },
+              combinedToken,
+            );
 
-          if (combinedToken.isCancellationRequested) {
-            throw new Error("Analysis cancelled by user");
-          }
+            if (combinedToken.isCancellationRequested) {
+              throw new Error("Analysis cancelled by user");
+            }
 
-          // Convert to persistent format
-          const persistentAnalysis = this.convertToPersistentFormat(
-            analysisResult,
-            gitState,
-            Date.now() - startTime,
-          );
+            // Convert to persistent format
+            const persistentAnalysis = this.convertToPersistentFormat(
+              analysisResult,
+              gitState,
+              Date.now() - startTime,
+            );
 
-          // Save to database
-          await this.databaseService.saveCodebaseAnalysis(
-            gitState,
-            persistentAnalysis,
-          );
+            // Save to database
+            await this.databaseService.saveCodebaseAnalysis(
+              gitState,
+              persistentAnalysis,
+            );
 
-          // Cleanup old snapshots
-          await this.databaseService.cleanupOldSnapshots();
+            // Cleanup old snapshots
+            await this.databaseService.cleanupOldSnapshots();
 
-          this.logger.info(
-            `Fresh codebase analysis completed in ${Date.now() - startTime}ms`,
-          );
-          return persistentAnalysis;
-        },
-      );
+            this.logger.info(
+              `Fresh codebase analysis completed in ${Date.now() - startTime}ms`,
+            );
+            return persistentAnalysis;
+          },
+        );
     } catch (error: any) {
       if (error instanceof Error && error.message.includes("cancelled")) {
         this.logger.info("Codebase analysis cancelled by user");
@@ -355,10 +368,10 @@ export class PersistentCodebaseUnderstandingService {
    * Create combined cancellation token
    */
   private createCombinedCancellationToken(
-    token1?: vscode.CancellationToken,
-    token2?: vscode.CancellationToken,
-  ): vscode.CancellationToken {
-    const source = new vscode.CancellationTokenSource();
+    token1?: ICancellationToken,
+    token2?: ICancellationToken,
+  ): ICancellationToken {
+    const source = new CancellationTokenSource();
 
     if (token1) {
       token1.onCancellationRequested(() => source.cancel());
@@ -374,7 +387,7 @@ export class PersistentCodebaseUnderstandingService {
    * Force refresh analysis (ignores cache)
    */
   async forceRefreshAnalysis(
-    cancellationToken?: vscode.CancellationToken,
+    cancellationToken?: ICancellationToken,
   ): Promise<PersistentCodebaseAnalysis | null> {
     try {
       const gitState = await this.databaseService.getCurrentGitState();

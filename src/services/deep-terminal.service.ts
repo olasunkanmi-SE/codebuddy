@@ -1,7 +1,7 @@
 import * as cp from "child_process";
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { EventEmitter } from "events";
+import { EditorHostService } from "./editor-host.service";
 
 interface TerminalSession {
   id: string;
@@ -45,8 +45,17 @@ export class DeepTerminalService extends EventEmitter {
     const shell =
       shellPath ||
       (process.platform === "win32" ? "powershell.exe" : "/bin/zsh");
-    const cwd =
-      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+
+    let cwd = process.cwd();
+    try {
+      const folders =
+        EditorHostService.getInstance().getHost().workspace.workspaceFolders;
+      if (folders && folders.length > 0) {
+        cwd = folders[0].uri.fsPath;
+      }
+    } catch (e) {
+      // Fallback to process.cwd() if EditorHost is not ready
+    }
 
     this.logger.info(
       `Starting terminal session ${id} with shell ${shell} in ${cwd}`,

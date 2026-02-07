@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import * as vscode from "vscode";
+import { IExtensionContext } from "../interfaces/editor-host";
+import { EditorHostService } from "../services/editor-host.service";
 import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
@@ -10,10 +11,10 @@ export class OpenAIWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
   readonly model: OpenAI;
   constructor(
-    extensionUri: vscode.Uri,
+    extensionUri: any,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: IExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.model = createOpenAIClient(this.apiKey);
@@ -147,13 +148,17 @@ export class OpenAIWebViewProvider extends BaseWebViewProvider {
 
       Memory.set("chatHistory", this.chatHistory);
       if (error.status === 401) {
-        vscode.window.showErrorMessage(
-          "Invalid API key. Please update your API key",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid API key. Please update your API key",
+          );
         this.logger.error("Invalid API key. Please update your API key", error);
       }
       if (error.status === 429) {
-        vscode.window.showErrorMessage("Rate limiting error, try again later");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("Rate limiting error, try again later");
       }
       this.logger.error("Error generating OpenAI response", error.stack);
       throw error;
@@ -239,13 +244,17 @@ export class OpenAIWebViewProvider extends BaseWebViewProvider {
 
       Memory.set("chatHistory", this.chatHistory);
       if (error.status === 401) {
-        vscode.window.showErrorMessage(
-          "Invalid API key. Please update your API key",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid API key. Please update your API key",
+          );
         this.logger.error("Invalid API key. Please update your API key", error);
       }
       if (error.status === 429) {
-        vscode.window.showErrorMessage("Rate limiting error, try again later");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("Rate limiting error, try again later");
       }
       this.logger.error("Error generating OpenAI response", error.stack);
       throw error;

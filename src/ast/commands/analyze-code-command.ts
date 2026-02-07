@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { OutputManager } from "../../services/output-manager";
 import { CodeAnalyzer } from "../analysis/code.analyser";
 import { CodeSearch } from "../analysis/code.search";
@@ -7,6 +6,7 @@ import { SummaryGenerator } from "../analysis/summry.generator";
 import { CacheManager } from "../cache/cache.manager";
 import { TreeSitterParser } from "../parser/tree-sitter.parser";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
+import { EditorHostService } from "../../services/editor-host.service";
 
 export class AnalyzeCodeCommand {
   private readonly codeSearcher: CodeSearch;
@@ -44,17 +44,18 @@ export class AnalyzeCodeCommand {
   }
 
   async execute(keywords: string[]): Promise<string | undefined> {
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+    const editorHost = EditorHostService.getInstance().getHost();
+    const workspaceRoot = editorHost.workspace.workspaceFolders?.[0].uri.fsPath;
     if (!workspaceRoot) {
-      vscode.window.showErrorMessage("No workspace open.");
+      editorHost.window.showErrorMessage("No workspace open.");
       return;
     }
 
     let codeSummary: string | undefined;
 
-    await vscode.window.withProgress(
+    await editorHost.window.withProgress(
       {
-        location: vscode.ProgressLocation.Notification,
+        location: "Notification",
         title: "Analyzing authentication...",
         cancellable: true,
       },
@@ -74,13 +75,17 @@ export class AnalyzeCodeCommand {
             error instanceof Error ? error.message : String(error);
           const message = `Tree-sitter initialization failed: ${errorMsg}`;
           this.outputManager.appendLine(message);
-          vscode.window.showErrorMessage("Tree-sitter failed to initialize.");
+          editorHost.window.showErrorMessage(
+            "Tree-sitter failed to initialize.",
+          );
           this.logger.error(message, error.stack);
           return;
         }
 
         if (!this.parser.initialized()) {
-          vscode.window.showErrorMessage("Tree-sitter failed to initialize.");
+          editorHost.window.showErrorMessage(
+            "Tree-sitter failed to initialize.",
+          );
           this.logger.info(`Tree-sitter failed to initialize.`);
           return;
         }
@@ -96,7 +101,7 @@ export class AnalyzeCodeCommand {
           const message = "Authentication analysis cancelled.";
           this.outputManager.appendLine(message);
           this.logger.info(message);
-          vscode.window.showInformationMessage(message);
+          editorHost.window.showInformationMessage(message);
           return;
         }
 
@@ -104,7 +109,7 @@ export class AnalyzeCodeCommand {
           const message = "No Related code elements found.";
           this.outputManager.appendLine(message);
           this.logger.info(message);
-          vscode.window.showInformationMessage(
+          editorHost.window.showInformationMessage(
             "No code data retrieved at the moment",
           );
           return;
@@ -114,7 +119,7 @@ export class AnalyzeCodeCommand {
         this.outputManager.appendLine(summary);
         this.logger.info(summary);
         const compactMessage = this.summaryGenerator.generateCompact(result);
-        vscode.window.showInformationMessage(compactMessage, { modal: false });
+        editorHost.window.showInformationMessage(compactMessage);
         codeSummary = summary;
         return;
       },
@@ -123,9 +128,10 @@ export class AnalyzeCodeCommand {
   }
 
   canExecute(): boolean {
+    const editorHost = EditorHostService.getInstance().getHost();
     return (
-      vscode.workspace.workspaceFolders !== undefined &&
-      vscode.workspace.workspaceFolders.length > 0
+      editorHost.workspace.workspaceFolders !== undefined &&
+      editorHost.workspace.workspaceFolders.length > 0
     );
   }
 

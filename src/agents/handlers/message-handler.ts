@@ -64,7 +64,6 @@ export class MessageHandler {
               metadata: event.metadata,
             });
             break;
-          case StreamEventType.PLANNING:
           case StreamEventType.THINKING_START:
             await this.orchestrator.publish(StreamEventType.THINKING_START, {
               requestId,

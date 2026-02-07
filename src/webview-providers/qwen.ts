@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import * as vscode from "vscode";
+import { IExtensionContext } from "../interfaces/editor-host";
+import { EditorHostService } from "../services/editor-host.service";
 import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
@@ -13,10 +14,10 @@ export class QwenWebViewProvider extends BaseWebViewProvider {
   private readonly qwenLLM: QwenLLM;
 
   constructor(
-    extensionUri: vscode.Uri,
+    extensionUri: any,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: IExtensionContext,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
     this.logger = Logger.initialize("QwenWebViewProvider", {
@@ -260,9 +261,11 @@ export class QwenWebViewProvider extends BaseWebViewProvider {
 
       Memory.set(COMMON.QWEN_CHAT_HISTORY, this.chatHistory);
       if (error.status === 401) {
-        vscode.window.showErrorMessage(
-          "Invalid API key. Please update your API key",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid API key. Please update your API key",
+          );
       }
       this.logger.error("Error generating Qwen response", error.stack);
       throw error;

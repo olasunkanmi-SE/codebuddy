@@ -1,5 +1,4 @@
 import * as ts from "typescript";
-import * as vscode from "vscode";
 import * as https from "https";
 
 export interface IFunctionInfo {
@@ -84,13 +83,13 @@ export interface IProperty {
 export interface ICodebaseKnowledgeExtractor {}
 
 export interface IFileUploader {
-  uploadFile(file: vscode.Uri): Promise<void>;
+  uploadFile(file: string): Promise<void>;
   getFiles(): Promise<string[]>;
   uploadFileHandler(): Promise<void>;
 }
 
 export interface IWorkspaceInfo {
-  root: vscode.Uri;
+  root: string;
   srcPath: string;
 }
 

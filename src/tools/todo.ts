@@ -1,7 +1,7 @@
 import { SchemaType } from "@google/generative-ai";
-import * as fs from "fs";
 import * as path from "path";
-import * as vscode from "vscode";
+import { EditorHostService } from "../services/editor-host.service";
+import { FileUtils } from "../utils/common-utils";
 
 interface Task {
   id: string;
@@ -11,45 +11,55 @@ interface Task {
 }
 
 export class TodoTool {
-  private getStoragePath(): string | undefined {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
+  private async getStoragePath(): Promise<string | undefined> {
+    const rootPath =
+      EditorHostService.getInstance().getHost().workspace.rootPath;
+    if (!rootPath) {
       return undefined;
     }
-    const rootPath = workspaceFolders[0].uri.fsPath;
     const codebuddyDir = path.join(rootPath, ".codebuddy");
 
-    if (!fs.existsSync(codebuddyDir)) {
-      fs.mkdirSync(codebuddyDir);
+    if (!(await FileUtils.fileExists(codebuddyDir))) {
+      await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.createDirectory(codebuddyDir);
     }
 
     return path.join(codebuddyDir, "tasks.json");
   }
 
-  private loadTasks(): Task[] {
-    const storagePath = this.getStoragePath();
-    if (!storagePath || !fs.existsSync(storagePath)) {
+  private async loadTasks(): Promise<Task[]> {
+    const storagePath = await this.getStoragePath();
+    if (!storagePath || !(await FileUtils.fileExists(storagePath))) {
       return [];
     }
     try {
-      return JSON.parse(fs.readFileSync(storagePath, "utf8"));
+      const contentBytes = await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.readFile(storagePath);
+      const content = new TextDecoder().decode(contentBytes);
+      return JSON.parse(content);
     } catch {
       return [];
     }
   }
 
-  private saveTasks(tasks: Task[]): void {
-    const storagePath = this.getStoragePath();
+  private async saveTasks(tasks: Task[]): Promise<void> {
+    const storagePath = await this.getStoragePath();
     if (storagePath) {
-      fs.writeFileSync(storagePath, JSON.stringify(tasks, null, 2));
+      const content = JSON.stringify(tasks, null, 2);
+      const encoder = new TextEncoder();
+      await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.writeFile(storagePath, encoder.encode(content));
     }
   }
 
   public async execute(action: string, task?: Partial<Task>): Promise<string> {
-    const tasks = this.loadTasks();
+    const tasks = await this.loadTasks();
 
     switch (action) {
-      case "add":
+      case "add": {
         if (!task?.content)
           return "Error: Task content is required for 'add' action.";
         const newTask: Task = {
@@ -59,18 +69,20 @@ export class TodoTool {
           priority: task.priority || "medium",
         };
         tasks.push(newTask);
-        this.saveTasks(tasks);
+        await this.saveTasks(tasks);
         return `Task added: [${newTask.id}] ${newTask.content}`;
+      }
 
-      case "update":
+      case "update": {
         if (!task?.id) return "Error: Task ID is required for 'update' action.";
         const taskIndex = tasks.findIndex((t) => t.id === task.id);
         if (taskIndex === -1)
           return `Error: Task with ID ${task.id} not found.`;
 
         tasks[taskIndex] = { ...tasks[taskIndex], ...task };
-        this.saveTasks(tasks);
+        await this.saveTasks(tasks);
         return `Task updated: [${task.id}] ${tasks[taskIndex].content} (${tasks[taskIndex].status})`;
+      }
 
       case "list":
         if (tasks.length === 0) return "No tasks found.";

@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { Orchestrator } from "../../orchestrator";
 import { COMMON } from "../../application/constant";
 import { Memory } from "../../memory/base";
@@ -10,6 +9,8 @@ import { Message } from "../message";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/chat";
+import { IDisposable } from "../../interfaces/editor-host";
+import { EditorHostService } from "../../services/editor-host.service";
 
 // Define interfaces for Deepseek responses
 interface DeepseekLLMSnapshot {
@@ -22,12 +23,12 @@ interface DeepseekLLMSnapshot {
 
 export class DeepseekLLM
   extends BaseLLM<DeepseekLLMSnapshot>
-  implements vscode.Disposable
+  implements IDisposable
 {
-  private readonly client: OpenAI;
+  private client: OpenAI;
   private response: any;
   protected readonly orchestrator: Orchestrator;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   private static instance: DeepseekLLM | undefined;
   private lastFunctionCalls: Set<string> = new Set();
   private readonly timeOutMs: number = 30000;
@@ -53,15 +54,18 @@ export class DeepseekLLM
 
   private initializeDisposable(): void {
     this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration(() =>
-        this.handleConfigurationChange(),
-      ),
+      EditorHostService.getInstance()
+        .getHost()
+        .workspace.onDidChangeConfiguration(() =>
+          this.handleConfigurationChange(),
+        ),
     );
   }
 
   private handleConfigurationChange() {
-    // Reset client when configuration changes
-    // this.client;
+    // Configuration changes are handled by the factory/orchestrator calling updateConfig
+    // We just log here for debugging
+    this.logger.debug("Configuration changed event received in DeepseekLLM");
   }
 
   static getInstance(config: ILlmConfig): DeepseekLLM {
@@ -75,9 +79,12 @@ export class DeepseekLLM
 
   public updateConfig(config: ILlmConfig) {
     this.config = config;
-    // We might want to re-initialize the client if API key or Base URL changes,
-    // but the OpenAI client is read-only.
-    // However, since we use `this.config.model` in generateText, updating `this.config` is enough for model switching.
+    // Re-initialize the client with new config
+    this.client = new OpenAI({
+      apiKey: this.config.apiKey,
+      baseURL: config.baseUrl || "https://api.deepseek.com/v1",
+    });
+    this.logger.debug("DeepseekLLM configuration updated");
   }
 
   getEmbeddingModel(): string {
@@ -347,11 +354,13 @@ export class DeepseekLLM
                 callCount++;
               } catch (error: any) {
                 this.logger.error("Error processing function call", error);
-                const retry = await vscode.window.showErrorMessage(
-                  `Function call failed: ${error.message}. Retry or abort?`,
-                  "Retry",
-                  "Abort",
-                );
+                const retry = await EditorHostService.getInstance()
+                  .getHost()
+                  .window.showErrorMessage(
+                    `Function call failed: ${error.message}. Retry or abort?`,
+                    "Retry",
+                    "Abort",
+                  );
 
                 if (retry === "Retry") {
                   continue;
@@ -393,7 +402,9 @@ export class DeepseekLLM
         "onError",
         "Model not responding at this time, please try again",
       );
-      vscode.window.showErrorMessage("Error processing user query");
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage("Error processing user query");
       this.logger.error(
         "Error generating queries, thoughts from user query",
         error,

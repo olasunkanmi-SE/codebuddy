@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import {
   CompletionProviderType,
   ICompletionConfig,
@@ -9,6 +8,7 @@ import { GroqLLM } from "./groq/groq";
 import { QwenLLM } from "./qwen/qwen";
 import { GeminiLLM } from "./gemini/gemini";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "../services/editor-host.service";
 
 export class CompletionProviderFactory {
   private static instance: CompletionProviderFactory;
@@ -77,10 +77,11 @@ export class CompletionProviderFactory {
         case CompletionProviderType.OpenAI:
         case CompletionProviderType.Deepseek:
         case CompletionProviderType.GLM:
-        default:
+        default: {
           // Handle OpenAI-compatible providers via LocalLLM
-          const localConfig =
-            vscode.workspace.getConfiguration("codebuddy.local");
+          const localConfig = EditorHostService.getInstance()
+            .getHost()
+            .workspace.getConfiguration("codebuddy.local");
           let baseUrl =
             localConfig.get<string>("baseUrl") || "http://localhost:11434/v1";
 
@@ -112,6 +113,7 @@ export class CompletionProviderFactory {
 
           // LocalLLM is a singleton that updates its config
           return LocalLLM.getInstance(llmConfig);
+        }
       }
     } catch (error) {
       this.logger.error(`Failed to create provider for ${providerType}`, error);

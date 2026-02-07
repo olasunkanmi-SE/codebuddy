@@ -1,7 +1,7 @@
-import * as fs from "fs";
 import * as path from "path";
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "./editor-host.service";
+import { FileUtils } from "../utils/common-utils";
 
 export interface Document {
   id: string;
@@ -19,10 +19,12 @@ export class SimpleVectorStore {
   private documents: Map<string, Document> = new Map();
   private readonly logger: Logger;
   private persistPath: string;
-  private isDirty: boolean = false;
+  private isDirty = false;
   private saveTimer: NodeJS.Timeout | null = null;
+  private storagePath: string;
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(storagePath: string) {
+    this.storagePath = storagePath;
     this.logger = Logger.initialize("SimpleVectorStore", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
@@ -30,21 +32,23 @@ export class SimpleVectorStore {
       enableTelemetry: true,
     });
 
-    // Store in global storage or workspace storage
-    const storagePath =
-      context.storageUri?.fsPath || context.globalStorageUri.fsPath;
-    if (!fs.existsSync(storagePath)) {
-      fs.mkdirSync(storagePath, { recursive: true });
-    }
     this.persistPath = path.join(storagePath, "vector_store.json");
-
-    this.load();
   }
 
-  private load() {
+  public async initialize(): Promise<void> {
+    const host = EditorHostService.getInstance().getHost();
+    if (!(await FileUtils.fileExists(this.storagePath))) {
+      await host.workspace.fs.createDirectory(this.storagePath);
+    }
+    await this.load();
+  }
+
+  private async load() {
     try {
-      if (fs.existsSync(this.persistPath)) {
-        const data = fs.readFileSync(this.persistPath, "utf-8");
+      const host = EditorHostService.getInstance().getHost();
+      if (await FileUtils.fileExists(this.persistPath)) {
+        const dataBytes = await host.workspace.fs.readFile(this.persistPath);
+        const data = new TextDecoder().decode(dataBytes);
         const rawDocs: Document[] = JSON.parse(data);
         this.documents = new Map(rawDocs.map((d) => [d.id, d]));
         this.logger.info(
@@ -61,7 +65,9 @@ export class SimpleVectorStore {
 
     try {
       const data = JSON.stringify(Array.from(this.documents.values()));
-      await fs.promises.writeFile(this.persistPath, data, "utf-8");
+      const host = EditorHostService.getInstance().getHost();
+      const dataBytes = new TextEncoder().encode(data);
+      await host.workspace.fs.writeFile(this.persistPath, dataBytes);
       this.isDirty = false;
       this.logger.debug("Saved vector store to disk.");
     } catch (error) {
@@ -87,10 +93,7 @@ export class SimpleVectorStore {
     this.scheduleSave();
   }
 
-  public async search(
-    queryVector: number[],
-    k: number = 5,
-  ): Promise<SearchResult[]> {
+  public async search(queryVector: number[], k = 5): Promise<SearchResult[]> {
     const results: SearchResult[] = [];
 
     // Convert map values to array for iteration

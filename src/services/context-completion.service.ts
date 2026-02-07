@@ -1,10 +1,11 @@
-import * as vscode from "vscode";
 import { TreeSitterParser } from "../ast/parser/tree-sitter.parser";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import {
   ICompletionContext,
   IImportSignature,
 } from "../interfaces/completion.interface";
+import { IOutputChannel } from "../interfaces/output-channel";
+import { ITextDocument } from "../interfaces/editor-host";
 // import { SyntaxNode } from "web-tree-sitter";
 
 export class ContextCompletionService {
@@ -14,10 +15,7 @@ export class ContextCompletionService {
   private readonly maxPrefixTokens = 2000;
   private readonly maxSuffixTokens = 500;
 
-  private constructor(
-    extensionPath: string,
-    outputChannel: vscode.OutputChannel,
-  ) {
+  private constructor(extensionPath: string, outputChannel: IOutputChannel) {
     this.logger = Logger.initialize("ContextCompletionService", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
@@ -29,7 +27,7 @@ export class ContextCompletionService {
 
   public static getInstance(
     extensionPath: string,
-    outputChannel: vscode.OutputChannel,
+    outputChannel: IOutputChannel,
   ): ContextCompletionService {
     if (!ContextCompletionService.instance) {
       ContextCompletionService.instance = new ContextCompletionService(
@@ -44,8 +42,8 @@ export class ContextCompletionService {
    * Gather context for the current cursor position
    */
   public async gatherContext(
-    document: vscode.TextDocument,
-    position: vscode.Position,
+    document: ITextDocument,
+    position: { line: number; character: number },
   ): Promise<ICompletionContext> {
     // 1. Get Prefix and Suffix (basic text splitting)
     // We limit the size to avoid blowing up the context window
@@ -104,7 +102,7 @@ export class ContextCompletionService {
    * Extract imported symbols using Tree-Sitter AST
    */
   private async extractImportSignatures(
-    document: vscode.TextDocument,
+    document: ITextDocument,
   ): Promise<IImportSignature[]> {
     const tree = await this.parser?.parse(
       document.getText(),

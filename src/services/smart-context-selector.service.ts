@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 /**

@@ -1,4 +1,4 @@
-import { StructuredTool } from "langchain";
+import { StructuredTool } from "@langchain/core/tools";
 import { Logger, LogLevel } from "../../../infrastructure/logger/logger";
 import { z, ZodTypeAny } from "zod";
 import { MCPService } from "../../../MCP/service";
@@ -31,7 +31,11 @@ export class LangChainMCPTool extends StructuredTool<any> {
     this.logger.info(`Executing MCP tool: ${this.tool.name}`);
 
     try {
-      const result = await this.mcpService.callTool(this.tool.name, input);
+      const result = await this.mcpService.callTool(
+        this.tool.serverName,
+        this.tool.name,
+        input,
+      );
       if (result.isError) {
         const errorText = result.content
           .map((c) => c.text ?? JSON.stringify(c))
@@ -61,16 +65,20 @@ export class LangChainMCPTool extends StructuredTool<any> {
   }
 
   private buildZodSchema(schema: MCPTool["inputSchema"]): ZodTypeAny {
-    if (schema.type === "object" && schema.properties) {
-      const required = new Set(schema.required ?? []);
-      const shape: Record<string, ZodTypeAny> = {};
+    if (schema.type === "object") {
+      if (schema.properties) {
+        const required = new Set(schema.required ?? []);
+        const shape: Record<string, ZodTypeAny> = {};
 
-      for (const [key, value] of Object.entries(schema.properties)) {
-        const fieldSchema = this.convertJsonSchemaToZod(value);
-        shape[key] = required.has(key) ? fieldSchema : fieldSchema.optional();
+        for (const [key, value] of Object.entries(schema.properties)) {
+          const fieldSchema = this.convertJsonSchemaToZod(value);
+          shape[key] = required.has(key) ? fieldSchema : fieldSchema.optional();
+        }
+
+        return z.object(shape).passthrough();
       }
-
-      return z.object(shape).passthrough();
+      // Object without properties - allow any keys
+      return z.record(z.string(), z.any());
     }
     return this.convertJsonSchemaToZod(schema);
   }

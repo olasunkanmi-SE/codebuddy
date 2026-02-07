@@ -1,5 +1,4 @@
-import { Logger } from "../infrastructure/logger/logger";
-import { LogLevel } from "../services/telemetry";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { validateLlmConfig } from "../utils/llm-config-validator";
 import { IBaseLLM, ILlmConfig } from "./interface";
 

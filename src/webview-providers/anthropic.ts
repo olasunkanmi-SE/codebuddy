@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import * as vscode from "vscode";
+import { IExtensionContext } from "../interfaces/editor-host";
+import { EditorHostService } from "../services/editor-host.service";
 import { COMMON, GROQ_CONFIG } from "../application/constant";
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
@@ -10,10 +11,10 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
   chatHistory: IMessageInput[] = [];
   readonly model: Anthropic;
   constructor(
-    extensionUri: vscode.Uri,
+    extensionUri: any,
     apiKey: string,
     generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: IExtensionContext,
     protected baseUrl?: string,
   ) {
     super(extensionUri, apiKey, generativeAiModel, context);
@@ -156,13 +157,17 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
 
       Memory.set("chatHistory", this.chatHistory);
       if (error.status === "401") {
-        vscode.window.showErrorMessage(
-          "Invalid API key. Please update your API key",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid API key. Please update your API key",
+          );
         this.logger.error("Invalid API key. Please update your API key", error);
       }
       if (error.status === "503") {
-        vscode.window.showErrorMessage("Rate limiting error, try again later");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("Rate limiting error, try again later");
       }
       this.logger.error("Error generating anthropic response", error.stack);
       throw error;
@@ -251,13 +256,17 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
 
       Memory.set("chatHistory", this.chatHistory);
       if (error.status === "401") {
-        vscode.window.showErrorMessage(
-          "Invalid API key. Please update your API key",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
+            "Invalid API key. Please update your API key",
+          );
         this.logger.error("Invalid API key. Please update your API key", error);
       }
       if (error.status === "503") {
-        vscode.window.showErrorMessage("Rate limiting error, try again later");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("Rate limiting error, try again later");
       }
       this.logger.error("Error generating anthropic response", error.stack);
       throw error;

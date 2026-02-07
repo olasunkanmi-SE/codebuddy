@@ -1,4 +1,4 @@
-import * as vscode from "vscode";
+import { IPosition, IRange } from "./editor-host";
 
 export enum CompletionTriggerMode {
   Automatic = "automatic",
@@ -39,11 +39,11 @@ export interface ICompletionContext {
   suffix: string;
   languageId: string;
   imports: IImportSignature[];
-  cursorPosition: vscode.Position;
+  cursorPosition: IPosition;
 }
 
 export interface ICompletionResult {
   text: string;
-  range?: vscode.Range;
+  range?: IRange;
   confidence?: number;
 }

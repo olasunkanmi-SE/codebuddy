@@ -1,19 +1,20 @@
 import { CacheManager } from "../cache/cache.manager";
 import { TreeSitterParser } from "../parser/tree-sitter.parser";
-import * as vscode from "vscode";
 import { IParsedFile } from "../query-types";
 import { LanguageDetector } from "../parser/language-detector";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
+import { IOutputChannel } from "../../interfaces/output-channel";
+import { EditorHostService } from "../../services/editor-host.service";
+import { TextDecoder } from "util";
 
 export class FileParser {
-  private textDecoder = new TextDecoder();
   private readonly logger: Logger;
   private static instance: FileParser;
 
   constructor(
     private parser: TreeSitterParser,
     private cacheManager: CacheManager,
-    private outputChannel: vscode.OutputChannel,
+    private outputChannel: IOutputChannel,
   ) {
     this.logger = Logger.initialize("QueryExecutor", {
       minLevel: LogLevel.DEBUG,
@@ -26,7 +27,7 @@ export class FileParser {
   static getInstance(
     parser: TreeSitterParser,
     cacheManager: CacheManager,
-    outputChannel: vscode.OutputChannel,
+    outputChannel: IOutputChannel,
   ) {
     return (FileParser.instance ??= new FileParser(
       parser,
@@ -37,10 +38,10 @@ export class FileParser {
 
   async parseFile(filePath: string): Promise<IParsedFile | undefined> {
     try {
-      const contentBytes = await vscode.workspace.fs.readFile(
-        vscode.Uri.file(filePath),
-      );
-      const content = this.textDecoder.decode(contentBytes);
+      const contentBytes = await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.readFile(filePath);
+      const content = new TextDecoder().decode(contentBytes);
       const cached = await this.cacheManager.get(filePath, content);
       if (cached) {
         return cached;

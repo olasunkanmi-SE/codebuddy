@@ -1,8 +1,9 @@
 // Service / Client for Codebase Analysis Worker
-import * as vscode from "vscode";
 import * as path from "path";
 import { Worker } from "worker_threads";
 import { Logger } from "../infrastructure/logger/logger";
+import { EditorHostService } from "./editor-host.service";
+import { ICancellationToken } from "../interfaces/cancellation";
 
 /**
  * Message types for communication
@@ -13,9 +14,14 @@ export interface WorkerMessage {
     | "ANALYSIS_COMPLETE"
     | "ANALYSIS_ERROR"
     | "ANALYSIS_PROGRESS"
-    | "LOG";
+    | "LOG"
+    | "REQUEST_FILE_READ"
+    | "FILE_READ_RESULT"
+    | "REQUEST_FILE_EXISTS"
+    | "FILE_EXISTS_RESULT";
   payload?: any;
   error?: string;
+  requestId?: string; // For correlation
   progress?: {
     current: number;
     total: number;
@@ -70,7 +76,7 @@ export class CodebaseAnalysisWorker {
       total: number;
       message: string;
     }) => void,
-    token?: vscode.CancellationToken,
+    token?: ICancellationToken,
   ): Promise<AnalysisResult> {
     if (this.worker) {
       throw new Error("Analysis already in progress");
@@ -176,7 +182,7 @@ export class CodebaseAnalysisWorker {
           this.onProgressCallback(message.progress);
         }
         break;
-      case "LOG":
+      case "LOG": {
         const { level, message: msg, data } = message;
         if (level === "ERROR") this.logger.error(msg || "Worker Error", data);
         else if (level === "WARN") this.logger.warn(msg || "Worker Warn", data);
@@ -184,6 +190,57 @@ export class CodebaseAnalysisWorker {
           this.logger.debug(msg || "Worker Debug", data);
         else this.logger.info(msg || "Worker Info", data);
         break;
+      }
+      case "REQUEST_FILE_READ":
+        this.handleFileReadRequest(message);
+        break;
+      case "REQUEST_FILE_EXISTS":
+        this.handleFileExistsRequest(message);
+        break;
+    }
+  }
+
+  private async handleFileReadRequest(message: WorkerMessage) {
+    if (!message.requestId || !message.payload?.path) return;
+
+    try {
+      const host = EditorHostService.getInstance().getHost();
+      const contentBytes = await host.workspace.fs.readFile(
+        message.payload.path,
+      );
+      const content = new TextDecoder().decode(contentBytes);
+      this.worker?.postMessage({
+        type: "FILE_READ_RESULT",
+        requestId: message.requestId,
+        payload: { content },
+      });
+    } catch (error: any) {
+      this.worker?.postMessage({
+        type: "FILE_READ_RESULT",
+        requestId: message.requestId,
+        error: error.message,
+      });
+    }
+  }
+
+  private async handleFileExistsRequest(message: WorkerMessage) {
+    if (!message.requestId || !message.payload?.path) return;
+
+    try {
+      const host = EditorHostService.getInstance().getHost();
+      // stat throws if file doesn't exist
+      await host.workspace.fs.stat(message.payload.path);
+      this.worker?.postMessage({
+        type: "FILE_EXISTS_RESULT",
+        requestId: message.requestId,
+        payload: { exists: true },
+      });
+    } catch (error) {
+      this.worker?.postMessage({
+        type: "FILE_EXISTS_RESULT",
+        requestId: message.requestId,
+        payload: { exists: false },
+      });
     }
   }
 
@@ -221,13 +278,15 @@ export class CodebaseAnalysisWorker {
 
     for (const pattern of data.filePatterns) {
       try {
-        const uris = await vscode.workspace.findFiles(
-          pattern,
-          `{${data.excludePatterns.join(",")}}`,
-          data.maxFiles,
-        );
+        const filePaths = await EditorHostService.getInstance()
+          .getHost()
+          .workspace.findFiles(
+            pattern,
+            `{${data.excludePatterns.join(",")}}`,
+            data.maxFiles,
+          );
 
-        files.push(...uris.map((uri) => uri.fsPath));
+        files.push(...filePaths);
       } catch (error: any) {
         this.logger.warn(
           `Failed to find files with pattern ${pattern}:`,

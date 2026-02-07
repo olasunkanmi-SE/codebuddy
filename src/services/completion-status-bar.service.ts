@@ -1,13 +1,14 @@
-import * as vscode from "vscode";
 import { CompletionConfigService } from "./completion-config.service";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "./editor-host.service";
+import { IStatusBarItem, StatusBarAlignment } from "../interfaces/editor-host";
 
 export class CompletionStatusBarService {
-  private statusBarItem: vscode.StatusBarItem;
+  private statusBarItem: IStatusBarItem;
   private configService: CompletionConfigService;
   private logger: Logger;
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: any) {
     this.logger = Logger.initialize("CompletionStatusBarService", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
@@ -15,9 +16,10 @@ export class CompletionStatusBarService {
       enableTelemetry: true,
     });
     this.configService = CompletionConfigService.getInstance();
+    const editorHost = EditorHostService.getInstance().getHost();
 
-    this.statusBarItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Right,
+    this.statusBarItem = editorHost.window.createStatusBarItem(
+      StatusBarAlignment.Right,
       100,
     );
     this.statusBarItem.command = "codebuddy.completion.openSettings";
@@ -29,7 +31,7 @@ export class CompletionStatusBarService {
     this.logger.info("CompletionStatusBarService initialized");
 
     // Listen for config changes
-    vscode.workspace.onDidChangeConfiguration((e) => {
+    editorHost.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("codebuddy.completion")) {
         this.updateStatusBar();
       }
@@ -38,6 +40,7 @@ export class CompletionStatusBarService {
 
   private updateStatusBar(): void {
     const config = this.configService.getConfig();
+    const editorHost = EditorHostService.getInstance().getHost();
 
     if (config.enabled) {
       this.statusBarItem.text = `$(zap) CodeBuddy: ${config.model}`;
@@ -47,7 +50,7 @@ export class CompletionStatusBarService {
       this.statusBarItem.text = `$(circle-slash) CodeBuddy: Off`;
       this.statusBarItem.tooltip =
         "CodeBuddy Completions: Disabled\n\nClick to configure";
-      this.statusBarItem.backgroundColor = new vscode.ThemeColor(
+      this.statusBarItem.backgroundColor = editorHost.createThemeColor(
         "statusBarItem.warningBackground",
       );
     }

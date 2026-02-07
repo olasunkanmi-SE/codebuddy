@@ -1,9 +1,8 @@
-import * as vscode from "vscode";
 import { CodeCommandHandler } from "./handler";
 import { formatText } from "../utils/utils";
 
 export class ExplainCode extends CodeCommandHandler {
-  constructor(action: string, context: vscode.ExtensionContext) {
+  constructor(action: string, context: any) {
     super(action, context);
   }
 

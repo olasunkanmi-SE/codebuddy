@@ -1,22 +1,20 @@
 import { spawn } from "child_process";
-import * as vscode from "vscode";
+import * as path from "path";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { IOutputChannel, IDisposable } from "../interfaces/editor-host";
+import { EditorHostService } from "../services/editor-host.service";
 
 type AllowedCommand = "git" | "npm" | "ls" | "echo" | "docker";
 
-const ALLOWED_COMMANDS: Readonly<Set<AllowedCommand>> = new Set([
-  "git",
-  "npm",
-  "ls",
-  "echo",
-  "docker",
-]);
+const ALLOWED_COMMANDS: Readonly<Set<AllowedCommand>> = new Set<AllowedCommand>(
+  ["git", "npm", "ls", "echo", "docker"],
+);
 
 export class Terminal {
   private readonly logger: Logger;
   private static instance: Terminal;
-  private extensionPath: string = "";
-  private outputChannel: vscode.OutputChannel;
+  private extensionPath = "";
+  private outputChannel: IOutputChannel;
   private listeners: ((data: string) => void)[] = [];
   private backgroundProcesses: Map<
     number,
@@ -30,8 +28,9 @@ export class Terminal {
       enableFile: true,
       enableTelemetry: true,
     });
-    this.outputChannel =
-      vscode.window.createOutputChannel("CodeBuddy Terminal");
+    this.outputChannel = EditorHostService.getInstance()
+      .getHost()
+      .window.createOutputChannel("CodeBuddy Terminal");
   }
 
   static getInstance(): Terminal {
@@ -46,11 +45,13 @@ export class Terminal {
    * @param listener The callback function to receive output data.
    * @returns A disposable to remove the listener.
    */
-  public onOutput(listener: (data: string) => void): vscode.Disposable {
+  public onOutput(listener: (data: string) => void): IDisposable {
     this.listeners.push(listener);
-    return new vscode.Disposable(() => {
-      this.listeners = this.listeners.filter((l) => l !== listener);
-    });
+    return {
+      dispose: () => {
+        this.listeners = this.listeners.filter((l) => l !== listener);
+      },
+    };
   }
 
   /**
@@ -82,16 +83,18 @@ export class Terminal {
   public async executeAnyCommand(
     command: string,
     cwd?: string,
-    background: boolean = false,
+    background = false,
   ): Promise<string> {
     // Safety Guard: User Confirmation only for dangerous commands
     if (this.isDangerousCommand(command)) {
-      const selection = await vscode.window.showWarningMessage(
-        `CodeBuddy wants to execute a potentially destructive command: "${command}"`,
-        { modal: true },
-        "Execute",
-        "Cancel",
-      );
+      const selection = await EditorHostService.getInstance()
+        .getHost()
+        .window.showWarningMessage(
+          `CodeBuddy wants to execute a potentially destructive command: "${command}"`,
+          { modal: true },
+          "Execute",
+          "Cancel",
+        );
 
       if (selection !== "Execute") {
         this.logger.info(`User denied execution of command: ${command}`);
@@ -112,7 +115,7 @@ export class Terminal {
         shell: true,
         cwd:
           cwd ||
-          vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
+          EditorHostService.getInstance().getHost().workspace.rootPath ||
           this.extensionPath ||
           undefined,
       });
@@ -404,10 +407,7 @@ export class Terminal {
 
   async runDockerComposeUp(): Promise<string> {
     if (this.extensionPath) {
-      const composePath = require("path").join(
-        this.extensionPath,
-        "docker-compose.yml",
-      );
+      const composePath = path.join(this.extensionPath, "docker-compose.yml");
       this.logger.info(`Running docker compose with file: ${composePath}`);
       return this.executeCommand("docker", [
         "compose",

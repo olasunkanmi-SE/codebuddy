@@ -3,7 +3,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { GenerativeModel, GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
-import * as vscode from "vscode";
 import {
   APP_CONFIG,
   CODEBUDDY_ACTIONS,
@@ -34,6 +33,7 @@ import { Memory } from "../memory/base";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
 import { architecturalRecommendationCommand } from "./architectural-recommendation";
+import { EditorHostService } from "../services/editor-host.service";
 
 interface ICodeCommandHandler {
   getApplicationConfig(configKey: string): string | undefined;
@@ -41,7 +41,7 @@ interface ICodeCommandHandler {
 }
 
 export abstract class CodeCommandHandler implements ICodeCommandHandler {
-  context: vscode.ExtensionContext;
+  context: any;
   protected readonly orchestrator: Orchestrator;
   protected error?: string;
   private readonly generativeAi: string;
@@ -62,7 +62,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   protected logger: Logger;
   constructor(
     private readonly action: string,
-    _context: vscode.ExtensionContext,
+    _context: any,
     errorMessage?: string,
   ) {
     this.context = _context;
@@ -315,20 +315,24 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       return { generativeAi: this.generativeAi, model, modelName };
     } catch (error: any) {
       this.logger.error("Error creating model:", error);
-      vscode.window.showErrorMessage(
-        "An error occurred while creating the model. Please try again.",
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage(
+          "An error occurred while creating the model. Please try again.",
+        );
     }
   }
 
   getSelectedWindowArea(): string | undefined {
-    const editor = vscode.window.activeTextEditor;
+    const editor =
+      EditorHostService.getInstance().getHost().window.activeTextEditor;
     if (!editor) {
       this.logger.info("No active text editor.");
       return;
     }
-    const selection: vscode.Selection | undefined = editor.selection;
-    const selectedArea: string | undefined = editor.document.getText(selection);
+    const selectedArea: string | undefined = editor.document.getText(
+      editor.selection,
+    );
     return selectedArea;
   }
 
@@ -418,9 +422,11 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       return response;
     } catch (error: any) {
       this.logger.error("Error generating response:", error);
-      vscode.window.showErrorMessage(
-        "An error occurred while generating the response. Please try again.",
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage(
+          "An error occurred while generating the response. Please try again.",
+        );
     }
   }
 
@@ -574,7 +580,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     let prompt;
     const selectedCode = this.getSelectedWindowArea();
     if (!message && !selectedCode) {
-      vscode.window.showErrorMessage("select a piece of code.");
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage("select a piece of code.");
       return;
     }
 
@@ -587,7 +595,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     }
 
     if (!prompt) {
-      vscode.window.showErrorMessage("model not reponding, try again later");
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage("model not reponding, try again later");
       return;
     }
 
@@ -704,15 +714,17 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
 
   async getUserInLineChat(): Promise<string | undefined> {
     try {
-      const userPrompt = await vscode.window.showInputBox({
-        placeHolder: "Enter instructions for CodeBuddy",
-        ignoreFocusOut: true,
-        validateInput: (text) => {
-          return text === ""
-            ? "Enter instructions for CodeBuddy or press Escape to close chat box"
-            : null;
-        },
-      });
+      const userPrompt = await EditorHostService.getInstance()
+        .getHost()
+        .window.showInputBox({
+          placeHolder: "Enter instructions for CodeBuddy",
+          ignoreFocusOut: true,
+          validateInput: (text: string) => {
+            return text === ""
+              ? "Enter instructions for CodeBuddy or press Escape to close chat box"
+              : null;
+          },
+        });
       return userPrompt;
     } catch (error: any) {
       this.logger.error("Error generating inline chat", error);
@@ -728,7 +740,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       let prompt;
       const selectedCode = this.getSelectedWindowArea();
       if (!message && !selectedCode) {
-        vscode.window.showErrorMessage("select a piece of code.");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("select a piece of code.");
         return;
       }
 
@@ -741,7 +755,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       }
 
       if (!prompt) {
-        vscode.window.showErrorMessage("model not reponding, try again later");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("model not reponding, try again later");
         return;
       }
 
@@ -749,7 +765,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       const provider = providerManager.getCurrentProvider();
 
       if (!provider) {
-        vscode.window.showErrorMessage("Provider not initialized");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage("Provider not initialized");
         return;
       }
 

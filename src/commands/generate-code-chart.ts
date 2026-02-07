@@ -1,9 +1,8 @@
 import { formatText } from "../utils/utils";
-import * as vscode from "vscode";
 import { CodeCommandHandler } from "./handler";
 
 export class GenerateMermaidDiagram extends CodeCommandHandler {
-  constructor(action: string, context: vscode.ExtensionContext) {
+  constructor(action: string, context: any) {
     super(action, context);
   }
 

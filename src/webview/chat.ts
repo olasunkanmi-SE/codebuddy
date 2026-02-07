@@ -1,6 +1,9 @@
 import { chartComponent } from "./chat_html";
-import { Webview, Uri } from "vscode";
+import { IWebview } from "../interfaces/editor-host";
 
-export function getWebviewContent(webview: Webview, extensionUri: Uri): string {
+export function getWebviewContent(
+  webview: IWebview,
+  extensionUri: any,
+): string {
   return chartComponent(webview, extensionUri);
 }

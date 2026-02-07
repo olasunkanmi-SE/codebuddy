@@ -1,5 +1,4 @@
 import * as assert from "assert";
-import * as vscode from "vscode";
 import { VectorDbConfigurationManager } from "../../config/vector-db.config";
 import { UserFeedbackService } from "../../services/user-feedback.service";
 

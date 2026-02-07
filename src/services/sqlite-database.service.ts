@@ -1,10 +1,9 @@
 import * as path from "path";
-import * as vscode from "vscode";
-import * as fs from "fs";
 import simpleGit from "simple-git";
-import { Logger } from "../infrastructure/logger/logger";
-import { LogLevel } from "./telemetry";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { PersistentCodebaseAnalysis } from "./persistent-codebase-understanding.service";
+import { EditorHostService } from "./editor-host.service";
+import { FileUtils } from "../utils/common-utils";
 
 // Database table names
 const CODEBASE_SNAPSHOTS_TABLE = "codebase_snapshots";
@@ -42,7 +41,7 @@ export class SqliteDatabaseService {
     this.logger = Logger.initialize("SqliteDatabaseService", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
-      enableFile: true,
+      enableFile: false,
       enableTelemetry: true,
     });
   }
@@ -54,7 +53,7 @@ export class SqliteDatabaseService {
   /**
    * Initialize the database connection and create tables
    */
-  async initialize(): Promise<void> {
+  async initialize(options?: { wasmPath?: string }): Promise<void> {
     if (this.initialized) {
       return;
     }
@@ -73,7 +72,10 @@ export class SqliteDatabaseService {
 
         // Configure sql.js with the WASM file location
         // In the bundled extension, the WASM file is in the same directory as extension.js
-        const wasmPath = path.join(__dirname, "grammars", "sql-wasm.wasm");
+        // Allow overriding wasmPath for server environment
+        const wasmPath =
+          options?.wasmPath ||
+          path.join(__dirname, "grammars", "sql-wasm.wasm");
         this.logger.info(`Looking for WASM file at: ${wasmPath}`);
 
         this.SQL = await initSqlJs({
@@ -86,22 +88,22 @@ export class SqliteDatabaseService {
         });
 
         // Create database in workspace or extension global storage
-        const workspaceRoot =
-          vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const host = EditorHostService.getInstance().getHost();
+        const workspaceRoot = host.workspace.rootPath;
         if (workspaceRoot) {
           this.logger.info(`Using workspace root: ${workspaceRoot}`);
           const codebuddyDir = path.join(workspaceRoot, ".codebuddy");
-          if (!fs.existsSync(codebuddyDir)) {
+          if (!(await FileUtils.fileExists(codebuddyDir))) {
             this.logger.info(`Creating .codebuddy directory: ${codebuddyDir}`);
-            fs.mkdirSync(codebuddyDir, { recursive: true });
+            await host.workspace.fs.createDirectory(codebuddyDir);
           }
           this.dbPath = path.join(codebuddyDir, "codebase_analysis.db");
         } else {
           this.logger.info("No workspace root, using extension global storage");
           const dbDir = path.join(__dirname, "..", "..", "database");
-          if (!fs.existsSync(dbDir)) {
+          if (!(await FileUtils.fileExists(dbDir))) {
             this.logger.info(`Creating database directory: ${dbDir}`);
-            fs.mkdirSync(dbDir, { recursive: true });
+            await host.workspace.fs.createDirectory(dbDir);
           }
           this.dbPath = path.join(dbDir, "codebase_analysis.db");
         }
@@ -113,10 +115,9 @@ export class SqliteDatabaseService {
 
         // Load existing database if it exists
         let data: Uint8Array | undefined = undefined;
-        if (fs.existsSync(this.dbPath)) {
+        if (await FileUtils.fileExists(this.dbPath)) {
           this.logger.info("Loading existing database file...");
-          const buffer = fs.readFileSync(this.dbPath);
-          data = new Uint8Array(buffer);
+          data = await host.workspace.fs.readFile(this.dbPath);
         }
 
         this.db = new this.SQL.Database(data);
@@ -138,7 +139,7 @@ export class SqliteDatabaseService {
         }
         throw error;
       } finally {
-        this.saveToDisk();
+        await this.saveToDisk();
       }
     })();
 
@@ -194,7 +195,7 @@ export class SqliteDatabaseService {
     await this.initializeSchema();
 
     // Save the database to disk
-    this.saveToDisk();
+    await this.saveToDisk();
   }
 
   private async initializeSchema(): Promise<void> {
@@ -274,14 +275,15 @@ export class SqliteDatabaseService {
   /**
    * Save the in-memory database to disk
    */
-  private saveToDisk(): void {
+  private async saveToDisk(): Promise<void> {
     if (!this.db || !this.dbPath) {
       return;
     }
 
     try {
       const data = this.db.export();
-      fs.writeFileSync(this.dbPath, data);
+      const host = EditorHostService.getInstance().getHost();
+      await host.workspace.fs.writeFile(this.dbPath, data);
     } catch (error: any) {
       this.logger.error("Failed to save database to disk", error);
     }
@@ -300,15 +302,17 @@ export class SqliteDatabaseService {
   /**
    * Create a diff hash based on file modifications
    */
-  private async createDiffHash(files: vscode.Uri[]): Promise<string> {
+  private async createDiffHash(files: string[]): Promise<string> {
     try {
       const fileStats = await Promise.all(
-        files.slice(0, 50).map(async (uri) => {
+        files.slice(0, 50).map(async (filePath) => {
           try {
-            const stat = await vscode.workspace.fs.stat(uri);
-            return `${uri.fsPath}:${stat.mtime}:${stat.size}`;
+            const stat = await EditorHostService.getInstance()
+              .getHost()
+              .workspace.fs.stat(filePath);
+            return `${filePath}:${stat.mtime}:${stat.size}`;
           } catch {
-            return uri.fsPath;
+            return filePath;
           }
         }),
       );
@@ -336,7 +340,8 @@ export class SqliteDatabaseService {
   }
 
   async getCurrentGitState(): Promise<GitState | null> {
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const workspaceRoot =
+      EditorHostService.getInstance().getHost().workspace.rootPath;
     if (!workspaceRoot) {
       return null;
     }
@@ -360,11 +365,9 @@ export class SqliteDatabaseService {
     }
 
     try {
-      const files = await vscode.workspace.findFiles(
-        "**/*",
-        "**/node_modules/**",
-        5000,
-      );
+      const files = await EditorHostService.getInstance()
+        .getHost()
+        .workspace.findFiles("**/*", "**/node_modules/**", 5000);
       const fileCount = files.length;
       const diffHash = await this.createDiffHash(files);
 
@@ -443,7 +446,7 @@ export class SqliteDatabaseService {
       );
 
       // Save to disk
-      this.saveToDisk();
+      await this.saveToDisk();
 
       this.logger.info("Codebase analysis saved to SQLite database");
     } catch (error: any) {
@@ -508,7 +511,7 @@ export class SqliteDatabaseService {
         );
 
         // Save to disk
-        this.saveToDisk();
+        await this.saveToDisk();
 
         this.logger.info(
           "Found valid cached codebase analysis with exact match",
@@ -545,7 +548,7 @@ export class SqliteDatabaseService {
         );
 
         // Save to disk
-        this.saveToDisk();
+        await this.saveToDisk();
 
         this.logger.info(
           "Found valid cached codebase analysis with loose match (ignoring diff hash)",
@@ -638,7 +641,7 @@ export class SqliteDatabaseService {
       ]);
 
       // Save to disk
-      this.saveToDisk();
+      await this.saveToDisk();
 
       this.logger.info(`Cleaned up old snapshots`);
     } catch (error: any) {
@@ -681,8 +684,9 @@ export class SqliteDatabaseService {
       // Get database file size
       let totalSize = 0;
       try {
-        if (fs.existsSync(this.dbPath)) {
-          const stat = await fs.promises.stat(this.dbPath);
+        if (await FileUtils.fileExists(this.dbPath)) {
+          const host = EditorHostService.getInstance().getHost();
+          const stat = await host.workspace.fs.stat(this.dbPath);
           totalSize = stat.size;
         }
       } catch (error: any) {

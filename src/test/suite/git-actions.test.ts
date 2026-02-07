@@ -1,9 +1,8 @@
 import * as assert from "assert";
-import * as vscode from "vscode";
 import { GitActions } from "../../services/git-actions";
 
 suite("GitActions Test Suite", () => {
-  vscode.window.showInformationMessage("Start GitActions tests.");
+  // vscode.window.showInformationMessage("Start GitActions tests.");
 
   test("GitActions instance creation", () => {
     const gitActions = new GitActions();

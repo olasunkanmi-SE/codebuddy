@@ -1,5 +1,5 @@
-import { getUri } from "../utils/utils";
-import { Uri, Webview } from "vscode";
+import { getUri } from "../utils/webview-utils";
+import { IWebview } from "../interfaces/editor-host";
 
 // This function generates a random 32-character string (nonce) using alphanumeric characters
 // A nonce is a unique, random value used for security purposes, typically to prevent replay attacks
@@ -16,7 +16,7 @@ function getNonce() {
 
 const nonce = getNonce();
 
-export const chartComponent = (webview: Webview, extensionUri: Uri) => {
+export const chartComponent = (webview: IWebview, extensionUri: any) => {
   const stylesUri = getUri(webview, extensionUri, [
     "dist",
     "webview",

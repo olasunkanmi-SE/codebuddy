@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { GroqLLM } from "../llms/groq/groq";
 import { getAPIKeyAndModel } from "../utils/utils";
@@ -8,6 +7,7 @@ import {
   SmartContextSelectorService,
   ContextSelectionResult,
 } from "./smart-context-selector.service";
+import { IExtensionContext } from "../interfaces/editor-host";
 
 export interface QuestionAnalysis {
   isCodebaseRelated: boolean;
@@ -47,11 +47,11 @@ export interface QuestionTypeClassification {
 export class EnhancedPromptBuilderService {
   private logger: Logger;
   private readonly groqLLM: GroqLLM | null;
-  private readonly _context: vscode.ExtensionContext;
+  private readonly _context: IExtensionContext;
   private readonly codeAnalyzerProvider: AnalyzeCodeProvider;
   private readonly smartContextSelector: SmartContextSelectorService;
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: IExtensionContext) {
     this.logger = Logger.initialize("EnhancedPromptBuilderService", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,

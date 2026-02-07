@@ -1,7 +1,7 @@
 // src/services/change-detection/change-detector.service.ts
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { IChangeProvider, ChangeDetails } from "./types";
+import { EditorHostService } from "../../services/editor-host.service";
 
 export class ChangeDetector {
   private readonly logger: Logger;
@@ -31,9 +31,11 @@ export class ChangeDetector {
     }
 
     // Final fallback if no providers succeed
-    vscode.window.showWarningMessage(
-      "Could not detect any Git changes. The review might be less accurate.",
-    );
+    EditorHostService.getInstance()
+      .getHost()
+      .window.showWarningMessage(
+        "Could not detect any Git changes. The review might be less accurate.",
+      );
     return {
       branchInfo: `Current branch vs ${targetBranch} (No changes detected)`,
       changedFiles: [],

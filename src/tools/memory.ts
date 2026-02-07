@@ -1,7 +1,7 @@
 import { SchemaType } from "@google/generative-ai";
-import * as fs from "fs";
 import * as path from "path";
-import * as vscode from "vscode";
+import { EditorHostService } from "../services/editor-host.service";
+import { FileUtils } from "../utils/common-utils";
 
 interface MemoryEntry {
   id: string;
@@ -14,9 +14,9 @@ interface MemoryEntry {
 }
 
 export class MemoryTool {
-  public static getFormattedMemories(): string {
+  public static async getFormattedMemories(): Promise<string> {
     const tool = new MemoryTool();
-    const memories = tool.loadMemories();
+    const memories = await tool.loadMemories();
     if (memories.length === 0) return "";
 
     let prompt = "\n\n## 🧠 Core Memories (Context from previous sessions):\n";
@@ -40,37 +40,47 @@ export class MemoryTool {
     return prompt;
   }
 
-  private getStoragePath(): string | undefined {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
+  private async getStoragePath(): Promise<string | undefined> {
+    const rootPath =
+      EditorHostService.getInstance().getHost().workspace.rootPath;
+    if (!rootPath) {
       return undefined;
     }
-    const rootPath = workspaceFolders[0].uri.fsPath;
     const codebuddyDir = path.join(rootPath, ".codebuddy");
 
-    if (!fs.existsSync(codebuddyDir)) {
-      fs.mkdirSync(codebuddyDir);
+    if (!(await FileUtils.fileExists(codebuddyDir))) {
+      await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.createDirectory(codebuddyDir);
     }
 
     return path.join(codebuddyDir, "memory.json");
   }
 
-  private loadMemories(): MemoryEntry[] {
-    const storagePath = this.getStoragePath();
-    if (!storagePath || !fs.existsSync(storagePath)) {
+  private async loadMemories(): Promise<MemoryEntry[]> {
+    const storagePath = await this.getStoragePath();
+    if (!storagePath || !(await FileUtils.fileExists(storagePath))) {
       return [];
     }
     try {
-      return JSON.parse(fs.readFileSync(storagePath, "utf8"));
+      const contentBytes = await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.readFile(storagePath);
+      const content = new TextDecoder().decode(contentBytes);
+      return JSON.parse(content);
     } catch {
       return [];
     }
   }
 
-  private saveMemories(memories: MemoryEntry[]): void {
-    const storagePath = this.getStoragePath();
+  private async saveMemories(memories: MemoryEntry[]): Promise<void> {
+    const storagePath = await this.getStoragePath();
     if (storagePath) {
-      fs.writeFileSync(storagePath, JSON.stringify(memories, null, 2));
+      const content = JSON.stringify(memories, null, 2);
+      const encoder = new TextEncoder();
+      await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.writeFile(storagePath, encoder.encode(content));
     }
   }
 
@@ -79,10 +89,10 @@ export class MemoryTool {
     memory?: Partial<MemoryEntry>,
     query?: string,
   ): Promise<string> {
-    const memories = this.loadMemories();
+    const memories = await this.loadMemories();
 
     switch (action) {
-      case "add":
+      case "add": {
         if (
           !memory?.content ||
           !memory?.category ||
@@ -101,10 +111,11 @@ export class MemoryTool {
           timestamp: Date.now(),
         };
         memories.push(newMemory);
-        this.saveMemories(memories);
+        await this.saveMemories(memories);
         return `Memory added: [${newMemory.category}] ${newMemory.title}`;
+      }
 
-      case "update":
+      case "update": {
         if (!memory?.id) return "Error: Memory ID is required for 'update'.";
         const index = memories.findIndex((m) => m.id === memory.id);
         if (index === -1)
@@ -115,20 +126,22 @@ export class MemoryTool {
           ...memory,
           timestamp: Date.now(),
         };
-        this.saveMemories(memories);
+        await this.saveMemories(memories);
         return `Memory updated: ${memories[index].title}`;
+      }
 
-      case "delete":
+      case "delete": {
         if (!memory?.id) return "Error: Memory ID is required for 'delete'.";
         const initialLength = memories.length;
         const filtered = memories.filter((m) => m.id !== memory.id);
         if (filtered.length === initialLength)
           return `Error: Memory with ID ${memory.id} not found.`;
 
-        this.saveMemories(filtered);
+        await this.saveMemories(filtered);
         return "Memory deleted successfully.";
+      }
 
-      case "search":
+      case "search": {
         if (!query) return JSON.stringify(memories, null, 2);
         const lowerQuery = query.toLowerCase();
         const results = memories.filter(
@@ -140,6 +153,7 @@ export class MemoryTool {
         return results.length > 0
           ? JSON.stringify(results, null, 2)
           : "No matching memories found.";
+      }
 
       default:
         return "Error: Invalid action. Use 'add', 'update', 'delete', or 'search'.";

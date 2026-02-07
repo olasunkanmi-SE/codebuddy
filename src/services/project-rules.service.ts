@@ -1,8 +1,9 @@
-import * as fs from "fs";
 import * as path from "path";
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { FileService } from "./file-service";
+import { IDisposable } from "../interfaces/disposable";
+import { EditorHostService } from "./editor-host.service";
+import { IWorkspaceConfiguration, FileType } from "../interfaces/editor-host";
 
 /**
  * Supported rule file locations in priority order
@@ -59,11 +60,11 @@ export interface IProjectRulesStatus {
  * - Merges multiple rule files
  * - Notifies webview of status changes
  */
-export class ProjectRulesService implements vscode.Disposable {
+export class ProjectRulesService implements IDisposable {
   private static instance: ProjectRulesService | undefined;
   private readonly logger: Logger;
   private readonly fileService: FileService;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
 
   private cachedRules: IProjectRules | undefined;
   private statusCallback: ((status: IProjectRulesStatus) => void) | undefined;
@@ -102,15 +103,17 @@ export class ProjectRulesService implements vscode.Disposable {
 
     // Watch for configuration changes
     this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration((e) => {
-        if (
-          e.affectsConfiguration("codebuddy.rules") ||
-          e.affectsConfiguration("rules.customRules") ||
-          e.affectsConfiguration("rules.customSystemPrompt")
-        ) {
-          this.loadRules();
-        }
-      }),
+      EditorHostService.getInstance()
+        .getHost()
+        .workspace.onDidChangeConfiguration((e) => {
+          if (
+            e.affectsConfiguration("codebuddy.rules") ||
+            e.affectsConfiguration("rules.customRules") ||
+            e.affectsConfiguration("rules.customSystemPrompt")
+          ) {
+            this.loadRules();
+          }
+        }),
     );
 
     this.logger.info("ProjectRulesService initialized");
@@ -155,9 +158,11 @@ export class ProjectRulesService implements vscode.Disposable {
         );
 
         if (truncated) {
-          vscode.window.showWarningMessage(
-            `Project rules exceeded token limit and were truncated. Consider reducing rules content.`,
-          );
+          EditorHostService.getInstance()
+            .getHost()
+            .window.showWarningMessage(
+              `Project rules exceeded token limit and were truncated. Consider reducing rules content.`,
+            );
         }
       } else {
         this.cachedRules = undefined;
@@ -216,7 +221,7 @@ export class ProjectRulesService implements vscode.Disposable {
    */
   public onStatusChange(
     callback: (status: IProjectRulesStatus) => void,
-  ): vscode.Disposable {
+  ): IDisposable {
     this.statusCallback = callback;
     // Immediately notify current status
     callback(this.getStatus());
@@ -233,7 +238,9 @@ export class ProjectRulesService implements vscode.Disposable {
   public async createRulesFile(): Promise<string | undefined> {
     const workspaceRoot = this.getWorkspaceRoot();
     if (!workspaceRoot) {
-      vscode.window.showErrorMessage("No workspace folder open");
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage("No workspace folder open");
       return undefined;
     }
 
@@ -241,13 +248,12 @@ export class ProjectRulesService implements vscode.Disposable {
     const rulesPath = path.join(codeBuddyDir, "rules.md");
 
     // Check if file already exists
-    if (fs.existsSync(rulesPath)) {
-      const openExisting = await vscode.window.showQuickPick(
-        ["Open existing", "Overwrite"],
-        {
+    if (await this.fileService.fileExists(rulesPath)) {
+      const openExisting = await EditorHostService.getInstance()
+        .getHost()
+        .window.showQuickPick(["Open existing", "Overwrite"], {
           placeHolder: "Rules file already exists. What would you like to do?",
-        },
-      );
+        });
 
       if (openExisting === "Open existing") {
         await this.openRulesFile(rulesPath);
@@ -258,13 +264,15 @@ export class ProjectRulesService implements vscode.Disposable {
     }
 
     // Ensure .codebuddy directory exists
-    if (!fs.existsSync(codeBuddyDir)) {
-      fs.mkdirSync(codeBuddyDir, { recursive: true });
+    if (!(await this.fileService.fileExists(codeBuddyDir))) {
+      await EditorHostService.getInstance()
+        .getHost()
+        .workspace.fs.createDirectory(codeBuddyDir);
     }
 
     // Write template content
     const templateContent = this.getTemplateContent();
-    fs.writeFileSync(rulesPath, templateContent, "utf-8");
+    await this.fileService.writeFile(rulesPath, templateContent, "utf-8");
 
     this.logger.info(`Created project rules file at ${rulesPath}`);
 
@@ -274,9 +282,11 @@ export class ProjectRulesService implements vscode.Disposable {
     // Reload rules
     await this.loadRules();
 
-    vscode.window.showInformationMessage(
-      "Project rules file created! Edit it to customize AI behavior.",
-    );
+    EditorHostService.getInstance()
+      .getHost()
+      .window.showInformationMessage(
+        "Project rules file created! Edit it to customize AI behavior.",
+      );
 
     return rulesPath;
   }
@@ -289,11 +299,13 @@ export class ProjectRulesService implements vscode.Disposable {
 
     if (!pathToOpen) {
       // No rules file exists, offer to create one
-      const create = await vscode.window.showInformationMessage(
-        "No project rules file found. Would you like to create one?",
-        "Create",
-        "Cancel",
-      );
+      const create = await EditorHostService.getInstance()
+        .getHost()
+        .window.showInformationMessage(
+          "No project rules file found. Would you like to create one?",
+          "Create",
+          "Cancel",
+        );
 
       if (create === "Create") {
         await this.createRulesFile();
@@ -302,13 +314,14 @@ export class ProjectRulesService implements vscode.Disposable {
     }
 
     try {
-      const doc = await vscode.workspace.openTextDocument(pathToOpen);
-      await vscode.window.showTextDocument(doc);
+      await EditorHostService.getInstance()
+        .getHost()
+        .window.showTextDocument(pathToOpen);
     } catch (error: any) {
       this.logger.error(`Failed to open rules file: ${error.message}`);
-      vscode.window.showErrorMessage(
-        `Failed to open rules file: ${error.message}`,
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage(`Failed to open rules file: ${error.message}`);
     }
   }
 
@@ -317,11 +330,13 @@ export class ProjectRulesService implements vscode.Disposable {
    */
   public async reloadRules(): Promise<void> {
     await this.loadRules();
-    vscode.window.showInformationMessage(
-      this.hasRules()
-        ? `Project rules reloaded (${this.cachedRules?.tokenCount} tokens)`
-        : "No project rules found",
-    );
+    EditorHostService.getInstance()
+      .getHost()
+      .window.showInformationMessage(
+        this.hasRules()
+          ? `Project rules reloaded (${this.cachedRules?.tokenCount} tokens)`
+          : "No project rules found",
+      );
   }
 
   /**
@@ -336,19 +351,21 @@ export class ProjectRulesService implements vscode.Disposable {
   // ================== Private Methods ==================
 
   private isEnabled(): boolean {
-    return vscode.workspace
-      .getConfiguration()
-      .get<boolean>(CONFIG_KEYS.enabled, DEFAULTS.enabled);
+    return EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("codebuddy")
+      .get<boolean>("rules.enabled", DEFAULTS.enabled);
   }
 
   private getMaxTokens(): number {
-    return vscode.workspace
-      .getConfiguration()
-      .get<number>(CONFIG_KEYS.maxTokens, DEFAULTS.maxTokens);
+    return EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("codebuddy")
+      .get<number>("rules.maxTokens", DEFAULTS.maxTokens);
   }
 
   private getWorkspaceRoot(): string | undefined {
-    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    return EditorHostService.getInstance().getHost().workspace.rootPath;
   }
 
   private async findRuleFile(
@@ -356,17 +373,26 @@ export class ProjectRulesService implements vscode.Disposable {
   ): Promise<string | undefined> {
     for (const location of RULE_FILE_LOCATIONS) {
       const fullPath = path.join(workspaceRoot, location);
-      if (fs.existsSync(fullPath)) {
+      if (await this.fileService.fileExists(fullPath)) {
         return fullPath;
       }
     }
 
     // Also check for multiple rule files in .codebuddy/rules/
     const rulesDir = path.join(workspaceRoot, ".codebuddy", "rules");
-    if (fs.existsSync(rulesDir) && fs.statSync(rulesDir).isDirectory()) {
-      const files = fs.readdirSync(rulesDir).filter((f) => f.endsWith(".md"));
-      if (files.length > 0) {
-        return rulesDir; // Return directory path to indicate multiple files
+    if (await this.fileService.fileExists(rulesDir)) {
+      try {
+        const host = EditorHostService.getInstance().getHost();
+        const stat = await host.workspace.fs.stat(rulesDir);
+        if (stat.type === FileType.Directory) {
+          const files = await host.workspace.fs.readDirectory(rulesDir);
+          const mdFiles = files.filter(([name]) => name.endsWith(".md"));
+          if (mdFiles.length > 0) {
+            return rulesDir; // Return directory path to indicate multiple files
+          }
+        }
+      } catch (error) {
+        this.logger.error("Error checking rules directory:", error);
       }
     }
 
@@ -374,24 +400,28 @@ export class ProjectRulesService implements vscode.Disposable {
   }
 
   private async readRuleFile(filePath: string): Promise<string> {
-    const stat = fs.statSync(filePath);
+    const host = EditorHostService.getInstance().getHost();
+    const stat = await host.workspace.fs.stat(filePath);
 
-    if (stat.isDirectory()) {
+    if (stat.type === FileType.Directory) {
       // Read all .md files in directory and concatenate
-      const files = fs
-        .readdirSync(filePath)
-        .filter((f) => f.endsWith(".md"))
+      const files = await host.workspace.fs.readDirectory(filePath);
+      const mdFiles = files
+        .filter(([name]) => name.endsWith(".md"))
+        .map(([name]) => name)
         .sort();
       const contents: string[] = [];
 
-      for (const file of files) {
-        const content = fs.readFileSync(path.join(filePath, file), "utf-8");
+      for (const file of mdFiles) {
+        const content = await this.fileService.readFile(
+          path.join(filePath, file),
+        );
         contents.push(`<!-- From: ${file} -->\n${content}`);
       }
 
       return contents.join("\n\n---\n\n");
     } else {
-      return fs.readFileSync(filePath, "utf-8");
+      return this.fileService.readFile(filePath);
     }
   }
 
@@ -424,16 +454,15 @@ export class ProjectRulesService implements vscode.Disposable {
 
   private async mergeSettingsRules(): Promise<void> {
     // Get custom system prompt from settings
-    const customSystemPrompt = vscode.workspace
-      .getConfiguration()
-      .get<string>("rules.customSystemPrompt", "");
+    const config = EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("rules");
+    const customSystemPrompt = config.get<string>("customSystemPrompt", "");
 
     // Get custom rules array from settings
-    const customRules = vscode.workspace
-      .getConfiguration()
-      .get<
-        Array<{ content: string; enabled: boolean }>
-      >("rules.customRules", []);
+    const customRules = config.get<
+      Array<{ content: string; enabled: boolean }>
+    >("customRules", []);
 
     const enabledRules = customRules
       .filter((r) => r.enabled)

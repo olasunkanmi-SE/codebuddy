@@ -291,7 +291,7 @@
               "GLM",
               "Local"
             ],
-            "default": "Gemini",
+            "default": "Anthropic",
             "description": "Select Model"
           },
           "tavily.apiKey": {
@@ -521,7 +521,13 @@
           },
           "codebuddy.contextWindow": {
             "type": "string",
-            "enum": ["4k", "8k", "16k", "32k", "128k"],
+            "enum": [
+              "4k",
+              "8k",
+              "16k",
+              "32k",
+              "128k"
+            ],
             "default": "16k",
             "description": "Maximum context window size for AI requests"
           },
@@ -566,7 +572,10 @@
             "description": "Model to use for completions (e.g., qwen2.5-coder, deepseek-coder)"
           },
           "codebuddy.completion.apiKey": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "default": "",
             "description": "API key for completion provider (optional, falls back to main key if empty)"
           },
@@ -583,7 +592,10 @@
           },
           "codebuddy.completion.triggerMode": {
             "type": "string",
-            "enum": ["automatic", "manual"],
+            "enum": [
+              "automatic",
+              "manual"
+            ],
             "default": "automatic",
             "description": "How completions are triggered (automatic on type, or manual hotkey)"
           },
@@ -614,12 +626,24 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
-                "name": { "type": "string" },
-                "description": { "type": "string" },
-                "content": { "type": "string" },
-                "enabled": { "type": "boolean" },
-                "createdAt": { "type": "number" }
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "number"
+                }
               }
             }
           },
@@ -635,8 +659,47 @@
             "additionalProperties": {
               "type": "object",
               "properties": {
-                "enabled": { "type": "boolean" }
+                "enabled": {
+                  "type": "boolean"
+                }
               }
+            }
+          },
+          "mcp.servers": {
+            "type": "object",
+            "default": {},
+            "description": "Configuration for MCP servers.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string",
+                  "description": "Command to execute"
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Command arguments"
+                },
+                "env": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Environment variables"
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable/Disable server"
+                }
+              },
+              "required": [
+                "command",
+                "args"
+              ]
             }
           }
         }
@@ -656,12 +719,14 @@
     "test": "vscode-test",
     "format": "prettier --write \"**/*.ts\"",
     "fix-chromadb": "npm uninstall chromadb && npm install chromadb@1.8.1",
-    "setup-chromadb-server": "echo 'Install ChromaDB server: pip install chromadb' && echo 'Start server: chroma run --host localhost --port 8000'"
+    "setup-chromadb-server": "echo 'Install ChromaDB server: pip install chromadb' && echo 'Start server: chroma run --host localhost --port 8000'",
+    "start:server": "CODEBUDDY_DISABLE_FILE_LOGGING=true npx ts-node src/MCP/server.ts"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
     "@types/jsdom": "^21.1.7",
     "@types/markdown-it": "^13.0.7",
+    "@types/micromatch": "^4.0.10",
     "@types/mocha": "^10.0.1",
     "@types/node": "20.2.5",
     "@types/readable-stream": "^4.0.11",
@@ -675,7 +740,8 @@
     "esbuild": "^0.25.8",
     "eslint": "^8.41.0",
     "mocha": "^10.2.0",
-    "typescript": "^5.4.3"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
@@ -694,11 +760,11 @@
     "@types/node-fetch": "^2.6.11",
     "@types/sql.js": "^1.4.9",
     "@vscode/ripgrep": "^1.17.0",
-    "apache-arrow": "18.1.0",
     "axios": "^1.7.9",
     "deepagents": "^1.1.1",
     "dompurify": "^3.2.6",
     "dotenv": "^16.1.4",
+    "fast-glob": "^3.3.3",
     "fast-levenshtein": "^3.0.0",
     "groq-sdk": "^0.22.0",
     "jsdom": "^26.0.0",
@@ -706,6 +772,7 @@
     "llama3-tokenizer-js": "^1.2.0",
     "lru-cache": "^11.2.2",
     "markdown-it": "^14.1.0",
+    "micromatch": "^4.0.8",
     "natural": "^8.1.0",
     "node-fetch": "^3.3.2",
     "openai": "^4.28.0",
@@ -714,7 +781,8 @@
     "simple-git": "^3.25.0",
     "sinon": "^17.0.1",
     "sql.js": "^1.13.0",
-    "web-tree-sitter": "^0.25.10"
+    "web-tree-sitter": "^0.25.10",
+    "zod": "^3.25.76"
   },
   "license": "MIT"
 }

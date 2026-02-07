@@ -1,5 +1,6 @@
 import { StructuredTool } from "@langchain/core/tools";
 import { BaseStore } from "@langchain/langgraph";
+import { IEditorHost } from "../../interfaces/editor-host";
 
 export enum AGENT_NODES {
   LLM_CALL = "llmCall",
@@ -41,6 +42,7 @@ export interface ICodeBuddyAgentConfig {
   enableHITL?: boolean;
   interruptOn?: InterruptConfiguration;
   streamOptions?: IStreamOptions;
+  host?: IEditorHost;
 }
 
 export interface ISubAgentConfig {

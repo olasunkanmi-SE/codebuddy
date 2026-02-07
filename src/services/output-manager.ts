@@ -4,18 +4,51 @@
  * Manages VS Code output channel for displaying analysis results.
  */
 
-import * as vscode from "vscode";
+import { IOutputChannel } from "../interfaces/output-channel";
+import { EditorHostService } from "./editor-host.service";
 
 export class OutputManager {
   private static instance: OutputManager | null = null;
-  private outputChannel: vscode.OutputChannel;
+  private _outputChannel: IOutputChannel | undefined;
+  private channelName: string;
 
   private constructor(channelName = "CodeBuddy Analysis") {
-    this.outputChannel = vscode.window.createOutputChannel(channelName);
+    this.channelName = channelName;
   }
 
   static getInstance(channelName?: string): OutputManager {
     return (OutputManager.instance ??= new OutputManager(channelName));
+  }
+
+  private get outputChannel(): IOutputChannel {
+    if (!this._outputChannel) {
+      try {
+        this._outputChannel = EditorHostService.getInstance()
+          .getHost()
+          .window.createOutputChannel(this.channelName);
+      } catch (e) {
+        // Fallback if EditorHost not ready or not initialized
+        // This ensures we don't crash if logging happens extremely early
+        return {
+          name: this.channelName,
+          append: (value: string) => process.stderr.write(value),
+          appendLine: (value: string) => process.stderr.write(value + "\n"),
+          clear: () => {
+            /* no-op */
+          },
+          show: () => {
+            /* no-op */
+          },
+          hide: () => {
+            /* no-op */
+          },
+          dispose: () => {
+            /* no-op */
+          },
+        };
+      }
+    }
+    return this._outputChannel;
   }
 
   appendLine(message: string): void {
@@ -38,12 +71,15 @@ export class OutputManager {
     this.outputChannel.hide();
   }
 
-  getChannel(): vscode.OutputChannel {
+  getChannel(): IOutputChannel {
     return this.outputChannel;
   }
 
   dispose(): void {
-    this.outputChannel.dispose();
+    if (this._outputChannel) {
+      this._outputChannel.dispose();
+      this._outputChannel = undefined;
+    }
     OutputManager.instance = null;
   }
 }

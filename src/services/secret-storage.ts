@@ -1,17 +1,24 @@
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { APP_CONFIG } from "../application/constant";
 import { Orchestrator } from "../orchestrator";
 import { IEventPayload } from "../emitter/interface";
+import { IDisposable } from "../interfaces/disposable";
+import { EditorHostService } from "./editor-host.service";
+import {
+  ISecretStorage,
+  ISecretStorageChangeEvent,
+  IConfigurationChangeEvent,
+  ConfigurationTarget,
+} from "../interfaces/editor-host";
 
-export class SecretStorageService implements vscode.Disposable {
-  private readonly localStorage: vscode.SecretStorage;
+export class SecretStorageService implements IDisposable {
+  private readonly localStorage: ISecretStorage;
   private readonly logger: Logger;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   protected readonly orchestrator: Orchestrator;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
-    this.localStorage = context.secrets;
+  constructor() {
+    this.localStorage = EditorHostService.getInstance().getHost().secrets;
     this.logger = Logger.initialize("LocalStorageManager", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
@@ -26,9 +33,11 @@ export class SecretStorageService implements vscode.Disposable {
   registerDisposables() {
     this.disposables.push(
       this.localStorage.onDidChange(this.handleSecretStorageChange.bind(this)),
-      vscode.workspace.onDidChangeConfiguration(
-        this.handleConfigurationChange.bind(this),
-      ),
+      EditorHostService.getInstance()
+        .getHost()
+        .workspace.onDidChangeConfiguration(
+          this.handleConfigurationChange.bind(this),
+        ),
       this.orchestrator.onUpdateUserPreferences(
         this.handleUpdateSecrets.bind(this),
       ),
@@ -68,7 +77,9 @@ export class SecretStorageService implements vscode.Disposable {
   async publishPreferences() {
     const username = await this.get("codebuddy-username");
     const theme = await this.get("codebuddy-theme");
-    const config = vscode.workspace.getConfiguration();
+    const config = EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("");
     const fontFamily = config.get<string>("font.family") || "JetBrains Mono";
     const fontSize = config.get<number>("chatview.font.size") || 16;
     const enableStreaming =
@@ -150,7 +161,7 @@ export class SecretStorageService implements vscode.Disposable {
    * @param event The event containing information about the change.
    * @returns The new value of the changed secret.
    */
-  async handleSecretStorageChange(event: vscode.SecretStorageChangeEvent) {
+  async handleSecretStorageChange(event: ISecretStorageChangeEvent) {
     const value = await this.localStorage.get(event.key);
     this.logger.info(`${event.key}'s value has been changed in SecretStorage`);
     return value;
@@ -163,8 +174,9 @@ export class SecretStorageService implements vscode.Disposable {
    */
   private logConfigurationChange(configKey: string, messagePrefix: string) {
     const data: any = {};
-    const newValue = vscode.workspace
-      .getConfiguration()
+    const newValue = EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("")
       .get<string | number>(configKey);
     const sensitiveValues = newValue ? "Configured" : "Not Configured";
     const logMessage =
@@ -181,7 +193,7 @@ export class SecretStorageService implements vscode.Disposable {
    * Handles changes in the VS Code configuration, logging relevant changes.
    * @param event The event containing information about the configuration change.
    */
-  async handleConfigurationChange(event: vscode.ConfigurationChangeEvent) {
+  async handleConfigurationChange(event: IConfigurationChangeEvent) {
     for (const change of Object.values(APP_CONFIG)) {
       if (event.affectsConfiguration(change)) {
         this.logConfigurationChange(change, "");
@@ -199,13 +211,15 @@ export class SecretStorageService implements vscode.Disposable {
   setConfig(
     option: string,
     value: any,
-    configurationTarget: vscode.ConfigurationTarget = vscode.ConfigurationTarget
-      .Global,
+    configurationTarget: ConfigurationTarget = ConfigurationTarget.Global,
   ): Thenable<void> {
     this.logger.info(
       `Updating configuration: ${option} to ${typeof value === "object" ? JSON.stringify(value) : value}`,
     );
-    return vscode.workspace.getConfiguration().update(option, value);
+    return EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("")
+      .update(option, value, configurationTarget);
   }
 
   /**
@@ -213,7 +227,10 @@ export class SecretStorageService implements vscode.Disposable {
    * @returns The value of the 'generativeAi.option' setting, or undefined if not set.
    */
   getOption(option: string): string | undefined {
-    return vscode.workspace.getConfiguration().get<string>(option);
+    return EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("")
+      .get<string>(option);
   }
 
   /**
@@ -222,9 +239,10 @@ export class SecretStorageService implements vscode.Disposable {
    * @returns A promise that resolves when the configuration has been updated.
    */
   setModelOption(value: string): Thenable<void> {
-    return vscode.workspace
-      .getConfiguration()
-      .update("generativeAi.option", value, vscode.ConfigurationTarget.Global);
+    return EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("")
+      .update("generativeAi.option", value, ConfigurationTarget.Global);
   }
 
   /**

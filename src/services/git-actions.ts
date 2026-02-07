@@ -1,6 +1,6 @@
 import simpleGit, { GitError, SimpleGit, SimpleGitOptions } from "simple-git";
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "./editor-host.service";
 
 export interface GitDiffResult {
   file: string;
@@ -40,7 +40,8 @@ export class GitActions {
    * Get the workspace root path
    */
   private getWorkspaceRoot(): string {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const workspaceFolders =
+      EditorHostService.getInstance().getHost().workspace.workspaceFolders;
     if (!workspaceFolders) {
       throw new Error("No workspace folder is open");
     }

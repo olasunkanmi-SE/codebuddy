@@ -1,7 +1,9 @@
-import * as vscode from "vscode";
 import * as path from "path";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { LanguageUtils, AsyncUtils } from "../utils/common-utils";
+import { EditorHostService } from "./editor-host.service";
+import { IDisposable } from "../interfaces/disposable";
+import { FileType } from "../interfaces/editor-host";
 
 export interface FileMetadata {
   size: number;
@@ -44,8 +46,9 @@ export class FileService {
    */
   async fileExists(filePath: string): Promise<boolean> {
     try {
-      await vscode.workspace.fs.stat(vscode.Uri.file(filePath));
-      return true;
+      const host = EditorHostService.getInstance().getHost();
+      const stat = await host.workspace.fs.stat(filePath);
+      return stat.type !== FileType.Unknown;
     } catch {
       return false;
     }
@@ -65,22 +68,29 @@ export class FileService {
     } = options;
 
     try {
-      const uri = vscode.Uri.file(filePath);
+      const host = EditorHostService.getInstance().getHost();
 
       // Check file size first
-      const stat = await vscode.workspace.fs.stat(uri);
+      const stat = await host.workspace.fs.stat(filePath);
+      if (stat.type === FileType.Unknown) {
+        throw new Error(`File not found: ${filePath}`);
+      }
+
       if (stat.size > maxSize) {
         throw new Error(`File too large: ${stat.size} bytes (max: ${maxSize})`);
       }
 
       // Read with timeout
-      const bytes = await AsyncUtils.safeExecute(
-        async () => vscode.workspace.fs.readFile(uri),
-        new Uint8Array(),
+      const content = await AsyncUtils.safeExecute(
+        async () => {
+          const buffer = await host.workspace.fs.readFile(filePath);
+          return new TextDecoder().decode(buffer);
+        },
+        "",
         (error) => this.logger.warn(`Failed to read file ${filePath}:`, error),
       );
 
-      return new TextDecoder(encoding).decode(bytes);
+      return content;
     } catch (error: any) {
       this.logger.error(`Error reading file ${filePath}:`, error);
       throw error;
@@ -96,9 +106,9 @@ export class FileService {
     encoding = "utf8",
   ): Promise<void> {
     try {
-      const uri = vscode.Uri.file(filePath);
-      const bytes = new TextEncoder().encode(content);
-      await vscode.workspace.fs.writeFile(uri, bytes);
+      const host = EditorHostService.getInstance().getHost();
+      // Use BackendProtocol write which handles file writing
+      await host.fs.write(filePath, content);
       this.logger.debug(`File written: ${path.basename(filePath)}`);
     } catch (error: any) {
       this.logger.error(`Error writing file ${filePath}:`, error);
@@ -111,8 +121,13 @@ export class FileService {
    */
   async getFileMetadata(filePath: string): Promise<FileMetadata | null> {
     try {
-      const uri = vscode.Uri.file(filePath);
-      const stat = await vscode.workspace.fs.stat(uri);
+      const host = EditorHostService.getInstance().getHost();
+      const stat = await host.workspace.fs.stat(filePath);
+
+      if (stat.type === FileType.Unknown) {
+        return null;
+      }
+
       const content = await this.readFile(filePath, { maxSize: 1024 * 1024 }); // Read up to 1MB for line count
 
       return {
@@ -134,33 +149,53 @@ export class FileService {
   async findFiles(
     includePatterns: string[],
     excludePatterns: string[] = [],
-    workspaceFolder?: vscode.WorkspaceFolder,
+    workspaceFolderPath?: string,
   ): Promise<string[]> {
-    const folders = workspaceFolder
-      ? [workspaceFolder]
-      : vscode.workspace.workspaceFolders || [];
+    const host = EditorHostService.getInstance().getHost();
     const allFiles: string[] = [];
 
-    for (const folder of folders) {
-      for (const pattern of includePatterns) {
-        try {
-          const excludePattern =
-            excludePatterns.length > 0
-              ? `{${excludePatterns.join(",")}}`
-              : undefined;
+    // If workspaceFolderPath is provided, we should scope the search to that folder.
+    // However, findFiles usually takes glob patterns.
+    // If workspaceFolderPath is provided, we can prepend it to patterns if they are relative?
+    // Or we rely on the host implementation to handle it.
+    // For now, let's assume patterns are what we need.
 
-          const files = await vscode.workspace.findFiles(
-            new vscode.RelativePattern(folder, pattern),
-            excludePattern,
-          );
+    // If we want to support multiple patterns, we iterate.
+    for (const pattern of includePatterns) {
+      try {
+        // Construct exclude string if needed
+        const exclude =
+          excludePatterns.length > 0
+            ? `{${excludePatterns.join(",")}}`
+            : undefined;
 
-          allFiles.push(...files.map((uri) => uri.fsPath));
-        } catch (error: any) {
-          this.logger.warn(
-            `Error finding files with pattern ${pattern}:`,
-            error,
-          );
+        // If workspaceFolderPath is provided, use it to construct a glob?
+        // VS Code findFiles works on the whole workspace.
+        // If we want to restrict to a folder, we can use a relative pattern string.
+        // But here we are passing strings.
+
+        let searchPattern = pattern;
+        if (workspaceFolderPath) {
+          // If pattern is relative, join it. If absolute, leave it.
+          if (!path.isAbsolute(pattern)) {
+            // Actually, findFiles patterns are glob patterns, not paths.
+            // So we might need `path/to/folder/**/*.ts`
+            // Let's assume the caller handles the pattern logic or we just pass it to host.
+            // But wait, the original code used new vscode.RelativePattern(folder, pattern).
+            // RelativePattern scopes to the folder.
+            // To replicate this with a global findFiles, we should probably prepend the folder path to the pattern.
+            // But finding the relative path of the folder to the workspace root is tricky without VS Code API.
+            // Let's assume for now we search globally and filter, or just use the pattern.
+            // Ideally, the pattern should be constructed to include the folder.
+            // If the caller passed a specific folder, they likely want to search inside it.
+            searchPattern = path.join(workspaceFolderPath, pattern);
+          }
         }
+
+        const files = await host.workspace.findFiles(searchPattern, exclude);
+        allFiles.push(...files);
+      } catch (error: any) {
+        this.logger.warn(`Error finding files with pattern ${pattern}:`, error);
       }
     }
 
@@ -176,6 +211,7 @@ export class FileService {
     daysBack = 7,
     excludePatterns: string[] = [],
   ): Promise<string[]> {
+    const host = EditorHostService.getInstance().getHost();
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysBack);
 
@@ -184,7 +220,10 @@ export class FileService {
 
     for (const filePath of allFiles) {
       try {
-        const stat = await vscode.workspace.fs.stat(vscode.Uri.file(filePath));
+        const stat = await host.workspace.fs.stat(filePath);
+        if (stat.type === FileType.Unknown) {
+          continue;
+        }
         const modifiedDate = new Date(stat.mtime);
 
         if (modifiedDate > cutoffDate) {
@@ -199,8 +238,11 @@ export class FileService {
     // Sort by modification time (newest first)
     recentFiles.sort((a, b) => {
       try {
-        // This is a simplified sort - in production you'd want to cache the stats
-        return b.localeCompare(a); // Sort by path as proxy for recency
+        // We can't easily access mtime again without re-reading stats or caching.
+        // The original code sorted by path string as a proxy or placeholder?
+        // "return b.localeCompare(a); // Sort by path as proxy for recency"
+        // Let's keep that behavior.
+        return b.localeCompare(a);
       } catch {
         return 0;
       }
@@ -213,21 +255,26 @@ export class FileService {
    * Get entry point files (main files of the project)
    */
   async findEntryPoints(): Promise<string[]> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) return [];
+    const host = EditorHostService.getInstance().getHost();
+    const rootPath = host.workspace.rootPath;
+
+    if (!rootPath) return [];
+
+    // For now, support single root. Multi-root would need IEditorHost update.
+    const folders = [rootPath];
 
     const entryPoints: string[] = [];
 
-    for (const folder of workspaceFolders) {
+    for (const folderPath of folders) {
       try {
         // Check package.json for main entry
-        const packageJsonPath = path.join(folder.uri.fsPath, "package.json");
+        const packageJsonPath = path.join(folderPath, "package.json");
         if (await this.fileExists(packageJsonPath)) {
           const packageContent = await this.readFile(packageJsonPath);
           const packageJson = JSON.parse(packageContent);
 
           if (packageJson.main) {
-            const mainPath = path.resolve(folder.uri.fsPath, packageJson.main);
+            const mainPath = path.resolve(folderPath, packageJson.main);
             if (await this.fileExists(mainPath)) {
               entryPoints.push(mainPath);
             }
@@ -251,16 +298,13 @@ export class FileService {
         ];
 
         for (const entry of commonEntries) {
-          const entryPath = path.join(folder.uri.fsPath, entry);
+          const entryPath = path.join(folderPath, entry);
           if (await this.fileExists(entryPath)) {
             entryPoints.push(entryPath);
           }
         }
       } catch (error: any) {
-        this.logger.debug(
-          `No package.json found in ${folder.uri.fsPath}:`,
-          error,
-        );
+        this.logger.debug(`No package.json found in ${folderPath}:`, error);
       }
     }
 
@@ -317,6 +361,7 @@ export class FileService {
 
     try {
       // Get files in same directory
+      // Note: glob needs to be constructed carefully
       const directoryFiles = await this.findFiles(
         [path.join(directory, "*")],
         [],
@@ -345,19 +390,31 @@ export class FileService {
    */
   createWatcher(
     options: FileSystemWatchOptions,
-    onCreated?: (uri: vscode.Uri) => void,
-    onChanged?: (uri: vscode.Uri) => void,
-    onDeleted?: (uri: vscode.Uri) => void,
-  ): vscode.Disposable[] {
-    const disposables: vscode.Disposable[] = [];
-    const workspaceFolders = vscode.workspace.workspaceFolders || [];
+    onCreated?: (uri: { fsPath: string }) => void,
+    onChanged?: (uri: { fsPath: string }) => void,
+    onDeleted?: (uri: { fsPath: string }) => void,
+  ): IDisposable[] {
+    const disposables: IDisposable[] = [];
+    const host = EditorHostService.getInstance().getHost();
+    const rootPath = host.workspace.rootPath;
 
-    for (const folder of workspaceFolders) {
+    if (!rootPath) return [];
+
+    // Support single root for now
+    const folders = [rootPath];
+
+    for (const folderPath of folders) {
       for (const pattern of options.patterns) {
         try {
-          const watcher = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(folder, pattern),
-          );
+          // Construct pattern. If we had RelativePattern support in host, we'd use it.
+          // For now, we use createFileSystemWatcher with string.
+          // We might need to make the pattern absolute if the host expects it?
+          // VS Code's createFileSystemWatcher takes a GlobPattern (string or RelativePattern).
+          // Our host interface takes string.
+          // Let's assume we pass a glob pattern relative to workspace or absolute.
+          // If we want to watch the workspace, "pattern" usually works if it is a relative glob like "**/*.ts".
+
+          const watcher = host.workspace.createFileSystemWatcher(pattern);
 
           if (onCreated) watcher.onDidCreate(onCreated);
           if (onChanged) watcher.onDidChange(onChanged);

@@ -1,4 +1,5 @@
-import * as vscode from "vscode";
+import { IDisposable } from "../../interfaces/editor-host";
+import { EditorHostService } from "../../services/editor-host.service";
 import { Orchestrator } from "../../orchestrator";
 import { COMMON } from "../../application/constant";
 import { Memory } from "../../memory/base";
@@ -20,14 +21,11 @@ interface GLMLLMSnapshot {
   chatHistory?: any[];
 }
 
-export class GLMLLM
-  extends BaseLLM<GLMLLMSnapshot>
-  implements vscode.Disposable
-{
+export class GLMLLM extends BaseLLM<GLMLLMSnapshot> implements IDisposable {
   private readonly client: OpenAI;
   private response: any;
   protected readonly orchestrator: Orchestrator;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   private static instance: GLMLLM | undefined;
   private lastFunctionCalls: Set<string> = new Set();
   private readonly timeOutMs: number = 30000;
@@ -53,9 +51,11 @@ export class GLMLLM
 
   private initializeDisposable(): void {
     this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration(() =>
-        this.handleConfigurationChange(),
-      ),
+      EditorHostService.getInstance()
+        .getHost()
+        .workspace.onDidChangeConfiguration(() =>
+          this.handleConfigurationChange(),
+        ),
     );
   }
 
@@ -339,11 +339,13 @@ export class GLMLLM
                 callCount++;
               } catch (error: any) {
                 this.logger.error("Error processing function call", error);
-                const retry = await vscode.window.showErrorMessage(
-                  `Function call failed: ${error.message}. Retry or abort?`,
-                  "Retry",
-                  "Abort",
-                );
+                const retry = await EditorHostService.getInstance()
+                  .getHost()
+                  .window.showErrorMessage(
+                    `Function call failed: ${error.message}. Retry or abort?`,
+                    "Retry",
+                    "Abort",
+                  );
 
                 if (retry === "Retry") {
                   continue;
@@ -381,7 +383,9 @@ export class GLMLLM
         "onError",
         "Model not responding at this time, please try again",
       );
-      vscode.window.showErrorMessage("Error processing user query");
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage("Error processing user query");
       this.logger.error(
         "Error generating queries, thoughts from user query",
         error,

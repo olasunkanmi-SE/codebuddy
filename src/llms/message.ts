@@ -1,5 +1,5 @@
 import { Part } from "@google/generative-ai";
-import * as vscode from "vscode";
+import { EditorHostService } from "../services/editor-host.service";
 
 export type Role = "function" | "user" | "model" | "assistant" | "system";
 
@@ -36,9 +36,11 @@ export class Message {
     let { role, content, parts } = input;
 
     if (!content && !parts) {
-      vscode.window.showErrorMessage(
-        "Model message must have either content or parts.",
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage(
+          "Model message must have either content or parts.",
+        );
       throw new Error("Model message must have either content or parts.");
     }
 

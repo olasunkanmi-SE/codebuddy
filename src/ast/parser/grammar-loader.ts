@@ -1,8 +1,8 @@
-import * as vscode from "vscode";
 import { Language } from "web-tree-sitter";
 import { languageConfigs, validateLanguageConfig } from "../language-config";
 import * as path from "path";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
+import { IOutputChannel } from "../../interfaces/output-channel";
 
 export class GrammarLoader {
   private grammarCache = new Map<string, Language>();
@@ -11,7 +11,7 @@ export class GrammarLoader {
 
   constructor(
     private extensionPath: string,
-    private outputChannel: vscode.OutputChannel,
+    private outputChannel: IOutputChannel,
   ) {
     this.logger = Logger.initialize("QueryExecutor", {
       minLevel: LogLevel.DEBUG,
@@ -21,10 +21,7 @@ export class GrammarLoader {
     });
   }
 
-  static getInstance(
-    extensionPath: string,
-    outputChannel: vscode.OutputChannel,
-  ) {
+  static getInstance(extensionPath: string, outputChannel: IOutputChannel) {
     return (GrammarLoader.instance ??= new GrammarLoader(
       extensionPath,
       outputChannel,

@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { Orchestrator } from "../orchestrator";
 import {
   FolderEntry,
@@ -21,7 +20,7 @@ import { FileService } from "../services/file-system";
 import { InputValidator } from "../services/input-validator";
 import { PerformanceProfiler } from "../services/performance-profiler.service";
 import { ProductionSafeguards } from "../services/production-safeguards.service";
-import { LogLevel } from "../services/telemetry";
+import { LogLevel } from "../infrastructure/logger/logger";
 import { UserFeedbackService } from "../services/user-feedback.service";
 import { WorkspaceService } from "../services/workspace-service";
 import {
@@ -42,6 +41,15 @@ import { LocalModelService } from "../llms/local/service";
 import { DockerModelService } from "../services/docker/DockerModelService";
 import { ProjectRulesService } from "../services/project-rules.service";
 import { NewsService } from "../services/news.service";
+import { EditorHostService } from "../services/editor-host.service";
+import {
+  IExtensionContext,
+  IWebviewView,
+  IWebviewOptions,
+  IEditorHost,
+  ConfigurationTarget,
+} from "../interfaces/editor-host";
+import { IDisposable } from "../interfaces/disposable";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -52,15 +60,15 @@ export interface ImessageAndSystemInstruction {
 
 export type LLMMessage = ImessageAndSystemInstruction | string;
 
-let _view: vscode.WebviewView | undefined;
-export abstract class BaseWebViewProvider implements vscode.Disposable {
+let _view: IWebviewView | undefined;
+export abstract class BaseWebViewProvider implements IDisposable {
   protected readonly orchestrator: Orchestrator;
   public static readonly viewId = "chatView";
-  public static webView: vscode.WebviewView | undefined;
-  public currentWebView: vscode.WebviewView | undefined = _view;
-  _context: vscode.ExtensionContext;
+  public static webView: IWebviewView | undefined;
+  public currentWebView: IWebviewView | undefined = _view;
+  _context: IExtensionContext;
   protected logger: Logger;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   private readonly workspaceService: WorkspaceService;
   private readonly fileService: FileService;
   private readonly fileManager: FileManager;
@@ -71,6 +79,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private readonly inputValidator: InputValidator;
   protected readonly MAX_HISTORY_MESSAGES = 3;
   private chatHistorySyncPromise: Promise<void> | null = null;
+  private readonly editorHost: IEditorHost;
 
   // Vector database services
   protected vectorConfigManager?: VectorDbConfigurationManager;
@@ -87,20 +96,22 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected promptBuilderService: EnhancedPromptBuilderService;
   private readonly groqLLM: GroqLLM | null;
   private readonly codeBuddyAgent: MessageHandler;
+  protected readonly mcpService = MCPService.getInstance();
 
   constructor(
-    private readonly _extensionUri: vscode.Uri,
+    private readonly _extensionUri: any,
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
-    context: vscode.ExtensionContext,
+    context: IExtensionContext,
   ) {
+    this.editorHost = EditorHostService.getInstance().getHost();
     const { apiKey: modelKey, model } = getAPIKeyAndModel("groq");
     const config = {
       apiKey: modelKey,
       model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",
     };
     this.groqLLM = GroqLLM.getInstance(config);
-    this.fileManager = FileManager.initialize(context, "files");
+    this.fileManager = FileManager.initialize(context as any, "files");
     this.fileService = FileService.getInstance();
     this._context = context;
     this.orchestrator = Orchestrator.getInstance();
@@ -145,7 +156,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     this.contextRetriever = new ContextRetriever();
 
-    this.promptBuilderService = new EnhancedPromptBuilderService(context);
+    this.promptBuilderService = new EnhancedPromptBuilderService(
+      context as any,
+    );
     this.codeBuddyAgent = MessageHandler.getInstance();
   }
 
@@ -184,7 +197,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       this.orchestrator.onChangeApplied(this.handleDiffChangeEvent.bind(this)),
       this.orchestrator.onChangeRejected(this.handleDiffChangeEvent.bind(this)),
       // Listen for workspace folder changes and update active workspace
-      vscode.workspace.onDidChangeWorkspaceFolders(async () => {
+      this.editorHost.workspace.onDidChangeWorkspaceFolders(async () => {
         this.logger.info(
           "Workspace folders changed, publishing updated workspace",
         );
@@ -192,7 +205,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         await this.publishWorkSpace();
       }),
       // Listen for active editor changes to update the current file display
-      vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+      this.editorHost.window.onDidChangeActiveTextEditor(async (editor) => {
         if (editor) {
           this.logger.info(
             "Active editor changed, publishing updated active file",
@@ -220,7 +233,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
   }
 
-  async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
+  async resolveWebviewView(webviewView: IWebviewView): Promise<void> {
     _view = webviewView;
     BaseWebViewProvider.webView = webviewView;
     this.currentWebView = webviewView;
@@ -228,18 +241,18 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     // Register disposables only when webview is actually resolved
     this.registerDisposables();
 
-    const webviewOptions: vscode.WebviewOptions = {
+    const webviewOptions: IWebviewOptions = {
       enableScripts: true,
       localResourceRoots: [
         this._extensionUri,
-        vscode.Uri.joinPath(this._extensionUri, "out"),
-        vscode.Uri.joinPath(this._extensionUri, "webviewUi/dist"),
+        this.editorHost.uri.joinPath(this._extensionUri, "out"),
+        this.editorHost.uri.joinPath(this._extensionUri, "webviewUi/dist"),
       ],
     };
     webviewView.webview.options = webviewOptions;
 
     if (!this.apiKey) {
-      vscode.window.showErrorMessage(
+      this.editorHost.window.showErrorMessage(
         "API key not configured. Check your settings.",
       );
       return;
@@ -349,7 +362,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
   }
 
-  private async setWebviewHtml(view: vscode.WebviewView): Promise<void> {
+  private async setWebviewHtml(view: IWebviewView): Promise<void> {
     view.webview.html = getWebviewContent(view.webview, this._extensionUri);
   }
 
@@ -437,42 +450,42 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
    */
   private async publishActiveWorkspace(): Promise<void> {
     try {
-      const activeEditor = vscode.window.activeTextEditor;
-      let displayName: string = "";
+      const activeEditor = this.editorHost.window.activeTextEditor;
+      let displayName = "";
 
       // Reset the tracked active file path
       this.currentActiveFilePath = undefined;
 
       if (activeEditor) {
-        // Check if it's an untitled (unsaved) file
-        if (activeEditor.document.isUntitled) {
+        // Check if it's an untitled (unsaved) file - ITextDocument doesn't have isUntitled, but we can check scheme or if fileName matches
+        // For now assume fileName
+        if (
+          activeEditor.document.fileName === "Untitled" ||
+          !activeEditor.document.uri.fsPath
+        ) {
+          // Simplification
           displayName = "";
           this.currentActiveFilePath = undefined;
         } else {
           // Show the current file name with relative path from workspace
           const filePath = activeEditor.document.uri.fsPath;
-          const workspaceFolder = vscode.workspace.getWorkspaceFolder(
-            activeEditor.document.uri,
-          );
-          if (workspaceFolder) {
-            // Get relative path from workspace root
-            const relativePath = vscode.workspace.asRelativePath(
-              activeEditor.document.uri,
-              false,
-            );
+          // Use asRelativePath to get relative path
+          const relativePath =
+            this.editorHost.workspace.asRelativePath(filePath);
+
+          if (relativePath !== filePath) {
             displayName = relativePath;
-            // Store the full path for context inclusion
             this.currentActiveFilePath = filePath;
           } else {
-            // Fallback to just the file name
+            // Fallback to just the file name if outside workspace
             displayName =
               activeEditor.document.fileName.split(/[\\/]/).pop() || "";
             this.currentActiveFilePath = filePath;
           }
         }
       } else {
-        // No active editor, show workspace name
-        const workspaceFolders = vscode.workspace.workspaceFolders;
+        // No active active editor, show workspace name
+        const workspaceFolders = this.editorHost.workspace.workspaceFolders;
         if (workspaceFolders && workspaceFolders.length > 0) {
           displayName = workspaceFolders[0].name;
         } else {
@@ -511,7 +524,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
   }
 
-  private async setupMessageHandler(_view: vscode.WebviewView): Promise<void> {
+  private async setupMessageHandler(_view: IWebviewView): Promise<void> {
     try {
       this.disposables.push(
         _view.webview.onDidReceiveMessage(async (message) => {
@@ -542,7 +555,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               break;
             }
             case "index-workspace": {
-              vscode.commands.executeCommand("codebuddy.indexWorkspace");
+              this.editorHost.commands.executeCommand(
+                "codebuddy.indexWorkspace",
+              );
               break;
             }
             case "user-input": {
@@ -594,6 +609,30 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
               // Use sanitized input
               const sanitizedMessage = validation.sanitizedInput;
+
+              // Phase 4: Forward to MCP Server if connected
+              if (this.mcpService.isServerConnected("codebuddy-internal")) {
+                try {
+                  // Save user message to history locally first (for UI consistency)
+                  await this.agentService.addChatMessage("agentId", {
+                    content: message.message,
+                    type: "user",
+                    metadata: { threadId: message.metaData?.threadId },
+                  });
+
+                  await this.mcpService.sendChat(
+                    "codebuddy-internal",
+                    sanitizedMessage,
+                    message.metaData,
+                  );
+                  return;
+                } catch (err) {
+                  this.logger.error(
+                    "Failed to forward chat to server, falling back to local",
+                    err,
+                  );
+                }
+              }
 
               // Check if we should prune history for performance
               if (this.UserMessageCounter % 10 === 0) {
@@ -776,18 +815,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               break;
             case "openExternal":
               if (message.text) {
-                vscode.env.openExternal(vscode.Uri.parse(message.text));
+                this.editorHost.env.openExternal(
+                  this.editorHost.uri.parse(message.text),
+                );
               }
               break;
             case "insertCode":
               {
-                const editor = vscode.window.activeTextEditor;
+                const editor = this.editorHost.window.activeTextEditor;
                 if (editor) {
                   editor.edit((editBuilder) => {
                     editBuilder.insert(editor.selection.active, message.text);
                   });
                 } else {
-                  vscode.window.showErrorMessage(
+                  this.editorHost.window.showErrorMessage(
                     "No active editor to insert code into.",
                   );
                 }
@@ -795,9 +836,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               break;
             case "runInTerminal":
               {
-                let terminal = vscode.window.activeTerminal;
+                let terminal = this.editorHost.window.activeTerminal;
                 if (!terminal) {
-                  terminal = vscode.window.createTerminal("CodeBuddy");
+                  terminal = this.editorHost.window.createTerminal("CodeBuddy");
                 }
                 terminal.show();
                 terminal.sendText(message.text);
@@ -836,26 +877,26 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               break;
 
             case "font-family-change-event":
-              // Handle font family change and update VS Code settings
+              // Handle font family change and update settings
               this.logger.info(`Font family changed to: ${message.message}`);
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "font.family",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
             case "font-size-change-event":
-              // Handle font size change and update VS Code settings
+              // Handle font size change and update settings
               this.logger.info(`Font size changed to: ${message.message}`);
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "chatview.font.size",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
@@ -872,12 +913,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.logger.info(
                 `Streaming preference changed to: ${message.message}`,
               );
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "codebuddy.enableStreaming",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
@@ -885,12 +926,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.logger.info(
                 `Compact mode preference changed to: ${message.message}`,
               );
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "codebuddy.compactMode",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
@@ -898,12 +939,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.logger.info(
                 `Auto-approve preference changed to: ${message.message}`,
               );
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "codebuddy.autoApprove",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
@@ -911,12 +952,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.logger.info(
                 `Allow file edits preference changed to: ${message.message}`,
               );
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "codebuddy.allowFileEdits",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
@@ -924,12 +965,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.logger.info(
                 `Allow terminal preference changed to: ${message.message}`,
               );
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "codebuddy.allowTerminal",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
@@ -937,12 +978,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.logger.info(
                 `Verbose logging preference changed to: ${message.message}`,
               );
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "codebuddy.verboseLogging",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
@@ -950,12 +991,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.logger.info(
                 `Index codebase preference changed to: ${message.message}`,
               );
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "codebuddy.indexCodebase",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
@@ -963,12 +1004,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.logger.info(
                 `Context window preference changed to: ${message.message}`,
               );
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "codebuddy.contextWindow",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
@@ -976,12 +1017,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.logger.info(
                 `Include hidden preference changed to: ${message.message}`,
               );
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "codebuddy.includeHidden",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
@@ -989,19 +1030,21 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               this.logger.info(
                 `Max file size preference changed to: ${message.message}`,
               );
-              await vscode.workspace
+              await this.editorHost.workspace
                 .getConfiguration()
                 .update(
                   "codebuddy.maxFileSize",
                   message.message,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
               break;
 
             case "reindex-workspace-event":
               this.logger.info("Reindexing workspace...");
               // Trigger workspace reindexing
-              vscode.commands.executeCommand("codebuddy.indexWorkspace");
+              this.editorHost.commands.executeCommand(
+                "codebuddy.indexWorkspace",
+              );
               break;
 
             // Diff Review Commands
@@ -1077,7 +1120,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
             case "view-change-diff": {
               // Open the VS Code diff view for a pending change
-              vscode.commands.executeCommand(
+              this.editorHost.commands.executeCommand(
                 "codebuddy.reviewChange",
                 message.id,
                 message.filePath,
@@ -1088,7 +1131,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "open-codebuddy-settings":
               // Open VS Code settings filtered to CodeBuddy settings
               this.logger.info("Opening CodeBuddy settings...");
-              vscode.commands.executeCommand(
+              this.editorHost.commands.executeCommand(
                 "workbench.action.openSettings",
                 "@ext:fiatinnovations.ola-code-buddy",
               );
@@ -1179,7 +1222,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
             case "docker-use-model":
               try {
-                const config = vscode.workspace.getConfiguration("local");
+                const config =
+                  this.editorHost.workspace.getConfiguration("local");
 
                 // Determine if this is a Docker Model Runner model (ai/...) or Ollama model
                 const isDockerModelRunner = message.message.startsWith("ai/");
@@ -1229,23 +1273,23 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 await config.update(
                   "model",
                   modelName,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
 
                 // Update baseUrl for Docker Model Runner
                 await config.update(
                   "baseUrl",
                   baseUrl,
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
 
                 // Also ensure Primary Model is set to Local
                 const mainConfig =
-                  vscode.workspace.getConfiguration("generativeAi");
+                  this.editorHost.workspace.getConfiguration("generativeAi");
                 await mainConfig.update(
                   "option",
                   "Local",
-                  vscode.ConfigurationTarget.Global,
+                  ConfigurationTarget.Global,
                 );
 
                 this.logger.info(
@@ -1283,7 +1327,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
             case "docker-get-local-model":
               try {
-                const config = vscode.workspace.getConfiguration("local");
+                const config =
+                  this.editorHost.workspace.getConfiguration("local");
                 const model = config.get<string>("model");
                 await this.currentWebView?.webview.postMessage({
                   type: "docker-local-model",
@@ -1430,12 +1475,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 const currentServers = getConfigValue("mcp.servers") || {};
                 if (currentServers[serverName]) {
                   currentServers[serverName].enabled = enabled;
-                  await vscode.workspace
+                  await this.editorHost.workspace
                     .getConfiguration("ola-code-buddy")
                     .update(
                       "mcp.servers",
                       currentServers,
-                      vscode.ConfigurationTarget.Global,
+                      ConfigurationTarget.Global,
                     );
                 }
 
@@ -1481,12 +1526,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
 
                 // Update config
-                await vscode.workspace
+                await this.editorHost.workspace
                   .getConfiguration("ola-code-buddy")
                   .update(
                     disabledToolsKey,
                     disabledTools,
-                    vscode.ConfigurationTarget.Global,
+                    ConfigurationTarget.Global,
                   );
 
                 // Notify UI
@@ -1587,7 +1632,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   data: { servers },
                 });
 
-                vscode.window.showInformationMessage(
+                this.editorHost.window.showInformationMessage(
                   `MCP tools refreshed: ${allTools.length} tools available`,
                 );
               } catch (error: any) {
@@ -1627,9 +1672,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               break;
 
             case "open-mcp-settings":
-              // Open VS Code settings filtered to MCP settings
+              // Open settings filtered to MCP settings
               this.logger.info("Opening MCP settings...");
-              vscode.commands.executeCommand(
+              this.editorHost.commands.executeCommand(
                 "workbench.action.openSettings",
                 "@ext:fiatinnovations.ola-code-buddy mcp",
               );
@@ -1739,12 +1784,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     createdAt: Date.now(),
                   };
                   rules.push(ruleWithId);
-                  await vscode.workspace
+                  await this.editorHost.workspace
                     .getConfiguration("ola-code-buddy")
                     .update(
                       "rules.customRules",
                       rules,
-                      vscode.ConfigurationTarget.Global,
+                      ConfigurationTarget.Global,
                     );
 
                   this.logger.info(`Added custom rule: ${ruleWithId.name}`);
@@ -1766,12 +1811,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   const index = rules.findIndex((r: any) => r.id === id);
                   if (index !== -1) {
                     rules[index] = { ...rules[index], ...updates };
-                    await vscode.workspace
+                    await this.editorHost.workspace
                       .getConfiguration("ola-code-buddy")
                       .update(
                         "rules.customRules",
                         rules,
-                        vscode.ConfigurationTarget.Global,
+                        ConfigurationTarget.Global,
                       );
 
                     this.logger.info(`Updated rule: ${id}`);
@@ -1788,12 +1833,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 if (id) {
                   const rules = getConfigValue("rules.customRules") || [];
                   const filteredRules = rules.filter((r: any) => r.id !== id);
-                  await vscode.workspace
+                  await this.editorHost.workspace
                     .getConfiguration("ola-code-buddy")
                     .update(
                       "rules.customRules",
                       filteredRules,
-                      vscode.ConfigurationTarget.Global,
+                      ConfigurationTarget.Global,
                     );
 
                   this.logger.info(`Deleted rule: ${id}`);
@@ -1811,12 +1856,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   const index = rules.findIndex((r: any) => r.id === id);
                   if (index !== -1) {
                     rules[index].enabled = enabled;
-                    await vscode.workspace
+                    await this.editorHost.workspace
                       .getConfiguration("ola-code-buddy")
                       .update(
                         "rules.customRules",
                         rules,
-                        vscode.ConfigurationTarget.Global,
+                        ConfigurationTarget.Global,
                       );
 
                     this.logger.info(`Toggled rule ${id}: ${enabled}`);
@@ -1838,12 +1883,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   const subagentConfig =
                     getConfigValue("rules.subagents") || {};
                   subagentConfig[id] = { ...subagentConfig[id], enabled };
-                  await vscode.workspace
+                  await this.editorHost.workspace
                     .getConfiguration("ola-code-buddy")
                     .update(
                       "rules.subagents",
                       subagentConfig,
-                      vscode.ConfigurationTarget.Global,
+                      ConfigurationTarget.Global,
                     );
 
                   this.logger.info(`Toggled subagent ${id}: ${enabled}`);
@@ -1902,12 +1947,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "system-prompt-update":
               try {
                 const { prompt } = message.message || {};
-                await vscode.workspace
+                await this.editorHost.workspace
                   .getConfiguration("ola-code-buddy")
                   .update(
                     "rules.customSystemPrompt",
                     prompt || "",
-                    vscode.ConfigurationTarget.Global,
+                    ConfigurationTarget.Global,
                   );
 
                 this.logger.info("Updated custom system prompt");

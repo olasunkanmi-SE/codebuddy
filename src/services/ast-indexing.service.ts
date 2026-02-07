@@ -1,10 +1,10 @@
-import * as vscode from "vscode";
 import { Worker } from "worker_threads";
 import * as path from "path";
 import { Logger } from "../infrastructure/logger/logger";
 import { SimpleVectorStore } from "./simple-vector-store";
 import { EmbeddingService } from "./embedding";
 import { getAPIKeyAndModel } from "../utils/utils";
+import { IExtensionContext } from "../interfaces/editor-host";
 
 export class AstIndexingService {
   private worker: Worker | undefined;
@@ -16,9 +16,9 @@ export class AstIndexingService {
 
   private static instance: AstIndexingService;
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: IExtensionContext) {
     this.logger = Logger.initialize("AstIndexingService", {});
-    this.vectorStore = new SimpleVectorStore(context);
+    this.vectorStore = new SimpleVectorStore(context.globalStorageUri.fsPath);
 
     // Initialize embedding service
     const { apiKey } = getAPIKeyAndModel("gemini");
@@ -27,9 +27,7 @@ export class AstIndexingService {
     this.initializeWorker(context);
   }
 
-  public static getInstance(
-    context?: vscode.ExtensionContext,
-  ): AstIndexingService {
+  public static getInstance(context?: IExtensionContext): AstIndexingService {
     if (!AstIndexingService.instance) {
       if (!context) {
         throw new Error(
@@ -41,7 +39,7 @@ export class AstIndexingService {
     return AstIndexingService.instance;
   }
 
-  private initializeWorker(context: vscode.ExtensionContext) {
+  private initializeWorker(context: IExtensionContext) {
     // Determine the worker execution path (dist for prod, out for dev)
     const isProd = __filename.includes("dist");
     const workerRelativePath = isProd

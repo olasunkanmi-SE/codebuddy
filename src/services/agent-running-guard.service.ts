@@ -1,5 +1,11 @@
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import {
+  IDisposable,
+  ITaskExecution,
+  TaskRevealKind,
+  TaskPanelKind,
+} from "../interfaces/editor-host";
+import { EditorHostService } from "./editor-host.service";
 
 /**
  * AgentRunningGuardService
@@ -11,7 +17,7 @@ import { Logger, LogLevel } from "../infrastructure/logger/logger";
  * This provides a safeguard against accidentally closing VS Code
  * while the CodeBuddy agent is still working.
  */
-export class AgentRunningGuardService implements vscode.Disposable {
+export class AgentRunningGuardService implements IDisposable {
   private static instance: AgentRunningGuardService;
   private readonly logger = Logger.initialize("AgentRunningGuardService", {
     minLevel: LogLevel.DEBUG,
@@ -19,25 +25,16 @@ export class AgentRunningGuardService implements vscode.Disposable {
     enableFile: true,
     enableTelemetry: false,
   });
-  private activeTaskExecution: vscode.TaskExecution | null = null;
-  private taskProvider: vscode.Disposable | null = null;
+  private activeTaskExecution: ITaskExecution | null = null;
   private activeAgentCount = 0;
 
   private constructor() {
-    this.registerTaskProvider();
+    // No need to register task provider explicitly with EditorHost abstraction
   }
 
   static getInstance(): AgentRunningGuardService {
     return (AgentRunningGuardService.instance ??=
       new AgentRunningGuardService());
-  }
-
-  private registerTaskProvider(): void {
-    // Register a custom task provider for the agent guard task
-    this.taskProvider = vscode.tasks.registerTaskProvider("codebuddy-agent", {
-      provideTasks: () => [],
-      resolveTask: () => undefined,
-    });
   }
 
   /**
@@ -56,34 +53,29 @@ export class AgentRunningGuardService implements vscode.Disposable {
       // Use ShellExecution with a long-running process that VS Code will detect
       // This ensures VS Code prompts "There are running tasks" when closing
       const isWindows = process.platform === "win32";
-      const shellExecution = new vscode.ShellExecution(
-        isWindows
-          ? "echo CodeBuddy Agent Running... && ping -n 999999 localhost > nul"
-          : "echo '🤖 CodeBuddy Agent Running...' && sleep infinity",
-      );
+      const command = isWindows
+        ? "echo CodeBuddy Agent Running... && ping -n 999999 localhost > nul"
+        : "echo '🤖 CodeBuddy Agent Running...' && sleep infinity";
 
-      // Create the task
-      const task = new vscode.Task(
-        { type: "codebuddy-agent" },
-        vscode.TaskScope.Workspace,
-        "CodeBuddy Agent Running",
-        "CodeBuddy",
-        shellExecution,
-        [], // No problem matchers
-      );
+      // Create the task using EditorHostService
+      const task = EditorHostService.getInstance()
+        .getHost()
+        .tasks.createShellTask("CodeBuddy Agent Running", command);
 
       // Configure task - NOT background so VS Code tracks it as running
       task.isBackground = false;
       task.presentationOptions = {
-        reveal: vscode.TaskRevealKind.Silent,
-        panel: vscode.TaskPanelKind.Dedicated,
+        reveal: TaskRevealKind.Silent,
+        panel: TaskPanelKind.Dedicated,
         echo: false,
         showReuseMessage: false,
         clear: true,
       };
 
       // Execute the task
-      this.activeTaskExecution = await vscode.tasks.executeTask(task);
+      this.activeTaskExecution = await EditorHostService.getInstance()
+        .getHost()
+        .tasks.executeTask(task);
       this.logger.info("Agent guard task started (shell execution)");
     } catch (error: any) {
       this.logger.error("Failed to start agent guard task", error);
@@ -100,36 +92,21 @@ export class AgentRunningGuardService implements vscode.Disposable {
       `Agent stopped. Remaining active: ${this.activeAgentCount}`,
     );
 
-    if (this.activeAgentCount > 0) {
-      // Still have active agents, keep task running
-      return;
+    if (this.activeAgentCount === 0 && this.activeTaskExecution) {
+      try {
+        this.activeTaskExecution.terminate();
+        this.activeTaskExecution = null;
+        this.logger.info("Agent guard task terminated");
+      } catch (error: any) {
+        this.logger.error("Failed to terminate agent guard task", error);
+      }
     }
-
-    // No more active agents, close the task
-    this.stopGuardTask();
-  }
-
-  /**
-   * Force stops the guard task regardless of agent count
-   */
-  stopGuardTask(): void {
-    if (this.activeTaskExecution) {
-      this.activeTaskExecution.terminate();
-      this.activeTaskExecution = null;
-      this.logger.info("Agent guard task stopped");
-    }
-    this.activeAgentCount = 0;
-  }
-
-  /**
-   * Check if there are any active agents
-   */
-  hasActiveAgents(): boolean {
-    return this.activeAgentCount > 0;
   }
 
   dispose(): void {
-    this.stopGuardTask();
-    this.taskProvider?.dispose();
+    if (this.activeTaskExecution) {
+      this.activeTaskExecution.terminate();
+      this.activeTaskExecution = null;
+    }
   }
 }

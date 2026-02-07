@@ -1,10 +1,9 @@
 import { formatText } from "../utils/utils";
 import { CodeCommandHandler } from "./handler";
-import * as vscode from "vscode";
 
 export class Comments extends CodeCommandHandler {
   selectedCode: string | undefined;
-  constructor(action: string, context: vscode.ExtensionContext) {
+  constructor(action: string, context: any) {
     super(action, context);
   }
 

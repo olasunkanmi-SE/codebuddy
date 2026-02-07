@@ -1,11 +1,19 @@
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "./editor-host.service";
+import {
+  IStatusBarItem,
+  StatusBarAlignment,
+  ProgressLocation,
+  IDisposable,
+  ICancellationToken,
+} from "../interfaces/editor-host";
+import { CancellationTokenSource } from "../utils/cancellation-token-source";
 
 export interface UserFeedbackOptions {
   enableStatusBar?: boolean;
   enableProgressNotifications?: boolean;
   enableToastNotifications?: boolean;
-  progressLocation?: vscode.ProgressLocation;
+  progressLocation?: ProgressLocation;
 }
 
 export interface ProgressInfo {
@@ -18,7 +26,7 @@ export interface ProgressInfo {
 export interface StatusInfo {
   text: string;
   tooltip?: string;
-  backgroundColor?: vscode.ThemeColor;
+  backgroundColor?: any;
   command?: string;
 }
 
@@ -26,12 +34,11 @@ export interface StatusInfo {
  * UserFeedbackService manages all user feedback for the vector database system
  * including status bar indicators, progress notifications, and settings integration
  */
-export class UserFeedbackService implements vscode.Disposable {
+export class UserFeedbackService implements IDisposable {
   private logger: Logger;
-  private statusBarItem: vscode.StatusBarItem;
-  private progressTokens: Map<string, vscode.CancellationTokenSource> =
-    new Map();
-  private disposables: vscode.Disposable[] = [];
+  private statusBarItem: IStatusBarItem;
+  private progressTokens: Map<string, CancellationTokenSource> = new Map();
+  private disposables: IDisposable[] = [];
   private readonly options: Required<UserFeedbackOptions>;
 
   constructor(options: UserFeedbackOptions = {}) {
@@ -47,14 +54,13 @@ export class UserFeedbackService implements vscode.Disposable {
       enableProgressNotifications: options.enableProgressNotifications ?? true,
       enableToastNotifications: options.enableToastNotifications ?? true,
       progressLocation:
-        options.progressLocation ?? vscode.ProgressLocation.Notification,
+        options.progressLocation ?? ProgressLocation.Notification,
     };
 
     // Create status bar item
-    this.statusBarItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Right,
-      100,
-    );
+    this.statusBarItem = EditorHostService.getInstance()
+      .getHost()
+      .window.createStatusBarItem(StatusBarAlignment.Right, 100);
     this.statusBarItem.command = "codebuddy.vectorDb.showStats";
     this.disposables.push(this.statusBarItem);
   }
@@ -89,9 +95,9 @@ export class UserFeedbackService implements vscode.Disposable {
       this.updateStatus({
         text: "$(loading~spin) CodeBuddy: Initializing...",
         tooltip: "Vector database is initializing",
-        backgroundColor: new vscode.ThemeColor(
-          "statusBarItem.warningBackground",
-        ),
+        backgroundColor: EditorHostService.getInstance()
+          .getHost()
+          .createThemeColor("statusBarItem.warningBackground"),
       });
 
       // Execute phases without progress UI
@@ -101,46 +107,48 @@ export class UserFeedbackService implements vscode.Disposable {
       return;
     }
 
-    await vscode.window.withProgress(
-      {
-        location: this.options.progressLocation,
-        title: "CodeBuddy Vector Database",
-        cancellable: false,
-      },
-      async (progress) => {
-        const totalPhases = phases.length;
-        const increment = 100 / totalPhases;
+    await EditorHostService.getInstance()
+      .getHost()
+      .window.withProgress(
+        {
+          location: this.options.progressLocation,
+          title: "CodeBuddy Vector Database",
+          cancellable: false,
+        },
+        async (progress) => {
+          const totalPhases = phases.length;
+          const increment = 100 / totalPhases;
 
-        for (let i = 0; i < phases.length; i++) {
-          const phase = phases[i];
+          for (let i = 0; i < phases.length; i++) {
+            const phase = phases[i];
+
+            progress.report({
+              increment: i === 0 ? 0 : increment,
+              message: `${phase.name}...`,
+            });
+
+            this.updateStatus({
+              text: `$(loading~spin) CodeBuddy: ${phase.name}`,
+              tooltip: `Initializing: ${phase.name}`,
+              backgroundColor: EditorHostService.getInstance()
+                .getHost()
+                .createThemeColor("statusBarItem.warningBackground"),
+            });
+
+            try {
+              await phase.action();
+            } catch (error: any) {
+              this.logger.error(`Phase ${phase.name} failed:`, error);
+              throw error;
+            }
+          }
 
           progress.report({
-            increment: i === 0 ? 0 : increment,
-            message: `${phase.name}...`,
+            increment: increment,
+            message: "Complete!",
           });
-
-          this.updateStatus({
-            text: `$(loading~spin) CodeBuddy: ${phase.name}`,
-            tooltip: `Initializing: ${phase.name}`,
-            backgroundColor: new vscode.ThemeColor(
-              "statusBarItem.warningBackground",
-            ),
-          });
-
-          try {
-            await phase.action();
-          } catch (error: any) {
-            this.logger.error(`Phase ${phase.name} failed:`, error);
-            throw error;
-          }
-        }
-
-        progress.report({
-          increment: increment,
-          message: "Complete!",
-        });
-      },
-    );
+        },
+      );
   }
 
   /**
@@ -155,49 +163,53 @@ export class UserFeedbackService implements vscode.Disposable {
       return;
     }
 
-    const tokenSource = new vscode.CancellationTokenSource();
+    const tokenSource = new CancellationTokenSource();
     this.progressTokens.set(operationId, tokenSource);
 
     try {
-      await vscode.window.withProgress(
-        {
-          location: this.options.progressLocation,
-          title: "CodeBuddy Embedding",
-          cancellable: true,
-        },
-        async (progress, token) => {
-          token.onCancellationRequested(() => {
-            tokenSource.cancel();
-          });
-
-          let processedFiles = 0;
-
-          // Set up progress callback
-          const progressCallback = async (info: ProgressInfo) => {
-            if (token.isCancellationRequested) {
-              return;
-            }
-
-            processedFiles++;
-            const percentage = Math.round((processedFiles / totalFiles) * 100);
-
-            progress.report({
-              increment: info.increment || 100 / totalFiles,
-              message: `${info.message || info.operation} (${processedFiles}/${totalFiles})`,
+      await EditorHostService.getInstance()
+        .getHost()
+        .window.withProgress(
+          {
+            location: this.options.progressLocation,
+            title: "CodeBuddy Embedding",
+            cancellable: true,
+          },
+          async (progress, token) => {
+            token.onCancellationRequested(() => {
+              tokenSource.cancel();
             });
 
-            this.updateStatus({
-              text: `$(sync~spin) CodeBuddy: ${percentage}%`,
-              tooltip: `Embedding progress: ${processedFiles}/${totalFiles} files`,
-              backgroundColor: new vscode.ThemeColor(
-                "statusBarItem.warningBackground",
-              ),
-            });
-          };
+            let processedFiles = 0;
 
-          await onProgress({ operation: "embedding", progress: 0 });
-        },
-      );
+            // Set up progress callback
+            const progressCallback = async (info: ProgressInfo) => {
+              if (token.isCancellationRequested) {
+                return;
+              }
+
+              processedFiles++;
+              const percentage = Math.round(
+                (processedFiles / totalFiles) * 100,
+              );
+
+              progress.report({
+                increment: info.increment || 100 / totalFiles,
+                message: `${info.message || info.operation} (${processedFiles}/${totalFiles})`,
+              });
+
+              this.updateStatus({
+                text: `$(sync~spin) CodeBuddy: ${percentage}%`,
+                tooltip: `Embedding progress: ${processedFiles}/${totalFiles} files`,
+                backgroundColor: EditorHostService.getInstance()
+                  .getHost()
+                  .createThemeColor("statusBarItem.warningBackground"),
+              });
+            };
+
+            await onProgress({ operation: "embedding", progress: 0 });
+          },
+        );
     } finally {
       this.progressTokens.delete(operationId);
       tokenSource.dispose();
@@ -244,7 +256,9 @@ export class UserFeedbackService implements vscode.Disposable {
       backgroundColor: undefined,
     });
 
-    return vscode.window.showInformationMessage(message, ...(actions || []));
+    return EditorHostService.getInstance()
+      .getHost()
+      .window.showInformationMessage(message, ...(actions || []));
   }
 
   /**
@@ -262,10 +276,14 @@ export class UserFeedbackService implements vscode.Disposable {
     this.updateStatus({
       text: "$(warning) CodeBuddy: Warning",
       tooltip: message,
-      backgroundColor: new vscode.ThemeColor("statusBarItem.warningBackground"),
+      backgroundColor: EditorHostService.getInstance()
+        .getHost()
+        .createThemeColor("statusBarItem.warningBackground"),
     });
 
-    return vscode.window.showWarningMessage(message, ...(actions || []));
+    return EditorHostService.getInstance()
+      .getHost()
+      .window.showWarningMessage(message, ...(actions || []));
   }
 
   /**
@@ -280,10 +298,14 @@ export class UserFeedbackService implements vscode.Disposable {
     this.updateStatus({
       text: "$(error) CodeBuddy: Error",
       tooltip: message,
-      backgroundColor: new vscode.ThemeColor("statusBarItem.errorBackground"),
+      backgroundColor: EditorHostService.getInstance()
+        .getHost()
+        .createThemeColor("statusBarItem.errorBackground"),
     });
 
-    return vscode.window.showErrorMessage(message, ...(actions || []));
+    return EditorHostService.getInstance()
+      .getHost()
+      .window.showErrorMessage(message, ...(actions || []));
   }
 
   /**
@@ -298,17 +320,17 @@ export class UserFeedbackService implements vscode.Disposable {
       this.updateStatus({
         text: `$(sync~spin) CodeBuddy: Processing ${filesQueued} files`,
         tooltip: `Vector database sync in progress: ${filesQueued} files queued`,
-        backgroundColor: new vscode.ThemeColor(
-          "statusBarItem.warningBackground",
-        ),
+        backgroundColor: EditorHostService.getInstance()
+          .getHost()
+          .createThemeColor("statusBarItem.warningBackground"),
       });
     } else if (filesQueued > 0) {
       this.updateStatus({
         text: `$(sync) CodeBuddy: ${filesQueued} queued`,
         tooltip: `${filesQueued} files queued for vector database sync`,
-        backgroundColor: new vscode.ThemeColor(
-          "statusBarItem.warningBackground",
-        ),
+        backgroundColor: EditorHostService.getInstance()
+          .getHost()
+          .createThemeColor("statusBarItem.warningBackground"),
       });
     } else {
       this.updateStatus({
@@ -328,8 +350,9 @@ export class UserFeedbackService implements vscode.Disposable {
     this.showStatusMessage(`$(search) ${message}`, 2000);
 
     // Configurable threshold for slow search warning
-    const slowSearchThreshold = vscode.workspace
-      .getConfiguration("codebuddy.vectorDb")
+    const slowSearchThreshold = EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("codebuddy.vectorDb")
       .get("slowSearchThreshold", 2000); // Default 2 seconds
 
     if (
@@ -367,25 +390,27 @@ export class UserFeedbackService implements vscode.Disposable {
    * Check if user has enabled vector database features in settings
    */
   isVectorDbEnabled(): boolean {
-    return vscode.workspace
-      .getConfiguration("codebuddy")
+    return EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("codebuddy")
       .get("vectorDb.enabled", true);
   }
 
   /**
    * Get user preference for progress notifications
    */
-  getProgressNotificationPreference(): vscode.ProgressLocation {
-    const preference = vscode.workspace
-      .getConfiguration("codebuddy")
+  getProgressNotificationPreference(): ProgressLocation {
+    const preference = EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("codebuddy")
       .get("vectorDb.progressLocation", "notification") as string;
 
     if (preference === "statusBar") {
-      return vscode.ProgressLocation.Window;
+      return ProgressLocation.Window;
     } else if (preference === "notification") {
-      return vscode.ProgressLocation.Notification;
+      return ProgressLocation.Notification;
     } else {
-      return vscode.ProgressLocation.Notification;
+      return ProgressLocation.Notification;
     }
   }
 
@@ -393,8 +418,9 @@ export class UserFeedbackService implements vscode.Disposable {
    * Get user preference for embedding batch size
    */
   getEmbeddingBatchSize(): number {
-    return vscode.workspace
-      .getConfiguration("codebuddy")
+    return EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("codebuddy")
       .get("vectorDb.batchSize", 10);
   }
 
@@ -402,33 +428,38 @@ export class UserFeedbackService implements vscode.Disposable {
    * Check if background processing is enabled
    */
   isBackgroundProcessingEnabled(): boolean {
-    return vscode.workspace
-      .getConfiguration("codebuddy")
+    return EditorHostService.getInstance()
+      .getHost()
+      .workspace.getConfiguration("codebuddy")
       .get("vectorDb.backgroundProcessing", true);
   }
 
   /**
    * Register configuration change listeners
    */
-  registerConfigurationListeners(): vscode.Disposable {
-    return vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration("codebuddy.vectorDb")) {
-        this.logger.info("Vector database configuration changed");
+  registerConfigurationListeners(): IDisposable {
+    return EditorHostService.getInstance()
+      .getHost()
+      .workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration("codebuddy.vectorDb")) {
+          this.logger.info("Vector database configuration changed");
 
-        // Update options based on new configuration
-        this.options.enableProgressNotifications = vscode.workspace
-          .getConfiguration("codebuddy")
-          .get("vectorDb.showProgress", true);
+          // Update options based on new configuration
+          this.options.enableProgressNotifications =
+            EditorHostService.getInstance()
+              .getHost()
+              .workspace.getConfiguration("codebuddy")
+              .get("vectorDb.showProgress", true);
 
-        this.options.progressLocation =
-          this.getProgressNotificationPreference();
+          this.options.progressLocation =
+            this.getProgressNotificationPreference();
 
-        // Show notification about configuration change
-        if (this.options.enableToastNotifications) {
-          this.showSuccess("Vector database settings updated");
+          // Show notification about configuration change
+          if (this.options.enableToastNotifications) {
+            this.showSuccess("Vector database settings updated");
+          }
         }
-      }
-    });
+      });
   }
 
   /**
@@ -444,40 +475,54 @@ export class UserFeedbackService implements vscode.Disposable {
       "Force Reindex",
     ];
 
-    const choice = await vscode.window.showQuickPick(options, {
-      placeHolder: "Select a vector database setting to configure",
-    });
+    const choice = await EditorHostService.getInstance()
+      .getHost()
+      .window.showQuickPick(options, {
+        placeHolder: "Select a vector database setting to configure",
+      });
 
     switch (choice) {
       case "Enable Vector Database":
-        await vscode.commands.executeCommand(
-          "workbench.action.openSettings",
-          "codebuddy.vectorDb.enabled",
-        );
+        await EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand(
+            "workbench.action.openSettings",
+            "codebuddy.vectorDb.enabled",
+          );
         break;
       case "Configure Progress Notifications":
-        await vscode.commands.executeCommand(
-          "workbench.action.openSettings",
-          "codebuddy.vectorDb.progressLocation",
-        );
+        await EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand(
+            "workbench.action.openSettings",
+            "codebuddy.vectorDb.progressLocation",
+          );
         break;
       case "Set Batch Size":
-        await vscode.commands.executeCommand(
-          "workbench.action.openSettings",
-          "codebuddy.vectorDb.batchSize",
-        );
+        await EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand(
+            "workbench.action.openSettings",
+            "codebuddy.vectorDb.batchSize",
+          );
         break;
       case "Toggle Background Processing":
-        await vscode.commands.executeCommand(
-          "workbench.action.openSettings",
-          "codebuddy.vectorDb.backgroundProcessing",
-        );
+        await EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand(
+            "workbench.action.openSettings",
+            "codebuddy.vectorDb.backgroundProcessing",
+          );
         break;
       case "View Statistics":
-        await vscode.commands.executeCommand("codebuddy.vectorDb.showStats");
+        await EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand("codebuddy.vectorDb.showStats");
         break;
       case "Force Reindex":
-        await vscode.commands.executeCommand("codebuddy.vectorDb.forceReindex");
+        await EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand("codebuddy.vectorDb.forceReindex");
         break;
     }
   }

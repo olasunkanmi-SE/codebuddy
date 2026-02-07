@@ -5,13 +5,11 @@ import {
   GoogleGenerativeAI,
 } from "@google/generative-ai";
 import { BaseMessage } from "@langchain/core/messages";
-import * as vscode from "vscode";
 // import { langGraphAgent } from "../../agents/langgraph/graphs/agent";
 import { Orchestrator } from "../../orchestrator";
 import { COMMON } from "../../application/constant";
-import { Logger } from "../../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { Memory } from "../../memory/base";
-import { LogLevel } from "../../services/telemetry";
 import { CodeBuddyToolProvider } from "../../tools/factory/tool";
 import { generateUUID, getAPIKeyAndModel } from "../../utils/utils";
 import { BaseLLM } from "../base";
@@ -24,15 +22,17 @@ import {
 } from "../interface";
 import { Message } from "../message";
 import { createAdvancedDeveloperAgent } from "../../agents/developer/agent";
+import { IDisposable } from "../../interfaces/disposable";
+import { EditorHostService } from "../../services/editor-host.service";
 
 export class GeminiLLM
   extends BaseLLM<GeminiLLMSnapShot>
-  implements vscode.Disposable, ICodeCompleter
+  implements IDisposable, ICodeCompleter
 {
   private readonly generativeAi: GoogleGenerativeAI;
   private response: EmbedContentResponse | GenerateContentResult | undefined;
   protected readonly orchestrator: Orchestrator;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   private static instance: GeminiLLM | undefined;
   private model: GenerativeModel | undefined;
   private lastFunctionCalls: Set<string> = new Set();
@@ -65,9 +65,11 @@ export class GeminiLLM
 
   private intializeDisposable(): void {
     this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration(() =>
-        this.handleConfigurationChange(),
-      ),
+      EditorHostService.getInstance()
+        .getHost()
+        .workspace.onDidChangeConfiguration(() =>
+          this.handleConfigurationChange(),
+        ),
     );
   }
 
@@ -222,7 +224,7 @@ export class GeminiLLM
       for await (const event of result) {
         for (const [nodeName, update] of Object.entries(event)) {
           yield { node: nodeName, update };
-          this.logger.log(LogLevel.INFO, `Stream event from node: ${nodeName}`);
+          this.logger.info(`Stream event from node: ${nodeName}`);
         }
       }
     } catch (error: any) {

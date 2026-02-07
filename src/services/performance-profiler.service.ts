@@ -1,7 +1,8 @@
-import * as vscode from "vscode";
 import * as os from "os";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { VectorDbConfigurationManager } from "../config/vector-db.config";
+import { EditorHostService } from "./editor-host.service";
+import { IDisposable } from "../interfaces/editor-host";
 
 /**
  * Performance metrics collection and analysis
@@ -120,13 +121,13 @@ export class RollingAverage {
 /**
  * Performance profiler for measuring and analyzing system performance
  */
-export class PerformanceProfiler implements vscode.Disposable {
+export class PerformanceProfiler implements IDisposable {
   private logger: Logger;
   private metrics: PerformanceMetrics;
   private alerts: PerformanceAlert[] = [];
   private configManager?: VectorDbConfigurationManager;
   private monitoringInterval?: NodeJS.Timeout;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
 
   constructor(configManager?: VectorDbConfigurationManager) {
     this.logger = Logger.initialize("PerformanceProfiler", {
@@ -411,13 +412,14 @@ export class PerformanceProfiler implements vscode.Disposable {
 
       // Show user notification for critical alerts
       if (alert.severity === "critical") {
-        vscode.window
-          .showWarningMessage(
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showWarningMessage(
             `CodeBuddy Performance Alert: ${alert.message}`,
             "View Details",
             "Optimize Settings",
           )
-          .then((action) => {
+          .then((action: string | undefined) => {
             if (action === "View Details") {
               this.showPerformanceReport();
             } else if (action === "Optimize Settings") {
@@ -446,7 +448,9 @@ export class PerformanceProfiler implements vscode.Disposable {
 **Targets**: Search <500ms, Memory <500MB, Errors <5%
     `.trim();
 
-    await vscode.window.showInformationMessage(reportMessage);
+    await EditorHostService.getInstance()
+      .getHost()
+      .window.showInformationMessage(reportMessage);
   }
 
   /**
@@ -454,7 +458,9 @@ export class PerformanceProfiler implements vscode.Disposable {
    */
   private async optimizeConfiguration(): Promise<void> {
     if (!this.configManager) {
-      vscode.window.showWarningMessage("Configuration manager not available");
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showWarningMessage("Configuration manager not available");
       return;
     }
 
@@ -527,20 +533,25 @@ export class PerformanceProfiler implements vscode.Disposable {
       if (changes.length > 0) {
         const message = `Configuration optimized:\\n\\n${changes.join("\\n")}\\n\\nPerformance metrics:\\n• Search latency: ${report.avgSearchLatency.toFixed(0)}ms\\n• Memory usage: ${report.avgMemoryUsage.toFixed(0)}MB`;
 
-        vscode.window
-          .showInformationMessage(
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showInformationMessage(
             `Configuration optimized with ${changes.length} changes`,
             "View Details",
           )
-          .then((action) => {
+          .then((action: string | undefined) => {
             if (action === "View Details") {
-              vscode.window.showInformationMessage(message);
+              EditorHostService.getInstance()
+                .getHost()
+                .window.showInformationMessage(message);
             }
           });
       } else {
-        vscode.window.showInformationMessage(
-          "Configuration is already optimal for current performance metrics",
-        );
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showInformationMessage(
+            "Configuration is already optimal for current performance metrics",
+          );
       }
 
       this.logger.info("Configuration optimization completed", {
@@ -554,9 +565,11 @@ export class PerformanceProfiler implements vscode.Disposable {
       this.logger.error("Failed to optimize configuration:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      vscode.window.showErrorMessage(
-        `Failed to optimize configuration: ${errorMessage}`,
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showErrorMessage(
+          `Failed to optimize configuration: ${errorMessage}`,
+        );
     }
   }
 

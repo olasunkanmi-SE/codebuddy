@@ -1,5 +1,6 @@
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { IDisposable } from "../interfaces/disposable";
+import { EditorHostService } from "./editor-host.service";
 
 /**
  * Resource usage monitoring
@@ -62,7 +63,7 @@ export interface ServiceStatusChecker {
 /**
  * Production safeguards for vector database operations
  */
-export class ProductionSafeguards implements vscode.Disposable {
+export class ProductionSafeguards implements IDisposable {
   private logger: Logger;
   private resourceLimits: ResourceLimits;
   private recoveryStrategies: RecoveryStrategy[];
@@ -70,7 +71,7 @@ export class ProductionSafeguards implements vscode.Disposable {
   private retryCounters: Map<RecoveryAction, number> = new Map();
   private monitoringInterval?: NodeJS.Timeout;
   private emergencyStopActive = false;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
   private serviceStatusChecker?: ServiceStatusChecker;
 
   // Circuit breaker state
@@ -319,14 +320,17 @@ export class ProductionSafeguards implements vscode.Disposable {
         `Circuit breaker opened due to ${this.circuitBreaker.failures} failures`,
       );
 
-      vscode.window
-        .showWarningMessage(
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showWarningMessage(
           "CodeBuddy Vector Database temporarily disabled due to repeated failures. Will retry automatically.",
           "View Logs",
         )
         .then((action) => {
           if (action === "View Logs") {
-            vscode.commands.executeCommand("workbench.action.toggleDevTools");
+            EditorHostService.getInstance()
+              .getHost()
+              .commands.executeCommand("workbench.action.toggleDevTools");
           }
         });
     }
@@ -452,7 +456,9 @@ export class ProductionSafeguards implements vscode.Disposable {
     switch (action) {
       case "CLEAR_CACHE":
         // Signal cache clearing to relevant services
-        vscode.commands.executeCommand("codebuddy.clearVectorCache");
+        EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand("codebuddy.clearVectorCache");
         break;
 
       case "FORCE_GC":
@@ -467,7 +473,9 @@ export class ProductionSafeguards implements vscode.Disposable {
 
       case "REDUCE_BATCH_SIZE":
         // Signal batch size reduction
-        vscode.commands.executeCommand("codebuddy.reduceBatchSize");
+        EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand("codebuddy.reduceBatchSize");
         break;
 
       case "PAUSE_INDEXING": {
@@ -479,15 +487,20 @@ export class ProductionSafeguards implements vscode.Disposable {
         });
 
         // Signal indexing pause
-        vscode.commands.executeCommand("codebuddy.pauseIndexing");
-        vscode.window
-          .showWarningMessage(
+        EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand("codebuddy.pauseIndexing");
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showWarningMessage(
             "CodeBuddy indexing paused due to high memory usage. Will resume automatically.",
             "Resume Now",
           )
           .then((action) => {
             if (action === "Resume Now") {
-              vscode.commands.executeCommand("codebuddy.resumeIndexing");
+              EditorHostService.getInstance()
+                .getHost()
+                .commands.executeCommand("codebuddy.resumeIndexing");
             }
           });
         break;
@@ -495,15 +508,20 @@ export class ProductionSafeguards implements vscode.Disposable {
 
       case "RESTART_WORKER":
         // Signal worker restart
-        vscode.commands.executeCommand("codebuddy.restartVectorWorker");
+        EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand("codebuddy.restartVectorWorker");
         break;
 
       case "EMERGENCY_STOP":
         this.emergencyStopActive = true;
-        vscode.commands.executeCommand("codebuddy.emergencyStop");
+        EditorHostService.getInstance()
+          .getHost()
+          .commands.executeCommand("codebuddy.emergencyStop");
 
-        vscode.window
-          .showErrorMessage(
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
             "CodeBuddy Emergency Stop: Critical resource usage detected. All vector operations stopped.",
             "View Status",
             "Force Resume",
@@ -580,7 +598,9 @@ export class ProductionSafeguards implements vscode.Disposable {
 **Recent Recovery Actions**: ${Array.from(this.retryCounters.keys()).join(", ") || "None"}
     `.trim();
 
-    await vscode.window.showInformationMessage(statusMessage);
+    await EditorHostService.getInstance()
+      .getHost()
+      .window.showInformationMessage(statusMessage);
   }
 
   /**
@@ -590,9 +610,11 @@ export class ProductionSafeguards implements vscode.Disposable {
     const usage = this.getCurrentResourceUsage();
 
     if (this.isResourceLimitExceeded(usage)) {
-      vscode.window.showWarningMessage(
-        "Cannot resume - resource usage still too high. Please close other applications or restart VS Code.",
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showWarningMessage(
+          "Cannot resume - resource usage still too high. Please close other applications or restart VS Code.",
+        );
       return;
     }
 
@@ -601,10 +623,12 @@ export class ProductionSafeguards implements vscode.Disposable {
     this.circuitBreaker.state = "CLOSED";
     this.retryCounters.clear();
 
-    vscode.commands.executeCommand("codebuddy.resumeFromEmergencyStop");
-    vscode.window.showInformationMessage(
-      "CodeBuddy resumed from emergency stop",
-    );
+    EditorHostService.getInstance()
+      .getHost()
+      .commands.executeCommand("codebuddy.resumeFromEmergencyStop");
+    EditorHostService.getInstance()
+      .getHost()
+      .window.showInformationMessage("CodeBuddy resumed from emergency stop");
   }
 
   /**
@@ -648,9 +672,11 @@ export class ProductionSafeguards implements vscode.Disposable {
   async triggerRecoveryAction(action: RecoveryAction): Promise<void> {
     try {
       await this.executeRecoveryAction(action);
-      vscode.window.showInformationMessage(
-        `Recovery action ${action} executed successfully`,
-      );
+      EditorHostService.getInstance()
+        .getHost()
+        .window.showInformationMessage(
+          `Recovery action ${action} executed successfully`,
+        );
     } catch (error: any) {
       this.logger.error(`Manual recovery action ${action} failed:`, error);
 
@@ -659,21 +685,28 @@ export class ProductionSafeguards implements vscode.Disposable {
         error instanceof Error &&
         error.message.includes("DefaultEmbeddingFunction")
       ) {
-        vscode.window
-          .showErrorMessage(
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(
             "Vector database initialization failed. Try restarting VS Code after ensuring ChromaDB dependencies are installed.",
             "Restart VS Code",
             "View Logs",
           )
           .then((action) => {
             if (action === "Restart VS Code") {
-              vscode.commands.executeCommand("workbench.action.reloadWindow");
+              EditorHostService.getInstance()
+                .getHost()
+                .commands.executeCommand("workbench.action.reloadWindow");
             } else if (action === "View Logs") {
-              vscode.commands.executeCommand("workbench.action.toggleDevTools");
+              EditorHostService.getInstance()
+                .getHost()
+                .commands.executeCommand("workbench.action.toggleDevTools");
             }
           });
       } else {
-        vscode.window.showErrorMessage(`Recovery action failed: ${error}`);
+        EditorHostService.getInstance()
+          .getHost()
+          .window.showErrorMessage(`Recovery action failed: ${error}`);
       }
     }
   }

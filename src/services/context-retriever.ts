@@ -1,23 +1,23 @@
-import * as vscode from "vscode";
 import { Orchestrator } from "../orchestrator";
 import {
   IFileToolConfig,
   IFileToolResponse,
 } from "../application/interfaces/agent.interface";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { getAPIKeyAndModel, getGenerativeAiModel } from "./../utils/utils";
 import { EmbeddingService } from "./embedding";
-import { LogLevel } from "./telemetry";
+
 import { WebSearchService } from "./web-search-service";
 import {
   TavilySearchProvider,
   SearchResponseFormatter,
 } from "../agents/tools/websearch";
 import { SimpleVectorStore } from "./simple-vector-store";
+import { EditorHostService } from "./editor-host.service";
 
 export class ContextRetriever {
   // private readonly codeRepository: CodeRepository;
-  private readonly embeddingService: EmbeddingService; // Always uses Gemini for consistency
+  private readonly embeddingService: EmbeddingService | undefined; // Always uses Gemini for consistency
   private static readonly SEARCH_RESULT_COUNT = 5;
   private readonly logger: Logger;
   private static instance: ContextRetriever;
@@ -26,13 +26,20 @@ export class ContextRetriever {
   private readonly tavilySearch: TavilySearchProvider;
   private vectorStore: SimpleVectorStore | undefined;
 
-  constructor(context?: vscode.ExtensionContext) {
+  constructor(storagePath?: string) {
     // this.codeRepository = CodeRepository.getInstance();
     // Always use Gemini for embeddings to ensure consistency
     // regardless of the selected chat model (Groq, Anthropic, etc.)
     const embeddingProvider = "Gemini";
-    const { apiKey: embeddingApiKey } = getAPIKeyAndModel(embeddingProvider);
-    this.embeddingService = new EmbeddingService(embeddingApiKey);
+    try {
+      const { apiKey: embeddingApiKey } = getAPIKeyAndModel(embeddingProvider);
+      this.embeddingService = new EmbeddingService(embeddingApiKey);
+    } catch (error) {
+      // console.warn(
+      //   "Gemini API key not found. Context retrieval will be disabled.",
+      // );
+      this.embeddingService = undefined;
+    }
     this.logger = Logger.initialize("ContextRetriever", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
@@ -43,17 +50,25 @@ export class ContextRetriever {
     this.tavilySearch = TavilySearchProvider.getInstance();
     this.orchestrator = Orchestrator.getInstance();
 
-    if (context) {
-      this.vectorStore = new SimpleVectorStore(context);
+    if (storagePath) {
+      this.vectorStore = new SimpleVectorStore(storagePath);
+      this.vectorStore.initialize().catch((err) => {
+        this.logger.error("Failed to initialize vector store", err);
+      });
     }
   }
 
-  static initialize(context?: vscode.ExtensionContext) {
+  static initialize(storagePath?: string) {
     if (!ContextRetriever.instance) {
-      ContextRetriever.instance = new ContextRetriever(context);
-    } else if (context && !ContextRetriever.instance.vectorStore) {
+      ContextRetriever.instance = new ContextRetriever(storagePath);
+    } else if (storagePath && !ContextRetriever.instance.vectorStore) {
       // Initialize vector store if it wasn't initialized before
-      ContextRetriever.instance.vectorStore = new SimpleVectorStore(context);
+      ContextRetriever.instance.vectorStore = new SimpleVectorStore(
+        storagePath,
+      );
+      ContextRetriever.instance.vectorStore.initialize().catch((err) => {
+        console.error("Failed to initialize vector store", err);
+      });
     }
     return ContextRetriever.instance;
   }
@@ -64,6 +79,9 @@ export class ContextRetriever {
     }
     try {
       this.logger.info(`Generating embedding for query: ${input}`);
+      if (!this.embeddingService) {
+        return "Context retrieval is disabled because Gemini API key is missing.";
+      }
       const embedding = await this.embeddingService.generateEmbedding(input);
       this.logger.info("Retrieving context from Vector Store");
 
@@ -107,6 +125,8 @@ export class ContextRetriever {
         // To prevent freezing, we yield.
         await new Promise((resolve) => setTimeout(resolve, 10));
 
+        if (!this.embeddingService) continue;
+
         const embedding = await this.embeddingService.generateEmbedding(chunk);
         if (embedding && embedding.length > 0) {
           await this.vectorStore.addDocument({
@@ -149,11 +169,15 @@ export class ContextRetriever {
 
   async readFileContent(filePath: string): Promise<string> {
     try {
-      const uri = vscode.Uri.file(filePath);
-      const fileContent = await vscode.workspace.fs.readFile(uri);
-      return Buffer.from(fileContent).toString("utf-8");
+      const fs = EditorHostService.getInstance().getHost().fs;
+      // BackendProtocol should have readRaw, if not we might need to cast or check.
+      // Assuming VscodeFsBackend logic where readRaw returns { content: string[] }
+      const fileData = await (fs as any).readRaw(filePath);
+      return Array.isArray(fileData.content)
+        ? fileData.content.join("\n")
+        : String(fileData.content);
     } catch (error: any) {
-      this.logger.error("Error reading file:", error);
+      this.logger.error(`Error reading file ${filePath}:`, error);
       throw error;
     }
   }

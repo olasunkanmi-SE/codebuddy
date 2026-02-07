@@ -1,9 +1,9 @@
-import * as vscode from "vscode";
-import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { OutputManager } from "../../services/output-manager";
 import * as os from "os";
+import * as fs from "fs";
+import { FileUtils } from "../../utils/common-utils";
 
 // TODO Log data in MongoDB Atlas, take advantage of telemetery
 
@@ -65,6 +65,7 @@ export class Logger {
   static sessionId: string;
   private static traceId: string;
   static instance: Logger;
+  private static initializationPromise: Promise<void> | null = null;
   constructor(private readonly module: string) {}
 
   public static initialize(
@@ -73,24 +74,33 @@ export class Logger {
     telemetry?: ITelemetry,
   ): Logger {
     Logger.config = { ...Logger.config, ...config };
+
+    // Force disable file logging if environment variable is set
+    if (process.env.CODEBUDDY_DISABLE_FILE_LOGGING === "true") {
+      Logger.config.enableFile = false;
+    }
+
+    // Force disable console logging if running as MCP Server to protect stdio transport
+    if (process.env.CODEBUDDY_MCP_SERVER === "true") {
+      Logger.config.enableConsole = false;
+    }
+
     if (Logger.config.enableFile && !Logger.config.filePath) {
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-      const baseDir = workspaceFolder
-        ? path.join(workspaceFolder.uri.fsPath, ".codebuddy", "logs")
-        : path.join(os.homedir(), ".codebuddy", "logs");
+      const baseDir = path.join(os.homedir(), ".codebuddy", "logs");
 
       const date = new Date().toISOString();
       const safeDate = date.replace(/[:.]/g, "-");
       Logger.config.filePath = path.join(baseDir, `codebuddy-${safeDate}.log`);
     }
     if (Logger.config.enableFile && Logger.config.filePath) {
-      const logDir = path.dirname(Logger.config.filePath);
-      if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
+      if (!Logger.initializationPromise) {
+        Logger.initializationPromise = Logger.ensureLogDir();
       }
-      console.log(Logger.config.filePath);
+      // console.error(Logger.config.filePath);
     }
-    Logger.telemetry = telemetry;
+    if (telemetry) {
+      Logger.telemetry = telemetry;
+    }
     Logger.setTraceId(Logger.generateId());
 
     // Always return a new instance to ensure correct module name mapping
@@ -98,141 +108,126 @@ export class Logger {
     return new Logger(module);
   }
 
-  public static setTraceId(traceId: string): void {
-    Logger.traceId = traceId;
+  private static async ensureLogDir(): Promise<void> {
+    if (!Logger.config.filePath) return;
+    const logDir = path.dirname(Logger.config.filePath);
+    try {
+      if (!fs.existsSync(logDir)) {
+        await fs.promises.mkdir(logDir, { recursive: true });
+      }
+    } catch (err) {
+      console.error("Failed to create log directory", err);
+    }
   }
 
-  static generateId(): string {
-    return crypto.randomBytes(16).toString("hex");
+  public static setTraceId(id: string) {
+    Logger.traceId = id;
   }
 
-  private shouldLog(logLevel: LogLevel) {
-    const levels = Object.keys(logLevel);
-    return levels.indexOf(logLevel) >= levels.indexOf(Logger.config.minLevel);
+  public static getTraceId() {
+    return Logger.traceId;
   }
 
-  private formatLogEvent(level: LogLevel, message: string, data?: any) {
-    return {
-      timestamp: new Date().toISOString(),
-      level,
-      module: this.module,
-      message,
-      data,
-      sessionId: Logger.sessionId,
-      traceId: Logger.traceId,
-    };
+  public static generateId(): string {
+    return crypto.randomUUID();
   }
-  private logToConsole(event: ILogEvent): void {
-    if (!Logger.config.enableConsole) return;
 
-    const formattedMessage = `[${event.timestamp}] [${event.level}] [${event.module}] ${event.message}`;
+  public log(level: LogLevel, message: string, data?: any) {
+    if (this.shouldLog(level)) {
+      const event: ILogEvent = {
+        timestamp: new Date().toISOString(),
+        level,
+        module: this.module,
+        message,
+        data,
+        sessionId: Logger.sessionId,
+        traceId: Logger.traceId,
+      };
 
+      if (Logger.config.enableConsole) {
+        this.logToConsole(event);
+      }
+
+      if (Logger.config.enableFile) {
+        this.logToFile(event);
+      }
+
+      if (Logger.config.enableTelemetry && Logger.telemetry) {
+        Logger.telemetry.recordEvent("log", event as any);
+      }
+    }
+  }
+
+  private shouldLog(level: LogLevel): boolean {
+    const levels = [
+      LogLevel.DEBUG,
+      LogLevel.INFO,
+      LogLevel.WARN,
+      LogLevel.ERROR,
+    ];
+    return levels.indexOf(level) >= levels.indexOf(Logger.config.minLevel);
+  }
+
+  private logToConsole(event: ILogEvent) {
+    const color = this.getColor(event.level);
+    const message = `[${event.timestamp}] [${event.level}] [${event.module}] ${event.message}`;
+
+    // Use OutputManager instead of direct console
+    this.outputManager.appendLine(message);
     if (event.data) {
       this.outputManager.appendLine(JSON.stringify(event.data, null, 2));
-    } else {
-      this.outputManager.appendLine(formattedMessage);
-    }
-    console.log(formattedMessage, event.data || "");
-  }
-
-  private logToFile(event: ILogEvent): void {
-    if (!Logger.config.enableFile || !Logger.config.filePath) return;
-
-    try {
-      const logEntry = JSON.stringify(event) + "\n";
-      fs.appendFileSync(Logger.config.filePath, logEntry);
-    } catch (error: any) {
-      console.error("Failed to write to log file:", error);
-      this.error("Log file write failed", { error: error.message });
     }
   }
 
-  private logToTelemetry(event: ILogEvent): void {
-    if (!Logger.config.enableTelemetry || !Logger.telemetry) return;
-
-    if (event.level === LogLevel.ERROR) {
-      Logger.telemetry.recordEvent("error", {
-        message: event.message,
-        module: event.module,
-        ...event.data,
-      });
-    } else if (event.level === LogLevel.INFO || event.level === LogLevel.WARN) {
-      // Allow recording interesting events
-      // Use the log message as the event name
-      Logger.telemetry.recordEvent(event.message, {
-        module: event.module,
-        ...event.data,
-      });
+  private async logToFile(event: ILogEvent) {
+    if (Logger.config.filePath) {
+      if (Logger.initializationPromise) {
+        await Logger.initializationPromise;
+      }
+      const logLine = JSON.stringify(event) + "\n";
+      const encoder = new TextEncoder();
+      const content = encoder.encode(logLine);
+      try {
+        await fs.promises.appendFile(Logger.config.filePath, content);
+      } catch (err) {
+        console.error("Failed to write to log file", err);
+      }
     }
   }
 
-  public log(level: LogLevel, message: string, data?: any): void {
-    if (!this.shouldLog(level)) return;
-
-    const event = this.formatLogEvent(level, message, data);
-    this.logToConsole(event);
-    this.logToFile(event);
-    if (
-      level === LogLevel.INFO ||
-      level === LogLevel.WARN ||
-      level === LogLevel.ERROR
-    ) {
-      this.logToTelemetry(event);
+  private getColor(level: LogLevel): string {
+    switch (level) {
+      case LogLevel.DEBUG:
+        return "\x1b[34m"; // Blue
+      case LogLevel.INFO:
+        return "\x1b[32m"; // Green
+      case LogLevel.WARN:
+        return "\x1b[33m"; // Yellow
+      case LogLevel.ERROR:
+        return "\x1b[31m"; // Red
+      default:
+        return "\x1b[0m"; // Reset
     }
   }
 
-  public debug(message: string, data?: any): void {
+  public debug(message: string, data?: any) {
     this.log(LogLevel.DEBUG, message, data);
   }
 
-  public info(message: string, data?: any): void {
+  public info(message: string, data?: any) {
     this.log(LogLevel.INFO, message, data);
   }
 
-  public warn(message: string, data?: any): void {
+  public warn(message: string, data?: any) {
     this.log(LogLevel.WARN, message, data);
   }
 
-  public error(message: string, data?: any): void {
-    this.log(LogLevel.ERROR, message, data);
-  }
-
-  public startTimer(operation: string): () => void {
-    const start = Date.now();
-    return () => {
-      const duration = Date.now() - start;
-      this.info(`${operation} completed in ${duration}ms`);
-
-      if (Logger.telemetry) {
-        Logger.telemetry.recordMetric(
-          `duration.${this.module}.${operation}`,
-          duration,
-        );
-      }
-    };
-  }
-
-  public traceOperation<T>(
-    operation: string,
-    fn: () => Promise<T>,
-  ): Promise<T> {
-    const span = Logger.telemetry?.startSpan(`${this.module}.${operation}`);
-    const endTimer = this.startTimer(operation);
-
-    return fn()
-      .then((result) => {
-        endTimer();
-        span?.setStatus("success");
-        return result;
-      })
-      .catch((error) => {
-        endTimer();
-        span?.setStatus("error", error.message);
-        this.error(`Error in ${operation}`, error);
-        throw error;
-      })
-      .finally(() => {
-        span?.end();
-      });
+  public error(message: string, error?: any) {
+    this.log(LogLevel.ERROR, message, {
+      error:
+        error instanceof Error
+          ? { message: error.message, stack: error.stack }
+          : error,
+    });
   }
 }

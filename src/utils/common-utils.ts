@@ -1,5 +1,6 @@
-import * as vscode from "vscode";
 import * as path from "path";
+import { EditorHostService } from "../services/editor-host.service";
+import { FileStat } from "../interfaces/editor-host";
 
 /**
  * Utility class for language and file type operations
@@ -117,6 +118,8 @@ export class LanguageUtils {
   }
 }
 
+import { IDisposable } from "../interfaces/disposable";
+
 /**
  * Utility class for file system operations
  */
@@ -124,9 +127,10 @@ export class FileUtils {
   /**
    * Safely gets file stats with error handling
    */
-  static async safeGetStats(uri: vscode.Uri): Promise<vscode.FileStat | null> {
+  static async safeGetStats(filePath: string): Promise<FileStat | null> {
     try {
-      return await vscode.workspace.fs.stat(uri);
+      const host = EditorHostService.getInstance().getHost();
+      return await host.workspace.fs.stat(filePath);
     } catch (error: any) {
       return null;
     }
@@ -137,7 +141,8 @@ export class FileUtils {
    */
   static async fileExists(filePath: string): Promise<boolean> {
     try {
-      await vscode.workspace.fs.stat(vscode.Uri.file(filePath));
+      const host = EditorHostService.getInstance().getHost();
+      await host.workspace.fs.stat(filePath);
       return true;
     } catch {
       return false;
@@ -147,12 +152,9 @@ export class FileUtils {
   /**
    * Gets the relative path from workspace root
    */
-  static getRelativePath(filePath: string): string {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-      return path.basename(filePath);
-    }
-    return path.relative(workspaceFolder.uri.fsPath, filePath);
+  static getRelativePath(filePath: string, rootPath?: string): string {
+    const workspaceRoot = rootPath || process.cwd();
+    return path.relative(workspaceRoot, filePath);
   }
 
   /**
@@ -324,7 +326,7 @@ export class DisposableUtils {
   /**
    * Safely disposes of multiple disposables
    */
-  static safeDispose(disposables: vscode.Disposable[]): void {
+  static safeDispose(disposables: IDisposable[]): void {
     disposables.forEach((disposable) => {
       try {
         disposable.dispose();
@@ -337,9 +339,11 @@ export class DisposableUtils {
   /**
    * Creates a composite disposable from multiple disposables
    */
-  static createComposite(disposables: vscode.Disposable[]): vscode.Disposable {
-    return new vscode.Disposable(() => {
-      this.safeDispose(disposables);
-    });
+  static createComposite(disposables: IDisposable[]): IDisposable {
+    return {
+      dispose: () => {
+        this.safeDispose(disposables);
+      },
+    };
   }
 }

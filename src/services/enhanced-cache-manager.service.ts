@@ -1,4 +1,4 @@
-import * as vscode from "vscode";
+import { IDisposable } from "../interfaces/disposable";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 /**
@@ -40,7 +40,7 @@ export interface CacheConfig {
 /**
  * Enhanced multi-level cache system for vector database operations
  */
-export class EnhancedCacheManager implements vscode.Disposable {
+export class EnhancedCacheManager implements IDisposable {
   private logger: Logger;
   private config: CacheConfig;
 
@@ -64,7 +64,7 @@ export class EnhancedCacheManager implements vscode.Disposable {
   private accessTimes: number[] = [];
   private cleanupInterval?: NodeJS.Timeout;
   private performanceProfiler?: any;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly disposables: IDisposable[] = [];
 
   constructor(config: Partial<CacheConfig> = {}, performanceProfiler?: any) {
     this.logger = Logger.initialize("EnhancedCacheManager", {

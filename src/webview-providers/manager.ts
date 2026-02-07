@@ -1,9 +1,9 @@
-import * as vscode from "vscode";
 import { StreamEventType } from "../agents/interface/agent.interface";
 import { generativeAiModels } from "../application/constant";
 import { IEventPayload } from "../emitter/interface";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
+import { MCPService } from "../MCP/service";
 import { ChatHistoryManager } from "../services/chat-history-manager";
 import { formatText, getAPIKeyAndModel } from "../utils/utils";
 import { AnthropicWebViewProvider } from "./anthropic";
@@ -16,33 +16,43 @@ import { QwenWebViewProvider } from "./qwen";
 import { GLMWebViewProvider } from "./glm";
 import { LocalWebViewProvider } from "./local";
 import { Terminal } from "../utils/terminal";
+import { IDisposable } from "../interfaces/disposable";
+import {
+  IExtensionContext,
+  IWebviewView,
+  IWebviewViewProvider,
+  IEditorHost,
+  IWebviewViewResolveContext,
+} from "../interfaces/editor-host";
+import { EditorHostService } from "../services/editor-host.service";
 
-export class WebViewProviderManager implements vscode.Disposable {
+export class WebViewProviderManager implements IDisposable {
   private static instance: WebViewProviderManager;
   private currentProvider: BaseWebViewProvider | undefined;
   private activeProviderName: string | undefined;
   private readonly providerRegistry: Map<
     string,
     new (
-      extensionUri: vscode.Uri,
+      extensionUri: any,
       apiKey: string,
       model: string,
-      context: vscode.ExtensionContext,
+      context: IExtensionContext,
     ) => BaseWebViewProvider
   > = new Map();
-  private webviewView: vscode.WebviewView | undefined;
-  private readonly disposables: vscode.Disposable[] = [];
-  private webviewViewProvider: vscode.WebviewViewProvider | undefined;
+  private webviewView: IWebviewView | undefined;
+  private readonly disposables: IDisposable[] = [];
+  private webviewViewProvider: IWebviewViewProvider | undefined;
   private isInitialized = false;
   protected readonly orchestrator: Orchestrator;
   protected readonly chatHistoryManager: ChatHistoryManager;
+  private readonly editorHost: IEditorHost;
+  private mcpService = MCPService.getInstance();
 
   static readonly AgentId = "agentId"; // TODO This is hardcoded for now,in upcoming versions, requests will be tagged to respective agents.
   private readonly logger: Logger;
 
-  private constructor(
-    private readonly extensionContext: vscode.ExtensionContext,
-  ) {
+  private constructor(private readonly extensionContext: IExtensionContext) {
+    this.editorHost = EditorHostService.getInstance().getHost();
     this.orchestrator = Orchestrator.getInstance();
     this.chatHistoryManager = ChatHistoryManager.getInstance();
     this.registerProviders();
@@ -61,6 +71,11 @@ export class WebViewProviderManager implements vscode.Disposable {
     if (this.isInitialized) {
       return;
     }
+
+    // Initialize MCP subscriptions for remote events
+    this.initializeMCPSubscriptions().catch((err) =>
+      this.logger.error("Failed to initialize MCP subscriptions:", err),
+    );
 
     this.disposables.push(
       this.orchestrator.onModelChange(this.handleModelChange.bind(this)),
@@ -149,7 +164,7 @@ export class WebViewProviderManager implements vscode.Disposable {
   }
 
   public static getInstance(
-    extensionContext: vscode.ExtensionContext,
+    extensionContext: IExtensionContext,
   ): WebViewProviderManager {
     if (!WebViewProviderManager.instance) {
       WebViewProviderManager.instance = new WebViewProviderManager(
@@ -180,10 +195,10 @@ export class WebViewProviderManager implements vscode.Disposable {
     this.providerRegistry.set(generativeAiModels.LOCAL, LocalWebViewProvider);
   }
 
-  registerWebViewProvider(): vscode.Disposable | undefined {
+  registerWebViewProvider(): IDisposable | undefined {
     if (!this.webviewViewProvider) {
       this.webviewViewProvider = {
-        resolveWebviewView: async (webviewView: vscode.WebviewView) => {
+        resolveWebviewView: async (webviewView: IWebviewView) => {
           this.webviewView = webviewView;
           if (this.currentProvider) {
             await this.currentProvider.resolveWebviewView(webviewView);
@@ -191,7 +206,7 @@ export class WebViewProviderManager implements vscode.Disposable {
         },
       };
 
-      const disposable = vscode.window.registerWebviewViewProvider(
+      const disposable = this.editorHost.window.registerWebviewViewProvider(
         BaseWebViewProvider.viewId,
         this.webviewViewProvider,
         { webviewOptions: { retainContextWhenHidden: true } },
@@ -442,6 +457,91 @@ export class WebViewProviderManager implements vscode.Disposable {
           timestamp: Date.now(),
         },
       });
+    }
+  }
+
+  private async initializeMCPSubscriptions(): Promise<void> {
+    try {
+      const serverName = "codebuddy-internal";
+      // Try to connect to the internal server
+      // This will spawn the process if configured in MCPService.initialize
+      await this.mcpService.ensureServerConnected(serverName);
+
+      const events = [
+        StreamEventType.START,
+        StreamEventType.CHUNK,
+        StreamEventType.END,
+        StreamEventType.TOOL_START,
+        StreamEventType.TOOL_END,
+        StreamEventType.TOOL_PROGRESS,
+        StreamEventType.PLANNING,
+        StreamEventType.THINKING,
+        StreamEventType.SUMMARIZING,
+        StreamEventType.THINKING_START,
+        StreamEventType.THINKING_UPDATE,
+        StreamEventType.THINKING_END,
+      ];
+
+      for (const event of events) {
+        await this.mcpService.subscribeToNotifications(
+          serverName,
+          event,
+          (params: any) => {
+            // Forward notification to handler
+            // Wrap params in IEventPayload structure
+            const payload: IEventPayload = {
+              type: event,
+              timestamp: new Date().toISOString(),
+              message: params,
+              metadata: { source: "mcp-server" },
+            };
+            this.handleRemoteEvent(event, payload);
+          },
+        );
+      }
+
+      this.logger.info(`Subscribed to MCP notifications from ${serverName}`);
+    } catch (error: any) {
+      // It's normal for the server to be missing if not bundled/configured
+      this.logger.debug(
+        "MCP subscription skipped (server not available):",
+        error,
+      );
+    }
+  }
+
+  private handleRemoteEvent(eventType: StreamEventType, event: IEventPayload) {
+    // Avoid double-handling if the event originated locally (though unlikely if distinct sources)
+    // Dispatch to specific handlers
+    switch (eventType) {
+      case StreamEventType.START:
+        this.handleStreamStart(event);
+        break;
+      case StreamEventType.CHUNK:
+        this.handleStreamChunk(event);
+        break;
+      case StreamEventType.END:
+        this.handleStreamEnd(event);
+        break;
+      case StreamEventType.TOOL_START:
+        this.handleToolStart(event);
+        break;
+      case StreamEventType.TOOL_END:
+        this.handleToolEnd(event);
+        break;
+      case StreamEventType.TOOL_PROGRESS:
+        this.handleToolProgress(event);
+        break;
+      case StreamEventType.PLANNING:
+        this.handlePlanning(event);
+        break;
+      case StreamEventType.SUMMARIZING:
+        this.handleSummarizing(event);
+        break;
+      default:
+        // Handle thinking and other activity events
+        this.handleActivityEvent(eventType, event);
+        break;
     }
   }
 

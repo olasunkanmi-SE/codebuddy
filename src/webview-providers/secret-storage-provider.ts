@@ -1,15 +1,14 @@
-import * as vscode from "vscode";
-import { Logger } from "../infrastructure/logger/logger";
+import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
-import { LogLevel } from "../services/telemetry";
+import { IExtensionContext, IDisposable } from "../interfaces/editor-host";
 
 export class VSCodeSecretStorage {
-  private readonly context: vscode.ExtensionContext;
+  private readonly context: IExtensionContext;
   private readonly logger: Logger;
   private readonly orchestrator: Orchestrator;
   private static instance: VSCodeSecretStorage;
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: IExtensionContext) {
     this.context = context;
     this.logger = Logger.initialize("VSCodeSecretStorage", {
       minLevel: LogLevel.DEBUG,
@@ -20,7 +19,7 @@ export class VSCodeSecretStorage {
     this.orchestrator = Orchestrator.getInstance();
   }
 
-  static getInstance(context: vscode.ExtensionContext) {
+  static getInstance(context: IExtensionContext) {
     if (!VSCodeSecretStorage.instance) {
       VSCodeSecretStorage.instance = new VSCodeSecretStorage(context);
     }
@@ -56,7 +55,7 @@ export class VSCodeSecretStorage {
     }
   }
 
-  onDidChange(): vscode.Disposable {
+  onDidChange(): IDisposable {
     return this.context.secrets.onDidChange((event) => {
       if (event.key.length > 0) {
         this.orchestrator.handleStatus({

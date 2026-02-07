@@ -1,7 +1,7 @@
 // src/services/change-detection/git-cli.provider.ts
-import * as vscode from "vscode";
 import { GitActions } from "../../services/git-actions";
 import { IChangeProvider, ChangeDetails } from "./types";
+import { EditorHostService } from "../../services/editor-host.service";
 
 export class GitCliProvider implements IChangeProvider {
   public readonly name = "Git CLI";
@@ -17,9 +17,11 @@ export class GitCliProvider implements IChangeProvider {
     const prDiff = await this.gitActions.getPRDifferenceSummary(targetBranch);
     const currentBranchInfo = await this.gitActions.getCurrentBranchInfo();
 
-    vscode.window.showInformationMessage(
-      `🔍 Reviewing PR via Git CLI: ${currentBranchInfo.current} → ${targetBranch} (${modifiedFiles.length} files changed)`,
-    );
+    EditorHostService.getInstance()
+      .getHost()
+      .window.showInformationMessage(
+        `🔍 Reviewing PR via Git CLI: ${currentBranchInfo.current} → ${targetBranch} (${modifiedFiles.length} files changed)`,
+      );
 
     return {
       branchInfo: `${currentBranchInfo.current} → ${targetBranch}`,

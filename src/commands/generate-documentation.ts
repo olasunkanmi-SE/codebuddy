@@ -1,7 +1,8 @@
-import * as vscode from "vscode";
 import { DocumentationConfig } from "../interfaces/documentation.interface";
 import { DocumentationGeneratorService } from "../services/documentation-generator.service";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { EditorHostService } from "../services/editor-host.service";
+import { IQuickPickItem } from "../interfaces/editor-host";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -14,10 +15,11 @@ const logger = Logger.initialize("extension-main", {
  * Command to generate intelligent documentation for the codebase
  */
 export const generateDocumentationCommand = async () => {
+  const editorHost = EditorHostService.getInstance().getHost();
   try {
     // Check if we have a workspace open
-    if (!vscode.workspace.workspaceFolders?.length) {
-      vscode.window.showErrorMessage(
+    if (!editorHost.workspace.workspaceFolders?.length) {
+      editorHost.window.showErrorMessage(
         "Please open a workspace to generate documentation.",
       );
       return;
@@ -32,9 +34,9 @@ export const generateDocumentationCommand = async () => {
     }
 
     // Show progress and generate documentation
-    await vscode.window.withProgress(
+    await editorHost.window.withProgress(
       {
-        location: vscode.ProgressLocation.Notification,
+        location: "Notification",
         title: "🚀 Generating Intelligent Documentation...",
         cancellable: true,
       },
@@ -53,7 +55,7 @@ export const generateDocumentationCommand = async () => {
     );
   } catch (error: any) {
     logger.error("Documentation generation command failed:", error);
-    vscode.window.showErrorMessage(
+    editorHost.window.showErrorMessage(
       `Failed to generate documentation: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
   }
@@ -65,7 +67,8 @@ export const generateDocumentationCommand = async () => {
 async function showDocumentationConfigDialog(): Promise<
   DocumentationConfig | undefined
 > {
-  const options: vscode.QuickPickItem[] = [
+  const editorHost = EditorHostService.getInstance().getHost();
+  const options: IQuickPickItem[] = [
     {
       label: "📚 Complete Documentation Suite",
       description:
@@ -90,18 +93,18 @@ async function showDocumentationConfigDialog(): Promise<
     },
   ];
 
-  const selection = await vscode.window.showQuickPick(options, {
+  const selection = (await editorHost.window.showQuickPick(options, {
     title: "📚 Documentation Generator - Select Documentation Type",
     placeHolder: "Choose what documentation to generate",
     canPickMany: false,
-  });
+  })) as IQuickPickItem | undefined;
 
   if (!selection) {
     return undefined;
   }
 
   // Get additional options
-  const outputFormat = await vscode.window.showQuickPick(
+  const outputFormat = (await editorHost.window.showQuickPick(
     [
       {
         label: "Markdown (.md)",
@@ -119,13 +122,13 @@ async function showDocumentationConfigDialog(): Promise<
       title: "Select Output Format",
       placeHolder: "Choose output format",
     },
-  );
+  )) as IQuickPickItem | undefined;
 
   if (!outputFormat) {
     return undefined;
   }
 
-  const diagramFormat = await vscode.window.showQuickPick(
+  const diagramFormat = (await editorHost.window.showQuickPick(
     [
       {
         label: "Mermaid",
@@ -143,7 +146,7 @@ async function showDocumentationConfigDialog(): Promise<
       title: "Select Diagram Format",
       placeHolder: "Choose diagram format for architecture",
     },
-  );
+  )) as IQuickPickItem | undefined;
 
   if (!diagramFormat) {
     return undefined;
@@ -190,7 +193,8 @@ async function showDocumentationConfigDialog(): Promise<
  * Command to regenerate existing documentation
  */
 export const regenerateDocumentationCommand = async () => {
-  const choice = await vscode.window.showInformationMessage(
+  const editorHost = EditorHostService.getInstance().getHost();
+  const choice = await editorHost.window.showInformationMessage(
     "🔄 Regenerate Documentation",
     "This will update existing documentation files. Continue?",
     "Yes, Regenerate",
@@ -206,27 +210,28 @@ export const regenerateDocumentationCommand = async () => {
  * Command to open generated documentation
  */
 export const openDocumentationCommand = async () => {
+  const editorHost = EditorHostService.getInstance().getHost();
   try {
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const workspaceRoot = editorHost.workspace.rootPath;
     if (!workspaceRoot) {
-      vscode.window.showErrorMessage("No workspace open");
+      editorHost.window.showErrorMessage("No workspace open");
       return;
     }
 
     const docPaths = [
-      vscode.Uri.file(`${workspaceRoot}/README.md`),
-      vscode.Uri.file(`${workspaceRoot}/docs/generated/index.md`),
-      vscode.Uri.file(`${workspaceRoot}/docs/generated/api.md`),
-      vscode.Uri.file(`${workspaceRoot}/docs/generated/architecture.md`),
+      `${workspaceRoot}/README.md`,
+      `${workspaceRoot}/docs/generated/index.md`,
+      `${workspaceRoot}/docs/generated/api.md`,
+      `${workspaceRoot}/docs/generated/architecture.md`,
     ];
 
-    const availableDocs = [];
+    const availableDocs: IQuickPickItem[] = [];
     for (const docPath of docPaths) {
       try {
-        await vscode.workspace.fs.stat(docPath);
+        await editorHost.workspace.fs.stat(docPath);
         availableDocs.push({
-          label: docPath.path.split("/").pop()?.replace(".md", "") || "Unknown",
-          description: docPath.fsPath,
+          label: docPath.split("/").pop()?.replace(".md", "") || "Unknown",
+          description: docPath,
           uri: docPath,
         });
       } catch {
@@ -235,7 +240,7 @@ export const openDocumentationCommand = async () => {
     }
 
     if (availableDocs.length === 0) {
-      const generate = await vscode.window.showInformationMessage(
+      const generate = await editorHost.window.showInformationMessage(
         "No documentation found. Would you like to generate it?",
         "Generate Documentation",
         "Cancel",
@@ -247,17 +252,19 @@ export const openDocumentationCommand = async () => {
       return;
     }
 
-    const selected = await vscode.window.showQuickPick(availableDocs, {
+    const selected = (await editorHost.window.showQuickPick(availableDocs, {
       title: "📖 Open Documentation",
       placeHolder: "Select documentation file to open",
-    });
+    })) as IQuickPickItem | undefined;
 
     if (selected) {
-      const document = await vscode.workspace.openTextDocument(selected.uri);
-      await vscode.window.showTextDocument(document);
+      const document = await editorHost.workspace.openTextDocument(
+        selected.uri,
+      );
+      await editorHost.window.showTextDocument(document);
     }
   } catch (error: any) {
     logger.error("Failed to open documentation:", error);
-    vscode.window.showErrorMessage("Failed to open documentation");
+    editorHost.window.showErrorMessage("Failed to open documentation");
   }
 };
