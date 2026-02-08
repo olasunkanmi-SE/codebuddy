@@ -38,7 +38,7 @@ export class DependencyGraphService implements vscode.Disposable {
    * Generates a Mermaid flowchart string for the current workspace
    * @param force If true, bypasses the cache and regenerates the graph
    */
-  public async generateGraph(force: boolean = false): Promise<string> {
+  public async generateGraph(force = false): Promise<string> {
     if (this.cachedGraph && !force) {
       return this.cachedGraph;
     }
@@ -60,8 +60,6 @@ export class DependencyGraphService implements vscode.Disposable {
       // Simple regex for imports
       // JS/TS: import ... from '...';
       const jsImportRegex = /import\s+.*?\s+from\s+['"](.+)['"]/g;
-      // Python: from ... import ... or import ...
-      const pyImportRegex = /from\s+(\S+)\s+import|import\s+(\S+)/g;
 
       let match;
       if (
