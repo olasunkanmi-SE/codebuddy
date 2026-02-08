@@ -6,7 +6,9 @@ export class ObservabilityService {
   private static instance: ObservabilityService;
   private profiler: PerformanceProfiler | undefined;
 
-  private constructor() {}
+  private constructor() {
+    // Singleton
+  }
 
   static getInstance(): ObservabilityService {
     return (ObservabilityService.instance ??= new ObservabilityService());
