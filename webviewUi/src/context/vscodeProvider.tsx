@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 import { vsCodeProviderProps } from "../interfaces/genric.interface";
 import { VSCodeContext } from "./vscodeContext";

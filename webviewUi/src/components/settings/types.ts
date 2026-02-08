@@ -1,6 +1,7 @@
 export type SettingsCategory =
   | "account"
   | "general"
+  | "browser"
   | "agents"
   | "mcp"
   | "connectors"
@@ -60,6 +61,12 @@ export const SETTINGS_CATEGORIES: SettingsCategoryInfo[] = [
     label: "General",
     icon: "settings",
     description: "General application settings",
+  },
+  {
+    id: "browser",
+    label: "Browser",
+    icon: "globe",
+    description: "Browser and link opening preferences",
   },
   {
     id: "agents",

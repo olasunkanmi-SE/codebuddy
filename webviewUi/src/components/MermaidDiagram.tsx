@@ -435,7 +435,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
     
     // Fix 5: Fix flowchart specific issues
     if (code.includes('flowchart') || code.includes('graph')) {
-      let flowFixed = code
+      const flowFixed = code
         // Remove extra > after label arrows
         .replace(/--\|([^|]+)\|>/g, '-->|$1|')
         // Normalize arrows like -> or ---> to -->
@@ -457,7 +457,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
     
     // Fix 6: Fix classDiagram issues
     if (code.includes('classDiagram')) {
-      let classFixed = code
+      const classFixed = code
         .replace(/:\s*\+/g, ': +') // Ensure space before visibility
         .replace(/:\s*-/g, ': -')
         .replace(/:\s*#/g, ': #');
@@ -501,7 +501,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
     // Fix 11: Remove numbered list prefixes (e.g., "1.", "2)") that break syntax
     const numberStripped = code
       .split('\n')
-      .map(line => line.replace(/^\s*\d+[\.)]\s*/, ''))
+      .map(line => line.replace(/^\s*\d+[.)]\s*/, ''))
       .join('\n');
     if (numberStripped !== code) fixes.push(numberStripped);
 

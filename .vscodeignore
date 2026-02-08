@@ -8,16 +8,11 @@
 !LICENSE
 
 !package.json
-!node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js
-!node_modules/web-tree-sitter/**
-!node_modules/@vscode/ripgrep/**
-
 # Exclude all source, config, and dev files
 src/**
 test/**
 docs/**
 webviewUi/**
-node_modules/**
 .vscode/**
 .vscode-test/**
 .github/
@@ -31,3 +26,15 @@ tsconfig*.json
 yarn.lock
 package-lock.json
 out/**
+
+# Ignore node_modules by default
+node_modules/**
+
+# Whitelist external dependencies needed for production
+!node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js
+!node_modules/web-tree-sitter/**
+!node_modules/@vscode/ripgrep/**
+!node_modules/better-sqlite3/**
+!node_modules/@lancedb/lancedb/**
+!node_modules/apache-arrow/**
+

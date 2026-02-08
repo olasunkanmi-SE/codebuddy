@@ -96,6 +96,7 @@ export class SecretStorageService implements vscode.Disposable {
     const dependencyCheckEnabled =
       config.get<boolean>("codebuddy.automations.dependencyCheck.enabled") ??
       true;
+    const browserType = config.get<string>("codebuddy.browserType") || "reader";
     const preferences = {
       username: nickname || username,
       theme: theme || "tokyo night", // default theme
@@ -114,6 +115,7 @@ export class SecretStorageService implements vscode.Disposable {
       dailyStandupEnabled,
       codeHealthEnabled,
       dependencyCheckEnabled,
+      browserType,
     };
     this.orchestrator.publish(
       "onGetUserPreferences",

@@ -122,7 +122,7 @@ export const createBranchFromGitLabCommand = async () => {
             const idMatch = line.trim().match(/^#(\d+)\s+(.*)/);
             if (idMatch) {
               const id = idMatch[1];
-              let rest = idMatch[2];
+              const rest = idMatch[2];
 
               // Try to clean up "rest" (remove time, labels if possible)
               // This is heuristics based.

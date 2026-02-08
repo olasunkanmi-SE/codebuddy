@@ -77,7 +77,7 @@ export class CompletionProviderFactory {
         case CompletionProviderType.OpenAI:
         case CompletionProviderType.Deepseek:
         case CompletionProviderType.GLM:
-        default:
+        default: {
           // Handle OpenAI-compatible providers via LocalLLM
           const localConfig =
             vscode.workspace.getConfiguration("codebuddy.local");
@@ -109,9 +109,8 @@ export class CompletionProviderFactory {
               maxTokens: config.maxTokens,
             },
           };
-
-          // LocalLLM is a singleton that updates its config
           return LocalLLM.getInstance(llmConfig);
+        }
       }
     } catch (error) {
       this.logger.error(`Failed to create provider for ${providerType}`, error);

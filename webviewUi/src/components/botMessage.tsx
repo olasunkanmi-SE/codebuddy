@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import DOMPurify from "dompurify";
 import React from "react";
 import { DownloadIcon } from "./downloadIcon";

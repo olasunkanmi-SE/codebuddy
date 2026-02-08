@@ -176,7 +176,7 @@ export class CodebaseAnalysisWorker {
           this.onProgressCallback(message.progress);
         }
         break;
-      case "LOG":
+      case "LOG": {
         const { level, message: msg, data } = message;
         if (level === "ERROR") this.logger.error(msg || "Worker Error", data);
         else if (level === "WARN") this.logger.warn(msg || "Worker Warn", data);
@@ -184,6 +184,7 @@ export class CodebaseAnalysisWorker {
           this.logger.debug(msg || "Worker Debug", data);
         else this.logger.info(msg || "Worker Info", data);
         break;
+      }
     }
   }
 
@@ -208,7 +209,19 @@ export class CodebaseAnalysisWorker {
   private getWorkerPath(): string {
     // In bundled environment, __dirname is dist/
     // Worker is in dist/workers/codebase-analysis.worker.js
-    return path.join(__dirname, "workers", "codebase-analysis.worker.js");
+    // In dev environment, __dirname is out/services/
+    // Worker is in out/workers/codebase-analysis.worker.js
+
+    const isProd = __filename.includes("dist");
+    if (isProd) {
+      return path.join(__dirname, "workers", "codebase-analysis.worker.js");
+    }
+
+    // Dev mode: resolve from out/services to out/workers
+    return path.resolve(
+      __dirname,
+      "../../out/workers/codebase-analysis.worker.js",
+    );
   }
 
   /**

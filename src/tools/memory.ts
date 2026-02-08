@@ -82,7 +82,7 @@ export class MemoryTool {
     const memories = this.loadMemories();
 
     switch (action) {
-      case "add":
+      case "add": {
         if (
           !memory?.content ||
           !memory?.category ||
@@ -103,8 +103,9 @@ export class MemoryTool {
         memories.push(newMemory);
         this.saveMemories(memories);
         return `Memory added: [${newMemory.category}] ${newMemory.title}`;
+      }
 
-      case "update":
+      case "update": {
         if (!memory?.id) return "Error: Memory ID is required for 'update'.";
         const index = memories.findIndex((m) => m.id === memory.id);
         if (index === -1)
@@ -117,8 +118,9 @@ export class MemoryTool {
         };
         this.saveMemories(memories);
         return `Memory updated: ${memories[index].title}`;
+      }
 
-      case "delete":
+      case "delete": {
         if (!memory?.id) return "Error: Memory ID is required for 'delete'.";
         const initialLength = memories.length;
         const filtered = memories.filter((m) => m.id !== memory.id);
@@ -127,8 +129,9 @@ export class MemoryTool {
 
         this.saveMemories(filtered);
         return "Memory deleted successfully.";
+      }
 
-      case "search":
+      case "search": {
         if (!query) return JSON.stringify(memories, null, 2);
         const lowerQuery = query.toLowerCase();
         const results = memories.filter(
@@ -140,6 +143,7 @@ export class MemoryTool {
         return results.length > 0
           ? JSON.stringify(results, null, 2)
           : "No matching memories found.";
+      }
 
       default:
         return "Error: Invalid action. Use 'add', 'update', 'delete', or 'search'.";

@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
 import * as vscode from "vscode";
+import * as path from "path";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
 type AllowedCommand = "git" | "npm" | "ls" | "echo" | "docker";
@@ -15,7 +16,7 @@ const ALLOWED_COMMANDS: Readonly<Set<AllowedCommand>> = new Set([
 export class Terminal {
   private readonly logger: Logger;
   private static instance: Terminal;
-  private extensionPath: string = "";
+  private extensionPath = "";
   private outputChannel: vscode.OutputChannel;
   private listeners: ((data: string) => void)[] = [];
   private backgroundProcesses: Map<
@@ -82,7 +83,7 @@ export class Terminal {
   public async executeAnyCommand(
     command: string,
     cwd?: string,
-    background: boolean = false,
+    background = false,
   ): Promise<string> {
     // Safety Guard: User Confirmation only for dangerous commands
     if (this.isDangerousCommand(command)) {
@@ -404,10 +405,7 @@ export class Terminal {
 
   async runDockerComposeUp(): Promise<string> {
     if (this.extensionPath) {
-      const composePath = require("path").join(
-        this.extensionPath,
-        "docker-compose.yml",
-      );
+      const composePath = path.join(this.extensionPath, "docker-compose.yml");
       this.logger.info(`Running docker compose with file: ${composePath}`);
       return this.executeCommand("docker", [
         "compose",

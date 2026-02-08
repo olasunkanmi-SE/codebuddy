@@ -133,6 +133,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     codeHealthEnabled: true,
     dependencyCheckEnabled: true,
     gitWatchdogEnabled: true,
+    browserType: 'system',
   };
 
   const defaultOptions: SettingsOptions = {
@@ -143,6 +144,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     languageOptions: [],
     fontFamilyOptions: [],
     fontSizeOptions: [],
+    browserTypeOptions: [],
   };
 
   const defaultHandlers: SettingsHandlers = {
@@ -177,6 +179,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     onCodeHealthChange: () => {},
     onDependencyCheckChange: () => {},
     onGitWatchdogChange: () => {},
+    onBrowserTypeChange: () => {},
   };
 
   const values = settingsValues || defaultValues;

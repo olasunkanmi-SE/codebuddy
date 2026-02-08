@@ -48,7 +48,7 @@ export interface AgentTimelineState {
   result?: { summary?: string };
 }
 
-export interface AgentTimelineSnapshot extends AgentTimelineState {}
+export type AgentTimelineSnapshot = AgentTimelineState;
 
 export interface IWebviewMessage {
   id: string;
@@ -415,7 +415,7 @@ export const useStreamingChat = (
     if (!payload?.status) return;
 
     switch (payload.status) {
-      case "interrupt_waiting":
+      case "interrupt_waiting": {
         const desc =
           payload.description ||
           (payload.toolName
@@ -426,6 +426,7 @@ export const useStreamingChat = (
           description: desc,
         });
         break;
+      }
       case "interrupt_approved":
         setPendingApproval(null);
         break;

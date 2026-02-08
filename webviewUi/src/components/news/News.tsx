@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import styled, { keyframes } from 'styled-components';
-import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
+import React, { useState, useMemo } from 'react';
+import styled, { keyframes, css } from 'styled-components';
 
 export interface NewsItem {
   id?: number;
@@ -18,6 +17,7 @@ interface NewsProps {
   onMarkAsRead: (id: number) => void;
   onRefresh?: () => void;
   onOpenUrl: (url: string) => void;
+  userName?: string;
 }
 
 const fadeIn = keyframes`
@@ -26,195 +26,153 @@ const fadeIn = keyframes`
 `;
 
 const Container = styled.div`
-  padding: 16px;
-  max-width: 800px;
+  padding: 24px 20px;
+  max-width: 600px;
   margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--vscode-editor-foreground);
+`;
+
+const HeaderSection = styled.div`
+  margin-bottom: 32px;
+  animation: ${fadeIn} 0.4s ease-out;
+`;
+
+const Greeting = styled.h1`
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  letter-spacing: -0.02em;
+`;
+
+const IntroText = styled.p`
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--vscode-descriptionForeground);
+  margin: 0 0 16px 0;
+  max-width: 90%;
+`;
+
+const SummaryCard = styled.div`
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 32px;
+  background: var(--vscode-editor-background);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  animation: ${fadeIn} 0.5s ease-out;
+`;
+
+const SummaryHeader = styled.div`
+  border-bottom: 1px solid var(--vscode-widget-border);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+`;
+
+const SummaryTitle = styled.h2`
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--vscode-editor-foreground);
+`;
+
+const ReadTime = styled.div`
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin-top: 8px;
+  font-feature-settings: "tnum";
+`;
+
+const Section = styled.div`
+  margin-bottom: 24px;
+`;
+
+const SectionLabel = styled.div`
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--vscode-textLink-foreground);
+  text-underline-offset: 4px;
+  margin-bottom: 12px;
+  color: var(--vscode-editor-foreground);
+  display: inline-block;
+`;
+
+const ItemList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 16px;
 `;
 
-const Title = styled.h2`
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: var(--vscode-foreground);
-  opacity: 0.9;
-  letter-spacing: 0.5px;
-`;
-
-const Subtitle = styled.p`
-  margin: 2px 0 0 0;
-  color: var(--vscode-descriptionForeground);
-  font-size: 0.85rem;
-  opacity: 0.8;
-`;
-
-const ListContainer = styled.div`
+const StyledNewsItem = styled.div`
   display: flex;
-  flex-direction: column;
   gap: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  align-items: flex-start;
 `;
 
-const ListItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 12px;
-  border-radius: 6px;
-  background: transparent;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-  animation: ${fadeIn} 0.3s ease-out;
+const Bullet = styled.span`
+  color: var(--vscode-editor-foreground);
+  font-size: 10px;
+  margin-top: 6px;
+`;
+
+const ItemContent = styled.div`
+  flex: 1;
+`;
+
+const ItemLink = styled.a`
+  color: #9cdcfe; /* Light Blue */
+  text-decoration: none;
+  font-weight: 500;
   cursor: pointer;
-  position: relative;
+  transition: opacity 0.2s;
 
   &:hover {
-    background: var(--vscode-list-hoverBackground);
-    
-    .action-btn {
-      opacity: 1;
-      transform: translateX(0);
-    }
+    opacity: 0.8;
+    text-decoration: underline;
   }
 `;
 
-const ContentColumn = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  min-width: 0; /* Ensures text truncation works */
-`;
-
-const MetaRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.75rem;
-  color: var(--vscode-descriptionForeground);
-`;
-
-const Source = styled.span`
+const ItemSource = styled.span`
   font-weight: 600;
-  color: var(--vscode-textLink-foreground);
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  opacity: 0.9;
+  color: var(--vscode-editor-foreground);
+  margin-right: 4px;
 `;
 
-const NewsTitle = styled.h3`
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 500;
-  line-height: 1.4;
-  color: var(--vscode-foreground);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  
-  a {
-    color: inherit;
-    text-decoration: none;
-    display: block;
-    
-    &:hover {
-      color: var(--vscode-textLink-foreground);
-    }
-  }
-`;
-
-const Summary = styled.p`
-  margin: 4px 0 0 0;
-  font-size: 0.85rem;
-  line-height: 1.4;
+const ItemText = styled.span`
   color: var(--vscode-descriptionForeground);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  opacity: 0.8;
 `;
 
-const ActionColumn = styled.div`
-  display: flex;
-  align-items: center;
-  padding-left: 12px;
-  height: 100%;
-  gap: 4px;
-`;
+// Footer removed as Refresh button moved to header
+// const Footer = styled.div`...`;
 
-const ActionButton = styled.button`
+const RefreshButton = styled.button<{ $refreshing: boolean }>`
   background: transparent;
   border: none;
+  color: var(--vscode-descriptionForeground);
   cursor: pointer;
-  padding: 6px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
   border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transform: translateX(10px);
-  transition: all 0.2s ease;
-  color: var(--vscode-descriptionForeground);
-
-  &:hover {
-    background: var(--vscode-toolbar-hoverBackground);
-    color: var(--vscode-foreground);
-  }
-
-  &.read-btn:hover {
-    color: var(--vscode-textLink-foreground);
-  }
-`;
-
-const EmptyState = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
-  color: var(--vscode-descriptionForeground);
-  text-align: center;
-  
-  svg {
-    width: 32px;
-    height: 32px;
-    margin-bottom: 12px;
-    opacity: 0.3;
-  }
-  
-  p {
-    margin-bottom: 16px;
-    font-size: 0.9rem;
-  }
-`;
-
-interface RefreshButtonProps {
-  rotating: boolean;
-}
-
-const RefreshIcon = styled.div<RefreshButtonProps>`
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--vscode-descriptionForeground);
   transition: all 0.2s;
-  
+
   &:hover {
     background: var(--vscode-toolbar-hoverBackground);
     color: var(--vscode-foreground);
   }
 
-  svg {
-    transition: transform 1s ease;
-    transform: ${props => props.rotating ? 'rotate(360deg)' : 'rotate(0deg)'};
-  }
+  ${props => props.$refreshing && css`
+    opacity: 0.7;
+    cursor: wait;
+  `}
 `;
 
-export const News: React.FC<NewsProps> = ({ newsItems, onMarkAsRead, onRefresh, onOpenUrl }) => {
+export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, userName = "Ola" }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = () => {
@@ -225,100 +183,147 @@ export const News: React.FC<NewsProps> = ({ newsItems, onMarkAsRead, onRefresh, 
     }
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    
-    if (diff > 86400000) return date.toLocaleDateString();
-    if (diff < 60000) return 'now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
-    return `${Math.floor(diff / 3600000)}h`;
-  };
+  const sortedItems = useMemo(() => {
+    return [...newsItems].sort((a, b) => {
+      // Sort primarily by date
+      const dateA = new Date(a.published_at || 0).getTime();
+      const dateB = new Date(b.published_at || 0).getTime();
+      return dateB - dateA;
+    });
+  }, [newsItems]);
 
-  const sortedItems = [...newsItems].sort((a, b) => {
-    const da = new Date(a.published_at || 0).getTime();
-    const db = new Date(b.published_at || 0).getTime();
-    return db - da; // Newest first
-  });
+  // Group items: First 3 as "Top News", others by Source
+  const topNews = sortedItems.slice(0, 3);
+  const otherNews = sortedItems.slice(3);
+
+  const groupedOthers = useMemo(() => {
+    const groups: Record<string, NewsItem[]> = {};
+    otherNews.forEach(item => {
+      if (!groups[item.source]) {
+        groups[item.source] = [];
+      }
+      groups[item.source].push(item);
+    });
+    return groups;
+  }, [otherNews]);
+
+  // Calculate read time (approx 200 wpm)
+  const totalWords = newsItems.reduce((acc, item) => {
+    return acc + (item.summary?.split(/\s+/).length || 0) + (item.title.split(/\s+/).length || 0);
+  }, 0);
+  const readTimeMinutes = Math.floor(totalWords / 200);
+  const readTimeSeconds = Math.floor(((totalWords % 200) / 200) * 60);
+
+  const introContent = useMemo(() => {
+    if (newsItems.length === 0) {
+      return (
+        <>
+          <IntroText>
+            Your daily briefing is ready. You can finally take a break from the AI firehose.
+          </IntroText>
+          <IntroText>
+            Our algos are currently fetching the latest updates. Click refresh to get started.
+          </IntroText>
+        </>
+      );
+    }
+
+    // Get unique sources
+    const sources = Array.from(new Set(newsItems.map(i => i.source)));
+    const displaySources = sources.slice(0, 3);
+    const sourceText = displaySources.join(', ') + (sources.length > 3 ? ', and more' : '');
+
+    // Get top 2 titles for highlights
+    const topTitles = newsItems.slice(0, 2).map(i => i.title);
+
+    return (
+      <>
+        <IntroText>
+          Your daily briefing is ready. Today we've curated {newsItems.length} updates from <strong>{sourceText}</strong>.
+        </IntroText>
+        <IntroText>
+          Highlights include {topTitles.map((t, i) => (
+            <span key={i}>
+              <strong>"{t}"</strong>{i < topTitles.length - 1 ? ' and ' : ''}
+            </span>
+          ))}.
+        </IntroText>
+        <IntroText>
+          Here's the must-read:
+        </IntroText>
+      </>
+    );
+  }, [newsItems]);
 
   return (
     <Container>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-        <div>
-          <Title>Briefing</Title>
-          <Subtitle>{sortedItems.length} available updates</Subtitle>
+      <HeaderSection>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+          <Greeting style={{ marginBottom: 0 }}>Hey {userName},</Greeting>
+          <RefreshButton onClick={handleRefresh} $refreshing={refreshing} disabled={refreshing}>
+            <span className={`codicon codicon-refresh ${refreshing ? 'codicon-modifier-spin' : ''}`}></span>
+            {refreshing ? 'Updating...' : 'Refresh'}
+          </RefreshButton>
         </div>
-        {onRefresh && (
-          <RefreshIcon onClick={handleRefresh} rotating={refreshing} title="Refresh News">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M13.65 2.35A7.96 7.96 0 0 0 8 0a8 8 0 1 0 8 8c0-2.15-.85-4.1-2.25-5.55l-1.45 1.45A5.96 5.96 0 0 1 14 8a6 6 0 1 1-6-6c1.6 0 3.05.65 4.15 1.75l-1.9 1.9h5.1v-5.1l-1.7 1.8z"/>
-            </svg>
-          </RefreshIcon>
-        )}
-      </div>
+        {introContent}
+      </HeaderSection>
 
-      {sortedItems.length === 0 ? (
-        <EmptyState>
-          <svg fill="currentColor" viewBox="0 0 16 16">
-            <path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
-            <path d="M4 4h8v1H4V4zm0 3h8v1H4V7zm0 3h6v1H4v-1z"/>
-          </svg>
-          <p>You're all caught up</p>
-          <VSCodeButton appearance="secondary" onClick={handleRefresh}>Check for Updates</VSCodeButton>
-        </EmptyState>
-      ) : (
-        <ListContainer>
-          {sortedItems.map((item) => (
-            // Entire card is clickable to open article
-            <ListItem 
-              key={item.id || item.url}
-              onClick={() => onOpenUrl(item.url)}
-            >
-              <ContentColumn>
-                <MetaRow>
-                  <Source>{item.source}</Source>
-                  <span>•</span>
-                  <span>{formatDate(item.published_at)}</span>
-                </MetaRow>
-                
-                <NewsTitle>
-                  {item.title}
-                </NewsTitle>
-                
-                {item.summary && <Summary>{item.summary}</Summary>}
-              </ContentColumn>
-              
-              <ActionColumn>
-                <ActionButton 
-                  className="action-btn read-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenUrl(item.url);
-                  }}
-                  title="Read Article"
-                  aria-label="Read Article"
-                >
-                  <span className="codicon codicon-link-external"></span>
-                </ActionButton>
-                
-                <ActionButton 
-                  className="action-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    item.id && onMarkAsRead(item.id);
-                  }}
-                  title="Mark as Read"
-                  aria-label="Mark as Read"
-                >
-                  <span className="codicon codicon-check"></span>
-                </ActionButton>
-              </ActionColumn>
-            </ListItem>
-          ))}
-        </ListContainer>
-      )}
+      <SummaryCard>
+        <SummaryHeader>
+          <SummaryTitle>Summary</SummaryTitle>
+          <ReadTime>Read time: {readTimeMinutes} min {readTimeSeconds} sec</ReadTime>
+        </SummaryHeader>
+
+        <Section>
+          <SectionLabel>Top News</SectionLabel>
+          <ItemList>
+            {topNews.map(item => (
+              <StyledNewsItem key={item.id || item.url}>
+                <Bullet>▶</Bullet>
+                <ItemContent>
+                  <ItemSource>{item.source}:</ItemSource>
+                  <ItemLink 
+                    href={item.url}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onOpenUrl(item.url);
+                    }}
+                  >
+                     {item.title}
+                  </ItemLink>
+                  {item.summary && (
+                    <ItemText> — {item.summary.substring(0, 120)}...</ItemText>
+                  )}
+                </ItemContent>
+              </StyledNewsItem>
+            ))}
+          </ItemList>
+        </Section>
+
+        {Object.entries(groupedOthers).map(([source, items]) => (
+          <Section key={source}>
+            <SectionLabel>{source}</SectionLabel>
+            <ItemList>
+              {items.map(item => (
+                <StyledNewsItem key={item.id || item.url}>
+                  <Bullet>▶</Bullet>
+                  <ItemContent>
+                    <ItemLink onClick={() => onOpenUrl(item.url)}>
+                      {item.title}
+                    </ItemLink>
+                  </ItemContent>
+                </StyledNewsItem>
+              ))}
+            </ItemList>
+          </Section>
+        ))}
+
+        {newsItems.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '20px', opacity: 0.6 }}>
+            No news items available. Try refreshing.
+          </div>
+        )}
+      </SummaryCard>
     </Container>
   );
 };

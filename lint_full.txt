@@ -25,9 +25,6 @@
 /Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/factory/agent.factory.ts
   3:3  warning  'AnnotationRoot' is defined but never used  @typescript-eslint/no-unused-vars
 
-/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/handlers/message-handler.ts
-  92:11  error  Duplicate case label  no-duplicate-case
-
 /Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/langgraph/state/agent-state.ts
   3:7  warning  'stateAnnotation' is assigned a value but never used  @typescript-eslint/no-unused-vars
 
@@ -92,8 +89,6 @@
 
 /Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/llms/completion-factory.ts
   43:11  warning  'cacheKey' is assigned a value but never used  @typescript-eslint/no-unused-vars
-  82:11  error    Unexpected lexical declaration in case block   no-case-declarations
-  84:11  error    Unexpected lexical declaration in case block   no-case-declarations
 
 /Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/llms/deepseek/deepseek.ts
   278:17  warning  'tokenCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
@@ -133,9 +128,6 @@
 
 /Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/code-indexing.ts
   26:21  warning  'model' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/codebase-analysis-worker.ts
-  180:9  error  Unexpected lexical declaration in case block  no-case-declarations
 
 /Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/codebase-understanding.service.ts
   310:5   warning  'analysis' is defined but never used  @typescript-eslint/no-unused-vars
@@ -275,27 +267,11 @@
   464:15  warning  'config' is assigned a value but never used          @typescript-eslint/no-unused-vars
 
 /Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/tools/memory.ts
-   94:9  error  Unexpected lexical declaration in case block  no-case-declarations
-  109:9  error  Unexpected lexical declaration in case block  no-case-declarations
-  123:9  error  Unexpected lexical declaration in case block  no-case-declarations
-  124:9  error  Unexpected lexical declaration in case block  no-case-declarations
-  133:9  error  Unexpected lexical declaration in case block  no-case-declarations
-  134:9  error  Unexpected lexical declaration in case block  no-case-declarations
-
-/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/tools/todo.ts
-  55:9  error  Unexpected lexical declaration in case block  no-case-declarations
-  67:9  error  Unexpected lexical declaration in case block  no-case-declarations
+  136:9  error  Unexpected lexical declaration in case block  no-case-declarations
+  137:9  error  Unexpected lexical declaration in case block  no-case-declarations
 
 /Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/tools/tools.ts
-  424:11  error  Unexpected lexical declaration in case block                  no-case-declarations
-  483:7   error  Do not use "@ts-ignore" because it alters compilation errors  @typescript-eslint/ban-ts-comment
-  635:11  error  Unexpected lexical declaration in case block                  no-case-declarations
-  647:11  error  Unexpected lexical declaration in case block                  no-case-declarations
-  651:11  error  Unexpected lexical declaration in case block                  no-case-declarations
-  664:11  error  Unexpected lexical declaration in case block                  no-case-declarations
-
-/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/utils/terminal.ts
-  407:27  error  Require statement not part of import statement  @typescript-eslint/no-var-requires
+  424:11  error  Unexpected lexical declaration in case block  no-case-declarations
 
 /Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/utils/utils.ts
    13:10  warning  'spawn' is defined but never used                  @typescript-eslint/no-unused-vars
@@ -366,5 +342,5 @@
 /Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/workers/embedding-worker.ts
   213:11  warning  'results' is assigned a value but never used  @typescript-eslint/no-unused-vars
 
-✖ 191 problems (19 errors, 172 warnings)
+✖ 175 problems (3 errors, 172 warnings)
 

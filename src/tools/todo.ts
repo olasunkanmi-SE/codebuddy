@@ -49,7 +49,7 @@ export class TodoTool {
     const tasks = this.loadTasks();
 
     switch (action) {
-      case "add":
+      case "add": {
         if (!task?.content)
           return "Error: Task content is required for 'add' action.";
         const newTask: Task = {
@@ -61,8 +61,9 @@ export class TodoTool {
         tasks.push(newTask);
         this.saveTasks(tasks);
         return `Task added: [${newTask.id}] ${newTask.content}`;
+      }
 
-      case "update":
+      case "update": {
         if (!task?.id) return "Error: Task ID is required for 'update' action.";
         const taskIndex = tasks.findIndex((t) => t.id === task.id);
         if (taskIndex === -1)
@@ -71,6 +72,7 @@ export class TodoTool {
         tasks[taskIndex] = { ...tasks[taskIndex], ...task };
         this.saveTasks(tasks);
         return `Task updated: [${task.id}] ${tasks[taskIndex].content} (${tasks[taskIndex].status})`;
+      }
 
       case "list":
         if (tasks.length === 0) return "No tasks found.";

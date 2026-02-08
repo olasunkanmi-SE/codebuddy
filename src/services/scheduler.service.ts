@@ -83,8 +83,8 @@ export class SchedulerService {
         });
       }
 
-      // --- Task 3: Evening News (6 PM) ---
-      if (currentHour >= 18) {
+      // --- Task 3: Evening News (5 PM) ---
+      if (currentHour >= 17) {
         await this.tryRunTask("news_evening", async () => {
           this.logger.info("Executing scheduled task: news_evening");
           await newsService.fetchAndStoreNews();
