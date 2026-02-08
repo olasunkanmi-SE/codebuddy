@@ -2,7 +2,9 @@ import * as vscode from "vscode";
 import { SqliteDatabaseService } from "./sqlite-database.service";
 import { NewsService } from "./news.service";
 import { Logger } from "../infrastructure/logger/logger";
-import { CodeHealthTask } from "./tasks/code-health.task"; // Import the new task
+import { CodeHealthTask } from "./tasks/code-health.task";
+import { DependencyCheckTask } from "./tasks/dependency-check.task";
+import { StandupService } from "./standup.service";
 
 export class SchedulerService {
   private static instance: SchedulerService;
@@ -10,11 +12,15 @@ export class SchedulerService {
   private logger: Logger;
   private intervalId: NodeJS.Timeout | undefined;
   private codeHealthTask: CodeHealthTask;
+  private standupService: StandupService;
+  private dependencyCheckTask: DependencyCheckTask;
 
   private constructor() {
     this.dbService = SqliteDatabaseService.getInstance();
     this.logger = Logger.initialize("SchedulerService", {});
     this.codeHealthTask = new CodeHealthTask();
+    this.standupService = StandupService.getInstance();
+    this.dependencyCheckTask = new DependencyCheckTask();
   }
 
   public static getInstance(): SchedulerService {
@@ -85,12 +91,37 @@ export class SchedulerService {
         });
       }
 
-      // --- Task 4: Code Health Check (9 AM - Daily Standup) ---
+      // --- Task 4: Code Health Check (9 AM) ---
       if (currentHour >= 9) {
-        await this.tryRunTask("code_health_daily", async () => {
-          this.logger.info("Executing scheduled task: code_health_daily");
-          await this.codeHealthTask.execute();
-        });
+        const config = vscode.workspace.getConfiguration("codebuddy.automations");
+        if (config.get<boolean>("codeHealth.enabled", true)) {
+          await this.tryRunTask("code_health_daily", async () => {
+            this.logger.info("Executing scheduled task: code_health_daily");
+            await this.codeHealthTask.execute();
+          });
+        }
+      }
+
+      // --- Task 5: Daily Standup (8 AM) ---
+      if (currentHour >= 8) {
+        const config = vscode.workspace.getConfiguration("codebuddy.automations");
+        if (config.get<boolean>("dailyStandup.enabled", true)) {
+          await this.tryRunTask("daily_standup", async () => {
+            this.logger.info("Executing scheduled task: daily_standup");
+            await this.standupService.generateReport();
+          });
+        }
+      }
+
+      // --- Task 6: Dependency Check (11 AM) ---
+      if (currentHour >= 11) {
+        const config = vscode.workspace.getConfiguration("codebuddy.automations");
+        if (config.get<boolean>("dependencyCheck.enabled", true)) {
+          await this.tryRunTask("dependency_check", async () => {
+            this.logger.info("Executing scheduled task: dependency_check");
+            await this.dependencyCheckTask.execute();
+          });
+        }
       }
     } catch (error) {
       this.logger.error("Error in Scheduler Service", error);

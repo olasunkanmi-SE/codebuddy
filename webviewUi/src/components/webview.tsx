@@ -107,6 +107,9 @@ interface ConfigData {
   includeHidden?: boolean;
   maxFileSize?: string;
   compactMode?: boolean;
+  dailyStandupEnabled?: boolean;
+  codeHealthEnabled?: boolean;
+  dependencyCheckEnabled?: boolean;
 }
 
 export const WebviewUI = () => {
@@ -134,6 +137,9 @@ export const WebviewUI = () => {
   const [includeHidden, setIncludeHidden] = useState(false);
   const [maxFileSize, setMaxFileSize] = useState("1");
   const [compactMode, setCompactMode] = useState(false);
+  const [dailyStandupEnabled, setDailyStandupEnabled] = useState(true);
+  const [codeHealthEnabled, setCodeHealthEnabled] = useState(true);
+  const [dependencyCheckEnabled, setDependencyCheckEnabled] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [fileChangesPanelCollapsed, setFileChangesPanelCollapsed] = useState(true);
   const [newsItems, setNewsItems] = useState<any[]>([]);
@@ -265,6 +271,15 @@ export const WebviewUI = () => {
         if (data["codebuddy.compactMode"] !== undefined) {
           setCompactMode(data["codebuddy.compactMode"]);
         }
+        if (data["codebuddy.automations.dailyStandup.enabled"] !== undefined) {
+          setDailyStandupEnabled(data["codebuddy.automations.dailyStandup.enabled"]);
+        }
+        if (data["codebuddy.automations.codeHealth.enabled"] !== undefined) {
+          setCodeHealthEnabled(data["codebuddy.automations.codeHealth.enabled"]);
+        }
+        if (data["codebuddy.automations.dependencyCheck.enabled"] !== undefined) {
+          setDependencyCheckEnabled(data["codebuddy.automations.dependencyCheck.enabled"]);
+        }
         break;
       }
 
@@ -311,6 +326,15 @@ export const WebviewUI = () => {
         }
         if (data.compactMode !== undefined) {
           setCompactMode(data.compactMode);
+        }
+        if (data.dailyStandupEnabled !== undefined) {
+          setDailyStandupEnabled(data.dailyStandupEnabled);
+        }
+        if (data.codeHealthEnabled !== undefined) {
+          setCodeHealthEnabled(data.codeHealthEnabled);
+        }
+        if (data.dependencyCheckEnabled !== undefined) {
+          setDependencyCheckEnabled(data.dependencyCheckEnabled);
         }
         break;
       }
@@ -575,13 +599,16 @@ export const WebviewUI = () => {
     includeHidden: includeHidden,
     maxFileSize: maxFileSize,
     compactMode: compactMode,
+    dailyStandupEnabled: dailyStandupEnabled,
+    codeHealthEnabled: codeHealthEnabled,
+    dependencyCheckEnabled: dependencyCheckEnabled,
     selectedModel: selectedModel,
     username: username,
     accountType: 'Free',
     customRules: customRules,
     customSystemPrompt: customSystemPrompt,
     subagents: subagents,
-  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents]);
+  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents, dailyStandupEnabled, codeHealthEnabled, dependencyCheckEnabled]);
 
   const settingsOptions = useMemo<SettingsOptions>(() => ({
     themeOptions: themeOptions,
@@ -667,10 +694,22 @@ export const WebviewUI = () => {
       setSelectedModel(value);
       vsCode.postMessage({ command: "update-model-event", message: value });
     },
+    onDailyStandupChange: (enabled: boolean) => {
+      setDailyStandupEnabled(enabled);
+      vsCode.postMessage({ command: "daily-standup-change-event", message: enabled });
+    },
+    onCodeHealthChange: (enabled: boolean) => {
+      setCodeHealthEnabled(enabled);
+      vsCode.postMessage({ command: "code-health-change-event", message: enabled });
+    },
+    onDependencyCheckChange: (enabled: boolean) => {
+      setDependencyCheckEnabled(enabled);
+      vsCode.postMessage({ command: "dependency-check-change-event", message: enabled });
+    },
     onUsernameChange: (value: string) => {
       setUsername(value);
     },
-    postMessage: (message: { command: string; message?: any }) => {
+    postMessage: (message: { command: string; [key: string]: any }) => {
       vsCode.postMessage(message);
     },
     // Rules & Subagents handlers

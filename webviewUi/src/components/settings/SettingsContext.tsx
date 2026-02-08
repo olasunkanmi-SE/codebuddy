@@ -47,6 +47,11 @@ export interface SettingsValues {
   // Models
   selectedModel: string;
   
+  // Automations
+  dailyStandupEnabled: boolean;
+  codeHealthEnabled: boolean;
+  dependencyCheckEnabled: boolean;
+
   // Account
   username: string;
   accountType: 'Free' | 'Pro';
@@ -95,7 +100,11 @@ export interface SettingsHandlers {
   onReindexWorkspace: () => void;
   onModelChange: (value: string) => void;
   onUsernameChange: (value: string) => void;
-  postMessage: (message: { command: string; message?: any }) => void;
+  postMessage: (message: { command: string; [key: string]: any }) => void;
+  // Automations handlers
+  onDailyStandupChange: (enabled: boolean) => void;
+  onCodeHealthChange: (enabled: boolean) => void;
+  onDependencyCheckChange: (enabled: boolean) => void;
   // Rules & Subagents handlers
   onAddRule: (rule: Omit<CustomRule, 'id' | 'createdAt'>) => void;
   onUpdateRule: (id: string, updates: Partial<CustomRule>) => void;
@@ -207,6 +216,9 @@ const defaultContextValue: SettingsContextType = {
     maxFileSize: '1',
     compactMode: false,
     selectedModel: 'Groq',
+    dailyStandupEnabled: true,
+    codeHealthEnabled: true,
+    dependencyCheckEnabled: true,
     username: '',
     accountType: 'Free',
     customRules: [],
@@ -242,6 +254,9 @@ const defaultContextValue: SettingsContextType = {
     onCompactModeChange: () => {},
     onReindexWorkspace: () => {},
     onModelChange: () => {},
+    onDailyStandupChange: () => {},
+    onCodeHealthChange: () => {},
+    onDependencyCheckChange: () => {},
     onUsernameChange: () => {},
     postMessage: () => {},
     onAddRule: () => {},

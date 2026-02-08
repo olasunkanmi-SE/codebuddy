@@ -67,6 +67,16 @@
       ],
       "editor/context": [
         {
+          "command": "codebuddy.triggerDailyStandup",
+          "group": "CodeBuddy",
+          "when": "editorFocus"
+        },
+        {
+          "command": "codebuddy.triggerCodeHealth",
+          "group": "CodeBuddy",
+          "when": "editorFocus"
+        },
+        {
           "when": "editorHasSelection",
           "command": "CodeBuddy.commentCode",
           "group": "CodeBuddy"
@@ -174,7 +184,19 @@
       },
       {
         "command": "CodeBuddy.reviewPR",
-        "title": "CodeBuddy. Review Pull Request"
+        "title": "CodeBuddy: Review Pull Request"
+      },
+      {
+        "command": "codebuddy.triggerDailyStandup",
+        "title": "CodeBuddy: Trigger Daily Standup"
+      },
+      {
+        "command": "codebuddy.triggerCodeHealth",
+        "title": "CodeBuddy: Trigger Code Health Check"
+      },
+      {
+        "command": "codebuddy.triggerDependencyCheck",
+        "title": "CodeBuddy: Trigger Dependency Check"
       },
       {
         "command": "CodeBuddy.rules.open",
@@ -676,6 +698,21 @@
             "default": {},
             "description": "Stores the configuration of MCP servers",
             "scope": "application"
+          },
+          "codebuddy.automations.dailyStandup.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable or disable the Daily Standup automation (8:00 AM)"
+          },
+          "codebuddy.automations.codeHealth.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable or disable the Daily Code Health Check (9:00 AM)"
+          },
+          "codebuddy.automations.dependencyCheck.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable or disable the Daily Dependency Check (11:00 AM)"
           }
         }
       }

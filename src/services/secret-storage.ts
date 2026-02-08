@@ -89,6 +89,12 @@ export class SecretStorageService implements vscode.Disposable {
       config.get<boolean>("codebuddy.includeHidden") ?? false;
     const maxFileSize = config.get<string>("codebuddy.maxFileSize") || "1";
     const compactMode = config.get<boolean>("codebuddy.compactMode") ?? false;
+    const dailyStandupEnabled =
+      config.get<boolean>("codebuddy.automations.dailyStandup.enabled") ?? true;
+    const codeHealthEnabled =
+      config.get<boolean>("codebuddy.automations.codeHealth.enabled") ?? true;
+    const dependencyCheckEnabled =
+      config.get<boolean>("codebuddy.automations.dependencyCheck.enabled") ?? true;
     const preferences = {
       username: nickname || username,
       theme: theme || "tokyo night", // default theme
@@ -104,6 +110,9 @@ export class SecretStorageService implements vscode.Disposable {
       includeHidden,
       maxFileSize,
       compactMode,
+      dailyStandupEnabled,
+      codeHealthEnabled,
+      dependencyCheckEnabled,
     };
     this.orchestrator.publish(
       "onGetUserPreferences",

@@ -593,6 +593,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               vscode.commands.executeCommand("codebuddy.indexWorkspace");
               break;
             }
+            case "execute-command": {
+              if (message.commandId) {
+                vscode.commands.executeCommand(message.commandId);
+              }
+              break;
+            }
             case "user-input": {
               this.UserMessageCounter += 1;
               const selectedGenerativeAiModel = getConfigValue(

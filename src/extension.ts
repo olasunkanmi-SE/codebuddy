@@ -58,6 +58,9 @@ import { AgentRunningGuardService } from "./services/agent-running-guard.service
 import { DiffReviewService } from "./services/diff-review.service";
 import { SecretStorageService } from "./services/secret-storage";
 import { AstIndexingService } from "./services/ast-indexing.service";
+import { StandupService } from "./services/standup.service";
+import { CodeHealthTask } from "./services/tasks/code-health.task";
+import { DependencyCheckTask } from "./services/tasks/dependency-check.task";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -311,6 +314,31 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand(
         "codebuddy.indexWorkspace",
         indexWorkspaceCommand,
+      ),
+    );
+
+    // Register Automation Triggers
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "codebuddy.triggerDailyStandup",
+        async () => {
+          logger.info("Manually triggering Daily Standup...");
+          await StandupService.getInstance().generateReport();
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.triggerCodeHealth",
+        async () => {
+          logger.info("Manually triggering Code Health Check...");
+          await new CodeHealthTask().execute();
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.triggerDependencyCheck",
+        async () => {
+          logger.info("Manually triggering Dependency Check...");
+          await new DependencyCheckTask().execute();
+        },
       ),
     );
 
