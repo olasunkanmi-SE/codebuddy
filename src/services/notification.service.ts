@@ -38,7 +38,7 @@ export class NotificationService {
     type: "info" | "warning" | "error" | "success",
     title: string,
     message: string,
-    source: string = "System",
+    source = "System",
   ): Promise<void> {
     try {
       await this.dbService.initialize();
@@ -58,7 +58,7 @@ export class NotificationService {
    * Get all notifications
    */
   public async getNotifications(
-    limit: number = 50,
+    limit = 50,
   ): Promise<NotificationItem[]> {
     try {
       await this.dbService.initialize();

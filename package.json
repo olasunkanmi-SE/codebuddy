@@ -757,6 +757,7 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
+    "fix": "eslint src --ext ts --fix",
     "test": "vscode-test",
     "format": "prettier --write \"**/*.ts\"",
     "fix-chromadb": "npm uninstall chromadb && npm install chromadb@1.8.1",
