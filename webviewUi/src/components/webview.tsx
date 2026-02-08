@@ -22,9 +22,10 @@ import { UserMessage } from "./personMessage";
 import { SettingsPanel, SettingsGearIcon, SettingsValues, SettingsOptions, SettingsHandlers, DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS, DEFAULT_FONT_FAMILY_OPTIONS, DEFAULT_FONT_SIZE_OPTIONS, CustomRule, SubagentConfig } from "./settings/index";
 import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
-import { News } from "./news/News";
 import { SessionsPanel, ChatSession } from "./sessions";
 import { NotificationPanel, INotificationItem } from "./notifications";
+import { UpdatesPanel } from "./updates/UpdatesPanel";
+import { ObservabilityPanel } from "./observability/ObservabilityPanel";
 
 // Styled components for settings toggle
 const SettingsToggleButton = styled.button`
@@ -133,6 +134,51 @@ const NotificationIcon = ({ size = 18 }: { size?: number }) => (
   </svg>
 );
 
+// Book icon component for Updates
+const BookIcon = ({ size = 18 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  </svg>
+);
+
+// Styled component for updates toggle button
+const UpdatesToggleButton = styled.button`
+  position: fixed;
+  top: 144px;
+  left: 12px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
 const vsCode = vscode;
@@ -173,7 +219,7 @@ export const WebviewUI = () => {
   const [username, setUsername] = useState("");
   const [enableStreaming, setEnableStreaming] = useState(true);
   const [fontFamily, setFontFamily] = useState("JetBrains Mono");
-  const [fontSize, setFontSize] = useState(16);
+  const [fontSize, setFontSize] = useState(13);
   const [autoApprove, setAutoApprove] = useState(false);
   const [allowFileEdits, setAllowFileEdits] = useState(true);
   const [allowTerminal, setAllowTerminal] = useState(true);
@@ -204,8 +250,13 @@ export const WebviewUI = () => {
 
   // Notifications state
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [isUpdatesPanelOpen, setIsUpdatesPanelOpen] = useState(false);
   const [notifications, setNotifications] = useState<INotificationItem[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  const [logs, setLogs] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<any>(null);
+  // const [dependencyGraph, setDependencyGraph] = useState<string | null>(null);
 
   // Ref for username input element
   // const nameInputRef = useRef<HTMLInputElement>(null);
@@ -323,6 +374,20 @@ export const WebviewUI = () => {
       case "onActiveworkspaceUpdate":
         setActiveEditor(message.message ?? "");
         break;
+
+      case "observability-logs":
+        setLogs(message.logs);
+        break;
+      case "observability-metrics":
+        setMetrics(message.metrics);
+        break;
+      case "log-entry":
+        setLogs((prev) => [...prev, message.event].slice(-1000));
+        break;
+
+      /* case "dependency-graph":
+        setDependencyGraph(message.graph);
+        break; */
 
       case "onConfigurationChange": {
         const data = JSON.parse(message.message);
@@ -935,10 +1000,31 @@ export const WebviewUI = () => {
         onClearAll={handleNotificationClearAll}
       />
 
+      {/* Updates Toggle Button */}
+      <UpdatesToggleButton
+        onClick={() => setIsUpdatesPanelOpen(true)}
+        aria-label="Open updates"
+        title="Updates"
+      >
+        <BookIcon size={18} />
+      </UpdatesToggleButton>
+
+      {/* Updates Panel */}
+      <UpdatesPanel
+        isOpen={isUpdatesPanelOpen}
+        onClose={() => setIsUpdatesPanelOpen(false)}
+        newsItems={newsItems}
+        onMarkAsRead={handleMarkAsRead}
+        onRefresh={handleRefreshNews}
+        onOpenUrl={handleOpenUrl}
+        userName={username || "Developer"}
+      />
+
       <VSCodePanels className="vscodePanels" activeid="tab-1">
         <VSCodePanelTab id="tab-1">CHAT</VSCodePanelTab>
         <VSCodePanelTab id="tab-2">FAQ</VSCodePanelTab>
-        <VSCodePanelTab id="tab-3">NEWS</VSCodePanelTab>
+        <VSCodePanelTab id="tab-4">OBSERVABILITY</VSCodePanelTab>
+        {/* <VSCodePanelTab id="tab-5">VISUALIZER</VSCodePanelTab> */}
         <VSCodePanelView id="view-1">
           <div className="panel-body-scroll">
             <div className={`chat-content ${compactMode ? 'compact-mode' : ''}`}>
@@ -1011,17 +1097,13 @@ export const WebviewUI = () => {
           </div>
         </VSCodePanelView>
         
-        <VSCodePanelView id="view-3">
-          <div className="panel-body-scroll">
-            <News 
-              newsItems={newsItems} 
-              onMarkAsRead={handleMarkAsRead}
-              onRefresh={handleRefreshNews}
-              onOpenUrl={handleOpenUrl}
-              userName={username || "Ola"}
-            />
-          </div>
+        <VSCodePanelView id="view-4">
+          <ObservabilityPanel vsCode={vsCode} logs={logs} metrics={metrics} />
         </VSCodePanelView>
+
+        {/* <VSCodePanelView id="view-5">
+          <VisualizerPanel vsCode={vsCode} graph={dependencyGraph} />
+        </VSCodePanelView> */}
       </VSCodePanels>
 
       <div

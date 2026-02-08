@@ -65,6 +65,20 @@ export class Logger {
   static sessionId: string;
   private static traceId: string;
   static instance: Logger;
+
+  // Observability features
+  private static logEmitter = new vscode.EventEmitter<ILogEvent>();
+  private static logBuffer: ILogEvent[] = [];
+  private static readonly MAX_LOG_BUFFER = 1000;
+
+  public static get onDidLog(): vscode.Event<ILogEvent> {
+    return this.logEmitter.event;
+  }
+
+  public static getRecentLogs(): ILogEvent[] {
+    return this.logBuffer;
+  }
+
   constructor(private readonly module: string) {}
 
   public static initialize(
@@ -170,6 +184,16 @@ export class Logger {
     if (!this.shouldLog(level)) return;
 
     const event = this.formatLogEvent(level, message, data);
+
+    // Buffer logs
+    Logger.logBuffer.push(event);
+    if (Logger.logBuffer.length > Logger.MAX_LOG_BUFFER) {
+      Logger.logBuffer.shift();
+    }
+
+    // Emit log event
+    Logger.logEmitter.fire(event);
+
     this.logToConsole(event);
     this.logToFile(event);
     if (

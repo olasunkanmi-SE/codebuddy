@@ -212,7 +212,7 @@ const defaultContextValue: SettingsContextType = {
     codeBuddyMode: 'Ask',
     enableStreaming: true,
     fontFamily: 'JetBrains Mono',
-    fontSize: 16,
+    fontSize: 13,
     autoApprove: false,
     allowFileEdits: true,
     allowTerminal: true,

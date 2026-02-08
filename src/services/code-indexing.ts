@@ -4,7 +4,7 @@ import { CodeRepository } from "../infrastructure/repository/code";
 import { CodeStructureMapper } from "./code-structure.mapper";
 import { EmbeddingService } from "./embedding";
 import { TypeScriptAtsMapper } from "./typescript-ats.service";
-import { getAPIKeyAndModel } from "../utils/utils";
+import { getAPIKeyAndModel, getGenerativeAiModel } from "../utils/utils";
 import { LogLevel } from "./telemetry";
 
 /**
@@ -23,8 +23,13 @@ export class CodeIndexingService {
       enableFile: true,
       enableTelemetry: true,
     });
-    const { apiKey, model } = getAPIKeyAndModel("gemini");
-    this.embeddingService = new EmbeddingService(apiKey);
+    const provider = getGenerativeAiModel() || "Gemini";
+    const { apiKey, baseUrl } = getAPIKeyAndModel(provider);
+    this.embeddingService = new EmbeddingService({
+      apiKey,
+      provider,
+      baseUrl,
+    });
   }
 
   /**

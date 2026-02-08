@@ -3,6 +3,7 @@ import {
   GenerativeModel,
   GoogleGenerativeAI,
 } from "@google/generative-ai";
+import OpenAI from "openai";
 import { EmbeddingsConfig } from "../application/constant";
 import { IFunctionData } from "../application/interfaces";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
@@ -21,9 +22,17 @@ interface BatchProcessResult {
   generateComments: IFunctionData[];
 }
 
+export interface EmbeddingProviderConfig {
+  apiKey: string;
+  provider: string;
+  model?: string;
+  baseUrl?: string;
+}
+
 /**
  * EmbeddingService is responsible for generating embeddings and text comments for functions.
  * It handles rate limiting, retries, and error logging.
+ * Supports Gemini and OpenAI-compatible providers.
  * @export
  * @class EmbeddingService
  */
@@ -33,28 +42,54 @@ export class EmbeddingService {
 
   private readonly options: Required<EmbeddingServiceOptions>;
   private readonly requestInterval: number;
-  private readonly genAI: GoogleGenerativeAI;
+  private readonly genAI: GoogleGenerativeAI | undefined;
+  private readonly openai: OpenAI | undefined;
   private readonly logger: Logger;
-  readonly model: GenerativeModel;
+  private readonly provider: string;
+  private readonly modelName: string | undefined;
 
-  constructor(private readonly apiKey: string) {
-    if (!this.apiKey) {
-      throw new Error("Gemini API key is required for embedding generation");
+  constructor(config: EmbeddingProviderConfig) {
+    if (!config.apiKey && config.provider !== "Local") {
+      throw new Error(
+        `${config.provider} API key is required for embedding generation`,
+      );
     }
 
+    this.provider = config.provider.toLowerCase();
+    this.modelName = config.model;
     this.options = { ...EmbeddingService.DEFAULT_OPTIONS };
     //update this to 120000
     this.requestInterval = (60 * 1000) / this.options.rateLimit;
-    this.genAI = new GoogleGenerativeAI(this.apiKey);
+
     this.logger = Logger.initialize("EmbeddingService", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
       enableFile: true,
       enableTelemetry: true,
     });
-    // Always use Gemini models for consistent embedding space
-    const embeddingModel = this.getEmbeddingModelFromConfig();
-    this.model = this.getModel(embeddingModel);
+
+    if (this.provider === "gemini") {
+      this.genAI = new GoogleGenerativeAI(config.apiKey);
+    } else if (
+      this.provider === "openai" ||
+      this.provider === "local" ||
+      this.provider === "deepseek" ||
+      this.provider === "groq"
+    ) {
+      // OpenAI compatible providers
+      const baseURL = config.baseUrl;
+      this.openai = new OpenAI({
+        apiKey: config.apiKey,
+        baseURL: baseURL,
+      });
+    } else {
+      // Fallback or default to Gemini if unknown, but better to warn
+      this.logger.warn(
+        `Unsupported provider for embeddings: ${this.provider}. Defaulting to Gemini logic if possible.`,
+      );
+      this.genAI = new GoogleGenerativeAI(config.apiKey);
+      this.provider = "gemini";
+    }
   }
 
   /**
@@ -101,10 +136,14 @@ export class EmbeddingService {
     return Math.max(0, this.requestInterval - elapsed);
   }
 
-  getModel(aiModel?: string): GenerativeModel {
-    return this.genAI.getGenerativeModel({
-      model: aiModel ?? this.options.embeddingModel,
-    });
+  getModel(aiModel?: string): GenerativeModel | undefined {
+    const genAI = this.genAI;
+    if (genAI) {
+      return genAI.getGenerativeModel({
+        model: aiModel ?? this.options.embeddingModel,
+      });
+    }
+    return undefined;
   }
 
   /**
@@ -116,12 +155,33 @@ export class EmbeddingService {
    * @memberof EmbeddingService
    */
   async generateEmbedding(text: string, aiModel?: string) {
-    const model = this.genAI.getGenerativeModel({
-      model: aiModel ?? this.options.embeddingModel,
-    });
-    const result: EmbedContentResponse = await model.embedContent(text);
-    const embedding = result.embedding.values;
-    return embedding;
+    const openai = this.openai;
+    if (openai) {
+      const model = aiModel ?? this.modelName ?? "text-embedding-3-small";
+      try {
+        const response = await openai.embeddings.create({
+          model,
+          input: text,
+          encoding_format: "float",
+        });
+        return response.data[0].embedding;
+      } catch (error: any) {
+        this.logger.error("OpenAI embedding generation failed", error);
+        throw error;
+      }
+    }
+
+    const genAI = this.genAI;
+    if (genAI) {
+      const model = genAI.getGenerativeModel({
+        model: aiModel ?? this.options.embeddingModel,
+      });
+      const result: EmbedContentResponse = await model.embedContent(text);
+      const embedding = result.embedding.values;
+      return embedding;
+    }
+
+    throw new Error("No valid embedding provider initialized");
   }
 
   /**
@@ -135,13 +195,28 @@ export class EmbeddingService {
    */
   private async generateText(item: IFunctionData): Promise<IFunctionData> {
     try {
-      const model = this.genAI.getGenerativeModel({
-        model: this.options.textModel,
-      });
-
       const prompt = this.buildPrompt(item.content);
-      const result = await model.generateContent(prompt);
-      const description = result.response.text();
+      let description = "";
+
+      const openai = this.openai;
+      const genAI = this.genAI;
+
+      if (openai) {
+        const model = this.modelName ?? "gpt-3.5-turbo";
+        const response = await openai.chat.completions.create({
+          model: model,
+          messages: [{ role: "user", content: prompt }],
+        });
+        description = response.choices[0].message.content || "";
+      } else if (genAI) {
+        const model = genAI.getGenerativeModel({
+          model: this.options.textModel,
+        });
+        const result = await model.generateContent(prompt);
+        description = result.response.text();
+      } else {
+        throw new Error("No valid provider for text generation");
+      }
 
       return {
         ...item,

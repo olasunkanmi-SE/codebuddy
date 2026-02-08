@@ -28,11 +28,17 @@ export class ContextRetriever {
 
   constructor(context?: vscode.ExtensionContext) {
     // this.codeRepository = CodeRepository.getInstance();
-    // Always use Gemini for embeddings to ensure consistency
-    // regardless of the selected chat model (Groq, Anthropic, etc.)
-    const embeddingProvider = "Gemini";
-    const { apiKey: embeddingApiKey } = getAPIKeyAndModel(embeddingProvider);
-    this.embeddingService = new EmbeddingService(embeddingApiKey);
+
+    // Use the currently selected provider for embeddings
+    const provider = getGenerativeAiModel() || "Gemini";
+    const { apiKey, baseUrl } = getAPIKeyAndModel(provider);
+
+    this.embeddingService = new EmbeddingService({
+      apiKey,
+      provider,
+      baseUrl,
+    });
+
     this.logger = Logger.initialize("ContextRetriever", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
@@ -62,30 +68,161 @@ export class ContextRetriever {
     if (!this.vectorStore) {
       return "Semantic search is not available (Vector Store not initialized).";
     }
+
+    let results: any[] = [];
+    let searchMethod = "Semantic";
+
     try {
       this.logger.info(`Generating embedding for query: ${input}`);
       const embedding = await this.embeddingService.generateEmbedding(input);
       this.logger.info("Retrieving context from Vector Store");
 
-      const results = await this.vectorStore.search(
+      results = await this.vectorStore.search(
         embedding,
         ContextRetriever.SEARCH_RESULT_COUNT,
       );
-
-      if (results.length === 0) {
-        return "No relevant context found in the knowledge base.";
-      }
-
-      return results
-        .map(
-          (r) =>
-            `File: ${r.document.metadata.filePath}\nRelevance: ${r.score.toFixed(2)}\nContent:\n${r.document.text}`,
-        )
-        .join("\n\n---\n\n");
     } catch (error: any) {
-      this.logger.error("Unable to retrieve context", error);
-      return `Error retrieving context: ${error.message}`;
+      this.logger.warn(
+        "Embedding generation failed, falling back to keyword search",
+        error,
+      );
+      searchMethod = "Keyword (Fallback)";
+
+      // Fallback to keyword search
+      results = await this.vectorStore.keywordSearch(
+        input,
+        ContextRetriever.SEARCH_RESULT_COUNT,
+      );
     }
+
+    // Check if query is general/architectural
+    const isGeneralQuery = this.isGeneralQuery(input);
+
+    // Determine if we should include common files:
+    // 1. If semantic search failed (fallback)
+    // 2. If it's a general query about the application
+    if (results.length === 0 || isGeneralQuery) {
+      this.logger.info(
+        `Retrieving common files. Reason: ${results.length === 0 ? "Fallback (No results)" : "General Query"}`,
+      );
+      const commonFilesResults = await this.retrieveCommonFiles();
+
+      // If it was a general query, append common files to existing results
+      // If it was a fallback, we just use common files (and any keyword matches if we had them)
+      results = [...results, ...commonFilesResults];
+
+      if (results.length === 0 && searchMethod.includes("Fallback")) {
+        searchMethod = "Keyword (Fallback) + Common Files";
+      } else if (isGeneralQuery) {
+        searchMethod += " + Common Files";
+      }
+    }
+
+    // Deduplicate by file path
+    const seenPaths = new Set();
+    results = results.filter((r) => {
+      const path = r.document.metadata.filePath;
+      if (seenPaths.has(path)) return false;
+      seenPaths.add(path);
+      return true;
+    });
+
+    // Limit results
+    results = results.slice(0, 15);
+
+    if (results.length === 0) {
+      return `No relevant context found in the knowledge base using ${searchMethod} search.`;
+    }
+
+    return results
+      .map(
+        (r) =>
+          `File: ${r.document.metadata.filePath}\nRelevance: ${r.score.toFixed(2)} (${searchMethod})\nContent:\n${r.document.text}`,
+      )
+      .join("\n\n---\n\n");
+  }
+
+  private isGeneralQuery(input: string): boolean {
+    const generalKeywords = [
+      "overview",
+      "architecture",
+      "structure",
+      "stack",
+      "codebase",
+      "project",
+      "scaffold",
+      "how does the app work",
+    ];
+
+    const lowerInput = input.toLowerCase();
+    return generalKeywords.some((keyword) => lowerInput.includes(keyword));
+  }
+
+  private async retrieveCommonFiles(): Promise<any[]> {
+    const commonFiles = [
+      "README.md",
+      "readme.md",
+      "package.json",
+      "CONTRIBUTING.md",
+      "docs/README.md",
+      "docs/architecture.md", // Added potential architecture doc
+    ];
+
+    const results: any[] = [];
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+
+    if (!workspaceFolders) {
+      this.logger.warn("No workspace folders found for common file retrieval.");
+      return [];
+    }
+
+    for (const folder of workspaceFolders) {
+      for (const fileName of commonFiles) {
+        try {
+          // Construct URI directly instead of using findFiles
+          const fileUri = vscode.Uri.joinPath(folder.uri, fileName);
+
+          // Try to read file attributes to confirm existence (and strict case matching if filesystem is sensitive)
+          // But readDirectory or just readFile is easier.
+          // We'll just try to read it. If it fails (FileNotFound), we catch it.
+
+          let content = "";
+          try {
+            const fileContent = await vscode.workspace.fs.readFile(fileUri);
+            content = Buffer.from(fileContent).toString("utf-8");
+          } catch (e) {
+            // File doesn't exist or other error
+            continue;
+          }
+
+          if (content) {
+            // Truncate if too long (e.g., 5KB)
+            const truncated =
+              content.length > 5000
+                ? content.substring(0, 5000) + "\n...(truncated)"
+                : content;
+
+            results.push({
+              document: {
+                id: `common:${fileUri.fsPath}`,
+                text: truncated,
+                metadata: { filePath: fileUri.fsPath },
+              },
+              score: 1.0, // High relevance for common files
+            });
+
+            this.logger.info(`Successfully retrieved common file: ${fileName}`);
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Unexpected error retrieving common file ${fileName}`,
+            error,
+          );
+        }
+      }
+    }
+
+    return results;
   }
 
   async indexFile(filePath: string, content: string): Promise<void> {
@@ -107,15 +244,22 @@ export class ContextRetriever {
         // To prevent freezing, we yield.
         await new Promise((resolve) => setTimeout(resolve, 10));
 
-        const embedding = await this.embeddingService.generateEmbedding(chunk);
-        if (embedding && embedding.length > 0) {
-          await this.vectorStore.addDocument({
-            id,
-            text: chunk,
-            vector: embedding,
-            metadata: { filePath },
-          });
+        let embedding: number[] | undefined;
+        try {
+          embedding = await this.embeddingService.generateEmbedding(chunk);
+        } catch (error) {
+          this.logger.warn(
+            `Failed to generate embedding for ${id}, storing text only`,
+            error,
+          );
         }
+
+        await this.vectorStore.addDocument({
+          id,
+          text: chunk,
+          vector: embedding,
+          metadata: { filePath },
+        });
       }
     } catch (error) {
       this.logger.error(`Failed to index file ${filePath}`, error);

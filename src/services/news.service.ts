@@ -71,6 +71,21 @@ const ENGINEERING_BLOG_FEEDS = [
   { name: "Julia Evans (jvns)", url: "https://jvns.ca/atom.xml" },
   { name: "StaffEng (Will Larson)", url: "https://staffeng.com/rss" },
   { name: "LangChain Blog", url: "https://blog.langchain.dev/rss/" },
+  { name: "Towards Data Science", url: "https://towardsdatascience.com/feed" },
+  // AI Agents & Research
+  { name: "DeepMind", url: "https://deepmind.google/discover/blog/rss.xml" },
+  { name: "Google Research", url: "https://research.google/blog/rss" },
+  { name: "Hugging Face", url: "https://huggingface.co/blog/feed.xml" },
+  {
+    name: "BAIR (Berkeley AI)",
+    url: "https://bair.berkeley.edu/blog/feed.xml",
+  },
+  {
+    name: "Lil'Log (Lilian Weng)",
+    url: "https://lilianweng.github.io/index.xml",
+  },
+  { name: "Eugene Yan", url: "https://eugeneyan.com/feed.xml" },
+  { name: "Simon Willison", url: "https://simonwillison.net/atom/" },
 ];
 
 export class NewsService {

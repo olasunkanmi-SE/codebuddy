@@ -8,6 +8,7 @@ import {
   SmartContextSelectorService,
   ContextSelectionResult,
 } from "./smart-context-selector.service";
+import { ContextRetriever } from "./context-retriever";
 
 export interface QuestionAnalysis {
   isCodebaseRelated: boolean;
@@ -50,6 +51,7 @@ export class EnhancedPromptBuilderService {
   private readonly _context: vscode.ExtensionContext;
   private readonly codeAnalyzerProvider: AnalyzeCodeProvider;
   private readonly smartContextSelector: SmartContextSelectorService;
+  private readonly contextRetriever: ContextRetriever;
 
   constructor(context: vscode.ExtensionContext) {
     this.logger = Logger.initialize("EnhancedPromptBuilderService", {
@@ -67,6 +69,7 @@ export class EnhancedPromptBuilderService {
     this._context = context;
     this.codeAnalyzerProvider = AnalyzeCodeProvider.getInstance(this._context);
     this.smartContextSelector = SmartContextSelectorService.getInstance();
+    this.contextRetriever = ContextRetriever.initialize(this._context);
   }
 
   async createEnhancedPrompt(
@@ -98,6 +101,35 @@ export class EnhancedPromptBuilderService {
       // Limit search terms to top 5 to avoid over-fetching
       const limitedTerms = searchTerms.slice(0, 5);
       autoGatheredCode = await this.codeAnalyzerProvider.analyse(limitedTerms);
+    }
+
+    // Retrieve semantic context from Vector Store
+    try {
+      // Only perform semantic search if no user files are selected, or as supplementary
+      if (!hasUserSelectedFiles) {
+        const semanticContext =
+          await this.contextRetriever.retrieveContext(message);
+
+        // Filter out error messages from ContextRetriever
+        if (
+          semanticContext &&
+          !semanticContext.startsWith("Semantic search is not available") &&
+          !semanticContext.startsWith("No relevant context") &&
+          !semanticContext.startsWith("Error retrieving context")
+        ) {
+          const formattedSemanticContext =
+            this.formatSemanticContext(semanticContext);
+
+          if (autoGatheredCode) {
+            autoGatheredCode += "\n\n" + formattedSemanticContext;
+          } else {
+            autoGatheredCode = formattedSemanticContext;
+          }
+          this.logger.info("Added semantic context to auto-gathered code.");
+        }
+      }
+    } catch (error) {
+      this.logger.warn("Failed to retrieve semantic context", error);
     }
 
     // Use smart context selector to pick the best context within token budget
@@ -161,6 +193,31 @@ export class EnhancedPromptBuilderService {
 
     this.logger.debug(`Enhanced prompt created with smart context selection.`);
     return enhancedPrompt;
+  }
+
+  /**
+   * Formats semantic context from ContextRetriever to match SmartContextSelector expectations
+   * Expected format by SmartContextSelector: ## File: path/to/file.ts\n```\ncode\n```
+   */
+  private formatSemanticContext(rawContext: string): string {
+    // ContextRetriever returns chunks separated by "\n\n---\n\n"
+    const chunks = rawContext.split("\n\n---\n\n");
+    return chunks
+      .map((chunk) => {
+        // Parse "File: <path>\nRelevance: <score>\nContent:\n<text>"
+        const fileMatch = chunk.match(/File: (.*?)\n/);
+        const contentMatch = chunk.match(/Content:\n([\s\S]*)/);
+
+        if (fileMatch && contentMatch) {
+          const filePath = fileMatch[1].trim();
+          const content = contentMatch[1].trim();
+          // Wrap in the format expected by SmartContextSelector
+          return `## File: ${filePath}\n\`\`\`\n${content}\n\`\`\``;
+        }
+        return "";
+      })
+      .filter((s) => s.length > 0)
+      .join("\n\n");
   }
 
   /**

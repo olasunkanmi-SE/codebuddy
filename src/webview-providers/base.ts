@@ -44,6 +44,7 @@ import { ProjectRulesService } from "../services/project-rules.service";
 import { NewsService } from "../services/news.service";
 import { ConnectorService } from "../services/connector.service";
 import { NotificationService } from "../services/notification.service";
+import { ObservabilityService } from "../services/observability.service";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -126,6 +127,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     // Initialize Phase 5 services
     this.performanceProfiler = new PerformanceProfiler(this.configManager);
+    ObservabilityService.getInstance().registerProfiler(
+      this.performanceProfiler,
+    );
     this.productionSafeguards = new ProductionSafeguards({
       maxMemoryMB: 1024,
       maxHeapMB: 512,
@@ -160,6 +164,15 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.disposables.push(
       NotificationService.getInstance().onDidNotificationChange(() => {
         this.synchronizeNotifications();
+      }),
+    );
+
+    this.disposables.push(
+      ObservabilityService.getInstance().onLog((event) => {
+        this.currentWebView?.webview.postMessage({
+          type: "log-entry",
+          event,
+        });
       }),
     );
 
@@ -1445,6 +1458,40 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               await NotificationService.getInstance().clearAll();
               await this.synchronizeNotifications();
               break;
+
+            // Observability Commands
+            case "observability-get-logs": {
+              const logs = ObservabilityService.getInstance().getRecentLogs();
+              await this.currentWebView?.webview.postMessage({
+                type: "observability-logs",
+                logs,
+              });
+              break;
+            }
+
+            case "observability-get-metrics": {
+              const metrics = ObservabilityService.getInstance().getMetrics();
+              await this.currentWebView?.webview.postMessage({
+                type: "observability-metrics",
+                metrics,
+              });
+              break;
+            }
+
+            // Dependency Graph Commands
+            case "get-dependency-graph": {
+              const { DependencyGraphService } =
+                await import("../services/dependency-graph.service");
+              const graph =
+                await DependencyGraphService.getInstance().generateGraph(
+                  message.force, // Pass force flag from frontend
+                );
+              await this.currentWebView?.webview.postMessage({
+                type: "dependency-graph",
+                graph,
+              });
+              break;
+            }
 
             case "open-codebuddy-settings":
               // Open VS Code settings filtered to CodeBuddy settings
@@ -3213,17 +3260,28 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   }
 
   protected async synchronizeNotifications(): Promise<void> {
-    if (!this.currentWebView) return;
-    const notifications =
-      await NotificationService.getInstance().getNotifications();
-    const unreadCount =
-      await NotificationService.getInstance().getUnreadCount();
+    if (!this.currentWebView) {
+      this.logger.warn("synchronizeNotifications: No currentWebView");
+      return;
+    }
+    try {
+      const notifications =
+        await NotificationService.getInstance().getNotifications();
+      const unreadCount =
+        await NotificationService.getInstance().getUnreadCount();
 
-    await this.currentWebView.webview.postMessage({
-      type: "notifications-update",
-      notifications,
-      unreadCount,
-    });
+      this.logger.info(
+        `synchronizeNotifications: Sending ${notifications.length} notifications, unread: ${unreadCount}`,
+      );
+
+      await this.currentWebView.webview.postMessage({
+        type: "notifications-update",
+        notifications,
+        unreadCount,
+      });
+    } catch (error) {
+      this.logger.error("synchronizeNotifications failed", error);
+    }
   }
 
   abstract getTokenCounts(input: string): Promise<number>;
