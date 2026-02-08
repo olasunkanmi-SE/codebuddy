@@ -86,6 +86,19 @@ const ENGINEERING_BLOG_FEEDS = [
   },
   { name: "Eugene Yan", url: "https://eugeneyan.com/feed.xml" },
   { name: "Simon Willison", url: "https://simonwillison.net/atom/" },
+  // Medium Topics
+  {
+    name: "Medium - Software Engineering",
+    url: "https://medium.com/feed/tag/software-engineering",
+  },
+  {
+    name: "Medium - AI",
+    url: "https://medium.com/feed/tag/artificial-intelligence",
+  },
+  {
+    name: "Medium - Data Science",
+    url: "https://medium.com/feed/tag/data-science",
+  },
 ];
 
 export class NewsService {

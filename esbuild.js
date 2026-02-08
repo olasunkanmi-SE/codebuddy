@@ -172,6 +172,10 @@ async function main() {
       "web-tree-sitter",
       "@vscode/ripgrep",
       // 'punycode' intentionally NOT external, so it is bundled
+      "playwright",
+      "playwright-core",
+      "chromium-bidi/lib/cjs/bidiMapper/BidiMapper",
+      "chromium-bidi/lib/cjs/cdp/CdpConnection",
     ],
     format: "cjs",
     target: "node16",

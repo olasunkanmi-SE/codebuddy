@@ -74,15 +74,12 @@ export class SqliteDatabaseService {
         // Configure sql.js with the WASM file location
         // In the bundled extension, the WASM file is in the same directory as extension.js
         const wasmPath = path.join(__dirname, "grammars", "sql-wasm.wasm");
-        this.logger.info(`Looking for WASM file at: ${wasmPath}`);
+        this.logger.info(`Loading WASM file from: ${wasmPath}`);
+
+        const wasmBinary = fs.readFileSync(wasmPath);
 
         this.SQL = await initSqlJs({
-          locateFile: (file: string) => {
-            if (file.endsWith(".wasm")) {
-              return wasmPath;
-            }
-            return file;
-          },
+          wasmBinary: wasmBinary as any,
         });
 
         // Create database in workspace or extension global storage

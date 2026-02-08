@@ -37,4 +37,7 @@ node_modules/**
 !node_modules/better-sqlite3/**
 !node_modules/@lancedb/lancedb/**
 !node_modules/apache-arrow/**
+!node_modules/playwright/**
+!node_modules/playwright-core/**
+!node_modules/chromium-bidi/**
 

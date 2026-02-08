@@ -43,6 +43,8 @@ import {
   DebugGetStateTool,
   DebugGetVariablesTool,
 } from "./debugger";
+import { PlaywrightTool } from "../../../tools/playwright";
+import { LangChainPlaywrightTool } from "./playwright";
 
 const logger = Logger.initialize("ToolProvider", {
   minLevel: LogLevel.DEBUG,
@@ -99,6 +101,12 @@ class DeepTerminalToolFactory implements IToolFactory {
 class RipgrepToolFactory implements IToolFactory {
   createTool(): StructuredTool<any> {
     return new LangChainRipgrepTool(new RipgrepSearchTool());
+  }
+}
+
+class PlaywrightToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainPlaywrightTool(new PlaywrightTool());
   }
 }
 
@@ -283,6 +291,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "search_vector_db",
     "manage_core_memory",
     "manage_tasks",
+    "playwright",
   ],
   reviewer: [
     "analyze",
@@ -318,6 +327,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "open_web_preview",
     "search_vector_db",
     "manage_terminal",
+    "playwright",
   ],
   debugger: [
     "debug_get_state",
@@ -335,6 +345,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "edit_file",
     "ripgrep_search",
     "get_diagnostics",
+    "playwright",
   ],
 };
 
@@ -372,6 +383,7 @@ export class ToolProvider {
       new DebugGetVariablesToolFactory(),
       new DebugEvaluateToolFactory(),
       new DebugControlToolFactory(),
+      new PlaywrightToolFactory(),
     ];
 
     // Deduplicate tools during initialization
