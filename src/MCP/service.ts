@@ -544,10 +544,14 @@ export class MCPService implements vscode.Disposable {
         },
       };
     }
+
+    // Deep copy to avoid proxy mutation issues
+    const serversCopy: MCPServersConfig = JSON.parse(JSON.stringify(servers));
+
     this.logger.info(
-      `Found ${Object.keys(servers).length} configured MCP Server(s)`,
+      `Found ${Object.keys(serversCopy).length} configured MCP Server(s)`,
     );
-    return servers;
+    return serversCopy;
   }
 
   private async checkDockerMCP(): Promise<boolean> {

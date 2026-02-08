@@ -40,6 +40,13 @@ export const CoWorkerSettings: React.FC<CoWorkerSettingsProps> = ({ searchQuery:
     });
   };
 
+  const handleTriggerGitWatchdog = () => {
+    handlers.postMessage({ 
+      command: 'execute-command',
+      commandId: 'codebuddy.triggerGitWatchdog'
+    });
+  };
+
   return (
     <>
       <SettingsSection>
@@ -105,6 +112,28 @@ export const CoWorkerSettings: React.FC<CoWorkerSettingsProps> = ({ searchQuery:
                 title={values.dependencyCheckEnabled ? "Disable Dependency Check" : "Enable Dependency Check"}
               />
               <Button onClick={handleTriggerDependencyCheck}>
+                Trigger Now
+              </Button>
+            </div>
+          </SettingControl>
+        </SettingsRow>
+
+        <SettingsRow>
+          <SettingInfo>
+            <SettingLabel>Git Watchdog</SettingLabel>
+            <SettingDescription>
+              Reminds you to commit your changes if you have been coding for a while without saving.
+              (Scheduled: Every 2 Hours)
+            </SettingDescription>
+          </SettingInfo>
+          <SettingControl>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Toggle 
+                checked={values.gitWatchdogEnabled} 
+                onChange={(checked: boolean) => handlers.onGitWatchdogChange(checked)} 
+                title={values.gitWatchdogEnabled ? "Disable Git Watchdog" : "Enable Git Watchdog"}
+              />
+              <Button onClick={handleTriggerGitWatchdog}>
                 Trigger Now
               </Button>
             </div>

@@ -199,6 +199,18 @@
         "title": "CodeBuddy: Trigger Dependency Check"
       },
       {
+        "command": "codebuddy.triggerGitWatchdog",
+        "title": "CodeBuddy: Trigger Git Watchdog"
+      },
+      {
+        "command": "codebuddy.createBranchFromJira",
+        "title": "CodeBuddy: Jira Tickets (List, Branch, View)"
+      },
+      {
+        "command": "codebuddy.createBranchFromGitLab",
+        "title": "CodeBuddy: GitLab Issues (List, Branch, View)"
+      },
+      {
         "command": "CodeBuddy.rules.open",
         "title": "CodeBuddy: Open Project Rules"
       },

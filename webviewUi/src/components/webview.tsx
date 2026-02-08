@@ -140,6 +140,7 @@ export const WebviewUI = () => {
   const [dailyStandupEnabled, setDailyStandupEnabled] = useState(true);
   const [codeHealthEnabled, setCodeHealthEnabled] = useState(true);
   const [dependencyCheckEnabled, setDependencyCheckEnabled] = useState(true);
+  const [gitWatchdogEnabled, setGitWatchdogEnabled] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [fileChangesPanelCollapsed, setFileChangesPanelCollapsed] = useState(true);
   const [newsItems, setNewsItems] = useState<any[]>([]);
@@ -279,6 +280,9 @@ export const WebviewUI = () => {
         }
         if (data["codebuddy.automations.dependencyCheck.enabled"] !== undefined) {
           setDependencyCheckEnabled(data["codebuddy.automations.dependencyCheck.enabled"]);
+        }
+        if (data["codebuddy.automations.gitWatchdog.enabled"] !== undefined) {
+          setGitWatchdogEnabled(data["codebuddy.automations.gitWatchdog.enabled"]);
         }
         break;
       }
@@ -602,13 +606,14 @@ export const WebviewUI = () => {
     dailyStandupEnabled: dailyStandupEnabled,
     codeHealthEnabled: codeHealthEnabled,
     dependencyCheckEnabled: dependencyCheckEnabled,
+    gitWatchdogEnabled: gitWatchdogEnabled,
     selectedModel: selectedModel,
     username: username,
     accountType: 'Free',
     customRules: customRules,
     customSystemPrompt: customSystemPrompt,
     subagents: subagents,
-  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents, dailyStandupEnabled, codeHealthEnabled, dependencyCheckEnabled]);
+  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents, dailyStandupEnabled, codeHealthEnabled, dependencyCheckEnabled, gitWatchdogEnabled]);
 
   const settingsOptions = useMemo<SettingsOptions>(() => ({
     themeOptions: themeOptions,
@@ -705,6 +710,10 @@ export const WebviewUI = () => {
     onDependencyCheckChange: (enabled: boolean) => {
       setDependencyCheckEnabled(enabled);
       vsCode.postMessage({ command: "dependency-check-change-event", message: enabled });
+    },
+    onGitWatchdogChange: (enabled: boolean) => {
+      setGitWatchdogEnabled(enabled);
+      vsCode.postMessage({ command: "git-watchdog-change-event", message: enabled });
     },
     onUsernameChange: (value: string) => {
       setUsername(value);

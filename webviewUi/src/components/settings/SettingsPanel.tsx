@@ -129,6 +129,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     customRules: [],
     customSystemPrompt: '',
     subagents: DEFAULT_SUBAGENTS,
+    dailyStandupEnabled: true,
+    codeHealthEnabled: true,
+    dependencyCheckEnabled: true,
+    gitWatchdogEnabled: true,
   };
 
   const defaultOptions: SettingsOptions = {
@@ -169,6 +173,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     onToggleRule: () => {},
     onUpdateSystemPrompt: () => {},
     onToggleSubagent: () => {},
+    onDailyStandupChange: () => {},
+    onCodeHealthChange: () => {},
+    onDependencyCheckChange: () => {},
+    onGitWatchdogChange: () => {},
   };
 
   const values = settingsValues || defaultValues;

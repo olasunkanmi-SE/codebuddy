@@ -51,6 +51,7 @@ export interface SettingsValues {
   dailyStandupEnabled: boolean;
   codeHealthEnabled: boolean;
   dependencyCheckEnabled: boolean;
+  gitWatchdogEnabled: boolean;
 
   // Account
   username: string;
@@ -105,6 +106,7 @@ export interface SettingsHandlers {
   onDailyStandupChange: (enabled: boolean) => void;
   onCodeHealthChange: (enabled: boolean) => void;
   onDependencyCheckChange: (enabled: boolean) => void;
+  onGitWatchdogChange: (enabled: boolean) => void;
   // Rules & Subagents handlers
   onAddRule: (rule: Omit<CustomRule, 'id' | 'createdAt'>) => void;
   onUpdateRule: (id: string, updates: Partial<CustomRule>) => void;
@@ -219,6 +221,7 @@ const defaultContextValue: SettingsContextType = {
     dailyStandupEnabled: true,
     codeHealthEnabled: true,
     dependencyCheckEnabled: true,
+    gitWatchdogEnabled: true,
     username: '',
     accountType: 'Free',
     customRules: [],
@@ -257,6 +260,7 @@ const defaultContextValue: SettingsContextType = {
     onDailyStandupChange: () => {},
     onCodeHealthChange: () => {},
     onDependencyCheckChange: () => {},
+    onGitWatchdogChange: () => {},
     onUsernameChange: () => {},
     postMessage: () => {},
     onAddRule: () => {},

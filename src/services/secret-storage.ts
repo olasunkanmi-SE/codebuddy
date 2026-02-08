@@ -94,7 +94,8 @@ export class SecretStorageService implements vscode.Disposable {
     const codeHealthEnabled =
       config.get<boolean>("codebuddy.automations.codeHealth.enabled") ?? true;
     const dependencyCheckEnabled =
-      config.get<boolean>("codebuddy.automations.dependencyCheck.enabled") ?? true;
+      config.get<boolean>("codebuddy.automations.dependencyCheck.enabled") ??
+      true;
     const preferences = {
       username: nickname || username,
       theme: theme || "tokyo night", // default theme

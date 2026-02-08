@@ -363,6 +363,7 @@ export class ConnectorService {
     if (connector.type === "mcp" && connector.mcpConfig) {
       const config = vscode.workspace.getConfiguration("codebuddy.mcp");
       const servers = config.get<MCPServersConfig>("servers") || {};
+      const serversCopy = { ...servers };
 
       // Construct the server config
       const serverConfig: MCPServerConfig = {
@@ -372,10 +373,10 @@ export class ConnectorService {
         enabled: true,
       };
 
-      servers[connectorId] = serverConfig;
+      serversCopy[connectorId] = serverConfig;
       await config.update(
         "servers",
-        servers,
+        serversCopy,
         vscode.ConfigurationTarget.Global,
       );
 
@@ -405,12 +406,13 @@ export class ConnectorService {
     if (connector.type === "mcp") {
       const config = vscode.workspace.getConfiguration("codebuddy.mcp");
       const servers = config.get<MCPServersConfig>("servers") || {};
+      const serversCopy = { ...servers };
 
-      if (servers[connectorId]) {
-        delete servers[connectorId];
+      if (serversCopy[connectorId]) {
+        delete serversCopy[connectorId];
         await config.update(
           "servers",
-          servers,
+          serversCopy,
           vscode.ConfigurationTarget.Global,
         );
 
@@ -425,8 +427,13 @@ export class ConnectorService {
   private async saveState(id: string, state: { status: string; config?: any }) {
     const config = vscode.workspace.getConfiguration("codebuddy.connectors");
     const states = config.get<Record<string, any>>("states") || {};
-    states[id] = state;
-    await config.update("states", states, vscode.ConfigurationTarget.Global);
+    const statesCopy = { ...states };
+    statesCopy[id] = state;
+    await config.update(
+      "states",
+      statesCopy,
+      vscode.ConfigurationTarget.Global,
+    );
   }
 
   private syncWithMCP() {
