@@ -46,6 +46,31 @@ const ENGINEERING_BLOG_FEEDS = [
     name: "AWS Architecture",
     url: "https://aws.amazon.com/blogs/architecture/feed/",
   },
+  { name: "Slack Engineering", url: "https://slack.engineering/feed/" },
+  {
+    name: "Pinterest Engineering",
+    url: "https://medium.com/feed/pinterest-engineering",
+  },
+  // Substack & Independent - Architecture & Leadership
+  {
+    name: "The Pragmatic Engineer",
+    url: "https://newsletter.pragmaticengineer.com/feed",
+  },
+  { name: "ByteByteGo System Design", url: "https://blog.bytebytego.com/feed" },
+  { name: "Refactoring (Luca Rossi)", url: "https://refactoring.fm/feed" },
+  { name: "System Design One", url: "https://blog.systemdesign.one/feed" },
+  {
+    name: "Tidy First? (Kent Beck)",
+    url: "https://tidyfirst.substack.com/feed",
+  },
+  {
+    name: "The Beautiful Mess (John Cutler)",
+    url: "https://cutlefish.substack.com/feed",
+  },
+  { name: "Martin Fowler", url: "https://martinfowler.com/feed.atom" },
+  { name: "Julia Evans (jvns)", url: "https://jvns.ca/atom.xml" },
+  { name: "StaffEng (Will Larson)", url: "https://staffeng.com/rss" },
+  { name: "LangChain Blog", url: "https://blog.langchain.dev/rss/" },
 ];
 
 export class NewsService {
@@ -121,7 +146,7 @@ export class NewsService {
         return dateB - dateA;
       });
 
-      const topItems = newsItems.slice(0, 10);
+      const topItems = newsItems.slice(0, 20);
 
       // Store in DB
       this.logger.info(
@@ -158,7 +183,7 @@ export class NewsService {
   public async getUnreadNews(): Promise<NewsItem[]> {
     await this.ensureInitialized();
     const results = this.dbService.executeSql(
-      `SELECT * FROM news_items WHERE read_status = 0 ORDER BY fetched_at DESC LIMIT 10`,
+      `SELECT * FROM news_items WHERE read_status = 0 ORDER BY published_at DESC LIMIT 20`,
     );
     return results as NewsItem[];
   }

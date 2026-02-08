@@ -419,7 +419,7 @@ export class DeepTerminalTool {
       switch (action) {
         case "start":
           return await service.startSession(sessionId);
-        case "execute":
+        case "execute": {
           if (!command) return "Error: Command required for execute action.";
           const result = await service.executeCommand(sessionId, command);
           if (waitMs && waitMs > 0) {
@@ -427,6 +427,7 @@ export class DeepTerminalTool {
             return result + "\nOutput:\n" + service.readOutput(sessionId);
           }
           return result;
+        }
         case "read":
           return service.readOutput(sessionId) || "(No new output)";
         case "terminate":
@@ -480,8 +481,8 @@ export class RipgrepSearchTool {
     const limit = 200; // Limit results to avoid context overflow
 
     try {
-      // @ts-ignore - findTextInFiles is available in newer VS Code versions
-      await vscode.workspace.findTextInFiles(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (vscode.workspace as any).findTextInFiles(
         { pattern, isRegExp: true },
         { include: glob },
         (result: any) => {
@@ -631,9 +632,10 @@ export class GitTool {
       const git = await this.getGit();
 
       switch (operation) {
-        case "status":
+        case "status": {
           const status = await git.status();
           return JSON.stringify(status, null, 2);
+        }
 
         case "add":
           if (!args?.files)
@@ -641,13 +643,14 @@ export class GitTool {
           await git.add(args.files);
           return `Added ${args.files}`;
 
-        case "commit":
+        case "commit": {
           if (!args?.message)
             return "Error: 'message' argument required for 'commit' operation";
           const result = await git.commit(args.message);
           return `Committed ${result.summary.changes} changes. Commit: ${result.commit}`;
+        }
 
-        case "log":
+        case "log": {
           const log = await git.log({ maxCount: args?.limit || 10 });
           return JSON.stringify(
             log.all.map((l: any) => ({
@@ -659,10 +662,12 @@ export class GitTool {
             null,
             2,
           );
+        }
 
-        case "diff":
+        case "diff": {
           const diff = await git.diff(args?.staged ? ["--staged"] : []);
           return diff || "No diff found.";
+        }
 
         case "checkout":
           if (!args?.branch)

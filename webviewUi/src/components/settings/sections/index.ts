@@ -10,3 +10,5 @@ export { RulesSettings } from "./RulesSettings";
 export { PrivacySettings } from "./PrivacySettings";
 export { BetaSettings } from "./BetaSettings";
 export { AboutSettings } from "./AboutSettings";
+export { CoWorkerSettings } from "./CoWorkerSettings";
+export { BrowserSettings } from "./BrowserSettings";

@@ -43,6 +43,7 @@ import { DockerModelService } from "../services/docker/DockerModelService";
 import { ProjectRulesService } from "../services/project-rules.service";
 import { NewsService } from "../services/news.service";
 import { ConnectorService } from "../services/connector.service";
+import { NotificationService } from "../services/notification.service";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -155,6 +156,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     if (this.disposables.length > 0) {
       return;
     }
+
+    this.disposables.push(
+      NotificationService.getInstance().onDidNotificationChange(() => {
+        this.synchronizeNotifications();
+      }),
+    );
+
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("codebuddy")) {
+          this.synchronizeConfiguration();
+        }
+      }),
+    );
 
     this.disposables.push(
       this.orchestrator.onResponse(this.handleModelResponseEvent.bind(this)),
@@ -486,7 +501,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private async publishActiveWorkspace(): Promise<void> {
     try {
       const activeEditor = vscode.window.activeTextEditor;
-      let displayName: string = "";
+      let displayName = "";
 
       // Reset the tracked active file path
       this.currentActiveFilePath = undefined;
@@ -559,6 +574,39 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
   }
 
+  protected async synchronizeConfiguration(): Promise<void> {
+    if (!this.currentWebView) return;
+
+    const config = vscode.workspace.getConfiguration("codebuddy");
+    const configData = {
+      enableStreaming: config.get<boolean>("enableStreaming", true),
+      "codebuddy.compactMode": config.get<boolean>("compactMode", false),
+      "codebuddy.automations.dailyStandup.enabled": config.get<boolean>(
+        "automations.dailyStandup.enabled",
+        true,
+      ),
+      "codebuddy.automations.codeHealth.enabled": config.get<boolean>(
+        "automations.codeHealth.enabled",
+        true,
+      ),
+      "codebuddy.automations.dependencyCheck.enabled": config.get<boolean>(
+        "automations.dependencyCheck.enabled",
+        true,
+      ),
+      "codebuddy.automations.gitWatchdog.enabled": config.get<boolean>(
+        "automations.gitWatchdog.enabled",
+        true,
+      ),
+      "codebuddy.browserType": config.get<string>("browserType", "system"),
+      "codebuddy.verboseLogging": config.get<boolean>("verboseLogging", false),
+    };
+
+    await this.currentWebView.webview.postMessage({
+      type: "onConfigurationChange",
+      message: JSON.stringify(configData),
+    });
+  }
+
   private async setupMessageHandler(_view: vscode.WebviewView): Promise<void> {
     try {
       this.disposables.push(
@@ -591,6 +639,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             }
             case "index-workspace": {
               vscode.commands.executeCommand("codebuddy.indexWorkspace");
+              break;
+            }
+            case "execute-command": {
+              if (message.commandId) {
+                vscode.commands.executeCommand(message.commandId);
+              }
               break;
             }
             case "user-input": {
@@ -854,6 +908,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 await this.synchronizeChatHistoryFromDatabase();
               }
               await this.synchronizeNews();
+              await this.synchronizeNotifications();
+              await this.synchronizeConfiguration();
               // Send current session info to webview
               await this.currentWebView?.webview.postMessage({
                 type: "current-session",
@@ -873,14 +929,40 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               break;
             }
             case "news-refresh":
+              // Force fetch fresh news from RSS
+              await NewsService.getInstance().fetchAndStoreNews();
               await this.synchronizeNews();
               break;
             case "upload-file":
               await this.fileManager.uploadFileHandler();
               break;
+            case "updateConfiguration": {
+              const { key, value } = message;
+              if (key && value !== undefined) {
+                await vscode.workspace
+                  .getConfiguration()
+                  .update(key, value, vscode.ConfigurationTarget.Global);
+              }
+              break;
+            }
             case "openExternal":
               if (message.text) {
-                vscode.env.openExternal(vscode.Uri.parse(message.text));
+                const browserType = vscode.workspace
+                  .getConfiguration("codebuddy")
+                  .get<string>("browserType", "system");
+
+                if (browserType === "reader") {
+                  const { NewsReaderService } =
+                    await import("../services/news-reader.service");
+                  NewsReaderService.getInstance().openReader(message.text);
+                } else if (browserType === "simple") {
+                  vscode.commands.executeCommand(
+                    "simpleBrowser.show",
+                    message.text,
+                  );
+                } else {
+                  vscode.env.openExternal(vscode.Uri.parse(message.text));
+                }
               }
               break;
             case "insertCode":
@@ -1340,6 +1422,29 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               );
               break;
             }
+
+            // Notification Commands
+            case "notifications-get":
+              await this.synchronizeNotifications();
+              break;
+            case "notifications-mark-read":
+              if (message.ids && Array.isArray(message.ids)) {
+                for (const id of message.ids) {
+                  await NotificationService.getInstance().markAsRead(id);
+                }
+              } else if (message.id) {
+                await NotificationService.getInstance().markAsRead(message.id);
+              }
+              await this.synchronizeNotifications();
+              break;
+            case "notifications-mark-all-read":
+              await NotificationService.getInstance().markAllAsRead();
+              await this.synchronizeNotifications();
+              break;
+            case "notifications-clear-all":
+              await NotificationService.getInstance().clearAll();
+              await this.synchronizeNotifications();
+              break;
 
             case "open-codebuddy-settings":
               // Open VS Code settings filtered to CodeBuddy settings
@@ -3105,6 +3210,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       throw error(error.message);
     }
     // 1. Create a mutable copy and ensure the history starts with a 'user' role.
+  }
+
+  protected async synchronizeNotifications(): Promise<void> {
+    if (!this.currentWebView) return;
+    const notifications =
+      await NotificationService.getInstance().getNotifications();
+    const unreadCount =
+      await NotificationService.getInstance().getUnreadCount();
+
+    await this.currentWebView.webview.postMessage({
+      type: "notifications-update",
+      notifications,
+      unreadCount,
+    });
   }
 
   abstract getTokenCounts(input: string): Promise<number>;

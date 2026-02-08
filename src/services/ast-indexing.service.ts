@@ -45,7 +45,7 @@ export class AstIndexingService {
     // Determine the worker execution path (dist for prod, out for dev)
     const isProd = __filename.includes("dist");
     const workerRelativePath = isProd
-      ? "../workers/ast-analyzer.worker.js"
+      ? "./workers/ast-analyzer.worker.js"
       : "../../out/workers/ast-analyzer.worker.js";
 
     const workerPath = path.resolve(__dirname, workerRelativePath);

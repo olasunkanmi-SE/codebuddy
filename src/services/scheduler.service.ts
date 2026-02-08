@@ -2,7 +2,10 @@ import * as vscode from "vscode";
 import { SqliteDatabaseService } from "./sqlite-database.service";
 import { NewsService } from "./news.service";
 import { Logger } from "../infrastructure/logger/logger";
-import { CodeHealthTask } from "./tasks/code-health.task"; // Import the new task
+import { CodeHealthTask } from "./tasks/code-health.task";
+import { DependencyCheckTask } from "./tasks/dependency-check.task";
+import { StandupService } from "./standup.service";
+import { GitWatchdogTask } from "./tasks/git-watchdog.task";
 
 export class SchedulerService {
   private static instance: SchedulerService;
@@ -10,11 +13,17 @@ export class SchedulerService {
   private logger: Logger;
   private intervalId: NodeJS.Timeout | undefined;
   private codeHealthTask: CodeHealthTask;
+  private standupService: StandupService;
+  private dependencyCheckTask: DependencyCheckTask;
+  private gitWatchdogTask: GitWatchdogTask;
 
   private constructor() {
     this.dbService = SqliteDatabaseService.getInstance();
     this.logger = Logger.initialize("SchedulerService", {});
     this.codeHealthTask = new CodeHealthTask();
+    this.standupService = StandupService.getInstance();
+    this.dependencyCheckTask = new DependencyCheckTask();
+    this.gitWatchdogTask = new GitWatchdogTask();
   }
 
   public static getInstance(): SchedulerService {
@@ -74,8 +83,8 @@ export class SchedulerService {
         });
       }
 
-      // --- Task 3: Evening News (6 PM) ---
-      if (currentHour >= 18) {
+      // --- Task 3: Evening News (5 PM) ---
+      if (currentHour >= 17) {
         await this.tryRunTask("news_evening", async () => {
           this.logger.info("Executing scheduled task: news_evening");
           await newsService.fetchAndStoreNews();
@@ -85,11 +94,51 @@ export class SchedulerService {
         });
       }
 
-      // --- Task 4: Code Health Check (9 AM - Daily Standup) ---
+      // --- Task 4: Code Health Check (9 AM) ---
       if (currentHour >= 9) {
-        await this.tryRunTask("code_health_daily", async () => {
-          this.logger.info("Executing scheduled task: code_health_daily");
-          await this.codeHealthTask.execute();
+        const config = vscode.workspace.getConfiguration(
+          "codebuddy.automations",
+        );
+        if (config.get<boolean>("codeHealth.enabled", true)) {
+          await this.tryRunTask("code_health_daily", async () => {
+            this.logger.info("Executing scheduled task: code_health_daily");
+            await this.codeHealthTask.execute();
+          });
+        }
+      }
+
+      // --- Task 5: Daily Standup (8 AM) ---
+      if (currentHour >= 8) {
+        const config = vscode.workspace.getConfiguration(
+          "codebuddy.automations",
+        );
+        if (config.get<boolean>("dailyStandup.enabled", true)) {
+          await this.tryRunTask("daily_standup", async () => {
+            this.logger.info("Executing scheduled task: daily_standup");
+            await this.standupService.generateReport();
+          });
+        }
+      }
+
+      // --- Task 6: Dependency Check (11 AM) ---
+      if (currentHour >= 11) {
+        const config = vscode.workspace.getConfiguration(
+          "codebuddy.automations",
+        );
+        if (config.get<boolean>("dependencyCheck.enabled", true)) {
+          await this.tryRunTask("dependency_check", async () => {
+            this.logger.info("Executing scheduled task: dependency_check");
+            await this.dependencyCheckTask.execute();
+          });
+        }
+      }
+
+      // --- Task 7: Git Watchdog (Every 2 Hours) ---
+      const config = vscode.workspace.getConfiguration("codebuddy.automations");
+      if (config.get<boolean>("gitWatchdog.enabled", true)) {
+        await this.tryRunTaskInterval("git_watchdog", 2, async () => {
+          this.logger.info("Executing scheduled task: git_watchdog");
+          await this.gitWatchdogTask.execute();
         });
       }
     } catch (error) {
@@ -129,6 +178,52 @@ export class SchedulerService {
           lastRun.getMonth() !== now.getMonth() ||
           lastRun.getFullYear() !== now.getFullYear()
         ) {
+          shouldRun = true;
+        }
+      }
+    }
+
+    if (shouldRun) {
+      await action();
+      // Update last_run
+      this.dbService.executeSqlCommand(
+        `UPDATE scheduled_tasks SET last_run = ? WHERE name = ?`,
+        [now.toISOString(), taskName],
+      );
+    }
+  }
+
+  private async tryRunTaskInterval(
+    taskName: string,
+    intervalHours: number,
+    action: () => Promise<void>,
+  ): Promise<void> {
+    const lastRunResults = this.dbService.executeSql(
+      `SELECT last_run FROM scheduled_tasks WHERE name = ?`,
+      [taskName],
+    );
+
+    let shouldRun = false;
+    const now = new Date();
+
+    if (lastRunResults.length === 0) {
+      // Initialize task entry
+      this.dbService.executeSqlCommand(
+        `INSERT INTO scheduled_tasks (name, cron_expression, command, status, last_run) 
+         VALUES (?, '', 'interval:task', 'active', NULL)`,
+        [taskName],
+      );
+      shouldRun = true;
+    } else {
+      const lastRunStr = lastRunResults[0].last_run;
+      if (!lastRunStr) {
+        shouldRun = true;
+      } else {
+        const lastRun = new Date(lastRunStr);
+        const diffMs = now.getTime() - lastRun.getTime();
+        const diffHours = diffMs / (1000 * 60 * 60);
+
+        if (diffHours >= intervalHours) {
           shouldRun = true;
         }
       }

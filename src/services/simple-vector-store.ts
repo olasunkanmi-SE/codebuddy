@@ -19,7 +19,7 @@ export class SimpleVectorStore {
   private documents: Map<string, Document> = new Map();
   private readonly logger: Logger;
   private persistPath: string;
-  private isDirty: boolean = false;
+  private isDirty = false;
   private saveTimer: NodeJS.Timeout | null = null;
 
   constructor(context: vscode.ExtensionContext) {
@@ -87,10 +87,7 @@ export class SimpleVectorStore {
     this.scheduleSave();
   }
 
-  public async search(
-    queryVector: number[],
-    k: number = 5,
-  ): Promise<SearchResult[]> {
+  public async search(queryVector: number[], k = 5): Promise<SearchResult[]> {
     const results: SearchResult[] = [];
 
     // Convert map values to array for iteration

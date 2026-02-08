@@ -1,0 +1,346 @@
+
+> ola-code-buddy@4.0.2 lint
+> eslint src --ext ts
+
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/MCP/client.ts
+  3:24  warning  'spawn' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/MCP/service.ts
+    1:10  warning  'spawn' is defined but never used  @typescript-eslint/no-unused-vars
+   75:9   warning  '_' is defined but never used      @typescript-eslint/no-unused-vars
+  403:19  warning  '_' is defined but never used      @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/backends/filesystem.ts
+  46:6  warning  'StateAndStore' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/developer/agent.ts
+   80:18  warning  Forbidden non-null assertion                      @typescript-eslint/no-non-null-assertion
+   86:18  warning  Forbidden non-null assertion                      @typescript-eslint/no-non-null-assertion
+   94:18  warning  Forbidden non-null assertion                      @typescript-eslint/no-non-null-assertion
+  110:18  warning  Forbidden non-null assertion                      @typescript-eslint/no-non-null-assertion
+  118:18  warning  Forbidden non-null assertion                      @typescript-eslint/no-non-null-assertion
+  170:33  warning  'configStore' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/factory/agent.factory.ts
+  3:3  warning  'AnnotationRoot' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/langgraph/state/agent-state.ts
+  3:7  warning  'stateAnnotation' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/langgraph/tools/debugger.ts
+  14:15  warning  '_input' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/langgraph/tools/provider.ts
+    1:26  warning  'Tool' is defined but never used                  @typescript-eslint/no-unused-vars
+   99:7   warning  'RipgrepToolFactory' is defined but never used    @typescript-eslint/no-unused-vars
+  123:7   warning  'ListFilesToolFactory' is defined but never used  @typescript-eslint/no-unused-vars
+  129:7   warning  'EditFileToolFactory' is defined but never used   @typescript-eslint/no-unused-vars
+  472:22  warning  Forbidden non-null assertion                      @typescript-eslint/no-non-null-assertion
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/services/codebuddy-agent.service.ts
+  136:17  warning  '_' is assigned a value but never used           @typescript-eslint/no-unused-vars
+  149:17  warning  '_' is assigned a value but never used           @typescript-eslint/no-unused-vars
+  921:7   warning  'agentState' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/agents/services/result-synthesizer.service.ts
+  341:11  warning  'topResult' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/application/constant.ts
+  388:7  warning  'FILE_TYPE_PROMPTS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/ast/analysis/code.analyser.ts
+  219:7  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/ast/analysis/summry.generator.ts
+   55:5   warning  'workspaceRoot' is defined but never used  @typescript-eslint/no-unused-vars
+  148:47  warning  'workspaceRoot' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/ast/query-extractor.ts
+  2:3  warning  'Query' is defined but never used       @typescript-eslint/no-unused-vars
+  4:3  warning  'TreeCursor' is defined but never used  @typescript-eslint/no-unused-vars
+  5:3  warning  'Point' is defined but never used       @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/ast/smart-truncate.ts
+   55:11  warning  'originalLength' is assigned a value but never used           @typescript-eslint/no-unused-vars
+   56:11  warning  'estimatedOriginalTokens' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  167:11  warning  'sections' is assigned a value but never used                 @typescript-eslint/no-unused-vars
+  259:24  warning  Forbidden non-null assertion                                  @typescript-eslint/no-non-null-assertion
+  280:25  warning  Forbidden non-null assertion                                  @typescript-eslint/no-non-null-assertion
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/commands/architectural-recommendation.ts
+  14:10  warning  'ILlmConfig' is defined but never used             @typescript-eslint/no-unused-vars
+  21:16  warning  'shouldRefreshAnalysis' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/commands/create-branch-from-gitlab.ts
+  117:19  warning  'match' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/commands/pr/review-pr.ts
+  87:22  warning  'selectedCode' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/extension.ts
+   42:3   warning  'setConfigValue' is defined but never used                @typescript-eslint/no-unused-vars
+  239:11  warning  'contextRetriever' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  515:11  warning  'completionStatusBar' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  846:33  warning  'context' is defined but never used                       @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/llms/anthropic/anthropic.ts
+  87:35  warning  'text' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/llms/completion-factory.ts
+  43:11  warning  'cacheKey' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/llms/deepseek/deepseek.ts
+  278:17  warning  'tokenCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/llms/gemini/gemini.ts
+   16:10  warning  'generateUUID' is defined but never used          @typescript-eslint/no-unused-vars
+  125:5   warning  'instruction' is defined but never used           @typescript-eslint/no-unused-vars
+  328:9   warning  'chatHistory' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/llms/glm/glm.ts
+  270:17  warning  'tokenCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/llms/groq/groq.ts
+  30:28  warning  'text' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/llms/message.ts
+  36:11  warning  'role' is never reassigned. Use 'const' instead  prefer-const
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/llms/qwen/qwen.ts
+  315:17  warning  'tokenCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/sections/documentation-sections.ts
+  220:5  warning  'config' is defined but never used  @typescript-eslint/no-unused-vars
+  494:5  warning  'config' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/analysis-strategies/analysis-strategy-factory.ts
+  20:12  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/analyzers/python-analyzer.ts
+  13:28  warning  'filePath' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/ast-indexing.service.ts
+  44:28  warning  'context' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/chat-history-manager.ts
+  11:11  warning  'ChatMessage' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/code-indexing.ts
+  26:21  warning  'model' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/codebase-understanding.service.ts
+  310:5   warning  'analysis' is defined but never used  @typescript-eslint/no-unused-vars
+  342:25  warning  'index' is defined but never used     @typescript-eslint/no-unused-vars
+  359:28  warning  'index' is defined but never used     @typescript-eslint/no-unused-vars
+  388:19  warning  Forbidden non-null assertion          @typescript-eslint/no-non-null-assertion
+  447:42  warning  'index' is defined but never used     @typescript-eslint/no-unused-vars
+  512:5   warning  'analysis' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/connector.service.ts
+  442:11  warning  'stats' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/context-retriever.ts
+  8:29  warning  'getGenerativeAiModel' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/diff-review.service.ts
+  133:5  warning  'token' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/documentation-enhancer.service.ts
+  114:28  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  145:28  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/documentation-generator.service.ts
+  310:5   warning  'config' is defined but never used           @typescript-eslint/no-unused-vars
+  406:46  warning  'patterns' is defined but never used         @typescript-eslint/no-unused-vars
+  441:27  warning  'codebaseContext' is defined but never used  @typescript-eslint/no-unused-vars
+  457:5   warning  'config' is defined but never used           @typescript-eslint/no-unused-vars
+  513:5   warning  'config' is defined but never used           @typescript-eslint/no-unused-vars
+  573:5   warning  'config' is defined but never used           @typescript-eslint/no-unused-vars
+  630:36  warning  'config' is defined but never used           @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/enhanced-cache-manager.service.ts
+  452:27  warning  'name' is assigned a value but never used            @typescript-eslint/no-unused-vars
+  494:15  warning  'entriesToEvict' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  638:7   warning  'name' is defined but never used                     @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/enhanced-prompt-builder.service.ts
+   9:3   warning  'ContextSelectionResult' is defined but never used  @typescript-eslint/no-unused-vars
+  61:21  warning  'model' is assigned a value but never used          @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/file-manager.ts
+  47:13  warning  'files' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/file-service.ts
+  62:7  warning  'timeout' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  96:5  warning  'encoding' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/file-storage.ts
+  96:25  warning  'workspaceRoot' is defined but never used  @typescript-eslint/no-unused-vars
+  96:48  warning  'pattern' is defined but never used        @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/inline-completion.service.ts
+    8:10  warning  'ICodeCompleter' is defined but never used  @typescript-eslint/no-unused-vars
+  108:28  warning  Forbidden non-null assertion                @typescript-eslint/no-non-null-assertion
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/news.service.ts
+  1:8  warning  'axios' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/pattern-extraction.service.ts
+  253:51  warning  'name' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/persistent-codebase-understanding.service.ts
+  11:10  warning  'ErrorHandler' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/secret-storage.ts
+   56:31  warning  'type' is defined but never used                          @typescript-eslint/no-unused-vars
+  129:40  warning  'type' is defined but never used                          @typescript-eslint/no-unused-vars
+  212:5   warning  'configurationTarget' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/smart-context-selector.service.ts
+  1:13  warning  'vscode' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/sqlite-database.service.ts
+  12:11  warning  'CodebaseSnapshot' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/standup.service.ts
+    7:10  warning  'ChatHistoryManager' is defined but never used  @typescript-eslint/no-unused-vars
+  136:23  warning  'stderr' is defined but never used              @typescript-eslint/no-unused-vars
+  192:23  warning  'stderr' is defined but never used              @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/tasks/dependency-check.task.ts
+  26:15  warning  'unpinned' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/tasks/git-watchdog.task.ts
+  2:13  warning  'path' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/user-feedback.service.ts
+  176:17  warning  'progressCallback' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  360:17  warning  'operationId' is assigned a value but never used       @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/services/web-search-service.ts
+  195:27  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/codebase-analysis-cache.test.ts
+    4:13  warning  'fs' is defined but never used              @typescript-eslint/no-unused-vars
+  243:13  warning  'stats' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/codebase-understanding-cache.test.ts
+  133:13  warning  'cacheStub' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/deepseek-provider.test.ts
+  15:28  warning  'message' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/glm-provider.test.ts
+  18:28  warning  'message' is defined but never used  @typescript-eslint/no-unused-vars
+  90:40  warning  Forbidden non-null assertion         @typescript-eslint/no-non-null-assertion
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/inline-completion.test.ts
+   88:22  warning  'line' is defined but never used  @typescript-eslint/no-unused-vars
+  128:22  warning  'line' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/intelligent-chunking.test.ts
+  118:9   warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  121:17  warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+  123:9   warning  Forbidden non-null assertion  @typescript-eslint/no-non-null-assertion
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/phase2-implementation.test.ts
+  131:16  warning  'item' is defined but never used              @typescript-eslint/no-unused-vars
+  264:9   warning  'context' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/phase4-integration.test.ts
+   2:13  warning  'vscode' is defined but never used                   @typescript-eslint/no-unused-vars
+  66:11  warning  'changeNotified' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/production-safeguards-indexing-fix.test.ts
+  2:13  warning  'vscode' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/qwen-provider.test.ts
+   18:28  warning  'message' is defined but never used           @typescript-eslint/no-unused-vars
+   90:40  warning  Forbidden non-null assertion                  @typescript-eslint/no-non-null-assertion
+  137:11  warning  'history' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/test/suite/vector-db-architecture.integration.test.ts
+    2:13  warning  'vscode' is defined but never used                   @typescript-eslint/no-unused-vars
+  247:11  warning  'changeNotified' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  248:11  warning  'lastConfig' is assigned a value but never used      @typescript-eslint/no-unused-vars
+  464:15  warning  'config' is assigned a value but never used          @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/tools/memory.ts
+  136:9  error  Unexpected lexical declaration in case block  no-case-declarations
+  137:9  error  Unexpected lexical declaration in case block  no-case-declarations
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/tools/tools.ts
+  424:11  error  Unexpected lexical declaration in case block  no-case-declarations
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/utils/utils.ts
+   13:10  warning  'spawn' is defined but never used                  @typescript-eslint/no-unused-vars
+  118:51  warning  'metaData' is defined but never used               @typescript-eslint/no-unused-vars
+  248:5   warning  'localBaseUrl' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/webview-providers/anthropic.ts
+  3:10  warning  'COMMON' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/webview-providers/base.ts
+    36:10  warning  'Role' is defined but never used                      @typescript-eslint/no-unused-vars
+    47:6   warning  'SummaryGenerator' is defined but never used          @typescript-eslint/no-unused-vars
+    99:31  warning  'model' is assigned a value but never used            @typescript-eslint/no-unused-vars
+   414:40  warning  'type' is defined but never used                      @typescript-eslint/no-unused-vars
+   425:41  warning  'type' is defined but never used                      @typescript-eslint/no-unused-vars
+   439:40  warning  'type' is defined but never used                      @typescript-eslint/no-unused-vars
+   451:35  warning  'type' is defined but never used                      @typescript-eslint/no-unused-vars
+   566:15  warning  'response' is defined but never used                  @typescript-eslint/no-unused-vars
+   737:23  warning  Forbidden non-null assertion                          @typescript-eslint/no-non-null-assertion
+  2609:23  warning  'optimizedConfig' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  3009:27  warning  Forbidden non-null assertion                          @typescript-eslint/no-non-null-assertion
+  3010:28  warning  Forbidden non-null assertion                          @typescript-eslint/no-non-null-assertion
+  3075:29  warning  Forbidden non-null assertion                          @typescript-eslint/no-non-null-assertion
+  3076:30  warning  Forbidden non-null assertion                          @typescript-eslint/no-non-null-assertion
+  3102:27  warning  Forbidden non-null assertion                          @typescript-eslint/no-non-null-assertion
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/webview-providers/code-actions.ts
+   8:5   warning  'token' is defined but never used                       @typescript-eslint/no-unused-vars
+  19:13  warning  'erroredLineOfCode' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/webview-providers/deepseek.ts
+  187:7   warning  'chatHistory' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  206:24  warning  'input' is defined but never used                 @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/webview-providers/gemini.ts
+  8:10  warning  'CodebuddyAgentService' is defined but never used  @typescript-eslint/no-unused-vars
+  9:10  warning  'MessageHandler' is defined but never used         @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/webview-providers/groq.ts
+    3:10  warning  'COMMON' is defined but never used               @typescript-eslint/no-unused-vars
+  119:28  warning  'max_tokens' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  222:28  warning  'max_tokens' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/webview-providers/local.ts
+    1:8   warning  'OpenAI' is defined but never used               @typescript-eslint/no-unused-vars
+    3:10  warning  'COMMON' is defined but never used               @typescript-eslint/no-unused-vars
+  206:15  warning  'max_tokens' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/webview-providers/manager.ts
+  234:38  warning  'type' is defined but never used     @typescript-eslint/no-unused-vars
+  234:44  warning  'message' is defined but never used  @typescript-eslint/no-unused-vars
+  351:31  warning  'type' is defined but never used     @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/webview-providers/openai.ts
+  3:10  warning  'COMMON' is defined but never used             @typescript-eslint/no-unused-vars
+  6:30  warning  'getAPIKeyAndModel' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/workers/ast-analyzer.worker.ts
+   1:22  warning  'workerData' is defined but never used       @typescript-eslint/no-unused-vars
+   2:13  warning  'fs' is defined but never used               @typescript-eslint/no-unused-vars
+   3:13  warning  'path' is defined but never used             @typescript-eslint/no-unused-vars
+   7:5   warning  'parser' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  26:16  warning  'initialize' is defined but never used       @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/workers/codebase-analysis.worker.ts
+  563:5  warning  'apiEndpoints' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/oyinlolaolasunkanmi/Downloads/git/codebuddy/src/workers/embedding-worker.ts
+  213:11  warning  'results' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 175 problems (3 errors, 172 warnings)
+

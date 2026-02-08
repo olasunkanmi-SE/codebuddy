@@ -129,6 +129,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     customRules: [],
     customSystemPrompt: '',
     subagents: DEFAULT_SUBAGENTS,
+    dailyStandupEnabled: true,
+    codeHealthEnabled: true,
+    dependencyCheckEnabled: true,
+    gitWatchdogEnabled: true,
+    browserType: 'system',
   };
 
   const defaultOptions: SettingsOptions = {
@@ -139,6 +144,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     languageOptions: [],
     fontFamilyOptions: [],
     fontSizeOptions: [],
+    browserTypeOptions: [],
   };
 
   const defaultHandlers: SettingsHandlers = {
@@ -169,6 +175,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     onToggleRule: () => {},
     onUpdateSystemPrompt: () => {},
     onToggleSubagent: () => {},
+    onDailyStandupChange: () => {},
+    onCodeHealthChange: () => {},
+    onDependencyCheckChange: () => {},
+    onGitWatchdogChange: () => {},
+    onBrowserTypeChange: () => {},
   };
 
   const values = settingsValues || defaultValues;

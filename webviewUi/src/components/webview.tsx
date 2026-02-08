@@ -24,6 +24,7 @@ import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
 import { News } from "./news/News";
 import { SessionsPanel, ChatSession } from "./sessions";
+import { NotificationPanel, INotificationItem } from "./notifications";
 
 // Styled components for settings toggle
 const SettingsToggleButton = styled.button`
@@ -88,6 +89,50 @@ const SessionsIcon = ({ size = 18 }: { size?: number }) => (
   </svg>
 );
 
+// Styled component for notification toggle button
+const NotificationToggleButton = styled.button`
+  position: fixed;
+  top: 100px;
+  left: 12px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+const NotificationIcon = ({ size = 18 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </svg>
+);
+
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
 const vsCode = vscode;
@@ -107,6 +152,10 @@ interface ConfigData {
   includeHidden?: boolean;
   maxFileSize?: string;
   compactMode?: boolean;
+  dailyStandupEnabled?: boolean;
+  codeHealthEnabled?: boolean;
+  dependencyCheckEnabled?: boolean;
+  browserType?: 'reader' | 'simple' | 'system';
 }
 
 export const WebviewUI = () => {
@@ -134,6 +183,11 @@ export const WebviewUI = () => {
   const [includeHidden, setIncludeHidden] = useState(false);
   const [maxFileSize, setMaxFileSize] = useState("1");
   const [compactMode, setCompactMode] = useState(false);
+  const [dailyStandupEnabled, setDailyStandupEnabled] = useState(true);
+  const [codeHealthEnabled, setCodeHealthEnabled] = useState(true);
+  const [dependencyCheckEnabled, setDependencyCheckEnabled] = useState(true);
+  const [gitWatchdogEnabled, setGitWatchdogEnabled] = useState(true);
+  const [browserType, setBrowserType] = useState<'reader' | 'simple' | 'system'>('reader');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [fileChangesPanelCollapsed, setFileChangesPanelCollapsed] = useState(true);
   const [newsItems, setNewsItems] = useState<any[]>([]);
@@ -147,6 +201,11 @@ export const WebviewUI = () => {
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  // Notifications state
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [notifications, setNotifications] = useState<INotificationItem[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   // Ref for username input element
   // const nameInputRef = useRef<HTMLInputElement>(null);
@@ -219,6 +278,15 @@ export const WebviewUI = () => {
         }
         break;
 
+      case "notifications-update":
+        if (message.notifications) {
+          setNotifications(message.notifications);
+        }
+        if (message.unreadCount !== undefined) {
+          setUnreadNotificationCount(message.unreadCount);
+        }
+        break;
+
       case "chat-history":
         try {
           const parsedMessages = JSON.parse(message.message);
@@ -264,6 +332,24 @@ export const WebviewUI = () => {
         // Handle configuration changes for compact mode
         if (data["codebuddy.compactMode"] !== undefined) {
           setCompactMode(data["codebuddy.compactMode"]);
+        }
+        if (data["codebuddy.automations.dailyStandup.enabled"] !== undefined) {
+          setDailyStandupEnabled(data["codebuddy.automations.dailyStandup.enabled"]);
+        }
+        if (data["codebuddy.automations.codeHealth.enabled"] !== undefined) {
+          setCodeHealthEnabled(data["codebuddy.automations.codeHealth.enabled"]);
+        }
+        if (data["codebuddy.automations.dependencyCheck.enabled"] !== undefined) {
+          setDependencyCheckEnabled(data["codebuddy.automations.dependencyCheck.enabled"]);
+        }
+        if (data["codebuddy.browserType"] !== undefined) {
+          setBrowserType(data["codebuddy.browserType"]);
+        }
+        if (data["codebuddy.automations.gitWatchdog.enabled"] !== undefined) {
+          setGitWatchdogEnabled(data["codebuddy.automations.gitWatchdog.enabled"]);
+        }
+        if (data["codebuddy.browserType"] !== undefined) {
+          setBrowserType(data["codebuddy.browserType"]);
         }
         break;
       }
@@ -311,6 +397,18 @@ export const WebviewUI = () => {
         }
         if (data.compactMode !== undefined) {
           setCompactMode(data.compactMode);
+        }
+        if (data.dailyStandupEnabled !== undefined) {
+          setDailyStandupEnabled(data.dailyStandupEnabled);
+        }
+        if (data.codeHealthEnabled !== undefined) {
+          setCodeHealthEnabled(data.codeHealthEnabled);
+        }
+        if (data.dependencyCheckEnabled !== undefined) {
+          setDependencyCheckEnabled(data.dependencyCheckEnabled);
+        }
+        if (data.browserType !== undefined) {
+          setBrowserType(data.browserType);
         }
         break;
       }
@@ -364,7 +462,7 @@ export const WebviewUI = () => {
         }
         break;
 
-      case "session-switched":
+      case "session-switched": {
         if (message.sessionId) {
           setCurrentSessionId(message.sessionId);
         }
@@ -384,6 +482,7 @@ export const WebviewUI = () => {
           clearMessages();
         }
         break;
+      }
 
       case "session-deleted":
         console.log("session-deleted received:", message);
@@ -443,6 +542,7 @@ export const WebviewUI = () => {
   // Request chat history on mount (in case the initial push was missed)
   useEffect(() => {
     vsCode.postMessage({ command: "request-chat-history" });
+    vsCode.postMessage({ command: "notifications-get" });
   }, []);
 
   // Highlight code blocks when messages update
@@ -532,6 +632,26 @@ export const WebviewUI = () => {
     setIsSessionsOpen(true);
   }, []);
 
+  // Notification handlers
+  const handleNotificationMarkAsRead = useCallback((id: number) => {
+    vsCode.postMessage({ command: "notification-mark-read", id });
+  }, []);
+
+  const handleNotificationMarkAllAsRead = useCallback(() => {
+    vsCode.postMessage({ command: "notification-mark-all-read" });
+  }, []);
+
+  const handleNotificationClearAll = useCallback(() => {
+    vsCode.postMessage({ command: "notification-clear-all" });
+  }, []);
+
+  const handleToggleNotifications = useCallback(() => {
+    if (!isNotificationPanelOpen) {
+      vsCode.postMessage({ command: "notifications-get" });
+    }
+    setIsNotificationPanelOpen(!isNotificationPanelOpen);
+  }, [isNotificationPanelOpen]);
+
   const processedContext = useMemo(() => {
     const contextArray = Array.from(new Set(selectedContext.split("@").join(", ").split(", ")));
     return contextArray.filter((item) => item.length > 1);
@@ -575,13 +695,18 @@ export const WebviewUI = () => {
     includeHidden: includeHidden,
     maxFileSize: maxFileSize,
     compactMode: compactMode,
+    dailyStandupEnabled: dailyStandupEnabled,
+    codeHealthEnabled: codeHealthEnabled,
+    dependencyCheckEnabled: dependencyCheckEnabled,
+    gitWatchdogEnabled: gitWatchdogEnabled,
+    browserType: browserType,
     selectedModel: selectedModel,
     username: username,
     accountType: 'Free',
     customRules: customRules,
     customSystemPrompt: customSystemPrompt,
     subagents: subagents,
-  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents]);
+  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents, dailyStandupEnabled, codeHealthEnabled, dependencyCheckEnabled, gitWatchdogEnabled, browserType]);
 
   const settingsOptions = useMemo<SettingsOptions>(() => ({
     themeOptions: themeOptions,
@@ -591,6 +716,11 @@ export const WebviewUI = () => {
     languageOptions: DEFAULT_LANGUAGE_OPTIONS,
     fontFamilyOptions: DEFAULT_FONT_FAMILY_OPTIONS,
     fontSizeOptions: DEFAULT_FONT_SIZE_OPTIONS,
+    browserTypeOptions: [
+      { value: 'reader', label: 'Smart Reader (Recommended)' },
+      { value: 'simple', label: 'Simple Browser' },
+      { value: 'system', label: 'System Browser' },
+    ],
   }), []);
 
   const settingsHandlers = useMemo<SettingsHandlers>(() => ({
@@ -667,10 +797,30 @@ export const WebviewUI = () => {
       setSelectedModel(value);
       vsCode.postMessage({ command: "update-model-event", message: value });
     },
+    onDailyStandupChange: (enabled: boolean) => {
+      setDailyStandupEnabled(enabled);
+      vsCode.postMessage({ command: "daily-standup-change-event", message: enabled });
+    },
+    onCodeHealthChange: (enabled: boolean) => {
+      setCodeHealthEnabled(enabled);
+      vsCode.postMessage({ command: "code-health-change-event", message: enabled });
+    },
+    onDependencyCheckChange: (enabled: boolean) => {
+      setDependencyCheckEnabled(enabled);
+      vsCode.postMessage({ command: "dependency-check-change-event", message: enabled });
+    },
+    onGitWatchdogChange: (enabled: boolean) => {
+      setGitWatchdogEnabled(enabled);
+      vsCode.postMessage({ command: "git-watchdog-change-event", message: enabled });
+    },
+    onBrowserTypeChange: (value: 'reader' | 'simple' | 'system') => {
+      setBrowserType(value);
+      vsCode.postMessage({ command: "updateConfiguration", key: "codebuddy.browserType", value: value });
+    },
     onUsernameChange: (value: string) => {
       setUsername(value);
     },
-    postMessage: (message: { command: string; message?: any }) => {
+    postMessage: (message: { command: string; [key: string]: any }) => {
       vsCode.postMessage(message);
     },
     // Rules & Subagents handlers
@@ -742,6 +892,47 @@ export const WebviewUI = () => {
         onSwitchSession={handleSwitchSession}
         onDeleteSession={handleDeleteSession}
         onRenameSession={handleRenameSession}
+      />
+
+      {/* Notifications Toggle Button */}
+      <NotificationToggleButton
+        onClick={handleToggleNotifications}
+        aria-label="Open notifications"
+        title="Notifications"
+      >
+        <NotificationIcon size={18} />
+        {unreadNotificationCount > 0 && (
+          <span
+            style={{
+              position: "absolute",
+              top: "-5px",
+              right: "-5px",
+              background: "var(--vscode-activityBarBadge-background)",
+              color: "var(--vscode-activityBarBadge-foreground)",
+              fontSize: "10px",
+              fontWeight: "bold",
+              borderRadius: "50%",
+              minWidth: "16px",
+              height: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px solid var(--vscode-editor-background)",
+            }}
+          >
+            {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+          </span>
+        )}
+      </NotificationToggleButton>
+
+      {/* Notifications Panel */}
+      <NotificationPanel
+        isOpen={isNotificationPanelOpen}
+        onClose={() => setIsNotificationPanelOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={handleNotificationMarkAsRead}
+        onMarkAllAsRead={handleNotificationMarkAllAsRead}
+        onClearAll={handleNotificationClearAll}
       />
 
       <VSCodePanels className="vscodePanels" activeid="tab-1">
@@ -827,6 +1018,7 @@ export const WebviewUI = () => {
               onMarkAsRead={handleMarkAsRead}
               onRefresh={handleRefreshNews}
               onOpenUrl={handleOpenUrl}
+              userName={username || "Ola"}
             />
           </div>
         </VSCodePanelView>

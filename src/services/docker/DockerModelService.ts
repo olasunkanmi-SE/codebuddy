@@ -109,7 +109,7 @@ export class DockerModelService implements vscode.Disposable {
 
   async getModels(): Promise<DockerModel[]> {
     let runnerModels: DockerModel[] = [];
-    let ollamaModels: DockerModel[] = [];
+    const ollamaModels: DockerModel[] = [];
 
     // 1. Try to get models from Docker Model Runner
     try {

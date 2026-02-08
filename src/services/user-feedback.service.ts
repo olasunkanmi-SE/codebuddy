@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { NotificationService } from "./notification.service";
 
 export interface UserFeedbackOptions {
   enableStatusBar?: boolean;
@@ -229,13 +230,18 @@ export class UserFeedbackService implements vscode.Disposable {
   /**
    * Show success notification
    */
-  showSuccess(
+  async showSuccess(
     message: string,
     actions?: string[],
-  ): Thenable<string | undefined> {
+  ): Promise<string | undefined> {
+    // Add to notification center
+    NotificationService.getInstance()
+      .addNotification("success", "Success", message, "System")
+      .catch((err) => this.logger.error("Failed to add notification", err));
+
     if (!this.options.enableToastNotifications) {
       this.logger.info(`Success: ${message}`);
-      return Promise.resolve(undefined);
+      return undefined;
     }
 
     this.updateStatus({
@@ -250,13 +256,18 @@ export class UserFeedbackService implements vscode.Disposable {
   /**
    * Show warning notification
    */
-  showWarning(
+  async showWarning(
     message: string,
     actions?: string[],
-  ): Thenable<string | undefined> {
+  ): Promise<string | undefined> {
+    // Add to notification center
+    NotificationService.getInstance()
+      .addNotification("warning", "Warning", message, "System")
+      .catch((err) => this.logger.error("Failed to add notification", err));
+
     if (!this.options.enableToastNotifications) {
       this.logger.warn(message);
-      return Promise.resolve(undefined);
+      return undefined;
     }
 
     this.updateStatus({
@@ -271,10 +282,18 @@ export class UserFeedbackService implements vscode.Disposable {
   /**
    * Show error notification
    */
-  showError(message: string, actions?: string[]): Thenable<string | undefined> {
+  async showError(
+    message: string,
+    actions?: string[],
+  ): Promise<string | undefined> {
+    // Add to notification center
+    NotificationService.getInstance()
+      .addNotification("error", "Error", message, "System")
+      .catch((err) => this.logger.error("Failed to add notification", err));
+
     if (!this.options.enableToastNotifications) {
       this.logger.error(message);
-      return Promise.resolve(undefined);
+      return undefined;
     }
 
     this.updateStatus({

@@ -47,6 +47,15 @@ export interface SettingsValues {
   // Models
   selectedModel: string;
   
+  // Automations
+  dailyStandupEnabled: boolean;
+  codeHealthEnabled: boolean;
+  dependencyCheckEnabled: boolean;
+  gitWatchdogEnabled: boolean;
+
+  // Browser
+  browserType: 'reader' | 'simple' | 'system';
+
   // Account
   username: string;
   accountType: 'Free' | 'Pro';
@@ -71,6 +80,7 @@ export interface SettingsOptions {
   languageOptions: SelectOption[];
   fontFamilyOptions: SelectOption[];
   fontSizeOptions: SelectOption[];
+  browserTypeOptions: SelectOption[];
 }
 
 // Change handlers
@@ -94,8 +104,14 @@ export interface SettingsHandlers {
   onCompactModeChange: (enabled: boolean) => void;
   onReindexWorkspace: () => void;
   onModelChange: (value: string) => void;
+  postMessage: (message: { command: string; [key: string]: any }) => void;
+  // Automations handlers
+  onDailyStandupChange: (enabled: boolean) => void;
+  onCodeHealthChange: (enabled: boolean) => void;
+  onDependencyCheckChange: (enabled: boolean) => void;
+  onGitWatchdogChange: (enabled: boolean) => void;
+  onBrowserTypeChange: (value: 'reader' | 'simple' | 'system') => void;
   onUsernameChange: (value: string) => void;
-  postMessage: (message: { command: string; message?: any }) => void;
   // Rules & Subagents handlers
   onAddRule: (rule: Omit<CustomRule, 'id' | 'createdAt'>) => void;
   onUpdateRule: (id: string, updates: Partial<CustomRule>) => void;
@@ -207,6 +223,11 @@ const defaultContextValue: SettingsContextType = {
     maxFileSize: '1',
     compactMode: false,
     selectedModel: 'Groq',
+    dailyStandupEnabled: true,
+    codeHealthEnabled: true,
+    dependencyCheckEnabled: true,
+    gitWatchdogEnabled: true,
+    browserType: 'system',
     username: '',
     accountType: 'Free',
     customRules: [],
@@ -221,6 +242,11 @@ const defaultContextValue: SettingsContextType = {
     languageOptions: DEFAULT_LANGUAGE_OPTIONS,
     fontFamilyOptions: DEFAULT_FONT_FAMILY_OPTIONS,
     fontSizeOptions: DEFAULT_FONT_SIZE_OPTIONS,
+    browserTypeOptions: [
+      { value: 'reader', label: 'Smart Reader (Recommended)' },
+      { value: 'simple', label: 'Simple Browser' },
+      { value: 'system', label: 'System Browser' },
+    ],
   },
   handlers: {
     onThemeChange: () => {},
@@ -242,6 +268,11 @@ const defaultContextValue: SettingsContextType = {
     onCompactModeChange: () => {},
     onReindexWorkspace: () => {},
     onModelChange: () => {},
+    onDailyStandupChange: () => {},
+    onCodeHealthChange: () => {},
+    onDependencyCheckChange: () => {},
+    onGitWatchdogChange: () => {},
+    onBrowserTypeChange: () => {},
     onUsernameChange: () => {},
     postMessage: () => {},
     onAddRule: () => {},

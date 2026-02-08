@@ -38,8 +38,8 @@ export class DebuggerService {
 
   public async getStackTrace(
     threadId: number,
-    startFrame: number = 0,
-    levels: number = 20,
+    startFrame = 0,
+    levels = 20,
   ): Promise<any[]> {
     if (!this.activeSession) throw new Error("No active debug session");
     try {

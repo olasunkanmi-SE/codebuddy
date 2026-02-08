@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { SettingsCategory, SETTINGS_CATEGORIES } from './types';
-import { AccountSettings, GeneralSettings, AgentsSettings, MCPSettings, ConnectorsSettings, ConversationSettings, ModelsSettings, ContextSettings, RulesSettings, PrivacySettings, BetaSettings, AboutSettings } from './sections';
+import { AccountSettings, GeneralSettings, AgentsSettings, MCPSettings, ConnectorsSettings, ConversationSettings, ModelsSettings, ContextSettings, RulesSettings, PrivacySettings, BetaSettings, AboutSettings, CoWorkerSettings, BrowserSettings } from './sections';
 
 
 interface SettingsContentProps {
@@ -70,6 +70,8 @@ const SECTION_COMPONENTS: Record<SettingsCategory, React.FC<{ searchQuery: strin
   rules: RulesSettings,
   privacy: PrivacySettings,
   beta: BetaSettings,
+  coworker: CoWorkerSettings,
+  browser: BrowserSettings,
   about: AboutSettings,
 };
 

@@ -1,13 +1,13 @@
 {
   "name": "ola-code-buddy",
-  "displayName": "CodeBuddy: Your AI Coding Assistant",
+  "displayName": "CodeBuddy: Autonomous AI Software Engineer",
   "author": {
     "name": "Oyinlola Olasunkanmi Raymond",
     "email": "oyinolasunkanmi@gmail.com",
     "url": "https://github.com/olasunkanmi-SE/codebuddy"
   },
   "publisher": "fiatinnovations",
-  "description": "CodeBuddy is a Visual Studio Code extension that enhances developer productivity through AI-powered code assistance. It provides intelligent code review, refactoring suggestions, optimization tips, and interactive chat capabilities powered by multiple AI models including Gemini, Groq, Anthropic, and Deepseek.",
+  "description": "CodeBuddy is an autonomous AI software engineer for Visual Studio Code. It goes beyond simple code completion to plan, execute, debug, and deploy complex software tasks using a multi-agent architecture. Features include deep codebase understanding, self-healing workflows, and seamless integration with external tools via MCP.",
   "version": "4.0.2",
   "engines": {
     "vscode": "^1.78.0"
@@ -33,6 +33,13 @@
   ],
   "keywords": [
     "ai",
+    "autonomous agent",
+    "software engineer",
+    "devin",
+    "cursor",
+    "trae",
+    "multi-agent",
+    "mcp",
     "code assistant",
     "code review",
     "code optimization",
@@ -66,6 +73,16 @@
         }
       ],
       "editor/context": [
+        {
+          "command": "codebuddy.triggerDailyStandup",
+          "group": "CodeBuddy",
+          "when": "editorFocus"
+        },
+        {
+          "command": "codebuddy.triggerCodeHealth",
+          "group": "CodeBuddy",
+          "when": "editorFocus"
+        },
         {
           "when": "editorHasSelection",
           "command": "CodeBuddy.commentCode",
@@ -174,7 +191,31 @@
       },
       {
         "command": "CodeBuddy.reviewPR",
-        "title": "CodeBuddy. Review Pull Request"
+        "title": "CodeBuddy: Review Pull Request"
+      },
+      {
+        "command": "codebuddy.triggerDailyStandup",
+        "title": "CodeBuddy: Trigger Daily Standup"
+      },
+      {
+        "command": "codebuddy.triggerCodeHealth",
+        "title": "CodeBuddy: Trigger Code Health Check"
+      },
+      {
+        "command": "codebuddy.triggerDependencyCheck",
+        "title": "CodeBuddy: Trigger Dependency Check"
+      },
+      {
+        "command": "codebuddy.triggerGitWatchdog",
+        "title": "CodeBuddy: Trigger Git Watchdog"
+      },
+      {
+        "command": "codebuddy.createBranchFromJira",
+        "title": "CodeBuddy: Jira Tickets (List, Branch, View)"
+      },
+      {
+        "command": "codebuddy.createBranchFromGitLab",
+        "title": "CodeBuddy: GitLab Issues (List, Branch, View)"
       },
       {
         "command": "CodeBuddy.rules.open",
@@ -676,6 +717,31 @@
             "default": {},
             "description": "Stores the configuration of MCP servers",
             "scope": "application"
+          },
+          "codebuddy.automations.dailyStandup.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable or disable the Daily Standup automation (8:00 AM)"
+          },
+          "codebuddy.automations.codeHealth.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable or disable the Daily Code Health Check (9:00 AM)"
+          },
+          "codebuddy.automations.dependencyCheck.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable or disable the Daily Dependency Check (11:00 AM)"
+          },
+          "codebuddy.browserType": {
+            "type": "string",
+            "enum": [
+              "reader",
+              "simple",
+              "system"
+            ],
+            "default": "system",
+            "description": "Choose how to open news links and other external URLs."
           }
         }
       }
@@ -691,6 +757,7 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
+    "fix": "eslint src --ext ts --fix",
     "test": "vscode-test",
     "format": "prettier --write \"**/*.ts\"",
     "fix-chromadb": "npm uninstall chromadb && npm install chromadb@1.8.1",

@@ -1,6 +1,7 @@
 export type SettingsCategory =
   | "account"
   | "general"
+  | "browser"
   | "agents"
   | "mcp"
   | "connectors"
@@ -10,6 +11,7 @@ export type SettingsCategory =
   | "rules"
   | "privacy"
   | "beta"
+  | "coworker"
   | "about";
 
 export interface SettingsCategoryInfo {
@@ -59,6 +61,12 @@ export const SETTINGS_CATEGORIES: SettingsCategoryInfo[] = [
     label: "General",
     icon: "settings",
     description: "General application settings",
+  },
+  {
+    id: "browser",
+    label: "Browser",
+    icon: "globe",
+    description: "Browser and link opening preferences",
   },
   {
     id: "agents",
@@ -112,11 +120,17 @@ export const SETTINGS_CATEGORIES: SettingsCategoryInfo[] = [
     id: "beta",
     label: "Beta",
     icon: "flask",
-    description: "Experimental features",
+    description: "Beta features and experiments",
+  },
+  {
+    id: "coworker",
+    label: "Co-Worker",
+    icon: "clock",
+    description: "Daily automations and productivity tools",
   },
   {
     id: "about",
-    label: "About CodeBuddy",
+    label: "About",
     icon: "info",
     description: "About this extension",
   },
