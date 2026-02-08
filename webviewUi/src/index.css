@@ -1,6 +1,6 @@
 :root {
   --codebuddy-font-family: "JetBrains Mono", "Fira Code", monospace;
-  --codebuddy-font-size: 14px;
+  --codebuddy-font-size: 13px;
   font-family: var(--codebuddy-font-family);
   font-size: var(--codebuddy-font-size);
   line-height: 1.6;
@@ -71,7 +71,7 @@ pre, code {
   padding: 8px 4px 0;
   max-width: 100%;
   width: 100%;
-  font-size: 14px;
+  font-size: 13px;
   margin-left: 0;
   box-sizing: border-box;
   word-wrap: break-word;

@@ -286,7 +286,11 @@ export class SqliteDatabaseService {
       this.db.run(`
         CREATE INDEX IF NOT EXISTS idx_news_read_status ON news_items(read_status)
       `);
+    } catch (error: any) {
+      this.logger.warn("Failed to initialize chat history schema:", error);
+    }
 
+    try {
       // Notifications Table
       this.db.run(`
         CREATE TABLE IF NOT EXISTS notifications (
@@ -304,7 +308,7 @@ export class SqliteDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_notifications_read_status ON notifications(read_status)
       `);
     } catch (error: any) {
-      this.logger.warn("Failed to initialize chat history schema:", error);
+      this.logger.warn("Failed to initialize notifications schema:", error);
     }
   }
 

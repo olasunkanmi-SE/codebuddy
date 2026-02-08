@@ -4,7 +4,7 @@ import * as path from "path";
 import { Logger } from "../infrastructure/logger/logger";
 import { SimpleVectorStore } from "./simple-vector-store";
 import { EmbeddingService } from "./embedding";
-import { getAPIKeyAndModel } from "../utils/utils";
+import { getAPIKeyAndModel, getGenerativeAiModel } from "../utils/utils";
 
 export class AstIndexingService {
   private worker: Worker | undefined;
@@ -21,8 +21,13 @@ export class AstIndexingService {
     this.vectorStore = new SimpleVectorStore(context);
 
     // Initialize embedding service
-    const { apiKey } = getAPIKeyAndModel("gemini");
-    this.embeddingService = new EmbeddingService(apiKey);
+    const provider = getGenerativeAiModel() || "Gemini";
+    const { apiKey, baseUrl } = getAPIKeyAndModel(provider);
+    this.embeddingService = new EmbeddingService({
+      apiKey,
+      provider,
+      baseUrl,
+    });
 
     this.initializeWorker(context);
   }
@@ -108,13 +113,47 @@ export class AstIndexingService {
     this.logger.info(`Persisted ${chunks.length} chunks to vector store`);
   }
 
-  public indexFile(filePath: string, content: string) {
-    if (!this.worker) return;
+  public async indexFile(filePath: string, content: string) {
+    if (!this.worker) {
+      this.logger.warn(
+        `Worker not initialized, falling back to main thread chunking for ${filePath}`,
+      );
+      const chunks = this.simpleChunk(content, filePath);
+      await this.processChunks(chunks);
+      return;
+    }
 
     // Send to worker
     this.worker.postMessage({
       type: "INDEX_FILE",
       data: { filePath, content },
     });
+  }
+
+  // Simple text splitter as fallback (copied from worker for robustness)
+  private simpleChunk(content: string, filePath: string): any[] {
+    const chunks: any[] = [];
+    const chunkSize = 1000;
+    const overlap = 200;
+
+    for (let i = 0; i < content.length; i += chunkSize - overlap) {
+      const chunkText = content.slice(i, i + chunkSize);
+      if (chunkText.length < 50) continue;
+
+      // Calculate approximate lines
+      const beforeText = content.slice(0, i);
+      const startLine = beforeText.split("\n").length;
+      const endLine = startLine + chunkText.split("\n").length - 1;
+
+      chunks.push({
+        id: `${filePath}::${i}`,
+        text: chunkText,
+        startLine,
+        endLine,
+        type: "text_chunk",
+        metadata: { filePath },
+      });
+    }
+    return chunks;
   }
 }

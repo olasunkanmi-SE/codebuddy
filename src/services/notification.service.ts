@@ -57,9 +57,7 @@ export class NotificationService {
   /**
    * Get all notifications
    */
-  public async getNotifications(
-    limit = 50,
-  ): Promise<NotificationItem[]> {
+  public async getNotifications(limit = 50): Promise<NotificationItem[]> {
     try {
       await this.dbService.initialize();
       const results = this.dbService.executeSql(

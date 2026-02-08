@@ -6,7 +6,7 @@ import { Logger, LogLevel } from "../infrastructure/logger/logger";
 export interface Document {
   id: string;
   text: string;
-  vector: number[];
+  vector?: number[];
   metadata: Record<string, any>;
 }
 
@@ -99,34 +99,69 @@ export class SimpleVectorStore {
     for (let i = 0; i < docs.length; i += chunkSize) {
       const chunk = docs.slice(i, i + chunkSize);
 
+      // Calculate cosine similarity
       for (const doc of chunk) {
+        if (!doc.vector || !queryVector) continue;
         const score = this.cosineSimilarity(queryVector, doc.vector);
         results.push({ document: doc, score });
       }
 
-      // Yield to event loop every chunk
+      // Yield to event loop to prevent freezing
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
-    // Sort by score descending and take top k
     return results.sort((a, b) => b.score - a.score).slice(0, k);
   }
 
-  private cosineSimilarity(vecA: number[], vecB: number[]): number {
+  public async keywordSearch(query: string, k = 5): Promise<SearchResult[]> {
+    const results: SearchResult[] = [];
+    const docs = Array.from(this.documents.values());
+    const queryTerms = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((t) => t.length > 2);
+
+    if (queryTerms.length === 0) return [];
+
+    const chunkSize = 1000;
+    for (let i = 0; i < docs.length; i += chunkSize) {
+      const chunk = docs.slice(i, i + chunkSize);
+
+      for (const doc of chunk) {
+        const text = doc.text.toLowerCase();
+        let score = 0;
+
+        // Simple scoring: +1 for each term found
+        for (const term of queryTerms) {
+          if (text.includes(term)) {
+            score += 1;
+          }
+        }
+
+        if (score > 0) {
+          // Normalize score by length to prefer shorter, denser matches?
+          // Or just raw count. Let's stick to raw count for simplicity/robustness.
+          results.push({ document: doc, score });
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    return results.sort((a, b) => b.score - a.score).slice(0, k);
+  }
+
+  private cosineSimilarity(a: number[], b: number[]): number {
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
-
-    for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
+    for (let i = 0; i < a.length; i++) {
+      dotProduct += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
     }
-
-    if (normA === 0 || normB === 0) return 0;
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
-
   public clear() {
     this.documents.clear();
     this.scheduleSave();

@@ -263,6 +263,7 @@ export const getAPIKeyAndModel = (
     case "groq":
       apiKey = getConfigValue(groqApiKey);
       modelName = getConfigValue(groqModel);
+      baseUrl = "https://api.groq.com/openai/v1";
       break;
     case "anthropic":
       apiKey = getConfigValue(anthropicApiKey);
