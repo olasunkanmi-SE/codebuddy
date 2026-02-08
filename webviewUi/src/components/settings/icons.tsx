@@ -138,3 +138,32 @@ export const SettingsGearIcon: React.FC<{ size?: number; className?: string }> =
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
   </svg>
 );
+
+// Service Icons Helper
+const ServiceIcon = ({ letter, size = 20 }: { letter: string, size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+    <text x="12" y="17" textAnchor="middle" fontSize="14" fontWeight="bold" fill="currentColor" stroke="none">{letter}</text>
+  </svg>
+);
+
+export const GoogleDriveIcon = ({ size }: { size?: number }) => <ServiceIcon letter="GD" size={size} />;
+export const GmailIcon = ({ size }: { size?: number }) => <ServiceIcon letter="M" size={size} />;
+export const GitHubIcon = ({ size }: { size?: number }) => <ServiceIcon letter="GH" size={size} />;
+export const SlackIcon = ({ size }: { size?: number }) => <ServiceIcon letter="S" size={size} />;
+export const JiraIcon = ({ size }: { size?: number }) => <ServiceIcon letter="J" size={size} />;
+export const NotionIcon = ({ size }: { size?: number }) => <ServiceIcon letter="N" size={size} />;
+export const LinearIcon = ({ size }: { size?: number }) => <ServiceIcon letter="L" size={size} />;
+export const AsanaIcon = ({ size }: { size?: number }) => <ServiceIcon letter="A" size={size} />;
+export const TrelloIcon = ({ size }: { size?: number }) => <ServiceIcon letter="T" size={size} />;
+export const GitLabIcon = ({ size }: { size?: number }) => <ServiceIcon letter="GL" size={size} />;
+export const ZoomIcon = ({ size }: { size?: number }) => <ServiceIcon letter="Z" size={size} />;
+export const MicrosoftTeamsIcon = ({ size }: { size?: number }) => <ServiceIcon letter="T" size={size} />;
+export const DiscordIcon = ({ size }: { size?: number }) => <ServiceIcon letter="D" size={size} />;
+export const ConfluenceIcon = ({ size }: { size?: number }) => <ServiceIcon letter="C" size={size} />;
+export const MySQLIcon = ({ size }: { size?: number }) => <ServiceIcon letter="MY" size={size} />;
+export const RedisIcon = ({ size }: { size?: number }) => <ServiceIcon letter="R" size={size} />;
+export const MongoDBIcon = ({ size }: { size?: number }) => <ServiceIcon letter="M" size={size} />;
+export const N8nIcon = ({ size }: { size?: number }) => <ServiceIcon letter="N" size={size} />;
+
+

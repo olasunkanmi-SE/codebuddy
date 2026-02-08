@@ -664,6 +664,18 @@
                 }
               }
             }
+          },
+          "codebuddy.connectors.states": {
+            "type": "object",
+            "default": {},
+            "description": "Stores the connection status and configuration of external connectors",
+            "scope": "application"
+          },
+          "codebuddy.mcp.servers": {
+            "type": "object",
+            "default": {},
+            "description": "Stores the configuration of MCP servers",
+            "scope": "application"
           }
         }
       }

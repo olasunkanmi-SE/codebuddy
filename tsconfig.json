@@ -23,6 +23,7 @@
     "webviewUi",
     "docs",
     "src/test/**/*",
-    "openclaw"
+    "openclaw",
+    "temp_deepagentsjs"
   ]
 }

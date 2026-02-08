@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { codeBuddyMode, faqItems, modelOptions, themeOptions } from "../constants/constant";
 import { IWebviewMessage, useStreamingChat } from "../hooks/useStreamingChat";
+import { vscode } from "../utils/vscode";
 import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
@@ -89,17 +90,7 @@ const SessionsIcon = ({ size = 18 }: { size?: number }) => (
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
-const vsCode = (() => {
-  if (typeof window !== "undefined" && "acquireVsCodeApi" in window) {
-    return (window as any).acquireVsCodeApi();
-  }
-
-  return {
-    postMessage: (message: any) => {
-      console.log("Message to VS Code:", message);
-    },
-  };
-})();
+const vsCode = vscode;
 
 interface ConfigData {
   username?: string;
@@ -178,6 +169,10 @@ export const WebviewUI = () => {
       console.log("Legacy message received:", messages);
     },
   });
+
+  useEffect(() => {
+    // Removed connectors effect
+  }, []);
 
   // Memoize the chat CSS to prevent unnecessary re-renders
   const chatCss = useMemo(() => getChatCss(selectedTheme), [selectedTheme]);
@@ -712,8 +707,10 @@ export const WebviewUI = () => {
         aria-label="Open settings"
         title="Settings"
       >
-        <SettingsGearIcon size={18} />
+        <SettingsGearIcon />
       </SettingsToggleButton>
+
+
 
       {/* Settings Panel */}
       <SettingsPanel

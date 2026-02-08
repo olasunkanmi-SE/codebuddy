@@ -1,3 +1,4 @@
+export { ConnectorsSettings } from "./ConnectorsSettings";
 export { AccountSettings } from "./AccountSettings";
 export { GeneralSettings } from "./GeneralSettings";
 export { AgentsSettings } from "./AgentsSettings";
