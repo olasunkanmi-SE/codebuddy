@@ -42,6 +42,7 @@ import { LocalModelService } from "../llms/local/service";
 import { DockerModelService } from "../services/docker/DockerModelService";
 import { ProjectRulesService } from "../services/project-rules.service";
 import { NewsService } from "../services/news.service";
+import { ConnectorService } from "../services/connector.service";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -1093,6 +1094,57 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 "@ext:fiatinnovations.ola-code-buddy",
               );
               break;
+
+            // Connector Commands
+            case "get-connectors": {
+              const connectors = ConnectorService.getInstance().getConnectors();
+              await this.currentWebView?.webview.postMessage({
+                type: "connectors-list",
+                connectors,
+              });
+              break;
+            }
+            case "connect-connector": {
+              try {
+                await ConnectorService.getInstance().connect(
+                  message.id,
+                  message.config,
+                );
+                const connectors =
+                  ConnectorService.getInstance().getConnectors();
+                await this.currentWebView?.webview.postMessage({
+                  type: "connectors-list",
+                  connectors,
+                });
+                vscode.window.showInformationMessage(
+                  `Connected to ${message.id}`,
+                );
+              } catch (error: any) {
+                vscode.window.showErrorMessage(
+                  `Failed to connect: ${error.message}`,
+                );
+              }
+              break;
+            }
+            case "disconnect-connector": {
+              try {
+                await ConnectorService.getInstance().disconnect(message.id);
+                const connectors =
+                  ConnectorService.getInstance().getConnectors();
+                await this.currentWebView?.webview.postMessage({
+                  type: "connectors-list",
+                  connectors,
+                });
+                vscode.window.showInformationMessage(
+                  `Disconnected from ${message.id}`,
+                );
+              } catch (error: any) {
+                vscode.window.showErrorMessage(
+                  `Failed to disconnect: ${error.message}`,
+                );
+              }
+              break;
+            }
 
             // Docker Model Runner Commands
             case "docker-enable-runner":
