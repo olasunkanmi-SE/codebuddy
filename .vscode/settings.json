@@ -10,7 +10,7 @@
   "typescript.tsc.autoDetect": "off",
   "liveServer.settings.port": 5501,
   "editor.fontSize": 14,
-  "generativeAi.option": "Gemini",
+  "generativeAi.option": "Groq",
   "mcp.servers": {
     "docker-gateway": {
       "command": "docker",

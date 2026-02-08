@@ -281,4 +281,149 @@ export class AgentService {
       await this.storage.delete(`${COMMON.CHAT_HISTORY_PREFIX}_${agentId}`);
     }
   }
+
+  // Session Management Methods
+
+  /**
+   * Get all chat sessions for an agent
+   */
+  async getSessions(agentId: string): Promise<any[]> {
+    try {
+      const requestId = `sessions-${agentId}-${Date.now()}`;
+      const sessions = await this.chatHistoryWorker.processRequest(
+        ChatHistoryWorkerOperation.GET_SESSIONS,
+        { agentId },
+        requestId,
+      );
+      return sessions || [];
+    } catch (error: any) {
+      this.logger.warn(`Failed to get sessions for agent ${agentId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Create a new chat session
+   */
+  async createSession(agentId: string, title?: string): Promise<string> {
+    try {
+      const requestId = `create-session-${agentId}-${Date.now()}`;
+      const result = await this.chatHistoryWorker.processRequest(
+        ChatHistoryWorkerOperation.CREATE_SESSION,
+        { agentId, title },
+        requestId,
+      );
+      return result.sessionId;
+    } catch (error: any) {
+      this.logger.warn(`Failed to create session for agent ${agentId}:`, error);
+      // Fallback to a generated UUID
+      return `session-${Date.now()}`;
+    }
+  }
+
+  /**
+   * Get the current active session for an agent
+   */
+  async getCurrentSession(agentId: string): Promise<string | null> {
+    try {
+      const requestId = `current-session-${agentId}-${Date.now()}`;
+      const result = await this.chatHistoryWorker.processRequest(
+        ChatHistoryWorkerOperation.GET_CURRENT_SESSION,
+        { agentId },
+        requestId,
+      );
+      return result.sessionId;
+    } catch (error: any) {
+      this.logger.warn(
+        `Failed to get current session for agent ${agentId}:`,
+        error,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Switch to a different session
+   */
+  async switchSession(agentId: string, sessionId: string): Promise<boolean> {
+    try {
+      const requestId = `switch-session-${agentId}-${Date.now()}`;
+      const result = await this.chatHistoryWorker.processRequest(
+        ChatHistoryWorkerOperation.SWITCH_SESSION,
+        { agentId, sessionId },
+        requestId,
+      );
+      return result.success;
+    } catch (error: any) {
+      this.logger.warn(`Failed to switch session for agent ${agentId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Update session title
+   */
+  async updateSessionTitle(
+    agentId: string,
+    sessionId: string,
+    title: string,
+  ): Promise<void> {
+    try {
+      const requestId = `update-session-title-${agentId}-${Date.now()}`;
+      await this.chatHistoryWorker.processRequest(
+        ChatHistoryWorkerOperation.UPDATE_SESSION_TITLE,
+        { agentId, sessionId, title },
+        requestId,
+      );
+    } catch (error: any) {
+      this.logger.warn(
+        `Failed to update session title for ${sessionId}:`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Delete a session and its messages
+   */
+  async deleteSession(agentId: string, sessionId: string): Promise<void> {
+    try {
+      this.logger.info(
+        `AgentService.deleteSession called for session: ${sessionId}`,
+      );
+      const requestId = `delete-session-${agentId}-${Date.now()}`;
+      await this.chatHistoryWorker.processRequest(
+        ChatHistoryWorkerOperation.DELETE_SESSION,
+        { agentId, sessionId },
+        requestId,
+      );
+      this.logger.info(
+        `AgentService.deleteSession completed for session: ${sessionId}`,
+      );
+    } catch (error: any) {
+      this.logger.warn(`Failed to delete session ${sessionId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get history for a specific session
+   */
+  async getSessionHistory(agentId: string, sessionId: string): Promise<any[]> {
+    try {
+      const requestId = `session-history-${agentId}-${Date.now()}`;
+      const history = await this.chatHistoryWorker.processRequest(
+        ChatHistoryWorkerOperation.GET_SESSION_HISTORY,
+        { agentId, sessionId },
+        requestId,
+      );
+      return history || [];
+    } catch (error: any) {
+      this.logger.warn(
+        `Failed to get session history for ${sessionId}:`,
+        error,
+      );
+      return [];
+    }
+  }
 }

@@ -236,6 +236,26 @@ export class SqliteDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_chat_timestamp ON chat_history(timestamp)
       `);
 
+      // Chat Sessions Table - for managing multiple chat sessions per agent
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL UNIQUE,
+          agent_id TEXT NOT NULL,
+          title TEXT DEFAULT 'New Chat',
+          is_active INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_session_agent_id ON chat_sessions(agent_id)
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_session_active ON chat_sessions(agent_id, is_active)
+      `);
+
       // Scheduled Tasks Table
       this.db.run(`
         CREATE TABLE IF NOT EXISTS scheduled_tasks (

@@ -23,6 +23,7 @@ import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
 import { Connectors, Connector } from "./Connectors";
 import { News } from "./news/News";
+import { SessionsPanel, ChatSession } from "./sessions";
 
 // Styled components for settings toggle
 const SettingsToggleButton = styled.button`
@@ -55,6 +56,41 @@ const SettingsToggleButton = styled.button`
 const ConnectorsToggleButton = styled(SettingsToggleButton)`
   left: 56px;
 `;
+
+// Styled component for sessions toggle button
+const SessionsToggleButton = styled.button`
+  position: fixed;
+  top: 56px;
+  left: 12px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+// Sessions icon component
+const SessionsIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
@@ -90,9 +126,9 @@ interface ConfigData {
 export const WebviewUI = () => {
   // State variables
   const [selectedTheme, setSelectedTheme] = useState("tokyo night");
-  const [selectedModel, setSelectedModel] = useState("Gemini");
-  // Default to Agent so the streaming pipeline is used during testing
-  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Agent");
+  const [selectedModel, setSelectedModel] = useState("Groq");
+  // Default to Ask mode for conversational interactions
+  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Ask");
   const [commandAction, setCommandAction] = useState<string>("");
   const [commandDescription, setCommandDescription] = useState<string>("");
   const [isCommandExecuting, setIsCommandExecuting] = useState(false);
@@ -122,6 +158,11 @@ export const WebviewUI = () => {
   const [customRules, setCustomRules] = useState<CustomRule[]>([]);
   const [customSystemPrompt, setCustomSystemPrompt] = useState("");
   const [subagents, setSubagents] = useState<SubagentConfig[]>(DEFAULT_SUBAGENTS);
+
+  // Sessions state
+  const [isSessionsOpen, setIsSessionsOpen] = useState(false);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   // Ref for username input element
   // const nameInputRef = useRef<HTMLInputElement>(null);
@@ -331,11 +372,73 @@ export const WebviewUI = () => {
         clearMessages();
         break;
 
+      // Session management handlers
+      case "sessions-list":
+        if (message.sessions) {
+          setSessions(message.sessions);
+        }
+        break;
+
+      case "session-created":
+        if (message.sessionId) {
+          setCurrentSessionId(message.sessionId);
+        }
+        if (message.sessions) {
+          setSessions(message.sessions);
+        }
+        break;
+
+      case "session-switched":
+        if (message.sessionId) {
+          setCurrentSessionId(message.sessionId);
+        }
+        if (message.history) {
+          // Convert and set the history for the new session
+          const formattedMessages: IWebviewMessage[] = message.history.map((msg: any) => ({
+            id: `session-${Date.now()}-${Math.random()}`,
+            type: msg.type,
+            content: msg.content,
+            language: msg.language,
+            alias: msg.alias,
+            timestamp: msg.timestamp || Date.now(),
+          }));
+          setMessages(formattedMessages);
+        } else {
+          // Clear messages for new session
+          clearMessages();
+        }
+        break;
+
+      case "session-deleted":
+        console.log("session-deleted received:", message);
+        if (message.sessions) {
+          console.log("Setting sessions:", message.sessions.length);
+          setSessions(message.sessions);
+        }
+        // If the deleted session was current, clear the view
+        if (message.sessionId === currentSessionId) {
+          setCurrentSessionId(null);
+          clearMessages();
+        }
+        break;
+
+      case "session-title-updated":
+        if (message.sessions) {
+          setSessions(message.sessions);
+        }
+        break;
+
+      case "current-session":
+        if (message.sessionId) {
+          setCurrentSessionId(message.sessionId);
+        }
+        break;
+
       default:
         // Ignore unknown message types
         break;
     }
-  }, [setMessages, clearMessages]);
+  }, [setMessages, clearMessages, currentSessionId]);
 
   // Update CSS whenever theme changes
   useEffect(() => {
@@ -426,6 +529,32 @@ export const WebviewUI = () => {
   const handleStop = useCallback(() => {
     cancelCurrentRequest();
   }, [cancelCurrentRequest]);
+
+  // Session management handlers
+  const handleNewSession = useCallback(() => {
+    vsCode.postMessage({ command: "create-session", message: {} });
+    setIsSessionsOpen(false);
+  }, []);
+
+  const handleSwitchSession = useCallback((sessionId: string) => {
+    vsCode.postMessage({ command: "switch-session", message: { sessionId } });
+    setIsSessionsOpen(false);
+  }, []);
+
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    console.log("handleDeleteSession called with sessionId:", sessionId);
+    vsCode.postMessage({ command: "delete-session", message: { sessionId } });
+  }, []);
+
+  const handleRenameSession = useCallback((sessionId: string, newTitle: string) => {
+    vsCode.postMessage({ command: "update-session-title", message: { sessionId, title: newTitle } });
+  }, []);
+
+  const handleOpenSessions = useCallback(() => {
+    // Request sessions list when opening
+    vsCode.postMessage({ command: "get-sessions" });
+    setIsSessionsOpen(true);
+  }, []);
 
   const processedContext = useMemo(() => {
     const contextArray = Array.from(new Set(selectedContext.split("@").join(", ").split(", ")));
@@ -654,6 +783,27 @@ export const WebviewUI = () => {
         settingsValues={settingsValues}
         settingsOptions={settingsOptions}
         settingsHandlers={settingsHandlers}
+      />
+
+      {/* Sessions Toggle Button */}
+      <SessionsToggleButton
+        onClick={handleOpenSessions}
+        aria-label="Open sessions"
+        title="Sessions"
+      >
+        <SessionsIcon size={18} />
+      </SessionsToggleButton>
+
+      {/* Sessions Panel */}
+      <SessionsPanel
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        isOpen={isSessionsOpen}
+        onClose={() => setIsSessionsOpen(false)}
+        onNewSession={handleNewSession}
+        onSwitchSession={handleSwitchSession}
+        onDeleteSession={handleDeleteSession}
+        onRenameSession={handleRenameSession}
       />
 
       <VSCodePanels className="vscodePanels" activeid="tab-1">

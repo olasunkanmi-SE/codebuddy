@@ -1,4 +1,5 @@
 import axios from "axios";
+import Parser from "rss-parser";
 import { SqliteDatabaseService } from "./sqlite-database.service";
 import { Logger } from "../infrastructure/logger/logger";
 
@@ -13,14 +14,55 @@ export interface NewsItem {
   read_status?: number; // 0 = unread, 1 = read
 }
 
+// Top engineering company blogs with RSS feeds
+const ENGINEERING_BLOG_FEEDS = [
+  { name: "OpenAI", url: "https://openai.com/blog/rss.xml" },
+  {
+    name: "Google Developers",
+    url: "https://developers.googleblog.com/feeds/posts/default?alt=rss",
+  },
+  { name: "Meta Engineering", url: "https://engineering.fb.com/feed/" },
+  { name: "Netflix Tech", url: "https://netflixtechblog.com/feed" },
+  {
+    name: "Uber Engineering",
+    url: "https://www.uber.com/blog/engineering/rss.xml",
+  },
+  { name: "Stripe Engineering", url: "https://stripe.com/blog/feed.rss" },
+  {
+    name: "Airbnb Engineering",
+    url: "https://medium.com/feed/airbnb-engineering",
+  },
+  {
+    name: "Spotify Engineering",
+    url: "https://engineering.atspotify.com/feed/",
+  },
+  {
+    name: "LinkedIn Engineering",
+    url: "https://engineering.linkedin.com/blog.rss.html",
+  },
+  { name: "GitHub Engineering", url: "https://github.blog/engineering/feed/" },
+  { name: "Microsoft DevBlogs", url: "https://devblogs.microsoft.com/feed/" },
+  {
+    name: "AWS Architecture",
+    url: "https://aws.amazon.com/blogs/architecture/feed/",
+  },
+];
+
 export class NewsService {
   private static instance: NewsService;
   private dbService: SqliteDatabaseService;
   private logger: Logger;
+  private rssParser: Parser;
 
   private constructor() {
     this.dbService = SqliteDatabaseService.getInstance();
     this.logger = Logger.initialize("NewsService", {});
+    this.rssParser = new Parser({
+      timeout: 10000,
+      headers: {
+        "User-Agent": "CodeBuddy/1.0 (Engineering News Aggregator)",
+      },
+    });
   }
 
   public static getInstance(): NewsService {
@@ -37,49 +79,55 @@ export class NewsService {
   public async fetchAndStoreNews(): Promise<void> {
     try {
       await this.ensureInitialized();
-      this.logger.info("Fetching curated news from Dev.to...");
-
-      // Define interests and distribution for 5 items
-      // 2 AI/Agents, 2 Architecture, 1 Leadership
-      const categories = [
-        { tag: "ai", count: 2 },
-        { tag: "architecture", count: 2 },
-        { tag: "leadership", count: 1 },
-      ];
+      this.logger.info("Fetching engineering news from top company blogs...");
 
       const newsItems: NewsItem[] = [];
 
-      for (const cat of categories) {
+      // Fetch from each engineering blog RSS feed
+      const fetchPromises = ENGINEERING_BLOG_FEEDS.map(async (feed) => {
         try {
-          const { data } = await axios.get("https://dev.to/api/articles", {
-            params: {
-              tag: cat.tag,
-              per_page: cat.count,
-              // 'fresh' ensures we get new articles, or we can use default (hot/rising)
-              // using default to ensure quality
-            },
-            timeout: 5000,
-          });
+          const parsed = await this.rssParser.parseURL(feed.url);
 
-          if (Array.isArray(data)) {
-            data.forEach((article: any) => {
-              newsItems.push({
-                title: article.title,
-                url: article.url,
-                source: "Dev.to", // or `Dev.to (${cat.tag})`
-                published_at: article.published_at || new Date().toISOString(),
-                summary: article.description,
-              });
-            });
-          }
+          // Get the 2 most recent articles from each feed
+          const recentItems = (parsed.items || []).slice(0, 2);
+
+          return recentItems.map((item) => ({
+            title: item.title || "Untitled",
+            url: item.link || "",
+            source: feed.name,
+            published_at:
+              item.pubDate || item.isoDate || new Date().toISOString(),
+            summary:
+              item.contentSnippet || item.content?.substring(0, 300) || "",
+          }));
         } catch (err) {
-          this.logger.error(`Failed to fetch articles for tag ${cat.tag}`, err);
+          this.logger.warn(`Failed to fetch from ${feed.name}: ${err}`);
+          return [];
+        }
+      });
+
+      const results = await Promise.allSettled(fetchPromises);
+
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          newsItems.push(...result.value);
         }
       }
 
+      // Sort by published date and take top 10
+      newsItems.sort((a, b) => {
+        const dateA = new Date(a.published_at || 0).getTime();
+        const dateB = new Date(b.published_at || 0).getTime();
+        return dateB - dateA;
+      });
+
+      const topItems = newsItems.slice(0, 10);
+
       // Store in DB
-      this.logger.info(`Storing ${newsItems.length} news items...`);
-      for (const item of newsItems) {
+      this.logger.info(
+        `Storing ${topItems.length} news items from top engineering blogs...`,
+      );
+      for (const item of topItems) {
         // Check for duplicates based on URL
         const existing = this.dbService.executeSql(
           `SELECT id FROM news_items WHERE url = ?`,
@@ -101,9 +149,9 @@ export class NewsService {
         }
       }
 
-      this.logger.info("News fetched and stored successfully.");
+      this.logger.info("Engineering news fetched and stored successfully.");
     } catch (error) {
-      this.logger.error("Failed to fetch news", error);
+      this.logger.error("Failed to fetch engineering news", error);
     }
   }
 
