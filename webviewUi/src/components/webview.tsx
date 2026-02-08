@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { codeBuddyMode, faqItems, modelOptions, themeOptions } from "../constants/constant";
 import { IWebviewMessage, useStreamingChat } from "../hooks/useStreamingChat";
+import { vscode } from "../utils/vscode";
 import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
@@ -21,7 +22,6 @@ import { UserMessage } from "./personMessage";
 import { SettingsPanel, SettingsGearIcon, SettingsValues, SettingsOptions, SettingsHandlers, DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS, DEFAULT_FONT_FAMILY_OPTIONS, DEFAULT_FONT_SIZE_OPTIONS, CustomRule, SubagentConfig } from "./settings/index";
 import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
-import { Connectors, Connector } from "./Connectors";
 import { News } from "./news/News";
 import { SessionsPanel, ChatSession } from "./sessions";
 
@@ -51,10 +51,6 @@ const SettingsToggleButton = styled.button`
   &:active {
     transform: scale(0.95);
   }
-`;
-
-const ConnectorsToggleButton = styled(SettingsToggleButton)`
-  left: 56px;
 `;
 
 // Styled component for sessions toggle button
@@ -94,17 +90,7 @@ const SessionsIcon = ({ size = 18 }: { size?: number }) => (
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
-const vsCode = (() => {
-  if (typeof window !== "undefined" && "acquireVsCodeApi" in window) {
-    return (window as any).acquireVsCodeApi();
-  }
-
-  return {
-    postMessage: (message: any) => {
-      console.log("Message to VS Code:", message);
-    },
-  };
-})();
+const vsCode = vscode;
 
 interface ConfigData {
   username?: string;
@@ -149,8 +135,6 @@ export const WebviewUI = () => {
   const [maxFileSize, setMaxFileSize] = useState("1");
   const [compactMode, setCompactMode] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isConnectorsOpen, setIsConnectorsOpen] = useState(false);
-  const [connectors, setConnectors] = useState<Connector[]>([]);
   const [fileChangesPanelCollapsed, setFileChangesPanelCollapsed] = useState(true);
   const [newsItems, setNewsItems] = useState<any[]>([]);
   
@@ -187,12 +171,8 @@ export const WebviewUI = () => {
   });
 
   useEffect(() => {
-    if (isConnectorsOpen) {
-      vsCode.postMessage({
-        command: "get-connectors",
-      });
-    }
-  }, [isConnectorsOpen]);
+    // Removed connectors effect
+  }, []);
 
   // Memoize the chat CSS to prevent unnecessary re-renders
   const chatCss = useMemo(() => getChatCss(selectedTheme), [selectedTheme]);
@@ -231,10 +211,6 @@ export const WebviewUI = () => {
 
       case "bootstrap":
         setFolders(message);
-        break;
-
-      case "connectors-list":
-        setConnectors(message.connectors);
         break;
 
       case "news-update":
@@ -723,21 +699,6 @@ export const WebviewUI = () => {
     },
   }), []);
 
-  const handleConnectConnector = useCallback((id: string) => {
-    vsCode.postMessage({
-      command: "connect-connector",
-      id,
-      config: {} // TODO: Open configuration modal
-    });
-  }, []);
-
-  const handleDisconnectConnector = useCallback((id: string) => {
-    vsCode.postMessage({
-      command: "disconnect-connector",
-      id
-    });
-  }, []);
-
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Settings Toggle Button */}
@@ -746,33 +707,10 @@ export const WebviewUI = () => {
         aria-label="Open settings"
         title="Settings"
       >
-        <SettingsGearIcon size={18} />
+        <SettingsGearIcon />
       </SettingsToggleButton>
 
-      {/* Connectors Toggle Button */}
-      <ConnectorsToggleButton
-        onClick={() => setIsConnectorsOpen(true)}
-        aria-label="Open connectors"
-        title="Connectors"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-        </svg>
-      </ConnectorsToggleButton>
 
-      {/* Connectors Panel */}
-      {isConnectorsOpen && (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 200, background: 'var(--vscode-editor-background)' }}>
-            <Connectors
-                connectors={connectors}
-                onConnect={handleConnectConnector}
-                onDisconnect={handleDisconnectConnector}
-                onConfigure={() => {}}
-                onClose={() => setIsConnectorsOpen(false)}
-            />
-        </div>
-      )}
 
       {/* Settings Panel */}
       <SettingsPanel

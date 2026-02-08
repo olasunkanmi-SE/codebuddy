@@ -11,6 +11,7 @@ import {
   Button,
 } from '../ui';
 import { useSettings } from '../SettingsContext';
+import { vscode } from '../../../utils/vscode';
 
 interface ConversationSettingsProps {
   searchQuery: string;
@@ -99,8 +100,7 @@ export const ConversationSettings: React.FC<ConversationSettingsProps> = ({ sear
             <Button
               $variant="danger"
               onClick={() => {
-                const vsCode = (window as any).acquireVsCodeApi?.() || { postMessage: () => {} };
-                vsCode.postMessage({ command: 'clear-history', message: '' });
+                vscode.postMessage({ command: 'clear-history', message: '' });
               }}
             >
               Clear History

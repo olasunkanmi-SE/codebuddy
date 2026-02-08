@@ -14,6 +14,7 @@ import {
   CardTitle,
   CardDescription,
 } from '../ui';
+import { vscode } from '../../../utils/vscode';
 
 interface PrivacySettingsProps {
   searchQuery: string;
@@ -80,8 +81,7 @@ export const PrivacySettings: React.FC<PrivacySettingsProps> = ({ searchQuery: _
             <Button
               $variant="danger"
               onClick={() => {
-                const vsCode = (window as any).acquireVsCodeApi?.() || { postMessage: () => {} };
-                vsCode.postMessage({ command: 'clear-history', message: '' });
+                vscode.postMessage({ command: 'clear-history', message: '' });
               }}
             >
               Clear History

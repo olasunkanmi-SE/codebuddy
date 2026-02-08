@@ -122,6 +122,66 @@ export class ConnectorService {
       },
     });
 
+    // MySQL
+    this.connectors.set("mysql", {
+      id: "mysql",
+      name: "MySQL",
+      description: "Connect to MySQL database",
+      icon: "mysql",
+      type: "mcp",
+      status: "disconnected",
+      mcpConfig: {
+        command: "docker",
+        args: ["run", "-i", "--rm", "mcp/mysql"],
+        env: {},
+      },
+    });
+
+    // Redis
+    this.connectors.set("redis", {
+      id: "redis",
+      name: "Redis",
+      description: "Connect to Redis (Local/Cloud)",
+      icon: "redis",
+      type: "mcp",
+      status: "disconnected",
+      mcpConfig: {
+        command: "docker",
+        args: ["run", "-i", "--rm", "mcp/redis"],
+        env: {},
+      },
+    });
+
+    // MongoDB
+    this.connectors.set("mongodb", {
+      id: "mongodb",
+      name: "MongoDB",
+      description: "Connect to MongoDB (Local/Cloud)",
+      icon: "mongodb",
+      type: "mcp",
+      status: "disconnected",
+      mcpConfig: {
+        command: "docker",
+        args: ["run", "-i", "--rm", "mcp/mongodb"],
+        env: {},
+      },
+    });
+
+    // n8n
+    this.connectors.set("n8n", {
+      id: "n8n",
+      name: "n8n",
+      description: "Workflow automation (Local/Cloud)",
+      icon: "n8n",
+      type: "mcp",
+      status: "disconnected",
+      mcpConfig: {
+        command: "docker",
+        args: ["run", "-i", "--rm", "mcp/n8n"],
+        env: {},
+      },
+    });
+
     // Slack
     this.connectors.set("slack", {
       id: "slack",
