@@ -10,6 +10,9 @@ export interface NewsItem {
   published_at?: string;
   fetched_at?: string;
   read_status?: number;
+  topics?: string;
+  relevance_score?: number;
+  analysis_status?: string;
 }
 
 interface NewsProps {
@@ -17,6 +20,7 @@ interface NewsProps {
   onMarkAsRead: (id: number) => void;
   onRefresh?: () => void;
   onOpenUrl: (url: string) => void;
+  onDiscuss?: (item: NewsItem) => void;
   userName?: string;
 }
 
@@ -98,6 +102,61 @@ const SectionLabel = styled.div`
   display: inline-block;
 `;
 
+const TopicTag = styled.span`
+  display: inline-block;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 4px;
+  margin-top: 4px;
+`;
+
+const ActionRow = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+`;
+
+const DiscussButton = styled.button`
+  background: transparent;
+  border: 1px solid var(--vscode-button-secondaryBackground);
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  
+  &:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+  }
+`;
+
+const RelevanceBadge = styled.span<{ $score: number }>`
+  font-size: 10px;
+  font-weight: bold;
+  color: ${props => props.$score > 0.7 ? '#4ec9b0' : props.$score > 0.4 ? '#dcdcaa' : '#ce9178'};
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: currentColor;
+  }
+`;
+
 const ItemList = styled.div`
   display: flex;
   flex-direction: column;
@@ -172,8 +231,20 @@ const RefreshButton = styled.button<{ $refreshing: boolean }>`
   `}
 `;
 
-export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, userName = "Ola" }) => {
+export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onDiscuss, userName = "Ola" }) => {
   const [refreshing, setRefreshing] = useState(false);
+
+  const parseTopics = (topicsStr?: string): string[] => {
+    if (!topicsStr) return [];
+    try {
+      if (topicsStr.startsWith('[')) {
+        return JSON.parse(topicsStr);
+      }
+      return [topicsStr];
+    } catch (e) {
+      return [];
+    }
+  };
 
   const handleRefresh = () => {
     if (onRefresh) {
@@ -281,7 +352,14 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, use
               <StyledNewsItem key={item.id || item.url}>
                 <Bullet>▶</Bullet>
                 <ItemContent>
-                  <ItemSource>{item.source}:</ItemSource>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
+                    <ItemSource>{item.source}:</ItemSource>
+                    {item.relevance_score !== undefined && (
+                      <RelevanceBadge $score={item.relevance_score}>
+                        {Math.round(item.relevance_score * 100)}% Match
+                      </RelevanceBadge>
+                    )}
+                  </div>
                   <ItemLink 
                     href={item.url}
                     onClick={(e) => {
@@ -292,8 +370,20 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, use
                      {item.title}
                   </ItemLink>
                   {item.summary && (
-                    <ItemText> — {item.summary.substring(0, 120)}...</ItemText>
+                    <ItemText> — {item.summary.substring(0, 200)}...</ItemText>
                   )}
+                  
+                  <ActionRow>
+                    {parseTopics(item.topics).slice(0, 3).map((tag, i) => (
+                      <TopicTag key={i}>{tag}</TopicTag>
+                    ))}
+                    {onDiscuss && (
+                      <DiscussButton onClick={() => onDiscuss(item)}>
+                        <span className="codicon codicon-comment-discussion"></span>
+                        Discuss
+                      </DiscussButton>
+                    )}
+                  </ActionRow>
                 </ItemContent>
               </StyledNewsItem>
             ))}
@@ -308,9 +398,30 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, use
                 <StyledNewsItem key={item.id || item.url}>
                   <Bullet>▶</Bullet>
                   <ItemContent>
-                    <ItemLink onClick={() => onOpenUrl(item.url)}>
-                      {item.title}
-                    </ItemLink>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
+                      <ItemLink onClick={() => onOpenUrl(item.url)}>
+                        {item.title}
+                      </ItemLink>
+                      {item.relevance_score !== undefined && (
+                        <RelevanceBadge $score={item.relevance_score}>
+                          {Math.round(item.relevance_score * 100)}%
+                        </RelevanceBadge>
+                      )}
+                    </div>
+                    {item.summary && (
+                      <ItemText> — {item.summary.substring(0, 150)}...</ItemText>
+                    )}
+                    <ActionRow>
+                      {parseTopics(item.topics).slice(0, 2).map((tag, i) => (
+                        <TopicTag key={i}>{tag}</TopicTag>
+                      ))}
+                      {onDiscuss && (
+                        <DiscussButton onClick={() => onDiscuss(item)}>
+                          <span className="codicon codicon-comment-discussion"></span>
+                          Discuss
+                        </DiscussButton>
+                      )}
+                    </ActionRow>
                   </ItemContent>
                 </StyledNewsItem>
               ))}

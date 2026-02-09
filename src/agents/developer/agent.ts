@@ -28,7 +28,7 @@ import {
   InterruptConfiguration,
 } from "../interface/agent.interface";
 import { ToolProvider } from "../langgraph/tools/provider";
-import { DEVELOPER_SYSTEM_PROMPT } from "./prompts";
+import { DEVELOPER_SYSTEM_PROMPT, MENTOR_SUPERVISOR_PROMPT } from "./prompts";
 import { createDeveloperSubagents } from "./subagents";
 
 export class DeveloperAgent {
@@ -195,10 +195,11 @@ export class DeveloperAgent {
    * Generates the final System Prompt
    */
   private getSystemPrompt(): string {
-    const { customSystemPrompt } = this.config;
+    const { customSystemPrompt, mode } = this.config;
     const projectRules = ProjectRulesService.getInstance().getRules();
 
-    let prompt = DEVELOPER_SYSTEM_PROMPT;
+    let prompt =
+      mode === "Mentor" ? MENTOR_SUPERVISOR_PROMPT : DEVELOPER_SYSTEM_PROMPT;
 
     // Add project rules if available
     if (projectRules) {
@@ -284,9 +285,14 @@ export class DeveloperAgent {
       }
     }
 
-    const subagents = enableSubAgents
+    let subagents = enableSubAgents
       ? createDeveloperSubagents(this.model, this.tools)
       : undefined;
+
+    // Filter subagents if in Mentor mode
+    if (this.config.mode === "Mentor" && subagents) {
+      subagents = subagents.filter((s) => s.name === "mentor");
+    }
 
     const interruptConfig =
       this.config.enableHITL === false

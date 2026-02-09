@@ -2,17 +2,8 @@ import axios from "axios";
 import Parser from "rss-parser";
 import { SqliteDatabaseService } from "./sqlite-database.service";
 import { Logger } from "../infrastructure/logger/logger";
-
-export interface NewsItem {
-  id?: number;
-  title: string;
-  url: string;
-  summary?: string;
-  source: string;
-  published_at?: string;
-  fetched_at?: string;
-  read_status?: number; // 0 = unread, 1 = read
-}
+import { NewsAnalysisService } from "./news-analysis.service";
+import { NewsItem } from "../interfaces/news.interface";
 
 // Top engineering company blogs with RSS feeds
 const ENGINEERING_BLOG_FEEDS = [
@@ -190,6 +181,12 @@ export class NewsService {
       }
 
       this.logger.info("Engineering news fetched and stored successfully.");
+
+      // Trigger background analysis
+      this.logger.info("Triggering news analysis...");
+      // We don't await this to avoid blocking the main fetch loop too long,
+      // but in this context (scheduled task), awaiting is fine and safer.
+      await NewsAnalysisService.getInstance().analyzePendingItems();
     } catch (error) {
       this.logger.error("Failed to fetch engineering news", error);
     }
@@ -206,7 +203,24 @@ export class NewsService {
   public async markAsRead(ids: number[]): Promise<void> {
     await this.ensureInitialized();
     if (ids.length === 0) return;
+
+    // Fetch items before marking as read to record history
     const placeholders = ids.map(() => "?").join(",");
+    const items = this.dbService.executeSql(
+      `SELECT * FROM news_items WHERE id IN (${placeholders})`,
+      ids,
+    ) as NewsItem[];
+
+    // Record interactions
+    try {
+      const { KnowledgeService } = await import("./knowledge.service");
+      for (const item of items) {
+        await KnowledgeService.getInstance().recordInteraction(item, "read");
+      }
+    } catch (e) {
+      this.logger.error("Failed to record knowledge interaction", e);
+    }
+
     this.dbService.executeSqlCommand(
       `UPDATE news_items SET read_status = 1 WHERE id IN (${placeholders})`,
       ids,

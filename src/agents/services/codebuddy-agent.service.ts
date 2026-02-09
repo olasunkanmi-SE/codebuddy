@@ -271,13 +271,31 @@ export class CodeBuddyAgentService {
     return { friendlyName, summary };
   }
 
+  private currentMode:
+    | "Developer"
+    | "Architect"
+    | "TechLead"
+    | "Mentor"
+    | "Chat" = "Developer";
+
   private async getAgent(config?: ICodeBuddyAgentConfig) {
+    // Check if mode has changed
+    if (config?.mode && config.mode !== this.currentMode) {
+      this.agent = null; // Force recreation
+      this.currentMode = config.mode;
+      this.logger.log(
+        LogLevel.INFO,
+        `Switching agent mode to ${this.currentMode}`,
+      );
+    }
+
     if (!this.agent) {
       this.agent = await createAdvancedDeveloperAgent({
         checkPointer: config?.checkPointer ?? this.checkpointer,
         store: config?.store ?? this.store,
         enableHITL: config?.enableHITL ?? true,
         interruptOn: config?.interruptOn,
+        mode: this.currentMode,
       });
       this.logger.log(LogLevel.INFO, "Agent initialized");
     }
@@ -300,6 +318,7 @@ export class CodeBuddyAgentService {
     threadId?: string,
     onChunk?: (chunk: any) => void,
     requestId?: string,
+    mode?: "Developer" | "Architect" | "TechLead" | "Mentor" | "Chat",
   ) {
     const conversationId = threadId ?? `thread-${Date.now()}`;
     const streamManger = new StreamManager({
@@ -362,7 +381,7 @@ export class CodeBuddyAgentService {
     let agentState: AgentState = "planning";
 
     try {
-      const agent = await this.getAgent();
+      const agent = await this.getAgent({ mode });
       const streamId = await streamManger.startStream(requestId);
       this.logger.log(
         LogLevel.INFO,

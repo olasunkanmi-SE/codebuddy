@@ -820,7 +820,8 @@
     "simple-git": "^3.25.0",
     "sinon": "^17.0.1",
     "sql.js": "^1.13.0",
-    "web-tree-sitter": "^0.25.10"
+    "web-tree-sitter": "^0.25.10",
+    "zod": "^4.3.6"
   },
   "license": "MIT"
 }

@@ -48,6 +48,7 @@ export class MessageHandler {
         threadId,
         undefined,
         requestId,
+        metaData?.mode,
       )) {
         if (!this.activeRequests.has(requestId)) break;
 

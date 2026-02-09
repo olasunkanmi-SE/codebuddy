@@ -279,9 +279,67 @@ export class SqliteDatabaseService {
           source TEXT NOT NULL,
           published_at DATETIME,
           fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          read_status INTEGER DEFAULT 0
+          read_status INTEGER DEFAULT 0,
+          topics TEXT,
+          relevance_score REAL,
+          analysis_status TEXT DEFAULT 'pending'
         )
       `);
+
+      // User Knowledge Table
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS user_knowledge (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          topic TEXT NOT NULL UNIQUE,
+          proficiency_score REAL DEFAULT 0,
+          last_interaction_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          article_count INTEGER DEFAULT 0
+        )
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_knowledge_topic ON user_knowledge(topic)
+      `);
+
+      // Reading History Table
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS reading_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          news_item_id INTEGER NOT NULL,
+          user_id TEXT DEFAULT 'default',
+          read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          interaction_type TEXT DEFAULT 'read'
+        )
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_history_user ON reading_history(user_id)
+      `);
+
+      try {
+        // Migration for existing news_items table
+        const result = this.db.exec("PRAGMA table_info(news_items)");
+        if (result && result.length > 0) {
+          const columns = result[0].values;
+          const columnNames = columns.map((c: any) => c[1]);
+
+          if (!columnNames.includes("topics")) {
+            this.db.run("ALTER TABLE news_items ADD COLUMN topics TEXT");
+          }
+          if (!columnNames.includes("relevance_score")) {
+            this.db.run(
+              "ALTER TABLE news_items ADD COLUMN relevance_score REAL",
+            );
+          }
+          if (!columnNames.includes("analysis_status")) {
+            this.db.run(
+              "ALTER TABLE news_items ADD COLUMN analysis_status TEXT DEFAULT 'pending'",
+            );
+          }
+        }
+      } catch (error) {
+        this.logger.warn("Failed to migrate news_items schema:", error);
+      }
 
       this.db.run(`
         CREATE INDEX IF NOT EXISTS idx_news_read_status ON news_items(read_status)

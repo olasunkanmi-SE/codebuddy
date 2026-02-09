@@ -94,7 +94,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
         this.updateProviderChatHistory(this.chatHistory);
       }
       let context: string | undefined;
-      if (metaData?.context.length > 0) {
+      if (metaData?.context?.length > 0) {
         context = await this.getContext(metaData.context);
       }
       const { max_tokens } = GROQ_CONFIG;

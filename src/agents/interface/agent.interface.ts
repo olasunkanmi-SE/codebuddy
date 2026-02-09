@@ -41,6 +41,7 @@ export interface ICodeBuddyAgentConfig {
   enableHITL?: boolean;
   interruptOn?: InterruptConfiguration;
   streamOptions?: IStreamOptions;
+  mode?: "Developer" | "Architect" | "TechLead" | "Mentor" | "Chat";
 }
 
 export interface ISubAgentConfig {

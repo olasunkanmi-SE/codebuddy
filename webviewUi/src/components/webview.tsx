@@ -237,6 +237,7 @@ export const WebviewUI = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [fileChangesPanelCollapsed, setFileChangesPanelCollapsed] = useState(true);
   const [newsItems, setNewsItems] = useState<any[]>([]);
+  const [knowledge, setKnowledge] = useState<any>(null);
   
   // Rules & Subagents state
   const [customRules, setCustomRules] = useState<CustomRule[]>([]);
@@ -324,8 +325,9 @@ export const WebviewUI = () => {
         break;
 
       case "news-update":
-        if (message.payload && message.payload.news) {
-          setNewsItems(message.payload.news);
+        if (message.payload) {
+          if (message.payload.news) setNewsItems(message.payload.news);
+          if (message.payload.knowledge) setKnowledge(message.payload.knowledge);
         }
         break;
 
@@ -635,6 +637,11 @@ export const WebviewUI = () => {
 
   const handleOpenUrl = useCallback((url: string) => {
     vsCode.postMessage({ command: "openExternal", text: url });
+  }, []);
+
+  const handleDiscuss = useCallback((item: any) => {
+    vsCode.postMessage({ command: "news-discuss", item });
+    setIsUpdatesPanelOpen(false);
   }, []);
 
   const handleContextChange = useCallback((value: string) => {
@@ -1017,7 +1024,13 @@ export const WebviewUI = () => {
         onMarkAsRead={handleMarkAsRead}
         onRefresh={handleRefreshNews}
         onOpenUrl={handleOpenUrl}
+        onDiscuss={handleDiscuss}
+        onQuiz={(topic) => {
+            setIsUpdatesPanelOpen(false);
+            vsCode.postMessage({ command: "topic-quiz", topic });
+        }}
         userName={username || "Developer"}
+        knowledge={knowledge}
       />
 
       <VSCodePanels className="vscodePanels" activeid="tab-1">

@@ -91,6 +91,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected promptBuilderService: EnhancedPromptBuilderService;
   private readonly groqLLM: GroqLLM | null;
   private readonly codeBuddyAgent: MessageHandler;
+  protected currentMode: string = "Ask";
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -576,12 +577,26 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private async synchronizeNews(): Promise<void> {
     try {
       const news = await NewsService.getInstance().getUnreadNews();
-      if (news.length > 0) {
-        await this.currentWebView?.webview.postMessage({
-          type: "news-update",
-          payload: { news },
-        });
+
+      // Also fetch knowledge profile
+      let knowledge: { topics: any[]; history: any[] } = {
+        topics: [],
+        history: [],
+      };
+      try {
+        const { KnowledgeService } =
+          await import("../services/knowledge.service");
+        const topics = await KnowledgeService.getInstance().getTopTopics();
+        const history = await KnowledgeService.getInstance().getRecentHistory();
+        knowledge = { topics, history };
+      } catch (e) {
+        this.logger.warn("Failed to fetch knowledge data", e);
       }
+
+      await this.currentWebView?.webview.postMessage({
+        type: "news-update",
+        payload: { news, knowledge },
+      });
     } catch (error: any) {
       this.logger.error("Failed to synchronize news", error);
     }
@@ -660,6 +675,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
               break;
             }
+            case "codebuddy-model-change-event": {
+              this.currentMode = message.message;
+              this.logger.info(`Switched to mode: ${this.currentMode}`);
+              break;
+            }
             case "user-input": {
               this.UserMessageCounter += 1;
               const selectedGenerativeAiModel = getConfigValue(
@@ -725,7 +745,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
               }
 
-              if (message.metaData?.mode === "Agent") {
+              if (
+                message.metaData?.mode === "Agent" ||
+                message.metaData?.mode === "Mentor"
+              ) {
                 // Ensure we have a session for saving messages
                 if (!this.currentSessionId) {
                   const title =
@@ -931,6 +954,311 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               break;
             case "request-chat-history": {
               await this.synchronizeChatHistoryFromDatabase();
+              break;
+            }
+            case "topic-quiz": {
+              const { topic } = message;
+
+              if (this.currentMode !== "Mentor") {
+                vscode.window.showWarningMessage(
+                  "Quizzes are only available in Mentor mode. Please switch to Mentor mode to take a quiz.",
+                );
+                await this.currentWebView?.webview.postMessage({
+                  type: "bot-response",
+                  message:
+                    "Quizzes are only available in Mentor mode. Please switch to Mentor mode to take a quiz.",
+                });
+                break;
+              }
+
+              if (topic) {
+                try {
+                  const sessionId = await this.agentService.createSession(
+                    "agentId",
+                    `Quiz: ${topic}`,
+                  );
+                  this.currentSessionId = sessionId;
+
+                  // Fetch current score
+                  let currentScore = 0;
+                  try {
+                    const { KnowledgeService } =
+                      await import("../services/knowledge.service");
+                    const details =
+                      await KnowledgeService.getInstance().getTopicDetails([
+                        topic,
+                      ]);
+                    if (details.length > 0) {
+                      currentScore = details[0].proficiency_score || 0;
+                    }
+                  } catch (e) {
+                    // ignore
+                  }
+
+                  const quizPrompt = `I want to test my knowledge on ${topic}.
+My current proficiency score is ${currentScore}/100.
+Please ask me a conceptual question appropriate for this level.
+If I answer correctly, please explicitly say "Correct!" and explain why.`;
+
+                  // Notify UI
+                  const sessions =
+                    await this.agentService.getSessions("agentId");
+                  await this.currentWebView?.webview.postMessage({
+                    type: "session-created",
+                    sessionId,
+                    sessions,
+                  });
+
+                  await this.agentService.addChatMessage("agentId", {
+                    content: quizPrompt,
+                    type: "user",
+                    sessionId,
+                  });
+
+                  await this.currentWebView?.webview.postMessage({
+                    type: "session-switched",
+                    sessionId,
+                    history: [
+                      {
+                        type: "user",
+                        content: quizPrompt,
+                        timestamp: Date.now(),
+                        alias: "Me",
+                        language: "text",
+                      },
+                    ],
+                  });
+
+                  // Trigger Response
+                  const modelName = this.getCurrentModelName();
+                  const messageAndSystemInstruction =
+                    await this.enhanceMessageWithCodebaseContext(
+                      quizPrompt,
+                      [],
+                      modelName,
+                    );
+
+                  const requestId = generateUUID();
+                  await this.currentWebView?.webview.postMessage({
+                    type: "onStreamStart",
+                    payload: { requestId },
+                  });
+
+                  let fullResponse = "";
+                  try {
+                    for await (const chunk of this.streamResponse(
+                      messageAndSystemInstruction,
+                      { mode: "Mentor" },
+                    )) {
+                      fullResponse += chunk;
+                      await this.currentWebView?.webview.postMessage({
+                        type: "onStreamChunk",
+                        payload: { requestId, content: chunk },
+                      });
+                    }
+
+                    await this.agentService.addChatMessage("agentId", {
+                      content: fullResponse,
+                      type: "model",
+                      sessionId,
+                    });
+
+                    await this.currentWebView?.webview.postMessage({
+                      type: "onStreamEnd",
+                      payload: { requestId },
+                    });
+                  } catch (error: any) {
+                    this.logger.error("Error during quiz streaming", error);
+                    await this.currentWebView?.webview.postMessage({
+                      type: "onStreamError",
+                      payload: { requestId, error: error.message },
+                    });
+                  }
+                } catch (e) {
+                  this.logger.error("Failed to start quiz", e);
+                }
+              }
+              break;
+            }
+            case "news-discuss": {
+              const { item } = message;
+              if (item) {
+                try {
+                  const title =
+                    item.title.length > 30
+                      ? item.title.substring(0, 30) + "..."
+                      : item.title;
+                  const sessionId = await this.agentService.createSession(
+                    "agentId",
+                    `Discuss: ${title}`,
+                  );
+                  this.currentSessionId = sessionId;
+
+                  // Record discussion in knowledge graph
+                  try {
+                    const { KnowledgeService } =
+                      await import("../services/knowledge.service");
+                    await KnowledgeService.getInstance().recordInteraction(
+                      item,
+                      "discuss",
+                    );
+                  } catch (e) {
+                    this.logger.error(
+                      "Failed to record knowledge interaction for discussion",
+                      e,
+                    );
+                  }
+
+                  // Parse topics if it's a string
+                  let topicsStr = item.topics || "N/A";
+                  let topicsList: string[] = [];
+                  if (typeof topicsStr === "string") {
+                    if (topicsStr.startsWith("[")) {
+                      try {
+                        const parsed = JSON.parse(topicsStr);
+                        if (Array.isArray(parsed)) {
+                          topicsList = parsed;
+                          topicsStr = parsed.join(", ");
+                        }
+                      } catch (e) {
+                        // ignore
+                      }
+                    } else {
+                      topicsList = topicsStr.split(",").map((t) => t.trim());
+                    }
+                  }
+
+                  // Fetch proficiency
+                  let proficiencyContext = "";
+                  try {
+                    const { KnowledgeService } =
+                      await import("../services/knowledge.service");
+                    const details =
+                      await KnowledgeService.getInstance().getTopicDetails(
+                        topicsList,
+                      );
+                    if (details.length > 0) {
+                      proficiencyContext =
+                        "\n\nMy current proficiency on these topics:\n" +
+                        details
+                          .map(
+                            (d) =>
+                              `- ${d.topic}: Score ${d.proficiency_score} (${d.article_count} articles)`,
+                          )
+                          .join("\n");
+                    }
+                  } catch (e) {
+                    this.logger.warn(
+                      "Failed to fetch proficiency for discussion",
+                      e,
+                    );
+                  }
+
+                  const discussionPrompt = `I'd like to discuss this news item:
+Title: ${item.title}
+Source: ${item.source}
+Summary: ${item.summary || "No summary available."}
+Link: ${item.url}
+Topics: ${topicsStr}
+Relevance: ${item.relevance_score || "N/A"}
+TL;DR: ${item.analysis_status === "completed" && item.summary ? item.summary : "N/A"}${proficiencyContext}
+
+What are your thoughts on this?`;
+
+                  // Notify UI to switch session
+                  const sessions =
+                    await this.agentService.getSessions("agentId");
+                  await this.currentWebView?.webview.postMessage({
+                    type: "session-created",
+                    sessionId,
+                    sessions,
+                  });
+
+                  await this.agentService.addChatMessage("agentId", {
+                    content: discussionPrompt,
+                    type: "user",
+                    sessionId,
+                  });
+
+                  await this.currentWebView?.webview.postMessage({
+                    type: "session-switched",
+                    sessionId,
+                    history: [
+                      {
+                        type: "user",
+                        content: discussionPrompt,
+                        timestamp: Date.now(),
+                        alias: "Me",
+                        language: "text",
+                      },
+                    ],
+                  });
+
+                  // Trigger Agent Response
+                  const modelName = this.getCurrentModelName();
+                  const messageAndSystemInstruction =
+                    await this.enhanceMessageWithCodebaseContext(
+                      discussionPrompt,
+                      [],
+                      modelName,
+                    );
+
+                  const requestId = generateUUID();
+                  await this.currentWebView?.webview.postMessage({
+                    type: "onStreamStart",
+                    payload: { requestId },
+                  });
+
+                  let fullResponse = "";
+                  try {
+                    for await (const chunk of this.streamResponse(
+                      messageAndSystemInstruction,
+                      {
+                        mode: this.currentMode === "Mentor" ? "Mentor" : "Chat",
+                      },
+                    )) {
+                      fullResponse += chunk;
+                      await this.currentWebView?.webview.postMessage({
+                        type: "onStreamChunk",
+                        payload: { requestId, content: chunk },
+                      });
+                    }
+
+                    await this.agentService.addChatMessage("agentId", {
+                      content: fullResponse,
+                      type: "model",
+                      sessionId,
+                    });
+
+                    await this.currentWebView?.webview.postMessage({
+                      type: "onStreamEnd",
+                      payload: {
+                        requestId,
+                        content: formatText(fullResponse),
+                      },
+                    });
+                  } catch (error: any) {
+                    this.logger.error(
+                      "Error during streaming discussion response",
+                      error,
+                    );
+                    await this.currentWebView?.webview.postMessage({
+                      type: "onStreamError",
+                      payload: { requestId, error: error.message },
+                    });
+                  }
+                } catch (error: any) {
+                  this.logger.error("Failed to start news discussion", error);
+                  vscode.window.showErrorMessage(
+                    `Failed to start discussion: ${error.message}`,
+                  );
+                  await this.currentWebView?.webview.postMessage({
+                    type: "bot-response",
+                    message:
+                      "I encountered an error starting the discussion. Please check the logs.",
+                  });
+                }
+              }
               break;
             }
             case "news-mark-read": {

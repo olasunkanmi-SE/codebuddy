@@ -2,6 +2,11 @@ import React from "react";
 import styled from "styled-components";
 import { News, NewsItem } from "../news/News";
 
+export interface KnowledgeData {
+    topics: { topic: string; proficiency_score: number; article_count: number }[];
+    history: { title: string; read_at: string; url: string }[];
+}
+
 interface UpdatesPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -9,7 +14,10 @@ interface UpdatesPanelProps {
   onMarkAsRead: (id: number) => void;
   onRefresh: () => void;
   onOpenUrl: (url: string) => void;
+  onDiscuss: (item: NewsItem) => void;
+  onQuiz: (topic: string) => void;
   userName: string;
+  knowledge?: KnowledgeData;
 }
 
 const PanelOverlay = styled.div<{ isOpen: boolean }>`
@@ -35,7 +43,7 @@ const PanelOverlay = styled.div<{ isOpen: boolean }>`
 `;
 
 const PanelContainer = styled.div`
-  width: 450px; /* Slightly wider than notifications for news readability */
+  width: 450px;
   height: 100%;
   background: var(--vscode-editor-background);
   border-left: 1px solid var(--vscode-widget-border);
@@ -108,6 +116,49 @@ const Content = styled.div`
   }
 `;
 
+const SectionTitle = styled.h3`
+  padding: 16px 16px 8px;
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+  border-bottom: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-editor-background);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+`;
+
+const KnowledgeSection = styled.div`
+  padding: 16px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+`;
+
+const TopicPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  margin-right: 6px;
+  margin-bottom: 6px;
+  border: 1px solid var(--vscode-widget-border);
+  gap: 4px;
+`;
+
+const QuizIcon = styled.span`
+  cursor: pointer;
+  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  &:hover {
+    opacity: 1;
+    color: var(--vscode-textLink-foreground);
+  }
+`;
+
 export const UpdatesPanel: React.FC<UpdatesPanelProps> = ({
   isOpen,
   onClose,
@@ -115,7 +166,10 @@ export const UpdatesPanel: React.FC<UpdatesPanelProps> = ({
   onMarkAsRead,
   onRefresh,
   onOpenUrl,
+  onDiscuss,
+  onQuiz,
   userName,
+  knowledge,
 }) => {
   return (
     <PanelOverlay isOpen={isOpen} onClick={onClose}>
@@ -130,19 +184,53 @@ export const UpdatesPanel: React.FC<UpdatesPanelProps> = ({
           </CloseButton>
         </Header>
         <Content>
-            {/* 
-                We reuse the News component but might need to adjust its internal container 
-                styling via props or by overriding styles if it has too much padding.
-                For now, let's just render it. The News component has its own header/greeting 
-                which might be redundant, but we'll keep it for now.
-            */}
-            <News 
-              newsItems={newsItems} 
-              onMarkAsRead={onMarkAsRead}
-              onRefresh={onRefresh}
-              onOpenUrl={onOpenUrl}
-              userName={userName}
-            />
+           {knowledge && knowledge.topics.length > 0 && (
+              <>
+                <SectionTitle>Your Knowledge Profile</SectionTitle>
+                <KnowledgeSection>
+                    <div style={{marginBottom: '12px'}}>
+                        {knowledge.topics.slice(0, 10).map(t => (
+                            <TopicPill key={t.topic} title={`Score: ${t.proficiency_score}`}>
+                                {t.topic} <span style={{opacity: 0.7, fontSize: '9px'}}>({t.article_count})</span>
+                                <QuizIcon 
+                                    className="codicon codicon-beaker" 
+                                    title="Take a quick quiz"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onQuiz(t.topic);
+                                    }}
+                                />
+                            </TopicPill>
+                        ))}
+                    </div>
+                     <div style={{fontSize: '11px', color: 'var(--vscode-descriptionForeground)', marginTop: '8px'}}>
+                        <strong>Recent Activity:</strong>
+                        <ul style={{margin: '4px 0 0 0', paddingLeft: '16px'}}>
+                            {knowledge.history.slice(0, 5).map((h, i) => (
+                                <li key={i} style={{marginBottom: '4px'}}>
+                                    <span style={{color: 'var(--vscode-textLink-foreground)', cursor: 'pointer'}} onClick={() => onOpenUrl(h.url)}>
+                                        {h.title || 'Untitled Article'}
+                                    </span>
+                                    <span style={{opacity: 0.6, marginLeft: '6px'}}>
+                                        {new Date(h.read_at).toLocaleDateString()}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                     </div>
+                </KnowledgeSection>
+              </>
+          )}
+
+          <SectionTitle>News Feed</SectionTitle>
+          <News 
+            newsItems={newsItems} 
+            onMarkAsRead={onMarkAsRead}
+            onRefresh={onRefresh}
+            onOpenUrl={onOpenUrl}
+            onDiscuss={onDiscuss}
+            userName={userName}
+          />
         </Content>
       </PanelContainer>
     </PanelOverlay>

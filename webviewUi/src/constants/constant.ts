@@ -14,6 +14,7 @@ export const modelOptions = [
 export const codeBuddyMode = [
   { value: "Agent", label: "Agent" },
   { value: "Ask", label: "Ask" },
+  { value: "Mentor", label: "Mentor" },
 ];
 
 export const themeOptions = [

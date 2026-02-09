@@ -113,7 +113,7 @@ export class GroqWebViewProvider extends BaseWebViewProvider {
         this.updateProviderChatHistory(this.chatHistory);
       }
       let context: string | undefined;
-      if (metaData?.context.length > 0) {
+      if (metaData?.context?.length > 0) {
         context = await this.getContext(metaData.context);
       }
       const { temperature, max_tokens, top_p, stop } = GROQ_CONFIG;

@@ -100,6 +100,13 @@ export enum FSPROPS {
   TSCONFIG_FILE = "tsconfig.json",
   NODE_MODULES_PATTERN = "**/node_modules/**",
 }
+export const KNOWLEDGE_SCORING = {
+  READ_WEIGHT: 1,
+  DISCUSS_WEIGHT: 5,
+  QUIZ_CORRECT_WEIGHT: 10,
+  QUIZ_INCORRECT_WEIGHT: 1,
+};
+
 export const EmbeddingsConfig = {
   batchSize: 5,
   maxRetries: 3,

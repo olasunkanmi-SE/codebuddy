@@ -36,6 +36,8 @@ import { LangChainWebPreviewTool } from "./web_preview";
 import { LangChainSearchTool } from "./search";
 import { LangChainTodoTool } from "./todo";
 import { LangChainMemoryTool } from "./memory";
+import { LangChainKnowledgeTool } from "./knowledge";
+import { KnowledgeTool } from "../../../tools/knowledge";
 import {
   DebugControlTool,
   DebugEvaluateTool,
@@ -147,6 +149,12 @@ class TodoToolFactory implements IToolFactory {
 class MemoryToolFactory implements IToolFactory {
   createTool(): StructuredTool<any> {
     return new LangChainMemoryTool(new MemoryTool());
+  }
+}
+
+class KnowledgeToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainKnowledgeTool(new KnowledgeTool());
   }
 }
 
@@ -284,6 +292,20 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "manage_core_memory",
     "manage_tasks",
   ],
+  mentor: [
+    "manage_core_memory",
+    "manage_user_knowledge",
+    "think",
+    "manage_tasks",
+    "travily",
+    "search_vector_db",
+    "read_file",
+    "edit_file",
+    "search",
+    "list_files",
+    "terminal",
+    "run_command",
+  ],
   reviewer: [
     "analyze",
     "lint",
@@ -367,6 +389,7 @@ export class ToolProvider {
       new SearchToolFactory(this.contextRetriever),
       new TodoToolFactory(),
       new MemoryToolFactory(),
+      new KnowledgeToolFactory(),
       new DebugGetStateToolFactory(),
       new DebugGetStackTraceToolFactory(),
       new DebugGetVariablesToolFactory(),

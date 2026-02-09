@@ -141,6 +141,17 @@ export class SchedulerService {
           await this.gitWatchdogTask.execute();
         });
       }
+
+      // --- Task 8: Mentor Daily Check-in (6 PM) ---
+      // Proactive check-in for Phase 3 Holistic Mentorship
+      if (currentHour >= 18) {
+        await this.tryRunTask("mentor_checkin", async () => {
+          this.logger.info("Executing scheduled task: mentor_checkin");
+          vscode.window.showInformationMessage(
+            "CodeBuddy Mentor: Time for your daily reflection? How was your day? (Open Chat to discuss)",
+          );
+        });
+      }
     } catch (error) {
       this.logger.error("Error in Scheduler Service", error);
     }

@@ -17,10 +17,7 @@ interface AgentsSettingsProps {
   searchQuery: string;
 }
 
-const agentModeOptions = [
-  { value: 'Agent', label: 'Agent Mode' },
-  { value: 'Ask', label: 'Ask Mode' },
-];
+import { codeBuddyMode as agentModeOptions } from '../../../constants/constant';
 
 export const AgentsSettings: React.FC<AgentsSettingsProps> = ({ searchQuery: _searchQuery }) => {
   const { values, handlers } = useSettings();

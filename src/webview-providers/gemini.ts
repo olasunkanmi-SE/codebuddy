@@ -119,7 +119,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       }
 
       let context: string | undefined;
-      if (metaData?.context.length > 0) {
+      if (metaData?.context?.length > 0) {
         context = await this.getContext(metaData.context);
       }
 
