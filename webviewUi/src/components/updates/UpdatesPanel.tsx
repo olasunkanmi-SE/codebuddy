@@ -9,6 +9,8 @@ interface UpdatesPanelProps {
   onMarkAsRead: (id: number) => void;
   onRefresh: () => void;
   onOpenUrl: (url: string) => void;
+  onToggleSaved: (id: number) => void;
+  onDelete: (id: number) => void;
   userName: string;
 }
 
@@ -115,6 +117,8 @@ export const UpdatesPanel: React.FC<UpdatesPanelProps> = ({
   onMarkAsRead,
   onRefresh,
   onOpenUrl,
+  onToggleSaved,
+  onDelete,
   userName,
 }) => {
   return (
@@ -141,6 +145,8 @@ export const UpdatesPanel: React.FC<UpdatesPanelProps> = ({
               onMarkAsRead={onMarkAsRead}
               onRefresh={onRefresh}
               onOpenUrl={onOpenUrl}
+              onToggleSaved={onToggleSaved}
+              onDelete={onDelete}
               userName={userName}
             />
         </Content>

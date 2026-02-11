@@ -144,7 +144,7 @@ export class GeminiWebViewProvider extends BaseWebViewProvider {
       const chat = this.model.startChat({
         history: history.map((msg: any) => ({
           role: msg.role,
-          parts: msg.parts,
+          parts: msg.parts || [{ text: msg.content || "" }],
         })),
         systemInstruction: {
           role: "System",

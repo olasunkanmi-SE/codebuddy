@@ -16,6 +16,7 @@ export class SchedulerService {
   private standupService: StandupService;
   private dependencyCheckTask: DependencyCheckTask;
   private gitWatchdogTask: GitWatchdogTask;
+  private lastCleanupDate: string = "";
 
   private constructor() {
     this.dbService = SqliteDatabaseService.getInstance();
@@ -59,6 +60,18 @@ export class SchedulerService {
       const newsService = NewsService.getInstance();
       const now = new Date();
       const currentHour = now.getHours();
+      const today = now.toDateString();
+
+      // --- Task: Daily News Cleanup (12 AM) ---
+      if (currentHour === 0 && this.lastCleanupDate !== today) {
+        await this.tryRunTask("news_cleanup", async () => {
+          this.logger.info("Executing scheduled task: news_cleanup");
+          // Clear all unsaved news to start the day fresh
+          await newsService.cleanupOldNews(0);
+          this.lastCleanupDate = today;
+          this.logger.info("Daily news cleanup completed.");
+        });
+      }
 
       // --- Task 1: Morning News (10 AM) ---
       if (currentHour >= 10) {
@@ -83,8 +96,8 @@ export class SchedulerService {
         });
       }
 
-      // --- Task 3: Evening News (5 PM) ---
-      if (currentHour >= 17) {
+      // --- Task 3: Evening News (6 PM) ---
+      if (currentHour >= 18) {
         await this.tryRunTask("news_evening", async () => {
           this.logger.info("Executing scheduled task: news_evening");
           await newsService.fetchAndStoreNews();

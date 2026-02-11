@@ -121,8 +121,9 @@ export class SqliteDatabaseService {
 
         this.db = new this.SQL.Database(data);
 
-        // Create tables and indexes
-        this.logger.info("Creating database tables...");
+        // ALWAYS run table creation/migration to ensure schema is up-to-date
+        // sql.js handles "IF NOT EXISTS" and column checks gracefully (with our logic)
+        this.logger.info("Creating/Verifying database tables...");
         await this.createTables();
 
         this.initialized = true;
@@ -279,13 +280,32 @@ export class SqliteDatabaseService {
           source TEXT NOT NULL,
           published_at DATETIME,
           fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          read_status INTEGER DEFAULT 0
+          read_status INTEGER DEFAULT 0,
+          saved INTEGER DEFAULT 0
         )
       `);
 
       this.db.run(`
         CREATE INDEX IF NOT EXISTS idx_news_read_status ON news_items(read_status)
       `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_news_saved ON news_items(saved)
+      `);
+
+      // Migration: Add saved column if it doesn't exist
+      try {
+        this.logger.info("Attempting to add 'saved' column to news_items...");
+        this.db.run(
+          `ALTER TABLE news_items ADD COLUMN saved INTEGER DEFAULT 0`,
+        );
+        this.logger.info("Successfully added 'saved' column to news_items");
+      } catch (e: any) {
+        // Ignore "duplicate column name" error, log others
+        if (!e.message?.includes("duplicate column")) {
+          this.logger.warn(`Migration note (saved column): ${e.message}`);
+        }
+      }
     } catch (error: any) {
       this.logger.warn("Failed to initialize chat history schema:", error);
     }

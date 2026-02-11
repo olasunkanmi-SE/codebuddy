@@ -135,7 +135,7 @@ export class DeepseekWebViewProvider extends BaseWebViewProvider {
       },
       ...chatHistory.map((m: any) => ({
         role: m.role,
-        content: m.content,
+        content: m.content || m.parts?.[0]?.text || "",
       })),
       {
         role: "user",

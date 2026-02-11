@@ -575,12 +575,26 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   private async synchronizeNews(): Promise<void> {
     try {
-      const news = await NewsService.getInstance().getUnreadNews();
-      if (news.length > 0) {
-        await this.currentWebView?.webview.postMessage({
-          type: "news-update",
-          payload: { news },
-        });
+      // Use getNews() instead of getUnreadNews() to include saved items
+      const news = await NewsService.getInstance().getNews();
+      this.logger.info(
+        `synchronizeNews: Found ${news.length} items. Sending update to webview.`,
+      );
+
+      // ALWAYS send the update, even if empty, so the UI can clear the list if needed
+      const success = await this.currentWebView?.webview.postMessage({
+        type: "news-update",
+        payload: { news },
+      });
+
+      if (success) {
+        this.logger.info(
+          `synchronizeNews: Successfully posted ${news.length} items to webview.`,
+        );
+      } else {
+        this.logger.warn(
+          "synchronizeNews: Failed to post message to webview (postMessage returned false).",
+        );
       }
     } catch (error: any) {
       this.logger.error("Failed to synchronize news", error);
@@ -725,6 +739,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
               }
 
+              // Inject News Reader context if available
+              const { NewsReaderService } =
+                await import("../services/news-reader.service");
+              const currentArticle =
+                NewsReaderService.getInstance().currentArticle;
+              let articleContext = "";
+              if (currentArticle) {
+                articleContext = `\n\n[Currently Reading Article]\nTitle: ${currentArticle.title}\nURL: ${currentArticle.url}\nContent: ${currentArticle.content.substring(0, 5000)}...`;
+              }
+
               if (message.metaData?.mode === "Agent") {
                 // Ensure we have a session for saving messages
                 if (!this.currentSessionId) {
@@ -757,6 +781,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 let context: string | undefined;
                 if (message.metaData?.context?.length > 0) {
                   context = await this.getContext(message.metaData.context);
+                }
+
+                if (articleContext) {
+                  context = context ? context + articleContext : articleContext;
                 }
 
                 const payload = context
@@ -811,9 +839,24 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
               const modelName = this.getCurrentModelName();
 
+              // Inject news context into sanitizedMessage for non-Agent flow
+              if (articleContext) {
+                // Append context to message or use it in enhancement
+                // Since enhanceMessageWithCodebaseContext takes message string, we append it.
+                // But wait, sanitizedMessage is used for RAG too?
+                // Let's append it to sanitizedMessage.
+                // Actually, sanitizedMessage is a const (line 725).
+                // We can't reassign it.
+                // We need to pass it to enhanceMessageWithCodebaseContext.
+              }
+
+              const messageWithContext = articleContext
+                ? `${sanitizedMessage}\n\n${articleContext}`
+                : sanitizedMessage;
+
               const messageAndSystemInstruction =
                 await this.enhanceMessageWithCodebaseContext(
-                  sanitizedMessage,
+                  messageWithContext,
                   userSelectedFiles,
                   modelName,
                 );
@@ -946,6 +989,22 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               await NewsService.getInstance().fetchAndStoreNews();
               await this.synchronizeNews();
               break;
+            case "news-toggle-saved": {
+              const { id } = message;
+              if (id) {
+                await NewsService.getInstance().toggleSaved(id);
+                await this.synchronizeNews();
+              }
+              break;
+            }
+            case "news-delete": {
+              const { id } = message;
+              if (id) {
+                await NewsService.getInstance().deleteNewsItem(id);
+                await this.synchronizeNews();
+              }
+              break;
+            }
             case "upload-file":
               await this.fileManager.uploadFileHandler();
               break;
@@ -964,20 +1023,53 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   .getConfiguration("codebuddy")
                   .get<string>("browserType", "system");
 
+                const { NewsReaderService } =
+                  await import("../services/news-reader.service");
+
                 if (browserType === "reader") {
-                  const { NewsReaderService } =
-                    await import("../services/news-reader.service");
                   NewsReaderService.getInstance().openReader(message.text);
-                } else if (browserType === "simple") {
-                  vscode.commands.executeCommand(
-                    "simpleBrowser.show",
-                    message.text,
-                  );
                 } else {
-                  vscode.env.openExternal(vscode.Uri.parse(message.text));
+                  // Analyze content in background for context awareness
+                  NewsReaderService.getInstance()
+                    .analyzeContent(message.text)
+                    .catch((err) => {
+                      this.logger.warn(
+                        "Failed to analyze background content",
+                        err,
+                      );
+                    });
+
+                  if (browserType === "simple") {
+                    vscode.commands.executeCommand(
+                      "simpleBrowser.show",
+                      message.text,
+                    );
+                  } else {
+                    vscode.env.openExternal(vscode.Uri.parse(message.text));
+                  }
                 }
               }
               break;
+            case "toggle-saved-news": {
+              const { id } = message;
+              if (id) {
+                const { NewsService } =
+                  await import("../services/news.service");
+                await NewsService.getInstance().toggleSaved(id);
+                await this.synchronizeNews();
+              }
+              break;
+            }
+            case "delete-news": {
+              const { id } = message;
+              if (id) {
+                const { NewsService } =
+                  await import("../services/news.service");
+                await NewsService.getInstance().deleteNewsItem(id);
+                await this.synchronizeNews();
+              }
+              break;
+            }
             case "insertCode":
               {
                 const editor = vscode.window.activeTextEditor;

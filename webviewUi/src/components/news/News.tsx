@@ -10,6 +10,7 @@ export interface NewsItem {
   published_at?: string;
   fetched_at?: string;
   read_status?: number;
+  saved?: number;
 }
 
 interface NewsProps {
@@ -17,6 +18,8 @@ interface NewsProps {
   onMarkAsRead: (id: number) => void;
   onRefresh?: () => void;
   onOpenUrl: (url: string) => void;
+  onToggleSaved: (id: number) => void;
+  onDelete: (id: number) => void;
   userName?: string;
 }
 
@@ -172,7 +175,38 @@ const RefreshButton = styled.button<{ $refreshing: boolean }>`
   `}
 `;
 
-export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, userName = "Ola" }) => {
+const ActionButtons = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-left: 8px;
+  align-items: flex-start;
+  padding-top: 2px;
+`;
+
+const ActionButton = styled.button<{ $active?: boolean; $danger?: boolean }>`
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: ${props => props.$danger ? 'var(--vscode-errorForeground)' : 'var(--vscode-descriptionForeground)'};
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: ${props => props.$active ? 1 : 0.6};
+  transition: all 0.2s;
+
+  &:hover {
+    opacity: 1;
+    background: var(--vscode-toolbar-hoverBackground);
+    border-radius: 4px;
+  }
+
+  ${props => props.$active && css`
+    color: var(--vscode-textLink-foreground);
+  `}
+`;
+
+export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onToggleSaved, onDelete, userName = "Ola" }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = () => {
@@ -295,6 +329,26 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, use
                     <ItemText> — {item.summary.substring(0, 120)}...</ItemText>
                   )}
                 </ItemContent>
+                <ActionButtons>
+                  <ActionButton 
+                    title={item.saved ? "Unsave" : "Save for later"} 
+                    $active={!!item.saved} 
+                    onClick={() => item.id && onToggleSaved(item.id)}
+                    style={{ opacity: 1 }}
+                  >
+                    <span className={`codicon codicon-bookmark`}></span>
+                    <span style={{ marginLeft: '4px', fontSize: '11px' }}>{item.saved ? 'Saved' : 'Save'}</span>
+                  </ActionButton>
+                  <ActionButton 
+                    title="Delete" 
+                    $danger 
+                    onClick={() => item.id && onDelete(item.id)}
+                    style={{ opacity: 1 }}
+                  >
+                    <span className="codicon codicon-trash"></span>
+                    <span style={{ marginLeft: '4px', fontSize: '11px' }}>Delete</span>
+                  </ActionButton>
+                </ActionButtons>
               </StyledNewsItem>
             ))}
           </ItemList>
@@ -312,6 +366,26 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, use
                       {item.title}
                     </ItemLink>
                   </ItemContent>
+                  <ActionButtons>
+                    <ActionButton 
+                      title={item.saved ? "Unsave" : "Save for later"} 
+                      $active={!!item.saved} 
+                      onClick={() => item.id && onToggleSaved(item.id)}
+                      style={{ opacity: 1 }}
+                    >
+                      <span className={`codicon codicon-bookmark`}></span>
+                      <span style={{ marginLeft: '4px', fontSize: '11px' }}>{item.saved ? 'Saved' : 'Save'}</span>
+                    </ActionButton>
+                    <ActionButton 
+                      title="Delete" 
+                      $danger 
+                      onClick={() => item.id && onDelete(item.id)}
+                      style={{ opacity: 1 }}
+                    >
+                      <span className="codicon codicon-trash"></span>
+                      <span style={{ marginLeft: '4px', fontSize: '11px' }}>Delete</span>
+                    </ActionButton>
+                  </ActionButtons>
                 </StyledNewsItem>
               ))}
             </ItemList>
