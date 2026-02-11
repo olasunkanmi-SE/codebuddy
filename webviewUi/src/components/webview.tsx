@@ -637,6 +637,14 @@ export const WebviewUI = () => {
     vsCode.postMessage({ command: "openExternal", text: url });
   }, []);
 
+  const handleToggleSaved = useCallback((id: number) => {
+    vsCode.postMessage({ command: "news-toggle-saved", id });
+  }, []);
+
+  const handleDeleteNews = useCallback((id: number) => {
+    vsCode.postMessage({ command: "news-delete", id });
+  }, []);
+
   const handleContextChange = useCallback((value: string) => {
     setSelectedContext(value);
   }, []);
@@ -1017,6 +1025,8 @@ export const WebviewUI = () => {
         onMarkAsRead={handleMarkAsRead}
         onRefresh={handleRefreshNews}
         onOpenUrl={handleOpenUrl}
+        onToggleSaved={handleToggleSaved}
+        onDelete={handleDeleteNews}
         userName={username || "Developer"}
       />
 

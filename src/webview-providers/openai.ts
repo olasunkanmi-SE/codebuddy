@@ -123,7 +123,7 @@ export class OpenAIWebViewProvider extends BaseWebViewProvider {
           { role: "system", content: systemInstruction ?? "" },
           ...history.map((msg) => ({
             role: msg.role,
-            content: msg.content,
+            content: msg.content || msg.parts?.[0]?.text || "",
           })),
         ],
         model: this.generativeAiModel,

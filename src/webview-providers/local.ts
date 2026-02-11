@@ -148,7 +148,7 @@ export class LocalWebViewProvider extends BaseWebViewProvider {
       const messages: Message[] = history.map((h) =>
         Message.of({
           role: h.role,
-          content: h.content,
+          content: h.content || h.parts?.[0]?.text || "",
         }),
       );
 

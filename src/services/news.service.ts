@@ -12,6 +12,7 @@ export interface NewsItem {
   published_at?: string;
   fetched_at?: string;
   read_status?: number; // 0 = unread, 1 = read
+  saved?: number; // 0 = not saved, 1 = saved
 }
 
 // Top engineering company blogs with RSS feeds
@@ -21,25 +22,7 @@ const ENGINEERING_BLOG_FEEDS = [
     name: "Google Developers",
     url: "https://developers.googleblog.com/feeds/posts/default?alt=rss",
   },
-  { name: "Meta Engineering", url: "https://engineering.fb.com/feed/" },
-  { name: "Netflix Tech", url: "https://netflixtechblog.com/feed" },
-  {
-    name: "Uber Engineering",
-    url: "https://www.uber.com/blog/engineering/rss.xml",
-  },
   { name: "Stripe Engineering", url: "https://stripe.com/blog/feed.rss" },
-  {
-    name: "Airbnb Engineering",
-    url: "https://medium.com/feed/airbnb-engineering",
-  },
-  {
-    name: "Spotify Engineering",
-    url: "https://engineering.atspotify.com/feed/",
-  },
-  {
-    name: "LinkedIn Engineering",
-    url: "https://engineering.linkedin.com/blog.rss.html",
-  },
   { name: "GitHub Engineering", url: "https://github.blog/engineering/feed/" },
   { name: "Microsoft DevBlogs", url: "https://devblogs.microsoft.com/feed/" },
   {
@@ -47,10 +30,30 @@ const ENGINEERING_BLOG_FEEDS = [
     url: "https://aws.amazon.com/blogs/architecture/feed/",
   },
   { name: "Slack Engineering", url: "https://slack.engineering/feed/" },
+  { name: "Netflix Tech Blog", url: "https://netflixtechblog.com/feed" },
+  {
+    name: "Uber Engineering Blog",
+    url: "https://www.uber.com/blog/engineering/rss/",
+  },
+  { name: "Dropbox Tech Blog", url: "https://dropbox.tech/feed" },
   {
     name: "Pinterest Engineering",
     url: "https://medium.com/feed/pinterest-engineering",
   },
+  // Human Side of Tech & Leadership
+  {
+    name: "The Engineering Manager",
+    url: "https://theengineeringmanager.com/feed/",
+  },
+  { name: "Lara Hogan’s Blog", url: "https://larahogan.me/feed.xml" },
+  { name: "Rands in Repose", url: "https://randsinrepose.com/feed/" },
+  {
+    name: "Irrational Exuberance (Will Larson)",
+    url: "https://lethain.com/feeds.xml",
+  },
+  { name: "LeadDev", url: "https://leaddev.com/feed" },
+  { name: "Jellyfish Blog", url: "https://jellyfish.co/blog/feed" },
+  { name: "StaffEng", url: "https://staffeng.com/rss" },
   // Substack & Independent - Architecture & Leadership
   {
     name: "The Pragmatic Engineer",
@@ -58,7 +61,6 @@ const ENGINEERING_BLOG_FEEDS = [
   },
   { name: "ByteByteGo System Design", url: "https://blog.bytebytego.com/feed" },
   { name: "Refactoring (Luca Rossi)", url: "https://refactoring.fm/feed" },
-  { name: "System Design One", url: "https://blog.systemdesign.one/feed" },
   {
     name: "Tidy First? (Kent Beck)",
     url: "https://tidyfirst.substack.com/feed",
@@ -69,11 +71,9 @@ const ENGINEERING_BLOG_FEEDS = [
   },
   { name: "Martin Fowler", url: "https://martinfowler.com/feed.atom" },
   { name: "Julia Evans (jvns)", url: "https://jvns.ca/atom.xml" },
-  { name: "StaffEng (Will Larson)", url: "https://staffeng.com/rss" },
   { name: "LangChain Blog", url: "https://blog.langchain.dev/rss/" },
   { name: "Towards Data Science", url: "https://towardsdatascience.com/feed" },
   // AI Agents & Research
-  { name: "DeepMind", url: "https://deepmind.google/discover/blog/rss.xml" },
   { name: "Google Research", url: "https://research.google/blog/rss" },
   { name: "Hugging Face", url: "https://huggingface.co/blog/feed.xml" },
   {
@@ -84,8 +84,6 @@ const ENGINEERING_BLOG_FEEDS = [
     name: "Lil'Log (Lilian Weng)",
     url: "https://lilianweng.github.io/index.xml",
   },
-  { name: "Eugene Yan", url: "https://eugeneyan.com/feed.xml" },
-  { name: "Simon Willison", url: "https://simonwillison.net/atom/" },
 ];
 
 export class NewsService {
@@ -161,7 +159,7 @@ export class NewsService {
         return dateB - dateA;
       });
 
-      const topItems = newsItems.slice(0, 20);
+      const topItems = newsItems.slice(0, 100);
 
       // Store in DB
       this.logger.info(
@@ -195,12 +193,47 @@ export class NewsService {
     }
   }
 
-  public async getUnreadNews(): Promise<NewsItem[]> {
+  public async getNews(): Promise<NewsItem[]> {
     await this.ensureInitialized();
-    const results = this.dbService.executeSql(
-      `SELECT * FROM news_items WHERE read_status = 0 ORDER BY published_at DESC LIMIT 20`,
-    );
-    return results as NewsItem[];
+    try {
+      // Return unread OR saved news, ordered by date
+      const results = this.dbService.executeSql(
+        `SELECT * FROM news_items WHERE read_status = 0 OR saved = 1 ORDER BY published_at DESC LIMIT 100`,
+      );
+      this.logger.info(`getNews returned ${results.length} items`);
+
+      // If no news, trigger a background fetch (if we haven't fetched recently?)
+      // But don't block.
+      if (results.length === 0) {
+        this.logger.info("No news found in DB, triggering fetch...");
+        // We don't await this, so it runs in background.
+        // But we should probably return empty array now and let the UI refresh later.
+        this.fetchAndStoreNews().catch((err) =>
+          this.logger.error("Background fetch failed", err),
+        );
+      }
+
+      return results as NewsItem[];
+    } catch (error: any) {
+      this.logger.error("Failed to get news", error);
+      // Fallback: if 'saved' column is missing, try getting without it
+      if (error.message?.includes("no such column: saved")) {
+        try {
+          const results = this.dbService.executeSql(
+            `SELECT * FROM news_items WHERE read_status = 0 ORDER BY published_at DESC LIMIT 100`,
+          );
+          return results as NewsItem[];
+        } catch (e) {
+          return [];
+        }
+      }
+      return [];
+    }
+  }
+
+  // Deprecated: use getNews()
+  public async getUnreadNews(): Promise<NewsItem[]> {
+    return this.getNews();
   }
 
   public async markAsRead(ids: number[]): Promise<void> {
@@ -213,21 +246,39 @@ export class NewsService {
     );
   }
 
-  public async cleanupOldNews(retentionDays: number): Promise<void> {
+  public async toggleSaved(id: number): Promise<boolean> {
     await this.ensureInitialized();
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-    const cutoffISO = cutoffDate.toISOString();
-
-    this.logger.info(
-      `Cleaning up news older than ${retentionDays} days (before ${cutoffISO})...`,
+    const result = this.dbService.executeSql(
+      `SELECT saved FROM news_items WHERE id = ?`,
+      [id],
     );
 
-    const result = this.dbService.executeSqlCommand(
-      `DELETE FROM news_items WHERE fetched_at < ?`,
-      [cutoffISO],
+    if (result.length === 0) return false;
+
+    const currentSaved = result[0].saved;
+    const newSaved = currentSaved === 1 ? 0 : 1;
+
+    this.dbService.executeSqlCommand(
+      `UPDATE news_items SET saved = ? WHERE id = ?`,
+      [newSaved, id],
     );
 
-    this.logger.info(`Deleted ${result.changes} old news items.`);
+    return newSaved === 1;
+  }
+
+  public async deleteNewsItem(id: number): Promise<void> {
+    await this.ensureInitialized();
+    this.dbService.executeSqlCommand(`DELETE FROM news_items WHERE id = ?`, [
+      id,
+    ]);
+  }
+
+  public async cleanupOldNews(daysToKeep: number = 1): Promise<void> {
+    await this.ensureInitialized();
+    // Delete items that are NOT saved and older than X days
+    this.dbService.executeSqlCommand(
+      `DELETE FROM news_items WHERE saved = 0 AND fetched_at < datetime('now', '-${daysToKeep} days')`,
+    );
+    this.logger.info(`Cleaned up unsaved news older than ${daysToKeep} days`);
   }
 }

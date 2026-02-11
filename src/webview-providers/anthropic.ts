@@ -29,7 +29,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       this.chatHistory = history.map((msg: any) =>
         Message.of({
           role: msg.role === "user" ? "user" : "assistant",
-          content: msg.content,
+          content: msg.content || msg.parts?.[0]?.text || "",
           parts: msg.parts,
         }),
       );
@@ -122,7 +122,7 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       const stream = await this.model.messages.create({
         messages: history.map((msg) => ({
           role: msg.role,
-          content: msg.content,
+          content: msg.content || msg.parts?.[0]?.text || "",
         })),
         model: this.generativeAiModel,
         max_tokens,
@@ -216,7 +216,10 @@ export class AnthropicWebViewProvider extends BaseWebViewProvider {
       );
 
       const chatCompletion = await this.model.messages.create({
-        messages: history,
+        messages: history.map((msg) => ({
+          role: msg.role,
+          content: msg.content || msg.parts?.[0]?.text || "",
+        })),
         model: this.generativeAiModel,
         max_tokens,
         stream: false,

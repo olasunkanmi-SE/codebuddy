@@ -12,6 +12,11 @@ export class NewsReaderService implements vscode.Disposable {
   private currentPanel: vscode.WebviewPanel | undefined;
   private cacheManager: EnhancedCacheManager;
 
+  // Expose current article for Agent context
+  public currentArticle:
+    | { title: string; content: string; url: string }
+    | undefined;
+
   private constructor() {
     this.logger = Logger.initialize("NewsReaderService", {});
     this.cacheManager = new EnhancedCacheManager({
@@ -47,12 +52,45 @@ export class NewsReaderService implements vscode.Disposable {
     this.logger.info("Reader cache cleared manually");
   }
 
+  public async analyzeContent(url: string): Promise<void> {
+    try {
+      this.logger.info(`Analyzing content for context: ${url}`);
+      const article = await this._fetchArticle(url);
+      if (article) {
+        this.currentArticle = {
+          title: article.title,
+          content: article.textContent,
+          url: url,
+        };
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to analyze content for ${url}`, error);
+    }
+  }
+
+  private async _fetchArticle(url: string): Promise<any> {
+    const response = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
+      timeout: 10000, // 10s timeout
+    });
+    const html = response.data;
+    const doc = new JSDOM(html, { url });
+    const reader = new Readability(doc.window.document);
+    return reader.parse();
+  }
+
   public async openReader(url: string, title?: string): Promise<void> {
     try {
       // 1. Check cache
       const cachedHtml = await this.cacheManager.getResponse(url);
       if (cachedHtml) {
         this.logger.info(`Cache hit for reader: ${url}`);
+        // We try to reconstruct context from cache if possible, or just skip it.
+        // Since we don't store metadata separately, we might miss context on cache hit.
+        // But if analyzeContent was called before, we might have it.
         this.showPanel(cachedHtml, title || "Reader View");
         return;
       }
@@ -69,23 +107,19 @@ export class NewsReaderService implements vscode.Disposable {
         },
         async (progress) => {
           progress.report({ message: "Fetching content..." });
-          const response = await axios.get(url, {
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            },
-            timeout: 10000, // 10s timeout
-          });
-          const html = response.data;
 
-          progress.report({ message: "Parsing content..." });
-          const doc = new JSDOM(html, { url });
-          const reader = new Readability(doc.window.document);
-          const article = reader.parse();
+          const article = await this._fetchArticle(url);
 
           if (!article) {
             throw new Error("Could not parse article content");
           }
+
+          // Set current article for context
+          this.currentArticle = {
+            title: article.title,
+            content: article.textContent,
+            url: url,
+          };
 
           const readerHtml = this.getReaderHtml(article);
 
@@ -125,7 +159,38 @@ export class NewsReaderService implements vscode.Disposable {
 
       this.currentPanel.onDidDispose(() => {
         this.currentPanel = undefined;
+        this.currentArticle = undefined; // Clear context when closed
       });
+
+      // Handle messages from the webview
+      this.currentPanel.webview.onDidReceiveMessage(
+        async (message) => {
+          switch (message.command) {
+            case "open":
+              if (message.url) {
+                this.openReader(message.url);
+              }
+              break;
+            case "open-new":
+              if (message.url) {
+                // Open in a new column/split if possible, or just a new panel
+                // For now, openReader reuses currentPanel if it exists.
+                // To support "New Tab", we'd need to manage multiple panels.
+                // Let's force a new panel by setting currentPanel to undefined temporarily?
+                // No, that would lose the reference to the old one.
+                // We need to change how we manage panels to support multiple tabs.
+                // But for now, let's just open in external browser as "New Tab" equivalent
+                // OR, we can instantiate a new NewsReaderService? No, it's a singleton.
+
+                // Simplest "New Tab" emulation: Open in system browser
+                vscode.env.openExternal(vscode.Uri.parse(message.url));
+              }
+              break;
+          }
+        },
+        undefined,
+        [],
+      );
     }
 
     this.currentPanel.title = title;
@@ -155,6 +220,11 @@ export class NewsReaderService implements vscode.Disposable {
             --text-color: var(--vscode-editor-foreground);
             --link-color: var(--vscode-textLink-foreground);
             --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --menu-bg: var(--vscode-menu-background);
+            --menu-fg: var(--vscode-menu-foreground);
+            --menu-border: var(--vscode-menu-border);
+            --menu-hover-bg: var(--vscode-menu-selectionBackground);
+            --menu-hover-fg: var(--vscode-menu-selectionForeground);
         }
         
         body {
@@ -218,10 +288,36 @@ export class NewsReaderService implements vscode.Disposable {
         a {
             color: var(--link-color);
             text-decoration: none;
+            cursor: pointer;
         }
 
         a:hover {
             text-decoration: underline;
+        }
+
+        /* Custom Context Menu */
+        #context-menu {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            background: var(--menu-bg);
+            color: var(--menu-fg);
+            border: 1px solid var(--menu-border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            border-radius: 4px;
+            padding: 4px 0;
+            min-width: 150px;
+        }
+
+        .menu-item {
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .menu-item:hover {
+            background: var(--menu-hover-bg);
+            color: var(--menu-hover-fg);
         }
     </style>
 </head>
@@ -236,6 +332,63 @@ export class NewsReaderService implements vscode.Disposable {
             ${cleanContent}
         </div>
     </article>
+
+    <div id="context-menu">
+        <div class="menu-item" id="menu-open-new">Open in System Browser</div>
+        <div class="menu-item" id="menu-copy-link">Copy Link Address</div>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        const contextMenu = document.getElementById('context-menu');
+        const openNewItem = document.getElementById('menu-open-new');
+        const copyLinkItem = document.getElementById('menu-copy-link');
+        let currentLink = null;
+
+        // Handle regular clicks
+        document.addEventListener('click', (e) => {
+            // Hide context menu on any click
+            if (contextMenu.style.display === 'block') {
+                contextMenu.style.display = 'none';
+            }
+
+            const link = e.target.closest('a');
+            if (link) {
+                // If it's a regular click, navigate in reader
+                e.preventDefault();
+                vscode.postMessage({ command: 'open', url: link.href });
+            }
+        });
+
+        // Handle right-click (context menu)
+        document.addEventListener('contextmenu', (e) => {
+            const link = e.target.closest('a');
+            if (link) {
+                e.preventDefault();
+                currentLink = link.href;
+                
+                // Position menu
+                contextMenu.style.left = e.clientX + 'px';
+                contextMenu.style.top = e.clientY + 'px';
+                contextMenu.style.display = 'block';
+            }
+        });
+
+        // Menu actions
+        openNewItem.addEventListener('click', () => {
+            if (currentLink) {
+                vscode.postMessage({ command: 'open-new', url: currentLink });
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        copyLinkItem.addEventListener('click', () => {
+            if (currentLink) {
+                navigator.clipboard.writeText(currentLink);
+                contextMenu.style.display = 'none';
+            }
+        });
+    </script>
 </body>
 </html>`;
   }

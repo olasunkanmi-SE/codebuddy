@@ -140,7 +140,7 @@ export class QwenWebViewProvider extends BaseWebViewProvider {
         },
         ...history.map((h) => ({
           role: h.role as "user" | "assistant" | "system",
-          content: h.content,
+          content: h.content || h.parts?.[0]?.text || "",
         })),
       ];
 
