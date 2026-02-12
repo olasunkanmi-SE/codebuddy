@@ -225,6 +225,8 @@ export class NewsReaderService implements vscode.Disposable {
             --menu-border: var(--vscode-menu-border);
             --menu-hover-bg: var(--vscode-menu-selectionBackground);
             --menu-hover-fg: var(--vscode-menu-selectionForeground);
+            --toolbar-bg: var(--vscode-editor-background);
+            --toolbar-border: var(--vscode-widget-border);
         }
         
         body {
@@ -235,6 +237,40 @@ export class NewsReaderService implements vscode.Disposable {
             max-width: 800px;
             margin: 0 auto;
             padding: 40px 20px;
+        }
+
+        /* Toolbar Styles */
+        #toolbar {
+            position: sticky;
+            top: 0;
+            background: var(--toolbar-bg);
+            border-bottom: 1px solid var(--toolbar-border);
+            padding: 10px 0;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .tool-button {
+            background: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .tool-button:hover {
+            background: var(--vscode-button-secondaryHoverBackground);
+        }
+
+        .font-label {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
         }
 
         h1 {
@@ -322,7 +358,12 @@ export class NewsReaderService implements vscode.Disposable {
     </style>
 </head>
 <body>
-    <article>
+    <div id="toolbar">
+        <span class="font-label">Font Size:</span>
+        <button class="tool-button" id="font-minus">-</button>
+        <button class="tool-button" id="font-plus">+</button>
+    </div>
+    <article id="main-content">
         <h1>${article.title}</h1>
         <div class="meta">
             ${article.siteName ? `<span>${article.siteName}</span> • ` : ""}
@@ -343,7 +384,24 @@ export class NewsReaderService implements vscode.Disposable {
         const contextMenu = document.getElementById('context-menu');
         const openNewItem = document.getElementById('menu-open-new');
         const copyLinkItem = document.getElementById('menu-copy-link');
+        const fontPlus = document.getElementById('font-plus');
+        const fontMinus = document.getElementById('font-minus');
+        const mainContent = document.getElementById('main-content');
         let currentLink = null;
+        let currentFontSize = 1.1; // Default em
+
+        // Font size handlers
+        fontPlus.addEventListener('click', () => {
+            currentFontSize += 0.1;
+            mainContent.style.fontSize = currentFontSize + 'em';
+        });
+
+        fontMinus.addEventListener('click', () => {
+            if (currentFontSize > 0.5) {
+                currentFontSize -= 0.1;
+                mainContent.style.fontSize = currentFontSize + 'em';
+            }
+        });
 
         // Handle regular clicks
         document.addEventListener('click', (e) => {

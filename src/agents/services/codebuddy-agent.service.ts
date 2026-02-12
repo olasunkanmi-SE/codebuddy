@@ -1,6 +1,7 @@
 import { Command, InMemoryStore, MemorySaver } from "@langchain/langgraph";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { createAdvancedDeveloperAgent } from "../developer/agent";
+import { Orchestrator } from "../../orchestrator";
 import {
   ICodeBuddyAgentConfig,
   IToolActivity,
@@ -112,7 +113,10 @@ export class CodeBuddyAgentService {
   private activeTools = new Map<string, IToolActivity>();
   private readonly synthesizer: ResultSynthesizerService;
   // Queue of pending approvals; each resolver represents one requested action approval
-  private consentWaiters: Array<() => void> = [];
+  private consentWaiters: Array<{
+    resolve: () => void;
+    reject: (error: Error) => void;
+  }> = [];
 
   constructor() {
     this.logger = Logger.initialize("CodeBuddyAgentService", {
@@ -122,6 +126,12 @@ export class CodeBuddyAgentService {
       enableTelemetry: true,
     });
     this.synthesizer = ResultSynthesizerService.getInstance();
+
+    // Listen for model changes to reset the agent
+    Orchestrator.getInstance().onModelChangeSuccess(() => {
+      this.agent = null;
+      this.logger.info("Agent reset due to model change");
+    });
   }
 
   static getInstance(): CodeBuddyAgentService {
@@ -285,14 +295,20 @@ export class CodeBuddyAgentService {
   }
 
   setUserConsent(granted: boolean) {
-    // Treat consent as approving the next pending action only
-    if (!granted) return;
-    const resolver = this.consentWaiters.shift();
-    resolver?.();
+    const waiter = this.consentWaiters.shift();
+    if (!waiter) return;
+
+    if (granted) {
+      waiter.resolve();
+    } else {
+      waiter.reject(new Error("User denied consent"));
+    }
   }
 
   private async waitForActionConsent(): Promise<void> {
-    await new Promise<void>((resolve) => this.consentWaiters.push(resolve));
+    await new Promise<void>((resolve, reject) =>
+      this.consentWaiters.push({ resolve, reject }),
+    );
   }
 
   async *streamResponse(
@@ -332,6 +348,8 @@ export class CodeBuddyAgentService {
     const readOnlyTools = new Set([
       "read_file",
       "list_directory",
+      "list_files",
+      "ls",
       "search_codebase",
       "grep",
       "glob",
@@ -404,69 +422,81 @@ export class CodeBuddyAgentService {
 
         // Check safety limits
         const elapsed = Date.now() - startTime;
-        let shouldStop = false;
+        let limitReached = false;
+        let limitReason: string = "";
 
         if (eventCount >= maxEventCount) {
-          forceStopReason = "max_events";
-          this.logger.log(
-            LogLevel.WARN,
-            `Force stopping: exceeded ${maxEventCount} events (${totalToolInvocations} tool calls in ${Math.round(elapsed / 1000)}s)`,
-          );
-          shouldStop = true;
+          limitReached = true;
+          limitReason = `exceeded ${maxEventCount} events`;
         } else if (totalToolInvocations >= maxToolInvocations) {
-          forceStopReason = "max_tools";
-          this.logger.log(
-            LogLevel.WARN,
-            `Force stopping: exceeded ${maxToolInvocations} tool invocations`,
-          );
-          shouldStop = true;
+          limitReached = true;
+          limitReason = `exceeded ${maxToolInvocations} tool calls`;
         } else if (elapsed >= maxDurationMs) {
-          forceStopReason = "timeout";
-          this.logger.log(
-            LogLevel.WARN,
-            `Force stopping: exceeded ${maxDurationMs / 1000}s timeout`,
-          );
-          shouldStop = true;
+          limitReached = true;
+          limitReason = `exceeded ${Math.round(maxDurationMs / 60000)} minute timeout`;
         }
 
-        if (shouldStop) {
-          // Mark pending tools as completed with no result to avoid losing context
-          for (const [toolName, activity] of pendingToolCalls) {
-            activity.status = "completed";
-            activity.endTime = Date.now();
-            yield {
-              type: StreamEventType.TOOL_END,
-              content: JSON.stringify(activity),
-              metadata: {
-                toolName,
-                duration: activity.endTime - activity.startTime,
-              },
-            };
-          }
-          pendingToolCalls.clear();
+        if (limitReached) {
+          this.logger.log(
+            LogLevel.WARN,
+            `Safety limit reached: ${limitReason}. Asking for consent to continue.`,
+          );
 
-          // Emit a warning chunk so UI can surface the partial state
-          const reasonMessages: Record<string, string> = {
-            max_events: `Processed ${eventCount} events`,
-            max_tools: `Made ${totalToolInvocations} tool calls`,
-            timeout: `Ran for ${Math.round(elapsed / 1000)} seconds`,
+          const warningMessage = `I've ${limitReason}. Should I continue processing?`;
+
+          yield {
+            type: StreamEventType.METADATA,
+            content: "interrupt_waiting",
+            metadata: {
+              threadId: conversationId,
+              status: "interrupt_waiting",
+              description: warningMessage,
+              reason: "safety_limit_reached",
+            },
           };
-          const reasonText = forceStopReason
-            ? reasonMessages[forceStopReason]
-            : "Safety limit reached";
-          const warning = `⚠️ Stopping early (${reasonText}). Here's what I found so far:`;
 
           yield {
             type: StreamEventType.CHUNK,
-            content: warning,
-            metadata: { threadId: conversationId, reason: forceStopReason },
-            accumulated: accumulatedContent
-              ? `${accumulatedContent}\n\n${warning}`
-              : warning,
+            content: `⚠️ ${warningMessage} Waiting for your approval to continue...`,
+            metadata: { threadId: conversationId, timestamp: Date.now() },
           };
 
-          // Break the loop but allow graceful END below
-          break;
+          // Wait for user to click "Approve" in UI
+          try {
+            await this.waitForActionConsent();
+          } catch (error) {
+            this.logger.log(
+              LogLevel.INFO,
+              `User denied consent to continue after safety limit: ${limitReason}`,
+            );
+            yield {
+              type: StreamEventType.CHUNK,
+              content: "\n\nStopping here as requested.",
+              metadata: { threadId: conversationId, timestamp: Date.now() },
+            };
+            break; // Stop processing
+          }
+
+          yield {
+            type: StreamEventType.METADATA,
+            content: "interrupt_approved",
+            metadata: {
+              threadId: conversationId,
+              status: "interrupt_approved",
+            },
+          };
+
+          yield {
+            type: StreamEventType.CHUNK,
+            content: `Approval received. Continuing...`,
+            metadata: { threadId: conversationId, timestamp: Date.now() },
+          };
+
+          // Increase limits to allow more processing
+          eventCount = 0; // Reset event count for the next batch
+          totalToolInvocations = 0; // Reset tool count
+          // Note: we don't reset startTime to avoid bypassing the total timeout entirely if needed,
+          // but for now let's just allow continuation.
         }
 
         const entries = Object.entries(event as Record<string, any>);
@@ -512,7 +542,20 @@ export class CodeBuddyAgentService {
               metadata: { threadId: conversationId, timestamp: Date.now() },
             };
 
-            await this.waitForActionConsent();
+            try {
+              await this.waitForActionConsent();
+            } catch (error) {
+              this.logger.log(
+                LogLevel.INFO,
+                "User denied consent for interrupt",
+              );
+              yield {
+                type: StreamEventType.CHUNK,
+                content: "\n\nOperation cancelled by user.",
+                metadata: { threadId: conversationId, timestamp: Date.now() },
+              };
+              break; // Stop processing
+            }
 
             yield {
               type: StreamEventType.METADATA,
@@ -746,22 +789,79 @@ export class CodeBuddyAgentService {
                   if (fileCount >= 4) {
                     this.logger.log(
                       LogLevel.WARN,
-                      `Same file ${filePath} edited ${fileCount} times - stopping to prevent infinite loop`,
+                      `Same file ${filePath} edited ${fileCount} times - potential loop detected`,
                     );
 
-                    hasErrored = true;
+                    const fileName = filePath.split("/").pop();
+                    const warningMessage = `I've tried to edit ${fileName} ${fileCount} times. The edit may not be matching correctly. Should I try again?`;
+
                     yield {
-                      type: StreamEventType.ERROR,
-                      content: `I've tried to edit the same file (${filePath.split("/").pop()}) ${fileCount} times. The edit may not be matching correctly or there's an issue with the file content. I'll stop here - please try the edit manually or check if the file content matches what I expect.`,
+                      type: StreamEventType.METADATA,
+                      content: "interrupt_waiting",
                       metadata: {
                         threadId: conversationId,
-                        reason: "same_file_loop",
+                        status: "interrupt_waiting",
                         toolName: toolCall.name,
+                        description: warningMessage,
+                        reason: "same_file_loop",
                         filePath,
                         fileEditCount: fileCount,
                       },
                     };
-                    break;
+
+                    yield {
+                      type: StreamEventType.CHUNK,
+                      content: `⚠️ ${warningMessage} Waiting for your approval to continue...`,
+                      metadata: {
+                        threadId: conversationId,
+                        timestamp: Date.now(),
+                      },
+                    };
+
+                    // Wait for user to click "Approve" in UI
+                    try {
+                      await this.waitForActionConsent();
+                    } catch (error) {
+                      this.logger.log(
+                        LogLevel.INFO,
+                        `User denied consent to continue after same-file loop on ${filePath}`,
+                      );
+                      yield {
+                        type: StreamEventType.CHUNK,
+                        content: `\n\nStopping edit on ${fileName} as requested.`,
+                        metadata: {
+                          threadId: conversationId,
+                          timestamp: Date.now(),
+                        },
+                      };
+                      hasErrored = true; // Use hasErrored to stop the outer loop
+                      break;
+                    }
+
+                    yield {
+                      type: StreamEventType.METADATA,
+                      content: "interrupt_approved",
+                      metadata: {
+                        threadId: conversationId,
+                        status: "interrupt_approved",
+                        toolName: toolCall.name,
+                        filePath,
+                      },
+                    };
+
+                    yield {
+                      type: StreamEventType.CHUNK,
+                      content: `Approval received. Continuing with edit on ${fileName}...`,
+                      metadata: {
+                        threadId: conversationId,
+                        timestamp: Date.now(),
+                      },
+                    };
+
+                    // Reset count for this file to allow another batch of edits
+                    fileEditCounts.set(filePath, 0);
+                    // Also reset general tool count for this tool
+                    toolCallCounts.set(toolCall.name, 0);
                   }
                 }
 
@@ -769,36 +869,94 @@ export class CodeBuddyAgentService {
                 if (isLooping && !isReadOnlyTool) {
                   this.logger.log(
                     LogLevel.WARN,
-                    `Tool ${toolCall.name} called ${currentCount + 1} times (limit: ${toolLimit}) - loop detected, stopping`,
+                    `Tool ${toolCall.name} called ${currentCount + 1} times (limit: ${toolLimit}) - potential loop detected`,
                   );
 
-                  hasErrored = true;
+                  const { friendlyName } = this.describeToolInvocation(
+                    toolCall.name,
+                    toolCall.args,
+                  );
 
-                  // Provide specific error messages based on tool type
-                  let errorMessage: string;
+                  // Provide specific warning messages based on tool type
+                  let warningMessage: string;
                   if (
                     toolCall.name === "edit_file" ||
                     toolCall.name === "write_file"
                   ) {
-                    errorMessage = `I've attempted to edit this file ${currentCount + 1} times but the edit isn't completing successfully. This usually happens when the edit operation is interrupted or the file content doesn't match exactly. I'll stop here to avoid an infinite loop. You may need to make the change manually.`;
+                    warningMessage = `I've attempted to edit this file ${currentCount + 1} times but the edit isn't completing successfully. This might be a loop. Should I try again?`;
                   } else if (toolCall.name === "web_search") {
-                    errorMessage = `I've searched for this information multiple times but couldn't find definitive results. For GitHub issues, try using the GitHub MCP tools directly or visit the repository issues page manually.`;
+                    warningMessage = `I've searched for this information ${currentCount + 1} times without clear results. Should I keep searching?`;
                   } else {
-                    errorMessage = `I've called ${toolCall.name} ${currentCount + 1} times which indicates a loop. I'll stop here to prevent infinite processing.`;
+                    warningMessage = `I've called ${friendlyName} ${currentCount + 1} times, which might indicate a loop. Should I continue?`;
+                  }
+
+                  // Ask for user consent before continuing
+                  yield {
+                    type: StreamEventType.METADATA,
+                    content: "interrupt_waiting",
+                    metadata: {
+                      threadId: conversationId,
+                      status: "interrupt_waiting",
+                      toolName: friendlyName,
+                      description: warningMessage,
+                      reason: "loop_detected",
+                    },
+                  };
+
+                  yield {
+                    type: StreamEventType.CHUNK,
+                    content: `⚠️ ${warningMessage} Waiting for your approval to continue...`,
+                    metadata: {
+                      threadId: conversationId,
+                      timestamp: Date.now(),
+                    },
+                  };
+
+                  // Wait for user to click "Approve" in UI
+                  try {
+                    await this.waitForActionConsent();
+                  } catch (error) {
+                    this.logger.log(
+                      LogLevel.INFO,
+                      `User denied consent to continue after tool loop on ${toolCall.name}`,
+                    );
+                    yield {
+                      type: StreamEventType.CHUNK,
+                      content: `\n\nStopping here as requested.`,
+                      metadata: {
+                        threadId: conversationId,
+                        timestamp: Date.now(),
+                      },
+                    };
+                    hasErrored = true; // Use hasErrored to stop the outer loop
+                    break;
                   }
 
                   yield {
-                    type: StreamEventType.ERROR,
-                    content: errorMessage,
+                    type: StreamEventType.METADATA,
+                    content: "interrupt_approved",
                     metadata: {
                       threadId: conversationId,
-                      reason: "tool_loop_detected",
-                      toolName: toolCall.name,
-                      callCount: currentCount + 1,
-                      limit: toolLimit,
+                      status: "interrupt_approved",
+                      toolName: friendlyName,
                     },
                   };
-                  break;
+
+                  yield {
+                    type: StreamEventType.CHUNK,
+                    content: `Approval received. Continuing with ${friendlyName}...`,
+                    metadata: {
+                      threadId: conversationId,
+                      timestamp: Date.now(),
+                    },
+                  };
+
+                  // Reset count for this tool to allow another batch of calls after approval
+                  toolCallCounts.set(toolCall.name, 0);
+                  // Also reset file edit counts if it was a file tool
+                  if (toolCall.args?.file_path) {
+                    fileEditCounts.set(toolCall.args.file_path, 0);
+                  }
                 } else if (isLooping && isReadOnlyTool) {
                   // Just log a warning for read-only tools, don't stop
                   this.logger.debug(

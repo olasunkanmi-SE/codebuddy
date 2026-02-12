@@ -20,6 +20,7 @@ interface NewsProps {
   onOpenUrl: (url: string) => void;
   onToggleSaved: (id: number) => void;
   onDelete: (id: number) => void;
+  onDeleteAll?: () => void;
   userName?: string;
 }
 
@@ -206,7 +207,16 @@ const ActionButton = styled.button<{ $active?: boolean; $danger?: boolean }>`
   `}
 `;
 
-export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onToggleSaved, onDelete, userName = "Ola" }) => {
+export const News: React.FC<NewsProps> = ({
+  newsItems,
+  onMarkAsRead,
+  onRefresh,
+  onOpenUrl,
+  onToggleSaved,
+  onDelete,
+  onDeleteAll,
+  userName = "Ola"
+}) => {
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = () => {
@@ -247,6 +257,13 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onT
   }, 0);
   const readTimeMinutes = Math.floor(totalWords / 200);
   const readTimeSeconds = Math.floor(((totalWords % 200) / 200) * 60);
+
+  const handleOpenLink = (item: NewsItem) => {
+    if (item.id) {
+      onMarkAsRead(item.id);
+    }
+    onOpenUrl(item.url);
+  };
 
   const introContent = useMemo(() => {
     if (newsItems.length === 0) {
@@ -294,10 +311,23 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onT
       <HeaderSection>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
           <Greeting style={{ marginBottom: 0 }}>Hey {userName},</Greeting>
-          <RefreshButton onClick={handleRefresh} $refreshing={refreshing} disabled={refreshing}>
-            <span className={`codicon codicon-refresh ${refreshing ? 'codicon-modifier-spin' : ''}`}></span>
-            {refreshing ? 'Updating...' : 'Refresh'}
-          </RefreshButton>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {newsItems.length > 0 && onDeleteAll && (
+              <RefreshButton 
+                onClick={onDeleteAll} 
+                title="Delete all news"
+                $refreshing={false}
+                style={{ background: 'var(--vscode-button-secondaryBackground)', color: 'var(--vscode-button-secondaryForeground)' }}
+              >
+                <span className="codicon codicon-trash"></span>
+                Delete All
+              </RefreshButton>
+            )}
+            <RefreshButton onClick={handleRefresh} $refreshing={refreshing} disabled={refreshing}>
+              <span className={`codicon codicon-refresh ${refreshing ? 'codicon-modifier-spin' : ''}`}></span>
+              {refreshing ? 'Updating...' : 'Refresh'}
+            </RefreshButton>
+          </div>
         </div>
         {introContent}
       </HeaderSection>
@@ -320,7 +350,7 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onT
                     href={item.url}
                     onClick={(e) => {
                       e.preventDefault();
-                      onOpenUrl(item.url);
+                      handleOpenLink(item);
                     }}
                   >
                      {item.title}
@@ -362,7 +392,7 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onT
                 <StyledNewsItem key={item.id || item.url}>
                   <Bullet>▶</Bullet>
                   <ItemContent>
-                    <ItemLink onClick={() => onOpenUrl(item.url)}>
+                    <ItemLink onClick={() => handleOpenLink(item)}>
                       {item.title}
                     </ItemLink>
                   </ItemContent>

@@ -1005,6 +1005,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
               break;
             }
+            case "news-delete-all": {
+              const { NewsService } = await import("../services/news.service");
+              await NewsService.getInstance().deleteAllNews();
+              await this.synchronizeNews();
+              break;
+            }
             case "upload-file":
               await this.fileManager.uploadFileHandler();
               break;
@@ -1040,8 +1046,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     });
 
                   if (browserType === "simple") {
-                    vscode.commands.executeCommand(
-                      "simpleBrowser.show",
+                    const { SimpleBrowserService } =
+                      await import("../services/simple-browser.service");
+                    SimpleBrowserService.getInstance().openBrowser(
                       message.text,
                     );
                   } else {

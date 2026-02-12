@@ -151,6 +151,89 @@ const BookIcon = ({ size = 18 }: { size?: number }) => (
   </svg>
 );
 
+// Globe icon component for Browser
+const GlobeIcon = ({ size = 18 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
+// Styled component for browser toggle button
+const BrowserToggleButton = styled.button`
+  position: fixed;
+  top: 188px;
+  left: 12px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+// Styled component for font size controls
+const FontSizeControls = styled.div`
+  position: fixed;
+  top: 232px;
+  left: 12px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const FontSizeButton = styled.button`
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  font-size: 16px;
+  font-weight: bold;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
 // Styled component for updates toggle button
 const UpdatesToggleButton = styled.button`
   position: fixed;
@@ -637,13 +720,32 @@ export const WebviewUI = () => {
     vsCode.postMessage({ command: "openExternal", text: url });
   }, []);
 
+  const handleLaunchBrowser = () => {
+    vsCode.postMessage({
+      command: "execute-command",
+      commandId: "codebuddy.openSimpleBrowser",
+    });
+  };
+
+  const handleIncreaseFont = () => {
+    setFontSize((prev) => Math.min(prev + 1, 24));
+  };
+
+  const handleDecreaseFont = () => {
+    setFontSize((prev) => Math.max(prev - 1, 8));
+  };
+
   const handleToggleSaved = useCallback((id: number) => {
     vsCode.postMessage({ command: "news-toggle-saved", id });
   }, []);
 
-  const handleDeleteNews = useCallback((id: number) => {
+  const handleDeleteNews = (id: number) => {
     vsCode.postMessage({ command: "news-delete", id });
-  }, []);
+  };
+
+  const handleDeleteAllNews = () => {
+    vsCode.postMessage({ command: "news-delete-all" });
+  };
 
   const handleContextChange = useCallback((value: string) => {
     setSelectedContext(value);
@@ -1017,6 +1119,33 @@ export const WebviewUI = () => {
         <BookIcon size={18} />
       </UpdatesToggleButton>
 
+      {/* Browser Toggle Button */}
+      <BrowserToggleButton
+        onClick={handleLaunchBrowser}
+        aria-label="Open browser"
+        title="Launch Browser (Google)"
+      >
+        <GlobeIcon size={18} />
+      </BrowserToggleButton>
+
+      {/* Font Size Controls */}
+      <FontSizeControls>
+        <FontSizeButton 
+          onClick={handleIncreaseFont} 
+          title="Increase font size"
+          aria-label="Increase font"
+        >
+          +
+        </FontSizeButton>
+        <FontSizeButton 
+          onClick={handleDecreaseFont} 
+          title="Decrease font size"
+          aria-label="Decrease font"
+        >
+          -
+        </FontSizeButton>
+      </FontSizeControls>
+
       {/* Updates Panel */}
       <UpdatesPanel
         isOpen={isUpdatesPanelOpen}
@@ -1027,6 +1156,7 @@ export const WebviewUI = () => {
         onOpenUrl={handleOpenUrl}
         onToggleSaved={handleToggleSaved}
         onDelete={handleDeleteNews}
+        onDeleteAll={handleDeleteAllNews}
         userName={username || "Developer"}
       />
 
