@@ -246,6 +246,12 @@ export class NewsService {
     );
   }
 
+  public async deleteAllNews(): Promise<void> {
+    await this.ensureInitialized();
+    this.dbService.executeSqlCommand(`DELETE FROM news_items`);
+    this.logger.info("All news items deleted");
+  }
+
   public async toggleSaved(id: number): Promise<boolean> {
     await this.ensureInitialized();
     const result = this.dbService.executeSql(

@@ -364,6 +364,16 @@ export async function activate(context: vscode.ExtensionContext) {
           await createBranchFromGitLabCommand();
         },
       ),
+      vscode.commands.registerCommand(
+        "codebuddy.openSimpleBrowser",
+        async (url?: string) => {
+          const { SimpleBrowserService } =
+            await import("./services/simple-browser.service");
+          await SimpleBrowserService.getInstance().openBrowser(
+            url || "https://www.google.com/webhp?hl=en",
+          );
+        },
+      ),
     );
 
     // Initialize Diff Review Service

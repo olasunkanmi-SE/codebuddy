@@ -97,7 +97,7 @@ export class Logger {
   }
 
   private shouldLog(logLevel: LogLevel) {
-    const levels = Object.keys(logLevel);
+    const levels = Object.values(LogLevel) as string[];
     return levels.indexOf(logLevel) >= levels.indexOf(Logger.config.minLevel);
   }
 

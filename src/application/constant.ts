@@ -32,6 +32,7 @@ export enum COMMON {
   QWEN_CHAT_HISTORY = "qwenChatHistory",
   GLM_CHAT_HISTORY = "glmChatHistory",
   LOCAL_CHAT_HISTORY = "localChatHistory",
+  OLLAMA_CHAT_HISTORY = "ollamaChatHistory",
   USER_INPUT = "user-input",
   BOT = "bot",
   GEMINI_SNAPSHOT = "GeminiSnapshot",

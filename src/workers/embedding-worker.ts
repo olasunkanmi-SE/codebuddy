@@ -4,10 +4,32 @@
  */
 import { Worker, isMainThread, parentPort, workerData } from "worker_threads";
 import * as os from "os";
+import * as path from "path";
+import * as fs from "fs";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { IFunctionData } from "../application/interfaces";
 import { EmbeddingsConfig } from "../application/constant";
-import { Logger, LogLevel } from "../infrastructure/logger/logger";
+// Import transformers directly to ensure esbuild bundles it and applies the alias
+import { pipeline, env } from "@huggingface/transformers";
+
+// Worker-safe logger
+class WorkerLogger {
+  constructor(private module: string) {}
+  debug(msg: string, data?: any) {
+    console.debug(`[DEBUG] [${this.module}] ${msg}`, data || "");
+  }
+  info(msg: string, data?: any) {
+    console.info(`[INFO] [${this.module}] ${msg}`, data || "");
+  }
+  warn(msg: string, data?: any) {
+    console.warn(`[WARN] [${this.module}] ${msg}`, data || "");
+  }
+  error(msg: string, data?: any) {
+    console.error(`[ERROR] [${this.module}] ${msg}`, data || "");
+  }
+}
+
+const logger = new WorkerLogger("embedding-worker");
 
 // Types for worker communication
 export interface WorkerTask {
@@ -27,16 +49,84 @@ export interface EmbeddingWorkerOptions {
   maxRetries?: number;
 }
 
-const logger = Logger.initialize("extension-main", {
-  minLevel: LogLevel.DEBUG,
-  enableConsole: true,
-  enableFile: true,
-  enableTelemetry: true,
-});
-
 // Worker thread code (runs when this file is executed as a worker)
 if (!isMainThread && parentPort) {
-  const genAI = new GoogleGenerativeAI(workerData.apiKey);
+  logger.info("Embedding worker starting...");
+  let genAI: any;
+  try {
+    genAI = new GoogleGenerativeAI(workerData.apiKey || "dummy-key");
+  } catch (err) {
+    logger.error("Failed to initialize GoogleGenerativeAI in worker", err);
+  }
+  let extractor: any | undefined;
+  let initializationPromise: Promise<void> | null = null;
+
+  /**
+   * Initialize Transformers.js extractor in worker
+   */
+  const initTransformers = async () => {
+    if (extractor) return;
+
+    if (initializationPromise) {
+      return initializationPromise;
+    }
+
+    initializationPromise = (async () => {
+      try {
+        logger.info("Initializing Transformers.js in worker (dtype: q8)...");
+
+        // Configure environment for worker
+        if (env) {
+          env.allowLocalModels = true;
+          env.allowRemoteModels = true;
+          env.useWasmCache = false; // Disable WASM cache to avoid blob: URL issues in worker
+
+          // Force WASM backend by disabling native node backend
+          if (env.backends && env.backends.onnx) {
+            // @ts-ignore
+            env.backends.onnx.node = false;
+
+            if (env.backends.onnx.wasm) {
+              // Ensure WASM paths are configured if needed
+              const isProd = __filename.includes("dist");
+              // In prod, worker is in dist/workers/, so wasm is in ../wasm/
+              // But we also copy it to dist/workers/ as a fallback
+              const wasmDir = isProd
+                ? path.resolve(__dirname, "..", "wasm")
+                : path.resolve(__dirname, "..", "..", "dist", "wasm");
+
+              // Fallback to current directory if wasmDir doesn't exist (though it should)
+              const finalWasmDir =
+                isProd && !fs.existsSync(wasmDir) ? __dirname : wasmDir;
+
+              // @ts-ignore
+              (env.backends.onnx.wasm as any).wasmPaths = {
+                "ort-wasm-simd-threaded.wasm": `file://${path.join(finalWasmDir, "ort-wasm-simd-threaded.wasm")}`,
+                "ort-wasm-simd-threaded.mjs": `file://${path.join(finalWasmDir, "ort-wasm-simd-threaded.mjs")}`,
+                "ort-wasm-simd-threaded.asyncify.wasm": `file://${path.join(finalWasmDir, "ort-wasm-simd-threaded.asyncify.wasm")}`,
+                "ort-wasm-simd-threaded.asyncify.mjs": `file://${path.join(finalWasmDir, "ort-wasm-simd-threaded.asyncify.mjs")}`,
+              };
+            }
+          }
+        }
+
+        extractor = await pipeline(
+          "feature-extraction",
+          "Xenova/all-MiniLM-L6-v2",
+          {
+            dtype: "q8", // Use quantized model to save memory and avoid std::bad_alloc
+          },
+        );
+        logger.info("Transformers.js initialized in worker");
+      } catch (error) {
+        logger.error("Failed to initialize Transformers.js in worker", error);
+        initializationPromise = null; // Reset on failure
+        throw error;
+      }
+    })();
+
+    return initializationPromise;
+  };
 
   /**
    * Centralized error formatting for consistent error handling
@@ -54,12 +144,24 @@ if (!isMainThread && parentPort) {
   const generateEmbeddingsInWorker = async (
     text: string,
   ): Promise<number[]> => {
-    const model = genAI.getGenerativeModel({
-      model: EmbeddingsConfig.embeddingModel,
-    });
+    // Only use Transformers.js for embeddings in worker
+    try {
+      await initTransformers();
+      if (extractor) {
+        const output = await extractor(text, {
+          pooling: "mean",
+          normalize: true,
+        });
+        return Array.from(output.data) as number[];
+      }
+    } catch (error) {
+      logger.error("Transformers.js in worker failed", error);
+      throw error;
+    }
 
-    const result = await model.embedContent(text);
-    return result.embedding.values;
+    throw new Error(
+      "Local embedding provider (Transformers.js) not available in worker",
+    );
   };
 
   /**
@@ -88,8 +190,7 @@ if (!isMainThread && parentPort) {
           data: { completed: i + 1, total: batch.length },
         });
 
-        // Small delay to prevent overwhelming the API
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // No delay needed for local Transformers.js processing
       } catch (error: any) {
         logger.error(
           `Failed to process item ${item.name || item.path || "unknown"}:`,
@@ -167,21 +268,58 @@ export class WorkerEmbeddingService {
    * Initialize worker pool
    */
   async initialize(): Promise<void> {
+    // Determine the worker execution path (dist for prod, out for dev)
+    const isProd = __filename.includes("dist");
+    const workerRelativePath = isProd
+      ? "./workers/embedding-worker.js"
+      : "../../out/workers/embedding-worker.js";
+    const workerPath = path.resolve(__dirname, workerRelativePath);
+
+    logger.info(`Initializing Embedding Worker Pool at: ${workerPath}`);
+
     // Create worker pool
     for (let i = 0; i < this.maxWorkers; i++) {
-      const worker = new Worker(__filename, {
-        workerData: { apiKey: this.apiKey },
-      });
+      try {
+        const worker = new Worker(workerPath, {
+          workerData: { apiKey: this.apiKey },
+        });
 
-      this.workers.push(worker);
+        worker.on("error", (err) => {
+          logger.error(`Worker ${i} error:`, err);
+        });
+
+        worker.on("exit", (code) => {
+          if (code !== 0) {
+            logger.error(`Worker ${i} exited with code ${code}`);
+          }
+        });
+
+        this.workers.push(worker);
+        logger.info(`Created embedding worker ${i}`);
+      } catch (err) {
+        logger.error(`Failed to create worker ${i}:`, err);
+        throw err;
+      }
     }
 
     // Test workers
-    await Promise.all(
-      this.workers.map((worker) =>
-        this.sendTaskToWorker(worker, { type: "ping", payload: null }),
-      ),
-    );
+    logger.info(`Testing ${this.workers.length} workers with ping...`);
+    try {
+      await Promise.all(
+        this.workers.map((worker, i) =>
+          this.sendTaskToWorker(worker, { type: "ping", payload: null })
+            .then(() => logger.info(`Worker ${i} ping successful`))
+            .catch((err) => {
+              logger.error(`Worker ${i} ping failed:`, err);
+              throw err;
+            }),
+        ),
+      );
+      logger.info("All embedding workers initialized successfully");
+    } catch (err) {
+      logger.error("One or more workers failed to respond to ping", err);
+      throw err;
+    }
   }
 
   /**

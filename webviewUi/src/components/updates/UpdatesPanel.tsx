@@ -11,6 +11,7 @@ interface UpdatesPanelProps {
   onOpenUrl: (url: string) => void;
   onToggleSaved: (id: number) => void;
   onDelete: (id: number) => void;
+  onDeleteAll: () => void;
   userName: string;
 }
 
@@ -119,6 +120,7 @@ export const UpdatesPanel: React.FC<UpdatesPanelProps> = ({
   onOpenUrl,
   onToggleSaved,
   onDelete,
+  onDeleteAll,
   userName,
 }) => {
   return (
@@ -140,15 +142,16 @@ export const UpdatesPanel: React.FC<UpdatesPanelProps> = ({
                 For now, let's just render it. The News component has its own header/greeting 
                 which might be redundant, but we'll keep it for now.
             */}
-            <News 
-              newsItems={newsItems} 
-              onMarkAsRead={onMarkAsRead}
-              onRefresh={onRefresh}
-              onOpenUrl={onOpenUrl}
-              onToggleSaved={onToggleSaved}
-              onDelete={onDelete}
-              userName={userName}
-            />
+            <News
+            newsItems={newsItems}
+            onMarkAsRead={onMarkAsRead}
+            onRefresh={onRefresh}
+            onOpenUrl={onOpenUrl}
+            onToggleSaved={onToggleSaved}
+            onDelete={onDelete}
+            onDeleteAll={onDeleteAll}
+            userName={userName}
+          />
         </Content>
       </PanelContainer>
     </PanelOverlay>

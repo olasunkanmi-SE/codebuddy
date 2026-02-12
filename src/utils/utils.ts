@@ -291,9 +291,15 @@ export const getAPIKeyAndModel = (
       modelName = getConfigValue(APP_CONFIG.deepseekModel);
       baseUrl = "https://api.deepseek.com";
       break;
+    case "xgrok":
+      apiKey = getConfigValue(APP_CONFIG.grokApiKey);
+      modelName = getConfigValue(APP_CONFIG.grokModel);
+      baseUrl = "https://api.x.ai/v1";
+      break;
     case "local":
+    case "transformers":
       apiKey = getConfigValue(localApiKey) || "not-needed";
-      modelName = getConfigValue(localModel);
+      modelName = getConfigValue(localModel) || "Xenova/all-MiniLM-L6-v2";
       baseUrl = getConfigValue(APP_CONFIG.localBaseUrl);
       break;
     default:

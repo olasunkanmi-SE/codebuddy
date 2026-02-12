@@ -7,6 +7,7 @@ import {
   ICodeCompletionOptions,
   ILlmConfig,
 } from "../interface";
+import { EmbeddingService } from "../../services/embedding";
 
 export class GroqLLM
   extends BaseLLM<any>
@@ -14,10 +15,15 @@ export class GroqLLM
 {
   private static instance: GroqLLM;
   private readonly groq: Groq;
+  private readonly embeddingService: EmbeddingService;
 
   constructor(protected config: ILlmConfig) {
     super(config);
     this.groq = new Groq({ apiKey: this.config.apiKey });
+    this.embeddingService = new EmbeddingService({
+      apiKey: config.apiKey,
+      provider: "transformers", // Force local embeddings for Groq
+    });
   }
 
   static getInstance(config: ILlmConfig) {
@@ -28,7 +34,15 @@ export class GroqLLM
   }
 
   async generateEmbeddings(text: string): Promise<number[]> {
-    return [1, 2];
+    try {
+      return await this.embeddingService.generateEmbedding(text);
+    } catch (error: any) {
+      this.logger.error("Failed to generate local embeddings for Groq", {
+        error,
+      });
+      // Fallback to a placeholder instead of throwing to prevent complete failure
+      return new Array(384).fill(0);
+    }
   }
 
   // TODO Implement function call, especially think for this model.
