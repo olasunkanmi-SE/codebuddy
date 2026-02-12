@@ -17,8 +17,10 @@ import { GroqWebViewProvider } from "../webview-providers/groq";
 import { OpenAIWebViewProvider } from "../webview-providers/openai";
 import { QwenWebViewProvider } from "../webview-providers/qwen";
 import { GLMWebViewProvider } from "../webview-providers/glm";
+import { LocalWebViewProvider } from "../webview-providers/local";
 import { QwenLLM } from "../llms/qwen/qwen";
 import { GLMLLM } from "../llms/glm/glm";
+import { LocalLLM } from "../llms/local/local";
 import { WebViewProviderManager } from "../webview-providers/manager";
 import {
   createAnthropicClient,
@@ -59,6 +61,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   private readonly qwenModel: string;
   private readonly glmApiKey: string;
   private readonly glmModel: string;
+  private readonly localApiKey: string;
+  private readonly localModel: string;
+  private readonly localBaseUrl: string;
   protected logger: Logger;
   constructor(
     private readonly action: string,
@@ -83,6 +88,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       qwenModel,
       glmApiKey,
       glmModel,
+      localApiKey,
+      localModel,
+      localBaseUrl,
     } = APP_CONFIG;
     this.generativeAi = getConfigValue(generativeAi);
     this.geminiApiKey = getConfigValue(geminiKey);
@@ -99,6 +107,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     this.qwenModel = getConfigValue(qwenModel);
     this.glmApiKey = getConfigValue(glmApiKey);
     this.glmModel = getConfigValue(glmModel);
+    this.localApiKey = getConfigValue(localApiKey);
+    this.localModel = getConfigValue(localModel);
+    this.localBaseUrl = getConfigValue(localBaseUrl);
     this.logger = Logger.initialize("CodeCommandHandler", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
@@ -249,6 +260,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           message: feedback,
         });
         break;
+      case generativeAiModels.LOCAL:
+        await LocalWebViewProvider.webView?.webview.postMessage({
+          type: "codebuddy-commands",
+          message: feedback,
+        });
+        break;
       default:
         this.logger.error("Unknown generative AI", "");
         break;
@@ -311,6 +328,17 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         const apiKey: string = this.glmApiKey;
         modelName = this.glmModel;
         model = GLMLLM.getInstance({ apiKey, model: modelName }).getModel();
+      }
+
+      if (this.generativeAi === generativeAiModels.LOCAL) {
+        const apiKey: string = this.localApiKey;
+        modelName = this.localModel;
+        const baseUrl = this.localBaseUrl;
+        model = LocalLLM.getInstance({
+          apiKey,
+          model: modelName,
+          baseUrl,
+        }).getModel();
       }
       return { generativeAi: this.generativeAi, model, modelName };
     } catch (error: any) {
@@ -399,6 +427,11 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         case generativeAiModels.GLM:
           if (modelName) {
             response = await this.glmResponse(model, modelName, text);
+          }
+          break;
+        case generativeAiModels.LOCAL:
+          if (modelName) {
+            response = await this.openAIResponse(model, modelName, text);
           }
           break;
         default:

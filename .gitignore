@@ -17,6 +17,5 @@ patterns
 !.codebuddy/rules/
 !.codebuddy/prompts/
 !.codebuddy/config.json
-scripts
 lancedb
 dist

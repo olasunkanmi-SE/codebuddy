@@ -273,7 +273,13 @@ export class NewsService {
     ]);
   }
 
-  public async cleanupOldNews(daysToKeep: number = 1): Promise<void> {
+  public async deleteAllNews(): Promise<void> {
+    await this.ensureInitialized();
+    this.dbService.executeSqlCommand(`DELETE FROM news_items`);
+    this.logger.info("All news items deleted");
+  }
+
+  public async cleanupOldNews(daysToKeep = 1): Promise<void> {
     await this.ensureInitialized();
     // Delete items that are NOT saved and older than X days
     this.dbService.executeSqlCommand(

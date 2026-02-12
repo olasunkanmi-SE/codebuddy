@@ -89,7 +89,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   // Prompt enhancement service
   protected promptBuilderService: EnhancedPromptBuilderService;
-  private readonly groqLLM: GroqLLM | null;
+  protected readonly groqLLM: GroqLLM | null = null;
   private readonly codeBuddyAgent: MessageHandler;
 
   constructor(
@@ -98,12 +98,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     protected readonly generativeAiModel: string,
     context: vscode.ExtensionContext,
   ) {
-    const { apiKey: modelKey, model } = getAPIKeyAndModel("groq");
-    const config = {
-      apiKey: modelKey,
-      model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-    };
-    this.groqLLM = GroqLLM.getInstance(config);
     this.fileManager = FileManager.initialize(context, "files");
     this.fileService = FileService.getInstance();
     this._context = context;
@@ -1005,6 +999,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
               break;
             }
+            case "news-delete-all": {
+              const { NewsService } = await import("../services/news.service");
+              await NewsService.getInstance().deleteAllNews();
+              await this.synchronizeNews();
+              break;
+            }
             case "upload-file":
               await this.fileManager.uploadFileHandler();
               break;
@@ -1040,8 +1040,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     });
 
                   if (browserType === "simple") {
-                    vscode.commands.executeCommand(
-                      "simpleBrowser.show",
+                    const { SimpleBrowserService } =
+                      await import("../services/simple-browser.service");
+                    SimpleBrowserService.getInstance().openBrowser(
                       message.text,
                     );
                   } else {

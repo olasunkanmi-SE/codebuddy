@@ -83,16 +83,36 @@ export class MCPClient {
       } else if (this.config.command) {
         // Stdio transport (subprocess)
         // IMPORTANT: Merge with process.env to preserve PATH and other critical vars
-        // Filter out undefined values to satisfy type requirements
         const mergedEnv: Record<string, string> = {};
         for (const [key, value] of Object.entries(process.env)) {
           if (value !== undefined) {
             mergedEnv[key] = value;
           }
         }
+
+        // Ensure standard paths are included, especially on macOS where GUI apps
+        // might have a limited PATH that doesn't include /usr/local/bin or /opt/homebrew/bin
+        if (process.platform === "darwin") {
+          const standardPaths =
+            "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+          if (!mergedEnv.PATH) {
+            mergedEnv.PATH = standardPaths;
+          } else if (
+            !mergedEnv.PATH.includes("/usr/local/bin") &&
+            !mergedEnv.PATH.includes("/opt/homebrew/bin")
+          ) {
+            mergedEnv.PATH = `${mergedEnv.PATH}:${standardPaths}`;
+          }
+        }
+
         if (this.config.env) {
           Object.assign(mergedEnv, this.config.env);
         }
+
+        this.logger.debug(`Environment for ${this.serverName}:`, {
+          PATH: mergedEnv.PATH,
+          hasDocker: !!mergedEnv.DOCKER_HOST,
+        });
 
         this.transport = new StdioClientTransport({
           command: this.config.command,
@@ -124,6 +144,11 @@ export class MCPClient {
           this.logger.debug(
             `Captured transport child process for ${this.serverName}: pid=${this.process.pid}`,
           );
+
+          // Log stderr from the child process
+          this.process.stderr?.on("data", (data) => {
+            this.logger.warn(`[${this.serverName} stderr]: ${data.toString()}`);
+          });
         }
       } catch (err) {
         this.logger.debug(
