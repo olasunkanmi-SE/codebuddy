@@ -330,10 +330,27 @@
               "OpenAI",
               "Qwen",
               "GLM",
+              "Ollama",
               "Local"
             ],
             "default": "Groq",
             "description": "Select Model"
+          },
+          "ollama.model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "qwen3-coder:30b",
+            "markdownDescription": "Provide the name of the Ollama model you want to use (e.g., qwen3-coder:30b, qwen2.5-coder:32b, llama3)."
+          },
+          "ollama.baseUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "http://localhost:11434",
+            "markdownDescription": "Enter the Base URL for your Ollama instance (default: http://localhost:11434)."
           },
           "tavily.apiKey": {
             "type": [
@@ -460,8 +477,8 @@
               "string",
               "null"
             ],
-            "default": "qwen2.5-coder",
-            "markdownDescription": "Provide the name of the Local model you want to use (e.g., qwen2.5-coder, llama3.2, gemma3, mistral)."
+            "default": "qwen3-coder:30b",
+            "markdownDescription": "Provide the name of the Local model you want to use (e.g., qwen3-coder:30b, llama3.2, gemma3, mistral)."
           },
           "local.baseUrl": {
             "type": [
@@ -609,8 +626,8 @@
           },
           "codebuddy.completion.model": {
             "type": "string",
-            "default": "qwen2.5-coder",
-            "description": "Model to use for completions (e.g., qwen2.5-coder, deepseek-coder)"
+            "default": "qwen3-coder:30b",
+            "description": "Model to use for completions (e.g., qwen3-coder:30b, deepseek-coder)"
           },
           "codebuddy.completion.apiKey": {
             "type": [
@@ -791,9 +808,11 @@
     "@huggingface/transformers": "^4.0.0-next.2",
     "@langchain/anthropic": "^1.0.0",
     "@langchain/core": "^1.0.0",
+    "@langchain/google-genai": "^1.0.3",
     "@langchain/groq": "^1.0.2",
     "@langchain/langgraph": "^1.0.0",
     "@langchain/langgraph-checkpoint-sqlite": "^1.0.0",
+    "@langchain/ollama": "^1.2.2",
     "@langchain/openai": "^1.2.4",
     "@modelcontextprotocol/sdk": "^1.24.3",
     "@mozilla/readability": "^0.4.1",
@@ -815,6 +834,7 @@
     "markdown-it": "^14.1.0",
     "natural": "^8.1.0",
     "node-fetch": "^3.3.2",
+    "onnxruntime-web": "^1.20.0",
     "openai": "^4.28.0",
     "prettier": "^3.2.5",
     "readable-stream": "^4.5.2",
@@ -823,6 +843,9 @@
     "sinon": "^17.0.1",
     "sql.js": "^1.13.0",
     "web-tree-sitter": "^0.25.10"
+  },
+  "overrides": {
+    "onnxruntime-node": "$onnxruntime-web"
   },
   "license": "MIT"
 }

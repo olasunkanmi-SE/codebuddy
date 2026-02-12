@@ -1,7 +1,9 @@
 import { ChatAnthropic } from "@langchain/anthropic";
-// import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatGroq } from "@langchain/groq";
 import { ChatOpenAI } from "@langchain/openai";
+import { ChatOllama } from "@langchain/ollama";
+import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { BaseStore } from "@langchain/langgraph";
 import { rgPath } from "@vscode/ripgrep";
 import { spawnSync } from "child_process";
@@ -22,6 +24,7 @@ import { ProjectRulesService } from "../../services/project-rules.service";
 import { MemoryTool } from "../../tools/memory";
 import { SkillManager } from "../../services/skill-manager";
 import { getAPIKeyAndModel } from "../../utils/utils";
+import { APP_CONFIG } from "../../application/constant";
 import { createVscodeFsBackendFactory } from "../backends/filesystem";
 import {
   ICodeBuddyAgentConfig,
@@ -33,7 +36,7 @@ import { createDeveloperSubagents } from "./subagents";
 
 export class DeveloperAgent {
   private config: ICodeBuddyAgentConfig;
-  private model: ChatAnthropic | ChatGroq | ChatOpenAI | undefined;
+  private model: BaseChatModel | undefined;
   private tools: StructuredTool[];
   private readonly logger: Logger;
   private readonly disposables: vscode.Disposable[] = [];
@@ -72,12 +75,13 @@ export class DeveloperAgent {
 
   private getAIConfigFromWebProvider(model: string) {
     const apiKeyAndModel = getAPIKeyAndModel(model.toLowerCase());
-    let currentModel: ChatAnthropic | ChatGroq | ChatOpenAI | undefined;
+    let currentModel: BaseChatModel | undefined;
+
     switch (model.toLowerCase()) {
       case "anthropic":
         currentModel = new ChatAnthropic({
           apiKey: apiKeyAndModel.apiKey,
-          model: apiKeyAndModel.model!,
+          modelName: apiKeyAndModel.model!,
         });
         break;
       case "groq":
@@ -87,10 +91,14 @@ export class DeveloperAgent {
         });
         break;
       case "gemini":
-        // Temporary mesaure to prevent an error being throwned to the user
-        // The current genai package isnt compatible with langchain 1.0.0 package
-        currentModel = new ChatAnthropic({
+        currentModel = new ChatGoogleGenerativeAI({
           apiKey: apiKeyAndModel.apiKey,
+          model: apiKeyAndModel.model!,
+        });
+        break;
+      case "ollama":
+        currentModel = new ChatOllama({
+          baseUrl: apiKeyAndModel.baseUrl,
           model: apiKeyAndModel.model!,
         });
         break;
@@ -98,7 +106,7 @@ export class DeveloperAgent {
         // Use ChatOpenAI with Ollama's OpenAI-compatible endpoint
         currentModel = new ChatOpenAI({
           apiKey: apiKeyAndModel.apiKey || "not-needed",
-          model: apiKeyAndModel.model || "qwen2.5-coder",
+          modelName: apiKeyAndModel.model || "qwen3-coder:30b",
           configuration: {
             baseURL: apiKeyAndModel.baseUrl || "http://localhost:11434/v1",
           },
@@ -107,15 +115,16 @@ export class DeveloperAgent {
       case "openai":
         currentModel = new ChatOpenAI({
           apiKey: apiKeyAndModel.apiKey,
-          model: apiKeyAndModel.model!,
+          modelName: apiKeyAndModel.model!,
         });
         break;
       case "qwen":
       case "glm":
       case "deepseek":
+      case "xgrok":
         currentModel = new ChatOpenAI({
           apiKey: apiKeyAndModel.apiKey,
-          model: apiKeyAndModel.model!,
+          modelName: apiKeyAndModel.model!,
           configuration: {
             baseURL: apiKeyAndModel.baseUrl,
           },
@@ -167,7 +176,7 @@ export class DeveloperAgent {
    */
   private getBackendFactory() {
     const vscodeFsBackend = this.createVscodeBackend();
-    const { assistantId, store: configStore } = this.config;
+    const { assistantId } = this.config;
 
     return (stateAndStore: {
       state: unknown;
@@ -239,7 +248,24 @@ export class DeveloperAgent {
    * Main entry point to build and return the agent runnable
    */
   public async create() {
-    const cachedModel = Memory.get("agentModel");
+    let cachedModel = Memory.get("agentModel");
+
+    if (!this.model && !cachedModel) {
+      // Try to initialize from current settings if not set
+      try {
+        const { generativeAi } = APP_CONFIG;
+        const currentProvider = vscode.workspace
+          .getConfiguration()
+          .get<string>(generativeAi);
+        if (currentProvider) {
+          this.getAIConfigFromWebProvider(currentProvider);
+          cachedModel = this.model;
+        }
+      } catch (error) {
+        this.logger.error("Failed to initialize model from settings", error);
+      }
+    }
+
     if (!this.model && !cachedModel) {
       this.logger.error("Error creating DeveloperAgent: No model found");
       vscode.window.showWarningMessage(
@@ -248,7 +274,7 @@ export class DeveloperAgent {
       throw new Error("Error creating DeveloperAgent: No model found");
     }
 
-    this.model = cachedModel as ChatAnthropic | ChatGroq | ChatOpenAI;
+    this.model = (this.model || cachedModel) as BaseChatModel;
     const { store, enableSubAgents = true, checkPointer } = this.config;
 
     // Ensure MCP tools are loaded before creating the agent

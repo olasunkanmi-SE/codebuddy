@@ -59,6 +59,7 @@ import { DiffReviewService } from "./services/diff-review.service";
 import { SecretStorageService } from "./services/secret-storage";
 import { AstIndexingService } from "./services/ast-indexing.service";
 import { StandupService } from "./services/standup.service";
+import { SimpleBrowserService } from "./services/simple-browser.service";
 import { CodeHealthTask } from "./services/tasks/code-health.task";
 import { DependencyCheckTask } from "./services/tasks/dependency-check.task";
 import { GitWatchdogTask } from "./services/tasks/git-watchdog.task";
@@ -276,6 +277,26 @@ export async function activate(context: vscode.ExtensionContext) {
     const projectRulesService = ProjectRulesService.getInstance();
     projectRulesService.initialize();
     context.subscriptions.push(projectRulesService);
+
+    const simpleBrowserService = SimpleBrowserService.getInstance();
+    context.subscriptions.push(simpleBrowserService);
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "codebuddy.openSimpleBrowser",
+        async (url?: string) => {
+          const targetUrl =
+            url ||
+            (await vscode.window.showInputBox({
+              prompt: "Enter URL to open",
+              placeHolder: "https://example.com",
+            }));
+          if (targetUrl) {
+            await SimpleBrowserService.getInstance().openBrowser(targetUrl);
+          }
+        },
+      ),
+    );
 
     const mainLogger = Logger.initialize("activate", {
       minLevel: LogLevel.DEBUG,
