@@ -26,6 +26,12 @@ tsconfig*.json
 yarn.lock
 package-lock.json
 out/**
+*.vsix
+.history/**
+.codebuddy/**
+.cache/**
+temp_deepagentsjs/**
+dist/.cache/**
 
 # Ignore node_modules by default
 node_modules/**

@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "CodeBuddy is an autonomous AI software engineer for Visual Studio Code. It goes beyond simple code completion to plan, execute, debug, and deploy complex software tasks using a multi-agent architecture. Features include deep codebase understanding, self-healing workflows, and seamless integration with external tools via MCP.",
-  "version": "4.0.2",
+  "version": "4.0.7",
   "engines": {
     "vscode": "^1.78.0"
   },
@@ -769,7 +769,7 @@
     "build": "npm run compile && npm run format && npm run build:webview && npm run package",
     "dev:webview": "cd webviewUi && npm run dev",
     "build:webview": "cd webviewUi && npm run build",
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run package",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
