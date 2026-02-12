@@ -292,8 +292,9 @@ export const getAPIKeyAndModel = (
       baseUrl = "https://api.deepseek.com";
       break;
     case "local":
+    case "transformers":
       apiKey = getConfigValue(localApiKey) || "not-needed";
-      modelName = getConfigValue(localModel);
+      modelName = getConfigValue(localModel) || "Xenova/all-MiniLM-L6-v2";
       baseUrl = getConfigValue(APP_CONFIG.localBaseUrl);
       break;
     default:

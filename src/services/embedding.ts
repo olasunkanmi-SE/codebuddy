@@ -4,9 +4,13 @@ import {
   GoogleGenerativeAI,
 } from "@google/generative-ai";
 import OpenAI from "openai";
+import * as path from "path";
+import * as fs from "fs";
 import { EmbeddingsConfig } from "../application/constant";
 import { IFunctionData } from "../application/interfaces";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+// Import transformers directly to ensure esbuild bundles it and applies the alias
+import { pipeline, env } from "@huggingface/transformers";
 
 interface EmbeddingServiceOptions {
   batchSize: number;
@@ -47,15 +51,22 @@ export class EmbeddingService {
   private readonly logger: Logger;
   private readonly provider: string;
   private readonly modelName: string | undefined;
+  private extractor: any | undefined;
+  private initializationPromise: Promise<void> | null = null;
 
   constructor(config: EmbeddingProviderConfig) {
-    if (!config.apiKey && config.provider !== "Local") {
+    this.provider = config.provider.toLowerCase();
+
+    // Providers that don't require an API key
+    const localProviders = ["local", "transformers", "ollama"];
+    const isLocal = localProviders.includes(this.provider);
+
+    if (!config.apiKey && !isLocal) {
       throw new Error(
         `${config.provider} API key is required for embedding generation`,
       );
     }
 
-    this.provider = config.provider.toLowerCase();
     this.modelName = config.model;
     this.options = { ...EmbeddingService.DEFAULT_OPTIONS };
     //update this to 120000
@@ -74,14 +85,19 @@ export class EmbeddingService {
       this.provider === "openai" ||
       this.provider === "local" ||
       this.provider === "deepseek" ||
-      this.provider === "groq"
+      this.provider === "groq" ||
+      this.provider === "transformers" ||
+      this.provider === "ollama"
     ) {
-      // OpenAI compatible providers
+      // OpenAI compatible or local providers
       const baseURL = config.baseUrl;
-      this.openai = new OpenAI({
-        apiKey: config.apiKey,
-        baseURL: baseURL,
-      });
+      if (this.provider !== "transformers" && this.provider !== "ollama") {
+        this.openai = new OpenAI({
+          apiKey: config.apiKey,
+          baseURL: baseURL,
+          dangerouslyAllowBrowser: true, // Add this if needed for certain environments
+        });
+      }
     } else {
       // Fallback or default to Gemini if unknown, but better to warn
       this.logger.warn(
@@ -146,42 +162,127 @@ export class EmbeddingService {
     return undefined;
   }
 
+  private async initTransformers(aiModel?: string) {
+    if (this.extractor) return;
+
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    this.initializationPromise = (async () => {
+      try {
+        this.logger.info("Initializing Transformers.js (v4)...");
+
+        if (!pipeline) {
+          throw new Error(
+            "Pipeline function not found in Transformers.js exports.",
+          );
+        }
+
+        // Configure environment for VS Code extension
+        if (env) {
+          env.allowLocalModels = true;
+          env.allowRemoteModels = true;
+          env.useWasmCache = false; // Disable WASM cache to avoid blob: URL issues in VS Code/Electron
+
+          // Force WASM backend by disabling native node backend
+          if (env.backends && env.backends.onnx) {
+            // @ts-ignore
+            env.backends.onnx.node = false;
+
+            if (env.backends.onnx.wasm) {
+              // Ensure WASM paths are configured if needed
+              const isProd = __filename.includes("dist");
+              // In prod, extension is in dist/, so wasm is in dist/wasm/
+              const wasmDir = isProd
+                ? path.resolve(__dirname, "wasm")
+                : path.resolve(__dirname, "..", "..", "dist", "wasm");
+
+              // Fallback to current directory if wasmDir doesn't exist (though it should)
+              const finalWasmDir =
+                isProd && !fs.existsSync(wasmDir) ? __dirname : wasmDir;
+
+              // @ts-ignore
+              (env.backends.onnx.wasm as any).wasmPaths = {
+                "ort-wasm-simd-threaded.wasm": `file://${path.join(finalWasmDir, "ort-wasm-simd-threaded.wasm")}`,
+                "ort-wasm-simd-threaded.mjs": `file://${path.join(finalWasmDir, "ort-wasm-simd-threaded.mjs")}`,
+                "ort-wasm-simd-threaded.asyncify.wasm": `file://${path.join(finalWasmDir, "ort-wasm-simd-threaded.asyncify.wasm")}`,
+                "ort-wasm-simd-threaded.asyncify.mjs": `file://${path.join(finalWasmDir, "ort-wasm-simd-threaded.asyncify.mjs")}`,
+              };
+            }
+          }
+        }
+
+        // Use local model name only if provider is local/transformers, otherwise use default
+        const localProviders = ["local", "transformers", "ollama"];
+        const isLocalProvider = localProviders.includes(this.provider);
+        const model =
+          aiModel ??
+          (isLocalProvider ? this.modelName : undefined) ??
+          "Xenova/all-MiniLM-L6-v2";
+
+        this.logger.info(
+          `Initializing Transformers.js pipeline with model: ${model} (dtype: q8)`,
+        );
+
+        this.extractor = await pipeline("feature-extraction", model, {
+          dtype: "q8", // Use quantized model to save memory and avoid std::bad_alloc
+        });
+        this.logger.info("Transformers.js pipeline initialized successfully.");
+      } catch (error: any) {
+        this.logger.error("Failed to initialize Transformers.js", {
+          message: error.message,
+          stack: error.stack,
+          code: error.code,
+        });
+        this.initializationPromise = null; // Reset on failure
+        throw error;
+      }
+    })();
+
+    return this.initializationPromise;
+  }
+
   /**
    * Generates an embedding for the given text using the configured AI model.
-   * The embedding is a numerical representation of the text that can be used for various tasks, such as clustering and classification.
+   * Prioritizes local generation using Transformers.js (v4) to ensure data privacy and
+   * reduce reliance on remote APIs. Falls back to OpenAI or Gemini if local generation
+   * is not possible and an API key is available.
+   *
    * @async
    * @param {string} text - The text to generate an embedding for.
+   * @param {string} [aiModel] - Optional specific model to use.
    * @returns {Promise<number[]>} The generated embedding.
    * @memberof EmbeddingService
    */
   async generateEmbedding(text: string, aiModel?: string) {
-    const openai = this.openai;
-    if (openai) {
-      const model = aiModel ?? this.modelName ?? "text-embedding-3-small";
-      try {
-        const response = await openai.embeddings.create({
-          model,
-          input: text,
-          encoding_format: "float",
+    // Use Transformers.js (Local) - No fallback to cloud providers
+    try {
+      await this.initTransformers(aiModel);
+      if (this.extractor) {
+        const output = await this.extractor(text, {
+          pooling: "mean",
+          normalize: true,
         });
-        return response.data[0].embedding;
-      } catch (error: any) {
-        this.logger.error("OpenAI embedding generation failed", error);
-        throw error;
+
+        if (output && output.data) {
+          this.logger.debug("Generated embedding using Transformers.js");
+          return Array.from(output.data) as number[];
+        } else {
+          throw new Error("Transformers.js returned empty or invalid output");
+        }
       }
-    }
-
-    const genAI = this.genAI;
-    if (genAI) {
-      const model = genAI.getGenerativeModel({
-        model: aiModel ?? this.options.embeddingModel,
+    } catch (error: any) {
+      this.logger.error("Transformers.js embedding failed", {
+        message: error.message,
+        stack: error.stack,
       });
-      const result: EmbedContentResponse = await model.embedContent(text);
-      const embedding = result.embedding.values;
-      return embedding;
+      throw error;
     }
 
-    throw new Error("No valid embedding provider initialized");
+    throw new Error(
+      "Local embedding provider (Transformers.js) not initialized",
+    );
   }
 
   /**
@@ -202,7 +303,23 @@ export class EmbeddingService {
       const genAI = this.genAI;
 
       if (openai) {
-        const model = this.modelName ?? "gpt-3.5-turbo";
+        let model = this.modelName;
+        if (!model) {
+          switch (this.provider) {
+            case "groq":
+              model = "llama3-8b-8192";
+              break;
+            case "deepseek":
+              model = "deepseek-chat";
+              break;
+            default:
+              model = "gpt-3.5-turbo";
+          }
+        }
+
+        this.logger.debug(
+          `Generating text using ${this.provider} model: ${model}`,
+        );
         const response = await openai.chat.completions.create({
           model: model,
           messages: [{ role: "user", content: prompt }],
@@ -401,7 +518,10 @@ export class EmbeddingService {
       const batch = data.slice(i, i + this.options.batchSize);
 
       try {
-        await this.delay(60000);
+        // Only delay for non-embedding (cloud) processing to avoid rate limits
+        if (!forEmbedding) {
+          await this.delay(60000);
+        }
         const result = await this.processBatchWithRetry(
           batch,
           lastRequestTime,

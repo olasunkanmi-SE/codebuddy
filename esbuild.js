@@ -162,6 +162,9 @@ async function main() {
   const mainCtx = await esbuild.context({
     entryPoints: ["src/extension.ts"],
     bundle: true,
+    alias: {
+      "onnxruntime-node": path.resolve(__dirname, "src/utils/ort-mock.js"),
+    },
     external: [
       "vscode",
       "better-sqlite3",
@@ -186,8 +189,15 @@ async function main() {
 
   // Worker bundle
   const workerCtx = await esbuild.context({
-    entryPoints: ["src/workers/ast-analyzer.worker.ts", "src/workers/codebase-analysis.worker.ts"],
+    entryPoints: [
+      "src/workers/ast-analyzer.worker.ts",
+      "src/workers/codebase-analysis.worker.ts",
+      "src/workers/embedding-worker.ts",
+    ],
     bundle: true,
+    alias: {
+      "onnxruntime-node": path.resolve(__dirname, "src/utils/ort-mock.js"),
+    },
     external: [
       "vscode",
       "better-sqlite3",

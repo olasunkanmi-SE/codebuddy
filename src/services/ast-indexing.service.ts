@@ -4,6 +4,7 @@ import * as path from "path";
 import { Logger } from "../infrastructure/logger/logger";
 import { SimpleVectorStore } from "./simple-vector-store";
 import { EmbeddingService } from "./embedding";
+import { WorkerEmbeddingService } from "../workers/embedding-worker";
 import { getAPIKeyAndModel, getGenerativeAiModel } from "../utils/utils";
 
 export class AstIndexingService {
@@ -11,6 +12,7 @@ export class AstIndexingService {
   private readonly logger: Logger;
   private vectorStore: SimpleVectorStore;
   private embeddingService: EmbeddingService;
+  private workerEmbeddingService: WorkerEmbeddingService | undefined;
   private queue: string[] = [];
   private isProcessing = false;
 
@@ -27,6 +29,15 @@ export class AstIndexingService {
       apiKey,
       provider,
       baseUrl,
+    });
+
+    // Initialize worker-based embedding service for heavy indexing
+    this.workerEmbeddingService = new WorkerEmbeddingService(apiKey);
+    this.workerEmbeddingService.initialize().catch((err) => {
+      this.logger.error(
+        "Failed to initialize worker embedding service",
+        err instanceof Error ? { message: err.message, stack: err.stack } : err,
+      );
     });
 
     this.initializeWorker(context);
@@ -92,9 +103,27 @@ export class AstIndexingService {
     // We'll generate embeddings for these chunks
     for (const chunk of chunks) {
       try {
-        const embedding = await this.embeddingService.generateEmbedding(
-          chunk.text,
-        );
+        let embedding: number[] | undefined;
+
+        // Prefer worker embedding service for non-blocking local generation
+        if (this.workerEmbeddingService) {
+          try {
+            embedding = await this.workerEmbeddingService.generateEmbedding(
+              chunk.text,
+            );
+          } catch (workerErr) {
+            this.logger.warn(
+              "Worker embedding failed, trying main thread fallback",
+              workerErr,
+            );
+          }
+        }
+
+        // Fallback to main thread embedding service if worker failed or not available
+        if (!embedding) {
+          embedding = await this.embeddingService.generateEmbedding(chunk.text);
+        }
+
         if (embedding) {
           await this.vectorStore.addDocument({
             id: chunk.id,
@@ -128,6 +157,10 @@ export class AstIndexingService {
       type: "INDEX_FILE",
       data: { filePath, content },
     });
+  }
+
+  public async clearIndex() {
+    this.vectorStore.clear();
   }
 
   // Simple text splitter as fallback (copied from worker for robustness)

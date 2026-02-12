@@ -15,12 +15,18 @@ export interface SearchResult {
   score: number;
 }
 
+/**
+ * SimpleVectorStore manages local vector storage and retrieval.
+ * It stores documents and their embeddings in a JSON file within the .codebuddy directory.
+ * Supports semantic search (cosine similarity) and keyword search.
+ */
 export class SimpleVectorStore {
   private documents: Map<string, Document> = new Map();
   private readonly logger: Logger;
   private persistPath: string;
   private isDirty = false;
   private saveTimer: NodeJS.Timeout | null = null;
+  private initialized: Promise<void>;
 
   constructor(context: vscode.ExtensionContext) {
     this.logger = Logger.initialize("SimpleVectorStore", {
@@ -30,29 +36,42 @@ export class SimpleVectorStore {
       enableTelemetry: true,
     });
 
-    // Store in global storage or workspace storage
-    const storagePath =
-      context.storageUri?.fsPath || context.globalStorageUri.fsPath;
+    // Store in .codebuddy directory within the workspace to keep data project-specific
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const storagePath = workspaceRoot
+      ? path.join(workspaceRoot, ".codebuddy")
+      : context.storageUri?.fsPath || context.globalStorageUri.fsPath;
+
     if (!fs.existsSync(storagePath)) {
       fs.mkdirSync(storagePath, { recursive: true });
     }
     this.persistPath = path.join(storagePath, "vector_store.json");
 
-    this.load();
+    this.initialized = this.load();
   }
 
-  private load() {
+  public async ensureInitialized() {
+    await this.initialized;
+  }
+
+  private async load() {
     try {
       if (fs.existsSync(this.persistPath)) {
-        const data = fs.readFileSync(this.persistPath, "utf-8");
+        const data = await fs.promises.readFile(this.persistPath, "utf-8");
         const rawDocs: Document[] = JSON.parse(data);
         this.documents = new Map(rawDocs.map((d) => [d.id, d]));
         this.logger.info(
           `Loaded ${this.documents.size} documents from vector store.`,
         );
       }
-    } catch (error) {
-      this.logger.error("Failed to load vector store", error);
+    } catch (error: any) {
+      if (error.code === "ENOENT") {
+        this.logger.info(
+          "Vector store file not found, starting with empty store.",
+        );
+      } else {
+        this.logger.error("Failed to load vector store", error);
+      }
     }
   }
 
@@ -76,18 +95,26 @@ export class SimpleVectorStore {
   }
 
   public async addDocument(doc: Document) {
+    await this.ensureInitialized();
     this.documents.set(doc.id, doc);
     this.scheduleSave();
   }
 
   public async addDocuments(docs: Document[]) {
+    await this.ensureInitialized();
     for (const doc of docs) {
       this.documents.set(doc.id, doc);
     }
     this.scheduleSave();
   }
 
+  /**
+   * Performs a semantic search using cosine similarity.
+   * @param queryVector The embedding vector of the search query
+   * @param k The number of results to return
+   */
   public async search(queryVector: number[], k = 5): Promise<SearchResult[]> {
+    await this.ensureInitialized();
     const results: SearchResult[] = [];
 
     // Convert map values to array for iteration
@@ -113,7 +140,13 @@ export class SimpleVectorStore {
     return results.sort((a, b) => b.score - a.score).slice(0, k);
   }
 
+  /**
+   * Performs a simple keyword search.
+   * @param query The search query string
+   * @param k The number of results to return
+   */
   public async keywordSearch(query: string, k = 5): Promise<SearchResult[]> {
+    await this.ensureInitialized();
     const results: SearchResult[] = [];
     const docs = Array.from(this.documents.values());
     const queryTerms = query
@@ -151,6 +184,11 @@ export class SimpleVectorStore {
     return results.sort((a, b) => b.score - a.score).slice(0, k);
   }
 
+  /**
+   * Calculates the cosine similarity between two vectors.
+   * Cosine similarity measures the cosine of the angle between two vectors,
+   * providing a similarity score between -1 and 1.
+   */
   private cosineSimilarity(a: number[], b: number[]): number {
     let dotProduct = 0;
     let normA = 0;
@@ -162,7 +200,8 @@ export class SimpleVectorStore {
     }
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
-  public clear() {
+  public async clear() {
+    await this.ensureInitialized();
     this.documents.clear();
     this.scheduleSave();
   }

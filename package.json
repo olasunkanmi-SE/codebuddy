@@ -779,6 +779,7 @@
     "@vscode/test-electron": "^2.3.2",
     "esbuild": "^0.25.8",
     "eslint": "^8.41.0",
+    "fs-extra": "^11.3.3",
     "mocha": "^10.2.0",
     "typescript": "^5.4.3"
   },
@@ -787,6 +788,7 @@
     "@chroma-core/default-embed": "^0.1.8",
     "@google/genai": "^0.7.0",
     "@google/generative-ai": "^0.21.0",
+    "@huggingface/transformers": "^4.0.0-next.2",
     "@langchain/anthropic": "^1.0.0",
     "@langchain/core": "^1.0.0",
     "@langchain/groq": "^1.0.2",

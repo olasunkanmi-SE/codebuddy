@@ -31,12 +31,13 @@ export class ContextRetriever {
 
     // Use the currently selected provider for embeddings
     const provider = getGenerativeAiModel() || "Gemini";
-    const { apiKey, baseUrl } = getAPIKeyAndModel(provider);
+    const { apiKey, baseUrl, model } = getAPIKeyAndModel(provider);
 
     this.embeddingService = new EmbeddingService({
       apiKey,
       provider,
       baseUrl,
+      model,
     });
 
     this.logger = Logger.initialize("ContextRetriever", {
@@ -65,34 +66,37 @@ export class ContextRetriever {
   }
 
   async retrieveContext(input: string): Promise<string> {
-    if (!this.vectorStore) {
-      return "Semantic search is not available (Vector Store not initialized).";
-    }
-
     let results: any[] = [];
     let searchMethod = "Semantic";
 
-    try {
-      this.logger.info(`Generating embedding for query: ${input}`);
-      const embedding = await this.embeddingService.generateEmbedding(input);
-      this.logger.info("Retrieving context from Vector Store");
+    if (this.vectorStore) {
+      try {
+        this.logger.info(`Generating embedding for query: ${input}`);
+        const embedding = await this.embeddingService.generateEmbedding(input);
+        this.logger.info("Retrieving context from Vector Store");
 
-      results = await this.vectorStore.search(
-        embedding,
-        ContextRetriever.SEARCH_RESULT_COUNT,
-      );
-    } catch (error: any) {
+        results = await this.vectorStore.search(
+          embedding,
+          ContextRetriever.SEARCH_RESULT_COUNT,
+        );
+      } catch (error: any) {
+        this.logger.warn(
+          "Embedding generation failed, falling back to keyword search",
+          error,
+        );
+        searchMethod = "Keyword (Fallback)";
+
+        // Fallback to keyword search
+        results = await this.vectorStore.keywordSearch(
+          input,
+          ContextRetriever.SEARCH_RESULT_COUNT,
+        );
+      }
+    } else {
       this.logger.warn(
-        "Embedding generation failed, falling back to keyword search",
-        error,
+        "Vector Store not initialized, skipping semantic search",
       );
-      searchMethod = "Keyword (Fallback)";
-
-      // Fallback to keyword search
-      results = await this.vectorStore.keywordSearch(
-        input,
-        ContextRetriever.SEARCH_RESULT_COUNT,
-      );
+      searchMethod = "Common Files Only";
     }
 
     // Check if query is general/architectural
@@ -101,9 +105,10 @@ export class ContextRetriever {
     // Determine if we should include common files:
     // 1. If semantic search failed (fallback)
     // 2. If it's a general query about the application
-    if (results.length === 0 || isGeneralQuery) {
+    // 3. If vector store is not available
+    if (results.length === 0 || isGeneralQuery || !this.vectorStore) {
       this.logger.info(
-        `Retrieving common files. Reason: ${results.length === 0 ? "Fallback (No results)" : "General Query"}`,
+        `Retrieving common files. Reason: ${results.length === 0 ? "No results" : isGeneralQuery ? "General Query" : "No Vector Store"}`,
       );
       const commonFilesResults = await this.retrieveCommonFiles();
 
@@ -152,6 +157,14 @@ export class ContextRetriever {
       "project",
       "scaffold",
       "how does the app work",
+      "tech stack",
+      "folder structure",
+      "high level",
+      "design patterns",
+      "orchestration",
+      "how it works",
+      "what is this",
+      "tell me about",
     ];
 
     const lowerInput = input.toLowerCase();
@@ -165,7 +178,7 @@ export class ContextRetriever {
       "package.json",
       "CONTRIBUTING.md",
       "docs/README.md",
-      "docs/architecture.md", // Added potential architecture doc
+      "docs/architecture.md",
     ];
 
     const results: any[] = [];
@@ -176,27 +189,20 @@ export class ContextRetriever {
       return [];
     }
 
+    // Phase 1: Hardcoded critical files
     for (const folder of workspaceFolders) {
       for (const fileName of commonFiles) {
         try {
-          // Construct URI directly instead of using findFiles
           const fileUri = vscode.Uri.joinPath(folder.uri, fileName);
-
-          // Try to read file attributes to confirm existence (and strict case matching if filesystem is sensitive)
-          // But readDirectory or just readFile is easier.
-          // We'll just try to read it. If it fails (FileNotFound), we catch it.
-
           let content = "";
           try {
             const fileContent = await vscode.workspace.fs.readFile(fileUri);
             content = Buffer.from(fileContent).toString("utf-8");
           } catch (e) {
-            // File doesn't exist or other error
             continue;
           }
 
           if (content) {
-            // Truncate if too long (e.g., 5KB)
             const truncated =
               content.length > 5000
                 ? content.substring(0, 5000) + "\n...(truncated)"
@@ -208,9 +214,8 @@ export class ContextRetriever {
                 text: truncated,
                 metadata: { filePath: fileUri.fsPath },
               },
-              score: 1.0, // High relevance for common files
+              score: 1.0,
             });
-
             this.logger.info(`Successfully retrieved common file: ${fileName}`);
           }
         } catch (error) {
@@ -219,6 +224,50 @@ export class ContextRetriever {
             error,
           );
         }
+      }
+
+      // Phase 2: Dynamic discovery of architecture/doc files
+      try {
+        const docFiles = await vscode.workspace.findFiles(
+          new vscode.RelativePattern(folder, "docs/**/*.{md,txt}"),
+          "**/node_modules/**",
+          5, // Limit to 5 most relevant looking docs
+        );
+
+        for (const fileUri of docFiles) {
+          // Skip if already added in Phase 1
+          if (
+            results.some((r) => r.document.metadata.filePath === fileUri.fsPath)
+          )
+            continue;
+
+          try {
+            const fileContent = await vscode.workspace.fs.readFile(fileUri);
+            const content = Buffer.from(fileContent).toString("utf-8");
+            if (content) {
+              const truncated =
+                content.length > 5000
+                  ? content.substring(0, 5000) + "\n...(truncated)"
+                  : content;
+
+              results.push({
+                document: {
+                  id: `common-discovery:${fileUri.fsPath}`,
+                  text: truncated,
+                  metadata: { filePath: fileUri.fsPath },
+                },
+                score: 0.9,
+              });
+              this.logger.info(
+                `Successfully discovered doc file: ${fileUri.fsPath}`,
+              );
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      } catch (error) {
+        this.logger.warn("Error discovering doc files", error);
       }
     }
 
