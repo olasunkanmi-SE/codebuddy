@@ -8,8 +8,6 @@ import * as path from "path";
 import * as fs from "fs";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { IFunctionData } from "../application/interfaces";
-import { EmbeddingsConfig } from "../application/constant";
-// Import transformers directly to ensure esbuild bundles it and applies the alias
 import { pipeline, env } from "@huggingface/transformers";
 
 // Worker-safe logger
@@ -52,9 +50,8 @@ export interface EmbeddingWorkerOptions {
 // Worker thread code (runs when this file is executed as a worker)
 if (!isMainThread && parentPort) {
   logger.info("Embedding worker starting...");
-  let genAI: any;
   try {
-    genAI = new GoogleGenerativeAI(workerData.apiKey || "dummy-key");
+    new GoogleGenerativeAI(workerData.apiKey || "dummy-key");
   } catch (err) {
     logger.error("Failed to initialize GoogleGenerativeAI in worker", err);
   }
@@ -83,6 +80,7 @@ if (!isMainThread && parentPort) {
 
           // Force WASM backend by disabling native node backend
           if (env.backends && env.backends.onnx) {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             env.backends.onnx.node = false;
 
@@ -99,6 +97,7 @@ if (!isMainThread && parentPort) {
               const finalWasmDir =
                 isProd && !fs.existsSync(wasmDir) ? __dirname : wasmDir;
 
+              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
               // @ts-ignore
               (env.backends.onnx.wasm as any).wasmPaths = {
                 "ort-wasm-simd-threaded.wasm": `file://${path.join(finalWasmDir, "ort-wasm-simd-threaded.wasm")}`,
@@ -348,7 +347,6 @@ export class WorkerEmbeddingService {
   ): Promise<IFunctionData[]> {
     const batchSize = this.options.batchSize || 10;
     const batches = this.chunkArray(data, batchSize);
-    const results: IFunctionData[] = [];
 
     // Process batches in parallel using multiple workers
     const workerPromises = batches.map(async (batch, index) => {

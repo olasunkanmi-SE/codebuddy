@@ -16,7 +16,7 @@ export class SchedulerService {
   private standupService: StandupService;
   private dependencyCheckTask: DependencyCheckTask;
   private gitWatchdogTask: GitWatchdogTask;
-  private lastCleanupDate: string = "";
+  private lastCleanupDate = "";
 
   private constructor() {
     this.dbService = SqliteDatabaseService.getInstance();

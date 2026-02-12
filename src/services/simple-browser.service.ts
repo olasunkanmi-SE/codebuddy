@@ -29,7 +29,7 @@ export class SimpleBrowserService implements vscode.Disposable {
 
   public async openBrowser(
     url: string,
-    title: string = "Simple Browser",
+    title = "Simple Browser",
   ): Promise<void> {
     if (this.currentPanel) {
       this.currentPanel.reveal(vscode.ViewColumn.Beside);

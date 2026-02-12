@@ -187,6 +187,7 @@ export class EmbeddingService {
 
           // Force WASM backend by disabling native node backend
           if (env.backends && env.backends.onnx) {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             env.backends.onnx.node = false;
 
@@ -202,6 +203,7 @@ export class EmbeddingService {
               const finalWasmDir =
                 isProd && !fs.existsSync(wasmDir) ? __dirname : wasmDir;
 
+              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
               // @ts-ignore
               (env.backends.onnx.wasm as any).wasmPaths = {
                 "ort-wasm-simd-threaded.wasm": `file://${path.join(finalWasmDir, "ort-wasm-simd-threaded.wasm")}`,
