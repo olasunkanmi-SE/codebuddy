@@ -1,3 +1,4 @@
+import { setupInstrumentation } from "./instrumentation"; // Moved call to tail end
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
@@ -42,17 +43,7 @@ import {
   setConfigValue,
 } from "./utils/utils";
 import { Terminal } from "./utils/terminal";
-import { AnthropicWebViewProvider } from "./webview-providers/anthropic";
-import { CodeActionsProvider } from "./webview-providers/code-actions";
-import { DeepseekWebViewProvider } from "./webview-providers/deepseek";
-import { GeminiWebViewProvider } from "./webview-providers/gemini";
-import { GroqWebViewProvider } from "./webview-providers/groq";
-import { OpenAIWebViewProvider } from "./webview-providers/openai";
-import { QwenWebViewProvider } from "./webview-providers/qwen";
-import { GLMWebViewProvider } from "./webview-providers/glm";
-import { LocalWebViewProvider } from "./webview-providers/local";
-import { WebViewProviderManager } from "./webview-providers/manager";
-import { DeveloperAgent } from "./agents/developer/agent";
+import { LocalObservabilityService } from "./infrastructure/observability/telemetry";
 import { AgentRunningGuardService } from "./services/agent-running-guard.service";
 
 import { DiffReviewService } from "./services/diff-review.service";
@@ -72,102 +63,100 @@ const logger = Logger.initialize("extension-main", {
   enableTelemetry: true,
 });
 
-const {
-  geminiKey,
-  geminiModel,
-  groqApiKey,
-  groqModel,
-  anthropicApiKey,
-  anthropicModel,
-  grokApiKey,
-  grokModel,
-  deepseekApiKey,
-  deepseekModel,
-  openaiApiKey,
-  openaiModel,
-  qwenApiKey,
-  qwenModel,
-  glmApiKey,
-  glmModel,
-  localApiKey,
-  localModel,
-} = APP_CONFIG;
-
 let quickFixCodeAction: vscode.Disposable;
 let agentEventEmmitter: EventEmitter;
 const orchestrator = Orchestrator.getInstance();
 
-/**
- * Initialize WebView providers lazily for faster startup
- */
-function initializeWebViewProviders(
+async function initializeWebViewProviders(
   context: vscode.ExtensionContext,
-  selectedGenerativeAiModel: string,
-): void {
-  // Use setImmediate to defer until after current call stack
-  setImmediate(() => {
-    try {
-      logger.info("🎨 CodeBuddy: Initializing WebView providers...");
+  selectedGenerativeAiModel: any,
+) {
+  const { WebViewProviderManager } =
+    await import("./webview-providers/manager");
+  const providerManager = WebViewProviderManager.getInstance(context);
+  const modelConfigurations: any = {
+    Anthropic: {
+      key: "anthropic.apiKey",
+      model: "anthropic.model",
+      provider: () => import("./webview-providers/anthropic"),
+    },
+    Deepseek: {
+      key: "deepseek.apiKey",
+      model: "deepseek.model",
+      provider: () => import("./webview-providers/deepseek"),
+    },
+    Gemini: {
+      key: "gemini.apiKey",
+      model: "gemini.model",
+      provider: () => import("./webview-providers/gemini"),
+    },
+    Groq: {
+      key: "groq.apiKey",
+      model: "groq.model",
+      provider: () => import("./webview-providers/groq"),
+    },
+    OpenAI: {
+      key: "openai.apiKey",
+      model: "openai.model",
+      provider: () => import("./webview-providers/openai"),
+    },
+    Qwen: {
+      key: "qwen.apiKey",
+      model: "qwen.model",
+      provider: () => import("./webview-providers/qwen"),
+    },
+    GLM: {
+      key: "glm.apiKey",
+      model: "glm.model",
+      provider: () => import("./webview-providers/glm"),
+    },
+    Local: {
+      key: "local.apiKey",
+      model: "local.model",
+      provider: () => import("./webview-providers/local"),
+    },
+  };
 
-      const modelConfigurations: {
-        [key: string]: {
-          key: string;
-          model: string;
-          webviewProviderClass: any;
-        };
-      } = {
-        [generativeAiModels.GEMINI]: {
-          key: geminiKey,
-          model: geminiModel,
-          webviewProviderClass: GeminiWebViewProvider,
-        },
-        [generativeAiModels.GROQ]: {
-          key: groqApiKey,
-          model: groqModel,
-          webviewProviderClass: GroqWebViewProvider,
-        },
-        [generativeAiModels.ANTHROPIC]: {
-          key: anthropicApiKey,
-          model: anthropicModel,
-          webviewProviderClass: AnthropicWebViewProvider,
-        },
-        [generativeAiModels.GROK]: {
-          key: grokApiKey,
-          model: grokModel,
-          webviewProviderClass: AnthropicWebViewProvider,
-        },
-        [generativeAiModels.DEEPSEEK]: {
-          key: deepseekApiKey,
-          model: deepseekModel,
-          webviewProviderClass: DeepseekWebViewProvider,
-        },
-        [generativeAiModels.OPENAI]: {
-          key: openaiApiKey,
-          model: openaiModel,
-          webviewProviderClass: OpenAIWebViewProvider,
-        },
-        [generativeAiModels.QWEN]: {
-          key: qwenApiKey,
-          model: qwenModel,
-          webviewProviderClass: QwenWebViewProvider,
-        },
-        [generativeAiModels.GLM]: {
-          key: glmApiKey,
-          model: glmModel,
-          webviewProviderClass: GLMWebViewProvider,
-        },
-        [generativeAiModels.LOCAL]: {
-          key: localApiKey,
-          model: localModel,
-          webviewProviderClass: LocalWebViewProvider,
-        },
+  const { APP_CONFIG } = await import("./application/constant");
+  const modelConfigs = [
+    { name: "Anthropic", key: "anthropicApiKey" },
+    { name: "Deepseek", key: "deepseekApiKey" },
+    { name: "Gemini", key: "geminiKey" },
+    { name: "Groq", key: "groqApiKey" },
+    { name: "OpenAI", key: "openaiApiKey" },
+    { name: "Qwen", key: "qwenApiKey" },
+    { name: "GLM", key: "glmApiKey" },
+    { name: "Local", key: "localApiKey" },
+  ];
+
+  vscode.commands.executeCommand("setContext", "isModelSelected", true);
+  modelConfigs.forEach(async (config) => {
+    try {
+      const {
+        geminiKey,
+        groqApiKey,
+        anthropicApiKey,
+        deepseekApiKey,
+        openaiApiKey,
+        qwenApiKey,
+        glmApiKey,
+        localApiKey,
+      } = APP_CONFIG;
+
+      const modelConfigurationsMap: any = {
+        Anthropic: anthropicApiKey,
+        Deepseek: deepseekApiKey,
+        Gemini: geminiKey,
+        Groq: groqApiKey,
+        OpenAI: openaiApiKey,
+        Qwen: qwenApiKey,
+        GLM: glmApiKey,
+        Local: localApiKey,
       };
 
-      const providerManager = WebViewProviderManager.getInstance(context);
       let apiKeys = "";
-
       for (const [key, value] of Object.entries(modelConfigurations)) {
-        if (getConfigValue(value.key) === "apiKey") {
+        if (getConfigValue((value as any).key) === "apiKey") {
           apiKeys += `${key}, `;
         }
       }
@@ -176,6 +165,9 @@ function initializeWebViewProviders(
         const modelConfig = modelConfigurations[selectedGenerativeAiModel];
         const apiKey = getConfigValue(modelConfig.key);
         const apiModel = getConfigValue(modelConfig.model);
+
+        // Ensure the provider class is loaded before initializing
+        await modelConfig.provider();
 
         providerManager.initializeProvider(
           selectedGenerativeAiModel,
@@ -218,10 +210,12 @@ export async function activate(context: vscode.ExtensionContext) {
     AstIndexingService.getInstance(context);
     logger.info("AST Indexing Service initialized");
 
+    // Use dynamic import for DeveloperAgent to ensure it's loaded AFTER telemetry initialization
+    const { DeveloperAgent } = await import("./agents/developer/agent");
     new DeveloperAgent({});
     const selectedGenerativeAiModel = getConfigValue("generativeAi.option");
     // setConfigValue("generativeAi.option", "Gemini");
-    initializeWebViewProviders(context, selectedGenerativeAiModel);
+    await initializeWebViewProviders(context, selectedGenerativeAiModel);
     Logger.sessionId = Logger.generateId();
 
     const databaseService: SqliteDatabaseService =
@@ -816,6 +810,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     logger.info(`Total commands registered: ${subscriptions.length}`);
 
+    // Dynamic import for CodeActionsProvider
+    const { CodeActionsProvider } =
+      await import("./webview-providers/code-actions");
     const quickFix = new CodeActionsProvider();
     quickFixCodeAction = vscode.languages.registerCodeActionsProvider(
       { scheme: "file", language: "*" },
@@ -831,7 +828,16 @@ export async function activate(context: vscode.ExtensionContext) {
       orchestrator,
       agentRunningGuard,
     );
+
+    // Initialize Traceloop observability at the tail end as requested
+    try {
+      await LocalObservabilityService.getInstance().initialize();
+      setupInstrumentation();
+    } catch (obsError) {
+      logger.error("Failed to initialize observability:", obsError);
+    }
   } catch (error: any) {
+    console.log("abcde", error);
     // Memory.clear();
     vscode.window.showErrorMessage(
       "An Error occured while setting up generative AI model",
@@ -919,8 +925,10 @@ export function deactivate(context: vscode.ExtensionContext) {
   agentGuard.dispose();
 
   // Dispose provider manager
-  const providerManager = WebViewProviderManager.getInstance(context);
-  providerManager.dispose();
+  import("./webview-providers/manager").then(({ WebViewProviderManager }) => {
+    const providerManager = WebViewProviderManager.getInstance(context);
+    providerManager.dispose();
+  });
 
   context.subscriptions.forEach((subscription) => subscription.dispose());
 

@@ -256,6 +256,7 @@ export const WebviewUI = () => {
 
   const [logs, setLogs] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
+  const [traces, setTraces] = useState<any[]>([]);
   // const [dependencyGraph, setDependencyGraph] = useState<string | null>(null);
 
   // Ref for username input element
@@ -380,6 +381,9 @@ export const WebviewUI = () => {
         break;
       case "observability-metrics":
         setMetrics(message.metrics);
+        break;
+      case "observability-traces":
+        setTraces(message.traces);
         break;
       case "log-entry":
         setLogs((prev) => [...prev, message.event].slice(-1000));
@@ -1108,7 +1112,7 @@ export const WebviewUI = () => {
         </VSCodePanelView>
         
         <VSCodePanelView id="view-4">
-          <ObservabilityPanel vsCode={vsCode} logs={logs} metrics={metrics} />
+          <ObservabilityPanel vsCode={vsCode} logs={logs} metrics={metrics} traces={traces} />
         </VSCodePanelView>
 
         {/* <VSCodePanelView id="view-5">

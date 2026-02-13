@@ -171,6 +171,7 @@ async function main() {
       "./node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js",
       "web-tree-sitter",
       "@vscode/ripgrep",
+      "fsevents",
       // 'punycode' intentionally NOT external, so it is bundled
     ],
     format: "cjs",
@@ -196,6 +197,7 @@ async function main() {
       "apache-arrow",
       "web-tree-sitter",
       "@vscode/ripgrep",
+      "fsevents",
     ],
     format: "cjs",
     target: "node16",

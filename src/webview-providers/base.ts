@@ -45,6 +45,7 @@ import { NewsService } from "../services/news.service";
 import { ConnectorService } from "../services/connector.service";
 import { NotificationService } from "../services/notification.service";
 import { ObservabilityService } from "../services/observability.service";
+import { LocalObservabilityService } from "../infrastructure/observability/telemetry";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -1567,6 +1568,79 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 type: "observability-metrics",
                 metrics,
               });
+              break;
+            }
+
+            case "observability-get-traces": {
+              const traces = ObservabilityService.getInstance().getTraces();
+              this.logger.info(
+                `[WEBVIEW] Sending ${traces.length} traces to webview`,
+              );
+
+              // Sanitize traces to avoid circular references and ensure serializability
+              const sanitizedTraces = traces.map((span) => ({
+                name: span.name,
+                context: span.spanContext(),
+                parentSpanId: (span as any).parentSpanId,
+                startTime: span.startTime,
+                endTime: span.endTime,
+                attributes: span.attributes,
+                status: span.status,
+                events: span.events,
+                links: span.links,
+                kind: span.kind,
+                duration: [
+                  span.endTime[0] - span.startTime[0],
+                  span.endTime[1] - span.startTime[1],
+                ],
+              }));
+
+              await this.currentWebView?.webview.postMessage({
+                type: "observability-traces",
+                traces: sanitizedTraces,
+              });
+              break;
+            }
+
+            case "observability-clear-traces": {
+              ObservabilityService.getInstance().clearTraces();
+              await this.currentWebView?.webview.postMessage({
+                type: "observability-traces",
+                traces: [],
+              });
+              break;
+            }
+
+            case "observability-send-test-trace": {
+              this.logger.info(
+                "Received observability-send-test-trace command",
+              );
+              LocalObservabilityService.getInstance().createTestSpan(
+                "manual_webview_test_span",
+              );
+              // Wait a bit for the span to end and be captured
+              setTimeout(async () => {
+                const traces = ObservabilityService.getInstance().getTraces();
+                this.logger.info(
+                  `[WEBVIEW] Sending ${traces.length} traces after test span`,
+                );
+                const sanitizedTraces = traces.map((span) => ({
+                  name: span.name,
+                  context: span.spanContext(),
+                  parentSpanId: (span as any).parentSpanId,
+                  startTime: span.startTime,
+                  endTime: span.endTime,
+                  attributes: span.attributes,
+                  status: span.status,
+                  events: span.events,
+                  links: span.links,
+                  kind: span.kind,
+                }));
+                await this.currentWebView?.webview.postMessage({
+                  type: "observability-traces",
+                  traces: sanitizedTraces,
+                });
+              }, 500);
               break;
             }
 
