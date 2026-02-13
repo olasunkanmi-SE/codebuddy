@@ -64,6 +64,10 @@ import { DependencyCheckTask } from "./services/tasks/dependency-check.task";
 import { GitWatchdogTask } from "./services/tasks/git-watchdog.task";
 import { createBranchFromJiraCommand } from "./commands/create-branch-from-jira";
 import { createBranchFromGitLabCommand } from "./commands/create-branch-from-gitlab";
+import {
+  openInReaderCommand,
+  openSelectionInReaderCommand,
+} from "./commands/open-reader";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -801,6 +805,12 @@ export async function activate(context: vscode.ExtensionContext) {
       },
       "CodeBuddy.rules.init": async () => {
         await projectRulesService.createRulesFile();
+      },
+      "CodeBuddy.openInReader": async () => {
+        await openInReaderCommand();
+      },
+      "CodeBuddy.openSelectionInReader": async () => {
+        await openSelectionInReaderCommand();
       },
       "CodeBuddy.rules.reload": async () => {
         await projectRulesService.reloadRules();

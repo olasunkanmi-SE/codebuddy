@@ -118,6 +118,43 @@ const NotificationToggleButton = styled.button`
   }
 `;
 
+const FontSizeGroup = styled.div`
+  position: fixed;
+  top: 188px;
+  left: 12px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const FontSizeButton = styled.button`
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
 const NotificationIcon = ({ size = 18 }: { size?: number }) => (
   <svg
     width={size}
@@ -715,7 +752,23 @@ export const WebviewUI = () => {
   }, []);
 
   const handleNotificationClearAll = useCallback(() => {
-    vsCode.postMessage({ command: "notification-clear-all" });
+    vsCode.postMessage({ command: "notifications-clear-all" });
+  }, []);
+
+  const handleIncreaseFontSize = useCallback(() => {
+    setFontSize(prev => {
+      const newSize = Math.min(prev + 1, 24);
+      vsCode.postMessage({ command: "font-size-change-event", message: newSize });
+      return newSize;
+    });
+  }, []);
+
+  const handleDecreaseFontSize = useCallback(() => {
+    setFontSize(prev => {
+      const newSize = Math.max(prev - 1, 8);
+      vsCode.postMessage({ command: "font-size-change-event", message: newSize });
+      return newSize;
+    });
   }, []);
 
   const handleToggleNotifications = useCallback(() => {
@@ -997,6 +1050,15 @@ export const WebviewUI = () => {
           </span>
         )}
       </NotificationToggleButton>
+
+      <FontSizeGroup>
+        <FontSizeButton onClick={handleIncreaseFontSize} title="Increase Font Size">
+          A+
+        </FontSizeButton>
+        <FontSizeButton onClick={handleDecreaseFontSize} title="Decrease Font Size">
+          A-
+        </FontSizeButton>
+      </FontSizeGroup>
 
       {/* Notifications Panel */}
       <NotificationPanel

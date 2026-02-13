@@ -121,7 +121,7 @@ export class NewsReaderService implements vscode.Disposable {
             url: url,
           };
 
-          const readerHtml = this.getReaderHtml(article);
+          const readerHtml = this.getReaderHtml({ ...article, url });
 
           // Cache the result
           await this.cacheManager.setResponse(url, readerHtml);
@@ -173,17 +173,15 @@ export class NewsReaderService implements vscode.Disposable {
               break;
             case "open-new":
               if (message.url) {
-                // Open in a new column/split if possible, or just a new panel
-                // For now, openReader reuses currentPanel if it exists.
-                // To support "New Tab", we'd need to manage multiple panels.
-                // Let's force a new panel by setting currentPanel to undefined temporarily?
-                // No, that would lose the reference to the old one.
-                // We need to change how we manage panels to support multiple tabs.
-                // But for now, let's just open in external browser as "New Tab" equivalent
-                // OR, we can instantiate a new NewsReaderService? No, it's a singleton.
-
-                // Simplest "New Tab" emulation: Open in system browser
                 vscode.env.openExternal(vscode.Uri.parse(message.url));
+              }
+              break;
+            case "open-simple":
+              if (message.url) {
+                vscode.commands.executeCommand(
+                  "simpleBrowser.show",
+                  message.url,
+                );
               }
               break;
           }
@@ -202,6 +200,7 @@ export class NewsReaderService implements vscode.Disposable {
     content: string;
     byline: string;
     siteName: string;
+    url: string;
   }): string {
     // Sanitize content
     const window = new JSDOM("").window;
@@ -225,6 +224,11 @@ export class NewsReaderService implements vscode.Disposable {
             --menu-border: var(--vscode-menu-border);
             --menu-hover-bg: var(--vscode-menu-selectionBackground);
             --menu-hover-fg: var(--vscode-menu-selectionForeground);
+            --toolbar-bg: var(--vscode-editor-background);
+            --toolbar-border: var(--vscode-widget-border);
+            --input-bg: var(--vscode-input-background);
+            --input-fg: var(--vscode-input-foreground);
+            --button-hover-bg: var(--vscode-toolbar-hoverBackground);
         }
         
         body {
@@ -232,6 +236,90 @@ export class NewsReaderService implements vscode.Disposable {
             color: var(--text-color);
             font-family: var(--font-family);
             line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* Trae-style Browser Header */
+        .browser-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background-color: var(--toolbar-bg);
+            border-bottom: 1px solid var(--toolbar-border);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 40px;
+            backdrop-filter: blur(8px);
+        }
+
+        .browser-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .browser-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.8;
+            transition: all 0.2s;
+        }
+
+        .browser-btn:hover {
+            background-color: var(--button-hover-bg);
+            opacity: 1;
+        }
+
+        .browser-btn.disabled {
+            opacity: 0.3;
+            cursor: default;
+        }
+
+        .url-bar {
+            flex: 1;
+            background-color: var(--input-bg);
+            color: var(--input-fg);
+            border: 1px solid var(--toolbar-border);
+            border-radius: 6px;
+            padding: 4px 12px;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .font-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            border-left: 1px solid var(--toolbar-border);
+            padding-left: 12px;
+        }
+
+        .font-btn {
+            width: 28px;
+            height: 28px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        /* Article Styles */
+        article {
             max-width: 800px;
             margin: 0 auto;
             padding: 40px 20px;
@@ -252,7 +340,7 @@ export class NewsReaderService implements vscode.Disposable {
         }
 
         .content {
-            font-size: 1.1em;
+            font-size: var(--article-font-size, 1.1em);
         }
 
         .content img {
@@ -322,6 +410,31 @@ export class NewsReaderService implements vscode.Disposable {
     </style>
 </head>
 <body>
+    <header class="browser-header">
+        <div class="browser-controls">
+            <button class="browser-btn disabled" title="Back">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button class="browser-btn disabled" title="Forward">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <button class="browser-btn" title="Reload" onclick="location.reload()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+            </button>
+        </div>
+        <div class="url-bar">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; opacity: 0.5;"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            ${article.url}
+        </div>
+        <div class="font-controls">
+            <button class="browser-btn" id="btn-simple" title="Switch to Simple Browser">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </button>
+            <button class="browser-btn font-btn" id="font-minus" title="Decrease font size">A-</button>
+            <button class="browser-btn font-btn" id="font-plus" title="Increase font size">A+</button>
+        </div>
+    </header>
+
     <article>
         <h1>${article.title}</h1>
         <div class="meta">
@@ -343,7 +456,33 @@ export class NewsReaderService implements vscode.Disposable {
         const contextMenu = document.getElementById('context-menu');
         const openNewItem = document.getElementById('menu-open-new');
         const copyLinkItem = document.getElementById('menu-copy-link');
+        const fontMinus = document.getElementById('font-minus');
+        const fontPlus = document.getElementById('font-plus');
+        const btnSimple = document.getElementById('btn-simple');
+        
         let currentLink = null;
+        let fontSize = parseFloat(localStorage.getItem('reader-font-size')) || 1.1;
+
+        function updateFontSize() {
+            document.documentElement.style.setProperty('--article-font-size', fontSize + 'em');
+            localStorage.setItem('reader-font-size', fontSize);
+        }
+
+        updateFontSize();
+
+        btnSimple.addEventListener('click', () => {
+            vscode.postMessage({ command: 'open-simple', url: ${JSON.stringify(article.url)} });
+        });
+
+        fontMinus.addEventListener('click', () => {
+            fontSize = Math.max(0.8, fontSize - 0.1);
+            updateFontSize();
+        });
+
+        fontPlus.addEventListener('click', () => {
+            fontSize = Math.min(2.0, fontSize + 0.1);
+            updateFontSize();
+        });
 
         // Handle regular clicks
         document.addEventListener('click', (e) => {

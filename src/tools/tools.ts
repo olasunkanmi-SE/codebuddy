@@ -376,11 +376,25 @@ export class TerminalTool {
   }
 }
 
+import { NewsReaderService } from "../services/news-reader.service";
+import { getConfigValue } from "../utils/utils";
+
 export class WebPreviewTool {
   public async execute(url: string) {
     try {
-      await vscode.commands.executeCommand("simpleBrowser.show", url);
-      return `Preview opened for ${url}`;
+      const browserType = getConfigValue("codebuddy.browserType") || "reader";
+
+      if (browserType === "reader") {
+        const reader = NewsReaderService.getInstance();
+        await reader.openReader(url);
+        return `Opened ${url} in Smart Reader`;
+      } else if (browserType === "system") {
+        await vscode.env.openExternal(vscode.Uri.parse(url));
+        return `Opened ${url} in System Browser`;
+      } else {
+        await vscode.commands.executeCommand("simpleBrowser.show", url);
+        return `Preview opened for ${url} in Simple Browser`;
+      }
     } catch (e: any) {
       return `Error opening preview: ${e.message}`;
     }
@@ -390,13 +404,13 @@ export class WebPreviewTool {
     return {
       name: "open_web_preview",
       description:
-        "Open a web preview in the editor (Simple Browser). Use this to view localhost servers or external URLs.",
+        "Open a web preview in the editor (Smart Reader, Simple Browser, or System Browser based on settings). Use this to view documentation, search results, or external URLs.",
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
           url: {
             type: SchemaType.STRING,
-            description: "The URL to preview (e.g., http://localhost:3000).",
+            description: "The URL to preview (e.g., https://docs.python.org).",
           },
         },
         required: ["url"],

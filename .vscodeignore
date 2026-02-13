@@ -15,7 +15,12 @@ docs/**
 webviewUi/**
 .vscode/**
 .vscode-test/**
-.github/
+.github/**
+.codebuddy/**
+temp_deepagentsjs/**
+repo/**
+patterns/**
+*.db
 *.log
 *.ts
 *.tsx
@@ -32,9 +37,39 @@ node_modules/**
 
 # Whitelist external dependencies needed for production
 !node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js
-!node_modules/web-tree-sitter/**
-!node_modules/@vscode/ripgrep/**
-!node_modules/better-sqlite3/**
-!node_modules/@lancedb/lancedb/**
-!node_modules/apache-arrow/**
+!node_modules/web-tree-sitter/tree-sitter.js
+!node_modules/web-tree-sitter/tree-sitter.wasm
+!node_modules/@vscode/ripgrep/bin/rg
+!node_modules/better-sqlite3/lib/**
+!node_modules/better-sqlite3/build/Release/better_sqlite3.node
+!node_modules/better-sqlite3/package.json
+!node_modules/apache-arrow/*.js
+!node_modules/apache-arrow/*.mjs
+!node_modules/apache-arrow/package.json
+
+# Exclude unnecessary files from the above included node_modules
+node_modules/**/*.map
+node_modules/**/*.d.ts
+node_modules/**/*.ts
+node_modules/**/README*
+node_modules/**/LICENSE*
+node_modules/**/CHANGELOG*
+node_modules/**/SECURITY.md
+node_modules/**/jsconfig.json
+node_modules/**/tsconfig.json
+node_modules/**/.vscode/**
+node_modules/**/build/pipeline.yml
+node_modules/**/deps/**
+node_modules/**/src/**
+node_modules/**/binding.gyp
+node_modules/**/NOTICE*
+node_modules/**/Arrow.externs.*
+node_modules/**/bin/**
+node_modules/**/fb/**
+node_modules/**/io/**
+node_modules/**/ipc/**
+node_modules/**/row/**
+node_modules/**/visitor/**
+node_modules/**/builder/**
+node_modules/apache-arrow/node_modules/**
 
