@@ -1,5 +1,5 @@
 import { ChatAnthropic } from "@langchain/anthropic";
-// import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatGroq } from "@langchain/groq";
 import { ChatOpenAI } from "@langchain/openai";
 import { BaseStore } from "@langchain/langgraph";
@@ -33,7 +33,12 @@ import { createDeveloperSubagents } from "./subagents";
 
 export class DeveloperAgent {
   private config: ICodeBuddyAgentConfig;
-  private model: ChatAnthropic | ChatGroq | ChatOpenAI | undefined;
+  private model:
+    | ChatAnthropic
+    | ChatGroq
+    | ChatOpenAI
+    | ChatGoogleGenerativeAI
+    | undefined;
   private tools: StructuredTool[];
   private readonly logger: Logger;
   private readonly disposables: vscode.Disposable[] = [];
@@ -72,7 +77,12 @@ export class DeveloperAgent {
 
   private getAIConfigFromWebProvider(model: string) {
     const apiKeyAndModel = getAPIKeyAndModel(model.toLowerCase());
-    let currentModel: ChatAnthropic | ChatGroq | ChatOpenAI | undefined;
+    let currentModel:
+      | ChatAnthropic
+      | ChatGroq
+      | ChatOpenAI
+      | ChatGoogleGenerativeAI
+      | undefined;
     switch (model.toLowerCase()) {
       case "anthropic":
         currentModel = new ChatAnthropic({
@@ -87,9 +97,7 @@ export class DeveloperAgent {
         });
         break;
       case "gemini":
-        // Temporary mesaure to prevent an error being throwned to the user
-        // The current genai package isnt compatible with langchain 1.0.0 package
-        currentModel = new ChatAnthropic({
+        currentModel = new ChatGoogleGenerativeAI({
           apiKey: apiKeyAndModel.apiKey,
           model: apiKeyAndModel.model!,
         });
@@ -248,7 +256,11 @@ export class DeveloperAgent {
       throw new Error("Error creating DeveloperAgent: No model found");
     }
 
-    this.model = cachedModel as ChatAnthropic | ChatGroq | ChatOpenAI;
+    this.model = cachedModel as
+      | ChatAnthropic
+      | ChatGroq
+      | ChatOpenAI
+      | ChatGoogleGenerativeAI;
     const { store, enableSubAgents = true, checkPointer } = this.config;
 
     // Ensure MCP tools are loaded before creating the agent
