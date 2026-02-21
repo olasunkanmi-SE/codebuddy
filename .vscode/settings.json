@@ -18,5 +18,6 @@
       "description": "Docker MCP Gateway (Context7, GitHub, GitLab, Fetch)",
       "enabled": true
     }
-  }
+  },
+  "cSpell.words": ["CODEBUDDY"]
 }

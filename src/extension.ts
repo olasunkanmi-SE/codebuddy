@@ -55,6 +55,10 @@ import { DependencyCheckTask } from "./services/tasks/dependency-check.task";
 import { GitWatchdogTask } from "./services/tasks/git-watchdog.task";
 import { createBranchFromJiraCommand } from "./commands/create-branch-from-jira";
 import { createBranchFromGitLabCommand } from "./commands/create-branch-from-gitlab";
+import {
+  openInReaderCommand,
+  openSelectionInReaderCommand,
+} from "./commands/open-reader";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -76,128 +80,92 @@ async function initializeWebViewProviders(
   const providerManager = WebViewProviderManager.getInstance(context);
   const modelConfigurations: any = {
     Anthropic: {
-      key: "anthropic.apiKey",
-      model: "anthropic.model",
+      key: APP_CONFIG.anthropicApiKey,
+      model: APP_CONFIG.anthropicModel,
       provider: () => import("./webview-providers/anthropic"),
     },
     Deepseek: {
-      key: "deepseek.apiKey",
-      model: "deepseek.model",
+      key: APP_CONFIG.deepseekApiKey,
+      model: APP_CONFIG.deepseekModel,
       provider: () => import("./webview-providers/deepseek"),
     },
     Gemini: {
-      key: "gemini.apiKey",
-      model: "gemini.model",
+      key: APP_CONFIG.geminiKey,
+      model: APP_CONFIG.geminiModel,
       provider: () => import("./webview-providers/gemini"),
     },
     Groq: {
-      key: "groq.apiKey",
-      model: "groq.model",
+      key: APP_CONFIG.groqApiKey,
+      model: APP_CONFIG.groqModel,
       provider: () => import("./webview-providers/groq"),
     },
     OpenAI: {
-      key: "openai.apiKey",
-      model: "openai.model",
+      key: APP_CONFIG.openaiApiKey,
+      model: APP_CONFIG.openaiModel,
       provider: () => import("./webview-providers/openai"),
     },
     Qwen: {
-      key: "qwen.apiKey",
-      model: "qwen.model",
+      key: APP_CONFIG.qwenApiKey,
+      model: APP_CONFIG.qwenModel,
       provider: () => import("./webview-providers/qwen"),
     },
     GLM: {
-      key: "glm.apiKey",
-      model: "glm.model",
+      key: APP_CONFIG.glmApiKey,
+      model: APP_CONFIG.glmModel,
       provider: () => import("./webview-providers/glm"),
     },
     Local: {
-      key: "local.apiKey",
-      model: "local.model",
+      key: APP_CONFIG.localApiKey,
+      model: APP_CONFIG.localModel,
       provider: () => import("./webview-providers/local"),
     },
   };
 
-  const { APP_CONFIG } = await import("./application/constant");
-  const modelConfigs = [
-    { name: "Anthropic", key: "anthropicApiKey" },
-    { name: "Deepseek", key: "deepseekApiKey" },
-    { name: "Gemini", key: "geminiKey" },
-    { name: "Groq", key: "groqApiKey" },
-    { name: "OpenAI", key: "openaiApiKey" },
-    { name: "Qwen", key: "qwenApiKey" },
-    { name: "GLM", key: "glmApiKey" },
-    { name: "Local", key: "localApiKey" },
-  ];
-
   vscode.commands.executeCommand("setContext", "isModelSelected", true);
-  modelConfigs.forEach(async (config) => {
-    try {
-      const {
-        geminiKey,
-        groqApiKey,
-        anthropicApiKey,
-        deepseekApiKey,
-        openaiApiKey,
-        qwenApiKey,
-        glmApiKey,
-        localApiKey,
-      } = APP_CONFIG;
-
-      const modelConfigurationsMap: any = {
-        Anthropic: anthropicApiKey,
-        Deepseek: deepseekApiKey,
-        Gemini: geminiKey,
-        Groq: groqApiKey,
-        OpenAI: openaiApiKey,
-        Qwen: qwenApiKey,
-        GLM: glmApiKey,
-        Local: localApiKey,
-      };
-
-      let apiKeys = "";
-      for (const [key, value] of Object.entries(modelConfigurations)) {
-        if (getConfigValue((value as any).key) === "apiKey") {
-          apiKeys += `${key}, `;
-        }
+  try {
+    let apiKeys = "";
+    for (const [key, value] of Object.entries(modelConfigurations)) {
+      if (getConfigValue((value as any).key) === "apiKey") {
+        apiKeys += `${key}, `;
       }
+    }
 
-      if (selectedGenerativeAiModel in modelConfigurations) {
-        const modelConfig = modelConfigurations[selectedGenerativeAiModel];
-        const apiKey = getConfigValue(modelConfig.key);
-        const apiModel = getConfigValue(modelConfig.model);
+    if (selectedGenerativeAiModel in modelConfigurations) {
+      const modelConfig = modelConfigurations[selectedGenerativeAiModel];
+      const apiKey = getConfigValue(modelConfig.key);
+      const apiModel = getConfigValue(modelConfig.model);
 
-        // Ensure the provider class is loaded before initializing
-        await modelConfig.provider();
+      // Ensure the provider class is loaded before initializing
+      await modelConfig.provider();
 
-        providerManager.initializeProvider(
-          selectedGenerativeAiModel,
-          apiKey,
-          apiModel,
-          true,
-        );
+      await providerManager.initializeProvider(
+        selectedGenerativeAiModel,
+        apiKey,
+        apiModel,
+        true,
+      );
 
-        logger.info(
-          `✓ WebView provider initialized: ${selectedGenerativeAiModel}`,
-        );
-      }
-
-      if (apiKeys.length > 0) {
-        vscode.window.showErrorMessage(
-          `${apiKeys} APIkeys are required \n
-              Check out the FAQ and SETTINGS section to configure your AI assistant`,
-        );
-      }
-
-      // Store providerManager globally and add to subscriptions
-      (globalThis as any).providerManager = providerManager;
-      context.subscriptions.push(providerManager);
-    } catch (error: any) {
-      logger.error("Failed to initialize WebView providers:", error);
-      vscode.window.showWarningMessage(
-        "CodeBuddy: WebView initialization failed, some features may be limited",
+      logger.info(
+        `✓ WebView provider initialized: ${selectedGenerativeAiModel}`,
       );
     }
-  });
+
+    if (apiKeys.length > 0) {
+      vscode.window.showErrorMessage(
+        `${apiKeys} APIkeys may be required \n
+            Check out the FAQ and SETTINGS section to configure your AI assistant`,
+      );
+    }
+
+    // Store providerManager globally and add to subscriptions
+    (globalThis as any).providerManager = providerManager;
+    context.subscriptions.push(providerManager);
+  } catch (error: any) {
+    logger.error("Failed to initialize WebView providers:", error);
+    vscode.window.showWarningMessage(
+      "CodeBuddy: WebView initialization failed, some features may be limited",
+    );
+  }
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -282,14 +250,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // ⚡ FAST STARTUP: Only essential sync operations
     orchestrator.start();
-
-    const { apiKey } = getAPIKeyAndModel("groq");
-
-    if (!apiKey) {
-      vscode.window.showInformationMessage(
-        "Groq API key is required. visit https://console.groq.com/keys to generate an API key",
-      );
-    }
 
     Memory.getInstance();
 
@@ -795,6 +755,12 @@ export async function activate(context: vscode.ExtensionContext) {
       },
       "CodeBuddy.rules.init": async () => {
         await projectRulesService.createRulesFile();
+      },
+      "CodeBuddy.openInReader": async () => {
+        await openInReaderCommand();
+      },
+      "CodeBuddy.openSelectionInReader": async () => {
+        await openSelectionInReaderCommand();
       },
       "CodeBuddy.rules.reload": async () => {
         await projectRulesService.reloadRules();

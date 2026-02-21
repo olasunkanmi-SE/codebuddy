@@ -141,6 +141,11 @@
         {
           "command": "CodeBuddy.rules.init",
           "group": "CodeBuddy@9"
+        },
+        {
+          "command": "CodeBuddy.openSelectionInReader",
+          "group": "CodeBuddy@10",
+          "when": "editorHasSelection"
         }
       ]
     },
@@ -246,6 +251,16 @@
         "command": "codebuddy.rejectChange",
         "title": "Discard Change",
         "icon": "$(close)"
+      },
+      {
+        "command": "CodeBuddy.openInReader",
+        "title": "Open URL in Smart Reader",
+        "category": "CodeBuddy"
+      },
+      {
+        "command": "CodeBuddy.openSelectionInReader",
+        "title": "Open Selection in Smart Reader",
+        "category": "CodeBuddy"
       }
     ],
     "keybindings": [
