@@ -10,11 +10,10 @@ const logger = Logger.initialize("IndexWorkspace", {
 });
 
 export async function indexWorkspaceCommand(): Promise<void> {
-  const astIndexer = AstIndexingService.getInstance(); // Singleton already initialized
+  const astIndexer = AstIndexingService.getInstance();
 
-  // Find all files, excluding common ignored folders
   const files = await vscode.workspace.findFiles(
-    "**/*.{ts,js,tsx,jsx,py,java,go,rs,cpp,h,c}", // Limit to code files for AST analysis
+    "**/*.{ts,js,tsx,jsx,py,java,go,rs,cpp,h,c}",
     "**/{node_modules,.git,dist,out,build,coverage,.codebuddy}/**",
   );
 
@@ -26,35 +25,34 @@ export async function indexWorkspaceCommand(): Promise<void> {
   vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: "Indexing Workspace (Background Worker)",
+      title: "Indexing Workspace",
       cancellable: true,
     },
     async (progress, token) => {
-      let processed = 0;
-      const total = files.length;
+      progress.report({ message: `Found ${files.length} files...` });
 
-      for (const file of files) {
-        if (token.isCancellationRequested) break;
+      const result = await astIndexer.indexFiles(files, progress, token);
 
-        try {
-          progress.report({
-            message: `Queueing ${processed}/${total}: ${vscode.workspace.asRelativePath(file)}`,
-            increment: (1 / total) * 100,
-          });
+      const searchMode = result.embeddingsAvailable
+        ? "semantic search enabled"
+        : "text-only mode (configure API key for semantic search)";
 
-          const document = await vscode.workspace.openTextDocument(file);
-          // Offload to worker
-          astIndexer.indexFile(file.fsPath, document.getText());
-        } catch (error) {
-          logger.error(`Failed to queue file: ${file.fsPath}`, error);
-        }
+      const summary = [
+        `Indexing complete:`,
+        `${result.indexed} indexed`,
+        `${result.skipped} unchanged (skipped)`,
+        result.errors > 0 ? `${result.errors} errors` : null,
+        searchMode,
+      ]
+        .filter(Boolean)
+        .join(", ");
 
-        processed++;
+      if (!result.embeddingsAvailable) {
+        vscode.window.showWarningMessage(summary);
+      } else {
+        vscode.window.showInformationMessage(summary);
       }
-
-      vscode.window.showInformationMessage(
-        `Workspace indexing queued for ${processed} files. Check logs for completion.`,
-      );
+      logger.info(summary);
     },
   );
 }
