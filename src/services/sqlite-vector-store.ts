@@ -288,6 +288,9 @@ export class SqliteVectorStore implements vscode.Disposable {
   /**
    * Semantic vector search using cosine similarity.
    * Loads vectors from SQLite in batches and yields the event loop to prevent UI freezing.
+   *
+   * TODO: Replace brute-force scan with an ANN index (e.g. HNSW via sqlite-vss)
+   * once the chunk count exceeds ~50k and latency becomes noticeable.
    */
   async search(
     queryVector: number[],

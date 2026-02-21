@@ -43,6 +43,7 @@ export class ResearchNotesExtractor {
   private provider: string;
   private modelName: string | undefined;
   private lastExtractionTime = 0;
+  private isExtractionEnabled = false;
 
   private constructor() {
     this.logger = Logger.initialize("ResearchNotesExtractor", {
@@ -71,6 +72,7 @@ export class ResearchNotesExtractor {
         this.logger.warn(
           "No API key configured — research notes extraction disabled",
         );
+        this.isExtractionEnabled = false;
         return;
       }
 
@@ -88,7 +90,10 @@ export class ResearchNotesExtractor {
         provider: providerName,
         baseUrl,
       });
+
+      this.isExtractionEnabled = true;
     } catch (error) {
+      this.isExtractionEnabled = false;
       this.logger.warn("Failed to initialize research notes provider", error);
     }
   }
@@ -105,7 +110,7 @@ export class ResearchNotesExtractor {
     // Skip pure code-generation responses (likely a diff/patch)
     const codeBlockCount = (aiResponse.match(/```/g) || []).length / 2;
     const textOutsideCode = aiResponse.replace(/```[\s\S]*?```/g, "").trim();
-    if (codeBlockCount > 0 && textOutsideCode.length < 100) {
+    if (codeBlockCount > 0 && textOutsideCode.length < 200) {
       return false;
     }
 
@@ -172,7 +177,7 @@ export class ResearchNotesExtractor {
     aiResponse: string,
     threadId?: string,
   ): Promise<void> {
-    if (!this.vectorStore.isReady) {
+    if (!this.isExtractionEnabled || !this.vectorStore.isReady) {
       return;
     }
 

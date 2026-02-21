@@ -221,63 +221,6 @@ export class ContextRetriever {
     return results;
   }
 
-  async indexFile(filePath: string, content: string): Promise<void> {
-    if (!this.vectorStore.isReady) return;
-
-    try {
-      const contentHash = SqliteVectorStore.computeFileHash(content);
-      if (!this.vectorStore.isFileChanged(filePath, contentHash)) {
-        return; // Skip unchanged files
-      }
-
-      this.vectorStore.removeFile(filePath);
-
-      const chunkSize = 1000;
-      const overlap = 200;
-      const docs: any[] = [];
-
-      for (let i = 0; i < content.length; i += chunkSize - overlap) {
-        const chunk = content.slice(i, i + chunkSize);
-        if (chunk.length < 100) continue;
-
-        const id = `${filePath}::${i}`;
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
-        let embedding: number[] | undefined;
-        try {
-          embedding = await this.embeddingService.generateEmbedding(chunk);
-        } catch (error) {
-          this.logger.warn(
-            `Failed to generate embedding for ${id}, storing text only`,
-            error,
-          );
-        }
-
-        if (embedding) {
-          const beforeText = content.slice(0, i);
-          const startLine = beforeText.split("\n").length;
-          const endLine = startLine + chunk.split("\n").length - 1;
-
-          this.vectorStore.addDocument({
-            id,
-            text: chunk,
-            vector: embedding,
-            filePath,
-            startLine,
-            endLine,
-            chunkType: "text_chunk",
-            language: "",
-          });
-          docs.push(id);
-        }
-      }
-
-      this.vectorStore.updateFileMetadata(filePath, contentHash, docs.length);
-    } catch (error) {
-      this.logger.error(`Failed to index file ${filePath}`, error);
-    }
-  }
-
   async readFiles(
     fileConfigs: IFileToolConfig[],
   ): Promise<IFileToolResponse[]> {
