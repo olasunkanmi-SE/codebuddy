@@ -38,6 +38,7 @@ import { MessageHandler } from "../agents/handlers/message-handler";
 import { CodeBuddyAgentService } from "../agents/services/codebuddy-agent.service";
 import { MCPService } from "../MCP/service";
 import { MCPClientState } from "../MCP/types";
+import { MCP_PRESETS } from "../MCP/presets";
 import { LocalModelService } from "../llms/local/service";
 import { DockerModelService } from "../services/docker/DockerModelService";
 import { ProjectRulesService } from "../services/project-rules.service";
@@ -2636,6 +2637,94 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 "@ext:fiatinnovations.ola-code-buddy mcp",
               );
               break;
+
+            case "mcp-get-presets": {
+              const currentServers = getConfigValue("mcp.servers") || {};
+              const presets = MCP_PRESETS.map((p) => ({
+                ...p,
+                installed: !!currentServers[p.id],
+              }));
+              this.currentWebView?.webview.postMessage({
+                command: "mcp-presets-data",
+                data: { presets },
+              });
+              break;
+            }
+
+            case "mcp-add-preset": {
+              try {
+                const { presetId } = message.message || {};
+                const preset = MCP_PRESETS.find((p) => p.id === presetId);
+                if (!preset) {
+                  throw new Error(`Unknown MCP preset: ${presetId}`);
+                }
+
+                const currentServers = getConfigValue("mcp.servers") || {};
+                currentServers[preset.id] = { ...preset.config };
+
+                await vscode.workspace
+                  .getConfiguration("ola-code-buddy")
+                  .update(
+                    "mcp.servers",
+                    currentServers,
+                    vscode.ConfigurationTarget.Global,
+                  );
+
+                this.logger.info(`Added MCP preset server: ${preset.name}`);
+
+                // Reload MCP service to pick up the new server
+                const mcpService = MCPService.getInstance();
+                await mcpService.reload();
+
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-preset-added",
+                  data: { presetId, name: preset.name },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to add MCP preset:", error);
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-preset-error",
+                  data: { error: error.message },
+                });
+              }
+              break;
+            }
+
+            case "mcp-remove-preset": {
+              try {
+                const { presetId } = message.message || {};
+                const currentServers = getConfigValue("mcp.servers") || {};
+
+                if (currentServers[presetId]) {
+                  delete currentServers[presetId];
+                  await vscode.workspace
+                    .getConfiguration("ola-code-buddy")
+                    .update(
+                      "mcp.servers",
+                      currentServers,
+                      vscode.ConfigurationTarget.Global,
+                    );
+
+                  // Disconnect and reload
+                  const mcpService = MCPService.getInstance();
+                  const client = mcpService.getClient(presetId);
+                  if (client) {
+                    await client.disconnect();
+                  }
+                  await mcpService.reload();
+
+                  this.logger.info(`Removed MCP preset server: ${presetId}`);
+                }
+
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-preset-removed",
+                  data: { presetId },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to remove MCP preset:", error);
+              }
+              break;
+            }
 
             // Rules & Subagents Commands
             case "rules-get-all":
