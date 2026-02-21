@@ -235,7 +235,9 @@ export class SecretStorageService implements vscode.Disposable {
       if (event.affectsConfiguration(change)) {
         this.logConfigurationChange(change, "");
 
-        // Auto-persist API key changes to SecretStorage
+        // Auto-persist API key changes from VS Code settings to SecretStorage.
+        // This ensures that if a user enters an API key in the regular settings,
+        // it is securely moved to the OS keychain for better protection.
         if (change.endsWith("apiKey") || change.endsWith("apiKeys")) {
           const newValue = vscode.workspace
             .getConfiguration()
@@ -294,7 +296,11 @@ export class SecretStorageService implements vscode.Disposable {
 
   /**
    * Migrate API keys from VS Code settings to OS-level SecretStorage.
-   * Called once during extension activation. Keys already in SecretStorage are skipped.
+   * Called once during extension activation. Handles three cases:
+   * - First run: copies settings values into SecretStorage.
+   * - Subsequent runs: loads existing SecretStorage values into cache.
+   * - Offline edits: if a user changed a key in settings.json while the
+   *   extension was inactive, the new value is synced to SecretStorage.
    * Original settings values are left unchanged for backward compatibility.
    */
   async migrateApiKeys(): Promise<void> {
@@ -312,20 +318,30 @@ export class SecretStorageService implements vscode.Disposable {
 
     for (const configKey of apiKeyConfigs) {
       const existingSecret = await this.get(`apikey:${configKey}`);
-      if (existingSecret) {
-        this.apiKeyCache.set(configKey, existingSecret);
-        continue;
-      }
-
       const settingsValue = vscode.workspace
         .getConfiguration()
         .get<string>(configKey);
-      if (
+      const isValidSettingsValue =
         settingsValue &&
         settingsValue !== "apiKey" &&
         settingsValue !== "not-needed" &&
-        settingsValue !== ""
+        settingsValue !== "";
+
+      if (
+        existingSecret &&
+        isValidSettingsValue &&
+        settingsValue !== existingSecret
       ) {
+        // Settings value was changed while extension was inactive — sync to SecretStorage
+        await this.add(`apikey:${configKey}`, settingsValue);
+        this.apiKeyCache.set(configKey, settingsValue);
+        this.logger.info(
+          `Synced updated API key for ${configKey} to secure storage`,
+        );
+      } else if (existingSecret) {
+        this.apiKeyCache.set(configKey, existingSecret);
+      } else if (isValidSettingsValue) {
+        // First-time migration from settings to SecretStorage
         await this.add(`apikey:${configKey}`, settingsValue);
         this.apiKeyCache.set(configKey, settingsValue);
         this.logger.info(`Migrated API key for ${configKey} to secure storage`);

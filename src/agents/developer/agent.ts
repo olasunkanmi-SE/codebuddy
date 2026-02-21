@@ -151,6 +151,8 @@ export class DeveloperAgent {
 
     return createVscodeFsBackendFactory({
       rootDir: workspacePath || "",
+      // opts.extraArgs and opts.glob are sourced from internal deepagents
+      // configuration only — never from unsanitized user input.
       ripgrepSearch: async (opts) => {
         try {
           const { stdout } = await execFileAsync(

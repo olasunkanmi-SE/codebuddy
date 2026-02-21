@@ -232,7 +232,8 @@ export const showInfoMessage = (message?: string): void => {
 export const getAPIKeyAndModel = (
   model: string,
 ): { apiKey: string; model?: string; baseUrl?: string } => {
-  // Read API keys from OS keychain (SecretStorage) first, fall back to settings
+  // Read API keys from OS keychain (SecretStorage) first, fall back to settings.
+  // SecretStorageService may not be initialized yet if called during provider module load.
   const getSecureApiKey = (configKey: string): string | undefined => {
     try {
       return (
