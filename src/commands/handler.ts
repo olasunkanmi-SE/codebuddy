@@ -34,6 +34,7 @@ import { Memory } from "../memory/base";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
 import { architecturalRecommendationCommand } from "./architectural-recommendation";
+import { trace, SpanStatusCode, SpanKind, Tracer } from "@opentelemetry/api";
 
 interface ICodeCommandHandler {
   getApplicationConfig(configKey: string): string | undefined;
@@ -60,6 +61,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   private readonly glmApiKey: string;
   private readonly glmModel: string;
   protected logger: Logger;
+  private readonly tracer: Tracer;
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,
@@ -106,6 +108,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       enableTelemetry: true,
     });
     this.orchestrator = Orchestrator.getInstance();
+    this.tracer = trace.getTracer("codebuddy-commands");
   }
 
   getApplicationConfig(configKey: string): string | undefined {
@@ -353,6 +356,13 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   protected async generateModelResponse(
     text: string,
   ): Promise<string | Anthropic.Messages.Message | undefined> {
+    const span = this.tracer.startSpan("llm.generate", {
+      kind: SpanKind.CLIENT,
+      attributes: {
+        "llm.provider": this.generativeAi || "unknown",
+        "llm.action": this.action,
+      },
+    });
     try {
       if (text?.length > 0) {
         this.orchestrator.publish("onUserPrompt", text);
@@ -366,6 +376,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       if (!generativeAi || !generativeAiModels) {
         throw new Error("Model not found. Check your settings.");
       }
+      span.setAttribute("llm.model", modelName || "unknown");
       let response;
       switch (generativeAi) {
         case generativeAiModels.GEMINI:
@@ -415,12 +426,24 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           response = this.cleanGraphString(response);
         }
       }
+      span.setAttribute(
+        "llm.response_length",
+        typeof response === "string" ? response.length : 0,
+      );
+      span.setStatus({ code: SpanStatusCode.OK });
       return response;
     } catch (error: any) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error?.message || "Unknown error",
+      });
+      span.recordException(error);
       this.logger.error("Error generating response:", error);
       vscode.window.showErrorMessage(
         "An error occurred while generating the response. Please try again.",
       );
+    } finally {
+      span.end();
     }
   }
 
@@ -720,15 +743,25 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   }
 
   async execute(action?: string, message?: string): Promise<void> {
+    const commandAction = action || this.action;
+    const span = this.tracer.startSpan(`command.${commandAction}`, {
+      kind: SpanKind.INTERNAL,
+      attributes: {
+        "command.action": commandAction,
+        "command.has_message": !!message,
+        "command.provider": this.generativeAi || "unknown",
+      },
+    });
     try {
       // Send command feedback immediately at the start
-      await this.sendCommandFeedback(action || this.action);
+      await this.sendCommandFeedback(commandAction);
 
       this.logger.info(this.action);
       let prompt;
       const selectedCode = this.getSelectedWindowArea();
       if (!message && !selectedCode) {
         vscode.window.showErrorMessage("select a piece of code.");
+        span.setStatus({ code: SpanStatusCode.UNSET });
         return;
       }
 
@@ -742,14 +775,24 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
 
       if (!prompt) {
         vscode.window.showErrorMessage("model not reponding, try again later");
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "Failed to create prompt",
+        });
         return;
       }
+
+      span.addEvent("prompt_created");
 
       const providerManager = WebViewProviderManager.getInstance(this.context);
       const provider = providerManager.getCurrentProvider();
 
       if (!provider) {
         vscode.window.showErrorMessage("Provider not initialized");
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "Provider not initialized",
+        });
         return;
       }
 
@@ -759,6 +802,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         payload: { requestId },
       });
 
+      span.addEvent("stream_start");
       let fullResponse = "";
       try {
         for await (const chunk of provider.streamResponse(prompt)) {
@@ -769,6 +813,11 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           });
         }
       } catch (error: any) {
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error?.message || "Streaming error",
+        });
+        span.recordException(error);
         this.logger.error("Error during streaming", error);
         await provider.currentWebView?.webview.postMessage({
           type: "onStreamError",
@@ -784,15 +833,21 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         payload: { requestId, content: formattedResponse },
       });
 
-      await provider.currentWebView?.webview.postMessage({
-        type: "bot-response",
-        message: formattedResponse,
-      });
+      span.setAttribute("command.response_length", fullResponse.length);
+      span.addEvent("stream_end");
+      span.setStatus({ code: SpanStatusCode.OK });
     } catch (error: any) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error?.message || "Unknown error",
+      });
+      span.recordException(error);
       this.logger.error(
         "Error while passing model response to the webview",
         error,
       );
+    } finally {
+      span.end();
     }
   }
 }

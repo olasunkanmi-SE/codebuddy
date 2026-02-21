@@ -202,12 +202,15 @@ const StatusDot = styled.span<{ $status: string }>`
   }};
 `;
 
-// MCP Preset from backend
+/**
+ * MCP Preset received from backend.
+ * Mirrors MCPPreset in src/MCP/presets.ts — keep in sync.
+ */
 interface MCPPreset {
   id: string;
   name: string;
   description: string;
-  category: string;
+  category: 'browser' | 'database' | 'devtools' | 'productivity';
   package: string;
   installed: boolean;
   docsUrl?: string;

@@ -31,7 +31,7 @@ export const MCP_PRESETS: MCPPreset[] = [
     package: "@playwright/mcp",
     config: {
       command: "npx",
-      args: ["@playwright/mcp@latest"],
+      args: ["@playwright/mcp@latest", "--headless"],
       description: "Playwright MCP — browser automation for the agent",
       enabled: true,
       transport: "stdio",

@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "CodeBuddy is an autonomous AI software engineer for Visual Studio Code. It goes beyond simple code completion to plan, execute, debug, and deploy complex software tasks using a multi-agent architecture. Features include deep codebase understanding, self-healing workflows, and seamless integration with external tools via MCP.",
-  "version": "4.1.1",
+  "version": "4.1.2",
   "engines": {
     "vscode": "^1.78.0"
   },
@@ -759,6 +759,12 @@
             "type": "object",
             "default": {},
             "description": "Stores the configuration of MCP servers",
+            "scope": "application"
+          },
+          "codebuddy.mcp.disabledTools": {
+            "type": "object",
+            "default": {},
+            "description": "Per-server lists of disabled MCP tool names",
             "scope": "application"
           },
           "codebuddy.automations.dailyStandup.enabled": {

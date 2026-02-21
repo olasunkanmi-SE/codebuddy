@@ -841,8 +841,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize Traceloop observability at the tail end as requested
     try {
-      await LocalObservabilityService.getInstance().initialize();
       setupInstrumentation();
+      await LocalObservabilityService.getInstance().initialize();
     } catch (obsError) {
       logger.error("Failed to initialize observability:", obsError);
     }
