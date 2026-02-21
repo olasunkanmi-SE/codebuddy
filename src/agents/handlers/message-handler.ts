@@ -1,5 +1,6 @@
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { Orchestrator } from "../../orchestrator";
+import { ResearchNotesExtractor } from "../../services/research-notes-extractor";
 import { StreamEventType } from "../interface/agent.interface";
 import { CodeBuddyAgentService } from "../services/codebuddy-agent.service";
 
@@ -168,6 +169,15 @@ export class MessageHandler {
             });
             break;
         }
+      }
+
+      // Fire-and-forget: extract research notes from the response
+      if (fullResponse) {
+        ResearchNotesExtractor.getInstance()
+          .processResponse(message, fullResponse, threadId)
+          .catch((err) =>
+            this.logger.warn("Research notes extraction failed", err),
+          );
       }
 
       return fullResponse;

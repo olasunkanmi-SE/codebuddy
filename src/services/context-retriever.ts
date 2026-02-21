@@ -13,23 +13,19 @@ import {
   TavilySearchProvider,
   SearchResponseFormatter,
 } from "../agents/tools/websearch";
-import { SimpleVectorStore } from "./simple-vector-store";
+import { SqliteVectorStore } from "./sqlite-vector-store";
 
 export class ContextRetriever {
-  // private readonly codeRepository: CodeRepository;
-  private readonly embeddingService: EmbeddingService; // Always uses Gemini for consistency
+  private readonly embeddingService: EmbeddingService;
   private static readonly SEARCH_RESULT_COUNT = 5;
   private readonly logger: Logger;
   private static instance: ContextRetriever;
   private readonly webSearchService: WebSearchService;
   protected readonly orchestrator: Orchestrator;
   private readonly tavilySearch: TavilySearchProvider;
-  private vectorStore: SimpleVectorStore | undefined;
+  private vectorStore: SqliteVectorStore;
 
   constructor(context?: vscode.ExtensionContext) {
-    // this.codeRepository = CodeRepository.getInstance();
-
-    // Use the currently selected provider for embeddings
     const provider = getGenerativeAiModel() || "Gemini";
     const { apiKey, baseUrl } = getAPIKeyAndModel(provider);
 
@@ -49,23 +45,24 @@ export class ContextRetriever {
     this.tavilySearch = TavilySearchProvider.getInstance();
     this.orchestrator = Orchestrator.getInstance();
 
+    // Use the shared singleton vector store
+    this.vectorStore = SqliteVectorStore.getInstance();
     if (context) {
-      this.vectorStore = new SimpleVectorStore(context);
+      this.vectorStore.initialize(context).catch((err) => {
+        this.logger.error("Failed to initialize vector store", err);
+      });
     }
   }
 
   static initialize(context?: vscode.ExtensionContext) {
     if (!ContextRetriever.instance) {
       ContextRetriever.instance = new ContextRetriever(context);
-    } else if (context && !ContextRetriever.instance.vectorStore) {
-      // Initialize vector store if it wasn't initialized before
-      ContextRetriever.instance.vectorStore = new SimpleVectorStore(context);
     }
     return ContextRetriever.instance;
   }
 
   async retrieveContext(input: string): Promise<string> {
-    if (!this.vectorStore) {
+    if (!this.vectorStore.isReady) {
       return "Semantic search is not available (Vector Store not initialized).";
     }
 
@@ -88,7 +85,6 @@ export class ContextRetriever {
       );
       searchMethod = "Keyword (Fallback)";
 
-      // Fallback to keyword search
       results = await this.vectorStore.keywordSearch(
         input,
         ContextRetriever.SEARCH_RESULT_COUNT,
@@ -121,9 +117,9 @@ export class ContextRetriever {
     // Deduplicate by file path
     const seenPaths = new Set();
     results = results.filter((r) => {
-      const path = r.document.metadata.filePath;
-      if (seenPaths.has(path)) return false;
-      seenPaths.add(path);
+      const filePath = r.document.filePath || r.document.metadata?.filePath;
+      if (!filePath || seenPaths.has(filePath)) return false;
+      seenPaths.add(filePath);
       return true;
     });
 
@@ -137,7 +133,7 @@ export class ContextRetriever {
     return results
       .map(
         (r) =>
-          `File: ${r.document.metadata.filePath}\nRelevance: ${r.score.toFixed(2)} (${searchMethod})\nContent:\n${r.document.text}`,
+          `File: ${r.document.filePath || r.document.metadata?.filePath}\nRelevance: ${r.score.toFixed(2)} (${searchMethod})\nContent:\n${r.document.text}`,
       )
       .join("\n\n---\n\n");
   }
@@ -223,47 +219,6 @@ export class ContextRetriever {
     }
 
     return results;
-  }
-
-  async indexFile(filePath: string, content: string): Promise<void> {
-    if (!this.vectorStore) return;
-
-    try {
-      // Simple chunking strategy: 500 characters overlap 100
-      // For better results, use a proper text splitter
-      const chunkSize = 1000;
-      const overlap = 200;
-
-      for (let i = 0; i < content.length; i += chunkSize - overlap) {
-        const chunk = content.slice(i, i + chunkSize);
-        if (chunk.length < 100) continue; // Skip small chunks
-
-        const id = `${filePath}::${i}`;
-        // Note: Generating embeddings one by one is slow.
-        // In production, batch these. Here we rely on EmbeddingService to handle rate limits/batching or we accept slowness for safety.
-        // To prevent freezing, we yield.
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
-        let embedding: number[] | undefined;
-        try {
-          embedding = await this.embeddingService.generateEmbedding(chunk);
-        } catch (error) {
-          this.logger.warn(
-            `Failed to generate embedding for ${id}, storing text only`,
-            error,
-          );
-        }
-
-        await this.vectorStore.addDocument({
-          id,
-          text: chunk,
-          vector: embedding,
-          metadata: { filePath },
-        });
-      }
-    } catch (error) {
-      this.logger.error(`Failed to index file ${filePath}`, error);
-    }
   }
 
   async readFiles(

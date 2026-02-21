@@ -48,6 +48,7 @@ import {
 import { AstIndexingService } from "./services/ast-indexing.service";
 import { DiffReviewService } from "./services/diff-review.service";
 import { SecretStorageService } from "./services/secret-storage";
+import { SqliteVectorStore } from "./services/sqlite-vector-store";
 import { StandupService } from "./services/standup.service";
 import { CodeHealthTask } from "./services/tasks/code-health.task";
 import { DependencyCheckTask } from "./services/tasks/dependency-check.task";
@@ -195,6 +196,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize Terminal with extension path early for Docker Compose support
     const terminal = Terminal.getInstance();
     terminal.setExtensionPath(context.extensionPath);
+
+    // Initialize shared vector store (used by AstIndexingService + ContextRetriever)
+    const vectorStore = SqliteVectorStore.getInstance();
+    await vectorStore.initialize(context);
+    context.subscriptions.push(vectorStore);
 
     // Initialize AST Indexing Service (Worker Thread Manager)
     AstIndexingService.getInstance(context);
