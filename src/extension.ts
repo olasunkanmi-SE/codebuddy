@@ -125,14 +125,20 @@ async function initializeWebViewProviders(
   try {
     let apiKeys = "";
     for (const [key, value] of Object.entries(modelConfigurations)) {
-      if (getConfigValue((value as any).key) === "apiKey") {
+      const configKey = (value as any).key;
+      const hasSecretKey =
+        SecretStorageService.getInstance().getApiKey(configKey);
+      const settingsKey = getConfigValue(configKey);
+      if (!hasSecretKey && (!settingsKey || settingsKey === "apiKey")) {
         apiKeys += `${key}, `;
       }
     }
 
     if (selectedGenerativeAiModel in modelConfigurations) {
       const modelConfig = modelConfigurations[selectedGenerativeAiModel];
-      const apiKey = getConfigValue(modelConfig.key);
+      const apiKey =
+        SecretStorageService.getInstance().getApiKey(modelConfig.key) ||
+        getConfigValue(modelConfig.key);
       const apiModel = getConfigValue(modelConfig.model);
 
       // Ensure the provider class is loaded before initializing
@@ -178,6 +184,11 @@ export async function activate(context: vscode.ExtensionContext) {
     AstIndexingService.getInstance(context);
     logger.info("AST Indexing Service initialized");
 
+    // Initialize Secret Storage Service (must be before webview providers for secure API key access)
+    const secretStorageService = SecretStorageService.initialize(context);
+    await secretStorageService.migrateApiKeys();
+    context.subscriptions.push(secretStorageService);
+
     // Use dynamic import for DeveloperAgent to ensure it's loaded AFTER telemetry initialization
     const { DeveloperAgent } = await import("./agents/developer/agent");
     new DeveloperAgent({});
@@ -192,10 +203,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Start Scheduler Service
     SchedulerService.getInstance().start();
-
-    // Initialize Secret Storage Service for user preferences
-    const secretStorageService = new SecretStorageService(context);
-    context.subscriptions.push(secretStorageService);
 
     // Initialize ContextRetriever for semantic search
     const contextRetriever = ContextRetriever.initialize(context);
