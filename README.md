@@ -2,13 +2,9 @@
 
 ### Autonomous AI Software Engineer for Visual Studio Code
 
-CodeBuddy is a multi-agent AI software engineer that operates inside VS Code. It does not autocomplete lines of code. It plans, writes, debugs, tests, documents, and deploys entire features autonomously -- reading your codebase, running terminal commands, editing files, searching the web, and correcting its own mistakes until the task is done.
+CodeBuddy is a multi-agent AI software engineer that operates inside VS Code. It plans, writes, debugs, tests, documents, and deploys entire features autonomously -- reading your codebase, running terminal commands, editing files, searching the web, and correcting its own mistakes until the task is done.
 
-It supports 10 AI providers (cloud and local), 20+ built-in tools, 17 pre-configured external connectors, and a Model Context Protocol gateway for unlimited extensibility. It ships with scheduled automations, a built-in tech news reader, persistent agent memory, and full internationalization in 7 languages.
-
-<p align="center">
-  <img src="images/codebuddy.png" alt="CodeBuddy" width="720" />
-</p>
+It supports several AI providers (cloud and local), diverse built-in tools, pre-configured external connectors, and a Model Context Protocol gateway for unlimited extensibility. It ships with scheduled automations, a built-in tech news reader, persistent agent memory, and full internationalization in 7 languages.
 
 ---
 
@@ -45,42 +41,9 @@ It supports 10 AI providers (cloud and local), 20+ built-in tools, 17 pre-config
 
 CodeBuddy is built on an event-driven, layered architecture designed for extensibility, provider-agnosticism, and real-time streaming.
 
-### System Layers
-
-```
-+---------------------------------------------------------+
-|                    Presentation Layer                    |
-|        React + Vite Webview  |  VS Code UI Commands     |
-+---------------------------------------------------------+
-          |  postMessage (bidirectional)  |
-+---------------------------------------------------------+
-|                  Webview Provider Layer                  |
-|     BaseWebViewProvider + per-provider subclasses        |
-|    (Anthropic, Gemini, Groq, OpenAI, DeepSeek, ...)     |
-+---------------------------------------------------------+
-          |  publish / subscribe  |
-+---------------------------------------------------------+
-|                   Orchestrator (Event Bus)               |
-|      Singleton mediator  |  50+ named event channels    |
-|     Decouples agents, UI, and services completely        |
-+---------------------------------------------------------+
-     |              |              |              |
-+----------+  +-----------+  +-----------+  +-----------+
-|  Agent   |  |  Service  |  |  Infra    |  |  Command  |
-|  Layer   |  |  Layer    |  |  Layer    |  |  Layer    |
-+----------+  +-----------+  +-----------+  +-----------+
-| DeepAgent|  | Context   |  | Logger    |  | Comment   |
-| LangGraph|  | Retriever |  | OTel/     |  | Review    |
-| Subagents|  | Chat Hist.|  | Traceloop |  | Refactor  |
-| Tools    |  | Diff Rev. |  | SQLite    |  | Optimize  |
-| Backends |  | Scheduler |  | SecretStore| | Explain  |
-| HITL     |  | Indexing  |  | HTTP      |  | PR Review |
-+----------+  +-----------+  +-----------+  +-----------+
-```
-
 ### Orchestrator
 
-The Orchestrator is a singleton event bus at the center of the system. Every subsystem communicates exclusively through publish/subscribe events. The Orchestrator never calls services directly -- it emits typed events (`onQuery`, `onStreamChunk`, `onToolStart`, `onPendingChange`, `onThinking`, etc.) and listeners react independently. This fully decouples the agent layer, webview layer, and service layer from one another.
+The Orchestrator is a singleton event bus at the center of the system. Every subsystem communicates exclusively through publish/subscribe events. The Orchestrator never calls services directly -- it emits typed events and listeners react independently. This fully decouples the agent layer, webview layer, and service layer from one another.
 
 ### Agent Execution Pipeline
 
@@ -100,7 +63,7 @@ User sees streamed response with real-time tool activity indicators
 
 ### Webview Communication
 
-The extension host and the React webview communicate over a bidirectional `postMessage` protocol. The webview sends structured commands (`user-input`, `cancel-request`, `user-consent`, `theme-change-event`, `language-change-event`). The extension responds with typed events (`onStreamStart`, `onStreamChunk`, `onToolStart`, `onToolEnd`, `onThinking`, `diff-change-event`, `bootstrap`, `chat-history`). There is no shared state -- all coordination happens through messages.
+The extension host and the React webview communicate over a bidirectional `postMessage` protocol. The webview sends structured commands  The extension responds with typed events.
 
 ### Persistence Strategy
 
@@ -113,17 +76,13 @@ The extension host and the React webview communicate over a bidirectional `postM
 | VS Code SecretStorage  | Encrypted OS keychain             | API keys and credentials                                |
 | Vector store           | SimpleVectorStore (JSON-backed)   | Workspace embeddings for semantic search                |
 
-### Design Patterns
-
-The codebase uses Singleton (Orchestrator, Logger, services), Observer/Pub-Sub (the entire event bus), Mediator (Orchestrator decouples all layers), Factory (AgentFactory, LLMFactory, ToolProvider), Strategy (dynamic LLM provider switching, CompositeBackend routing), Template Method (BaseWebViewProvider with per-provider subclasses), Adapter (LangChain tool wrappers, MCP tool adapter), Composite (CompositeBackend routes by path prefix), Guard/Mutex (AgentRunningGuardService, SimpleMutex), and Worker (ChatHistoryWorker, AstIndexingService on background threads).
-
 ---
 
 ## Agent System
 
 ### Multi-Agent Architecture
 
-CodeBuddy uses a multi-agent architecture built on the DeepAgents framework and LangGraph. A primary Developer Agent coordinates the work, with seven specialized subagents that each receive role-specific filtered tools:
+CodeBuddy uses a multi-agent architecture built on the LangGraph DeepAgents framework. A Developer Agent coordinates the work, with seven specialized subagents that each receive role-specific filtered tools:
 
 | Subagent       | Responsibility                                                                        |
 | -------------- | ------------------------------------------------------------------------------------- |
