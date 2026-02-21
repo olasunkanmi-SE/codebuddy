@@ -4,11 +4,17 @@
 # Include only what you need
 !dist/**
 !images/**
+!l10n/**
 !README.md
 !LICENSE
 
 !package.json
-# Exclude all source, config, and dev files
+!package.nls*.json
+
+# Exclude dev / runtime artifacts that must never ship
+.codebuddy/**
+repo/**
+patterns/**
 src/**
 test/**
 docs/**
@@ -34,5 +40,4 @@ node_modules/**
 !node_modules/jsdom/lib/jsdom/living/xhr/xhr-sync-worker.js
 !node_modules/web-tree-sitter/**
 !node_modules/@vscode/ripgrep/**
-!node_modules/better-sqlite3/**
 
