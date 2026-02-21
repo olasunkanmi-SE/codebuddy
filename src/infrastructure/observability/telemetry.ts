@@ -54,7 +54,7 @@ export class LocalObservabilityService {
       const processor = new SimpleSpanProcessor(this.inMemoryExporter);
       const originalOnEnd = processor.onEnd.bind(processor);
       processor.onEnd = (span: ReadableSpan) => {
-        this.logger.info(
+        this.logger.debug(
           `[TELEMETRY] Span finished: ${span.name} (${span.kind}) TraceId: ${span.spanContext().traceId}`,
         );
         if (span.attributes) {
@@ -65,32 +65,46 @@ export class LocalObservabilityService {
         return originalOnEnd(span);
       };
 
-      // 1. Traceloop should already be initialized via src/instrumentation.ts
-      // But we'll check and ensure we have a provider
+      // 1. setupInstrumentation() should already have run and registered a provider.
+      // Check and create a fallback provider if needed.
       let provider = trace.getTracerProvider() as any;
+      let unwrapped = provider?._delegate || provider;
       const isNoop =
         !provider ||
         provider.constructor.name === "NoopTracerProvider" ||
-        (provider as any)._delegate?.constructor.name === "NoopTracerProvider";
+        unwrapped?.constructor.name === "NoopTracerProvider";
 
       if (isNoop) {
         this.logger.info(
-          "No tracer provider found, creating BasicTracerProvider...",
+          "No tracer provider found, creating BasicTracerProvider with processor...",
         );
         const { BasicTracerProvider } =
           await import("@opentelemetry/sdk-trace-base");
         const newProvider = new BasicTracerProvider();
 
-        // We MUST use trace.setGlobalTracerProvider to ensure other services get this provider
+        // Attach processor directly before setting global (OTel 2.x: push to internal MultiSpanProcessor)
+        const asp = (newProvider as any)._activeSpanProcessor;
+        if (asp?._spanProcessors) {
+          asp._spanProcessors.push(processor);
+          this.logger.info(
+            "✓ Pre-attached processor to new BasicTracerProvider",
+          );
+        }
+
         if (trace.setGlobalTracerProvider) {
           trace.setGlobalTracerProvider(newProvider);
           this.logger.info("✓ Set global tracer provider");
         }
 
-        provider = newProvider;
+        this.isInitialized = true;
+        this.createTestSpan("initialization_test_span");
+        this.logger.info(
+          "✓ Local observability initialized with in-memory exporter",
+        );
+        return;
       }
 
-      // 2. Attach our in-memory processor
+      // 2. Attach our in-memory processor to the existing provider
       const attachProcessor = (targetProvider: any): boolean => {
         if (!targetProvider) {
           this.logger.warn("attachProcessor called with null provider");
@@ -189,7 +203,7 @@ export class LocalObservabilityService {
       return [];
     }
     const spans = this.inMemoryExporter.getFinishedSpans();
-    this.logger.info(
+    this.logger.debug(
       `getSpans returning ${spans.length} spans. First few names: ${spans
         .slice(0, 3)
         .map((s) => s.name)
@@ -220,11 +234,11 @@ export class LocalObservabilityService {
 
       setTimeout(() => {
         span.end();
-        this.logger.info(`Finished manual test span: ${name}`);
+        this.logger.debug(`Finished manual test span: ${name}`);
         // Log the current number of spans
         if (this.inMemoryExporter) {
           const spans = this.inMemoryExporter.getFinishedSpans();
-          this.logger.info(
+          this.logger.debug(
             `Total spans in exporter after test: ${spans.length}`,
           );
         }

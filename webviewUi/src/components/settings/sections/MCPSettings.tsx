@@ -202,16 +202,123 @@ const StatusDot = styled.span<{ $status: string }>`
   }};
 `;
 
+/**
+ * MCP Preset received from backend.
+ * Mirrors MCPPreset in src/MCP/presets.ts — keep in sync.
+ */
+interface MCPPreset {
+  id: string;
+  name: string;
+  description: string;
+  category: 'browser' | 'database' | 'devtools' | 'productivity';
+  package: string;
+  installed: boolean;
+  docsUrl?: string;
+}
+
+// Styled components for presets
+const PresetCard = styled.div<{ $installed: boolean }>`
+  background: ${props => props.$installed
+    ? 'rgba(34, 197, 94, 0.05)'
+    : 'rgba(255, 255, 255, 0.03)'};
+  border: 1px solid ${props => props.$installed
+    ? 'rgba(34, 197, 94, 0.2)'
+    : 'rgba(255, 255, 255, 0.08)'};
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    border-color: ${props => props.$installed
+      ? 'rgba(34, 197, 94, 0.35)'
+      : 'rgba(255, 255, 255, 0.15)'};
+  }
+`;
+
+const PresetIcon = styled.div<{ $category: string }>`
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: ${props => {
+    switch (props.$category) {
+      case 'browser': return 'rgba(99, 102, 241, 0.15)';
+      case 'database': return 'rgba(234, 179, 8, 0.15)';
+      case 'devtools': return 'rgba(34, 197, 94, 0.15)';
+      default: return 'rgba(255, 255, 255, 0.08)';
+    }
+  }};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+`;
+
+const PresetInfo = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const PresetName = styled.h4`
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+`;
+
+const PresetDescription = styled.p`
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+`;
+
+const PresetPackage = styled.code`
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+`;
+
+const PresetActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+`;
+
+const AddButton = styled(Button)`
+  white-space: nowrap;
+`;
+
+const RemoveButton = styled(Button)`
+  white-space: nowrap;
+  opacity: 0.7;
+  &:hover { opacity: 1; }
+`;
+
+const categoryIcons: Record<string, string> = {
+  browser: '🌐',
+  database: '🗄️',
+  devtools: '🔧',
+  productivity: '⚡',
+};
+
 export const MCPSettings: React.FC<MCPSettingsProps> = ({ searchQuery: _searchQuery }) => {
   const { handlers } = useSettings();
   const [servers, setServers] = useState<MCPServer[]>([]);
   const [expandedServers, setExpandedServers] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [presets, setPresets] = useState<MCPPreset[]>([]);
+  const [addingPreset, setAddingPreset] = useState<string | null>(null);
 
   // Request MCP data from backend
   const fetchMCPData = useCallback(() => {
     handlers.postMessage({ command: 'mcp-get-servers' });
+    handlers.postMessage({ command: 'mcp-get-presets' });
   }, [handlers]);
 
   // Listen for MCP data from backend
@@ -225,6 +332,30 @@ export const MCPSettings: React.FC<MCPSettingsProps> = ({ searchQuery: _searchQu
         setIsRefreshing(false);
       }
       
+      if (message.command === 'mcp-presets-data') {
+        setPresets(message.data?.presets || []);
+      }
+
+      if (message.command === 'mcp-preset-added') {
+        setAddingPreset(null);
+        // Mark preset as installed and refresh servers
+        setPresets(prev => prev.map(p =>
+          p.id === message.data?.presetId ? { ...p, installed: true } : p
+        ));
+        handlers.postMessage({ command: 'mcp-get-servers' });
+      }
+
+      if (message.command === 'mcp-preset-removed') {
+        setPresets(prev => prev.map(p =>
+          p.id === message.data?.presetId ? { ...p, installed: false } : p
+        ));
+        handlers.postMessage({ command: 'mcp-get-servers' });
+      }
+
+      if (message.command === 'mcp-preset-error') {
+        setAddingPreset(null);
+      }
+
       if (message.command === 'mcp-tool-updated') {
         // Update local state when a tool is toggled
         setServers(prev => prev.map(server => {
@@ -263,6 +394,15 @@ export const MCPSettings: React.FC<MCPSettingsProps> = ({ searchQuery: _searchQu
   const handleRefresh = () => {
     setIsRefreshing(true);
     handlers.postMessage({ command: 'mcp-refresh-tools' });
+  };
+
+  const handleAddPreset = (presetId: string) => {
+    setAddingPreset(presetId);
+    handlers.postMessage({ command: 'mcp-add-preset', message: { presetId } });
+  };
+
+  const handleRemovePreset = (presetId: string) => {
+    handlers.postMessage({ command: 'mcp-remove-preset', message: { presetId } });
   };
 
   const toggleServerExpanded = (serverId: string) => {
@@ -457,6 +597,41 @@ export const MCPSettings: React.FC<MCPSettingsProps> = ({ searchQuery: _searchQu
           })
         )}
       </SettingsSection>
+
+      {presets.length > 0 && (
+        <SettingsSection>
+          <SectionTitle>Recommended Servers</SectionTitle>
+          {presets.map((preset) => (
+            <PresetCard key={preset.id} $installed={preset.installed}>
+              <PresetIcon $category={preset.category}>
+                {categoryIcons[preset.category] || '📦'}
+              </PresetIcon>
+              <PresetInfo>
+                <PresetName>{preset.name}</PresetName>
+                <PresetDescription>{preset.description}</PresetDescription>
+                <PresetPackage>{preset.package}</PresetPackage>
+              </PresetInfo>
+              <PresetActions>
+                {preset.installed ? (
+                  <>
+                    <Badge $variant="success">Installed</Badge>
+                    <RemoveButton onClick={() => handleRemovePreset(preset.id)}>
+                      Remove
+                    </RemoveButton>
+                  </>
+                ) : (
+                  <AddButton
+                    onClick={() => handleAddPreset(preset.id)}
+                    disabled={addingPreset === preset.id}
+                  >
+                    {addingPreset === preset.id ? 'Adding...' : 'Add'}
+                  </AddButton>
+                )}
+              </PresetActions>
+            </PresetCard>
+          ))}
+        </SettingsSection>
+      )}
 
       <SettingsSection>
         <SectionTitle>Configuration</SectionTitle>

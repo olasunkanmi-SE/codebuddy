@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Logger, ILogEvent, LogLevel } from "../infrastructure/logger/logger";
+import { Logger, ILogEvent } from "../infrastructure/logger/logger";
 import { PerformanceProfiler } from "./performance-profiler.service";
 import { LocalObservabilityService } from "../infrastructure/observability/telemetry";
 
@@ -30,10 +30,6 @@ export class ObservabilityService {
 
   getTraces() {
     const spans = LocalObservabilityService.getInstance().getSpans();
-    Logger.instance.log(
-      LogLevel.INFO,
-      `ObservabilityService.getTraces: returning ${spans.length} spans`,
-    );
     return spans;
   }
 

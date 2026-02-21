@@ -120,7 +120,7 @@ const NotificationToggleButton = styled.button`
 
 const FontSizeGroup = styled.div`
   position: fixed;
-  top: 232px;
+  top: 276px;
   left: 12px;
   z-index: 100;
   display: flex;
@@ -206,10 +206,54 @@ const BrowserIcon = ({ size = 18 }: { size?: number }) => (
   </svg>
 );
 
+// Styled component for observability toggle button
+const ObservabilityToggleButton = styled.button`
+  position: fixed;
+  top: 188px;
+  left: 12px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+// Observability icon component
+const ObservabilityIcon = ({ size = 18 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </svg>
+);
+
 // Styled component for browser toggle button
 const BrowserToggleButton = styled.button`
   position: fixed;
-  top: 188px;
+  top: 232px;
   left: 12px;
   z-index: 100;
   background: rgba(255, 255, 255, 0.06);
@@ -237,7 +281,7 @@ const BrowserToggleButton = styled.button`
 // Browsing history dropdown
 const BrowsingHistoryDropdown = styled.div`
   position: fixed;
-  top: 188px;
+  top: 232px;
   left: 52px;
   z-index: 200;
   background: var(--vscode-menu-background, #1e1e2e);
@@ -355,7 +399,6 @@ export const WebviewUI = () => {
   // Default to Ask mode for conversational interactions
   const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Ask");
   const [commandAction, setCommandAction] = useState<string>("");
-  const [commandDescription, setCommandDescription] = useState<string>("");
   const [isCommandExecuting, setIsCommandExecuting] = useState(false);
   const [selectedContext, setSelectedContext] = useState("");
   const [folders, setFolders] = useState<any>("");
@@ -395,6 +438,7 @@ export const WebviewUI = () => {
   // Notifications state
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [isUpdatesPanelOpen, setIsUpdatesPanelOpen] = useState(false);
+  const [isObservabilityOpen, setIsObservabilityOpen] = useState(false);
   const [notifications, setNotifications] = useState<INotificationItem[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
@@ -447,7 +491,6 @@ export const WebviewUI = () => {
     if (messageType === 'onStreamEnd' || messageType === 'onStreamError') {
       setIsCommandExecuting(false);
       setCommandAction("");
-      setCommandDescription("");
       return;
     }
 
@@ -462,10 +505,8 @@ export const WebviewUI = () => {
         setIsCommandExecuting(true);
         if (typeof message.message === "object" && message.message.action && message.message.description) {
           setCommandAction(message.message.action);
-          setCommandDescription(message.message.description);
         } else {
           setCommandAction(message.message || "Processing request");
-          setCommandDescription("CodeBuddy is analyzing your code and generating a response...");
         }
         break;
 
@@ -510,7 +551,6 @@ export const WebviewUI = () => {
         console.error("Extension error", message.payload);
         setIsCommandExecuting(false);
         setCommandAction("");
-        setCommandDescription("");
         break;
 
       case "bot-response":
@@ -518,7 +558,6 @@ export const WebviewUI = () => {
         // The actual message handling is done by useStreamingChat hook
         setIsCommandExecuting(false);
         setCommandAction("");
-        setCommandDescription("");
         break;
 
       case "onActiveworkspaceUpdate":
@@ -805,7 +844,6 @@ export const WebviewUI = () => {
     if (!isStreaming && !isBotLoading) {
       setIsCommandExecuting(false);
       setCommandAction("");
-      setCommandDescription("");
     }
   }, [isStreaming, isBotLoading]);
 
@@ -1259,6 +1297,15 @@ export const WebviewUI = () => {
         userName={username || "Developer"}
       />
 
+      {/* Observability Toggle Button */}
+      <ObservabilityToggleButton
+        onClick={() => setIsObservabilityOpen(true)}
+        aria-label="Open observability"
+        title="Observability"
+      >
+        <ObservabilityIcon size={18} />
+      </ObservabilityToggleButton>
+
       {/* Browser Toggle Button */}
       <BrowserToggleButton
         onClick={handleOpenBrowser}
@@ -1294,10 +1341,19 @@ export const WebviewUI = () => {
         </>
       )}
 
+      {/* Observability Panel */}
+      <ObservabilityPanel
+        vsCode={vsCode}
+        logs={logs}
+        metrics={metrics}
+        traces={traces}
+        isOpen={isObservabilityOpen}
+        onClose={() => setIsObservabilityOpen(false)}
+      />
+
       <VSCodePanels className="vscodePanels" activeid="tab-1">
         <VSCodePanelTab id="tab-1">CHAT</VSCodePanelTab>
         <VSCodePanelTab id="tab-2">FAQ</VSCodePanelTab>
-        <VSCodePanelTab id="tab-4">OBSERVABILITY</VSCodePanelTab>
         {/* <VSCodePanelTab id="tab-5">VISUALIZER</VSCodePanelTab> */}
         <VSCodePanelView id="view-1">
           <div className="panel-body-scroll">
@@ -1341,7 +1397,6 @@ export const WebviewUI = () => {
                       {isCommandExecuting && (
                         <CommandFeedbackLoader
                           commandAction={commandAction}
-                          commandDescription={commandDescription}
                         />
                       )}
                       {/* Show skeleton only if no activities are being tracked */}
@@ -1371,10 +1426,6 @@ export const WebviewUI = () => {
           </div>
         </VSCodePanelView>
         
-        <VSCodePanelView id="view-4">
-          <ObservabilityPanel vsCode={vsCode} logs={logs} metrics={metrics} traces={traces} />
-        </VSCodePanelView>
-
         {/* <VSCodePanelView id="view-5">
           <VisualizerPanel vsCode={vsCode} graph={dependencyGraph} />
         </VSCodePanelView> */}

@@ -38,6 +38,7 @@ import { MessageHandler } from "../agents/handlers/message-handler";
 import { CodeBuddyAgentService } from "../agents/services/codebuddy-agent.service";
 import { MCPService } from "../MCP/service";
 import { MCPClientState } from "../MCP/types";
+import { MCP_PRESETS } from "../MCP/presets";
 import { LocalModelService } from "../llms/local/service";
 import { DockerModelService } from "../services/docker/DockerModelService";
 import { ProjectRulesService } from "../services/project-rules.service";
@@ -1678,16 +1679,17 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
             case "observability-get-metrics": {
               const metrics = ObservabilityService.getInstance().getMetrics();
+              const mcpStats = MCPService.getInstance().getStat();
               await this.currentWebView?.webview.postMessage({
                 type: "observability-metrics",
-                metrics,
+                metrics: metrics ? { ...metrics, mcpStats } : { mcpStats },
               });
               break;
             }
 
             case "observability-get-traces": {
               const traces = ObservabilityService.getInstance().getTraces();
-              this.logger.info(
+              this.logger.debug(
                 `[WEBVIEW] Sending ${traces.length} traces to webview`,
               );
 
@@ -2327,14 +2329,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               try {
                 this.logger.info("Fetching MCP servers data...");
                 const mcpService = MCPService.getInstance();
-                const stats = mcpService.getStat();
                 const allTools = await mcpService.getAllTools();
 
                 // Get server configurations
-                const serverConfigs = getConfigValue("mcp.servers") || {};
+                const serverConfigs =
+                  getConfigValue("codebuddy.mcp.servers") || {};
+
+                // Merge docker-gateway (from MCPService) with user config
+                const allServerConfigs: Record<string, any> = {
+                  ...mcpService.getServerConfigs(),
+                  ...serverConfigs,
+                };
 
                 // Build servers data with tools
-                const servers = Object.entries(serverConfigs).map(
+                const servers = Object.entries(allServerConfigs).map(
                   ([id, config]: [string, any]) => {
                     const serverTools = allTools.filter(
                       (t) => t.serverName === id,
@@ -2359,8 +2367,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     }
 
                     // Get disabled tools from config
-                    const disabledTools =
-                      getConfigValue(`mcp.disabledTools.${id}`) || [];
+                    const allDisabledTools: Record<string, string[]> =
+                      getConfigValue("codebuddy.mcp.disabledTools") || {};
+                    const disabledTools = allDisabledTools[id] || [];
 
                     return {
                       id,
@@ -2380,33 +2389,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     };
                   },
                 );
-
-                // If no custom config, show docker-gateway
-                if (
-                  Object.keys(serverConfigs).length === 0 &&
-                  stats.isGatewayMode
-                ) {
-                  const gatewayTools = allTools.filter(
-                    (t) => t.serverName === "docker-gateway",
-                  );
-                  const disabledTools =
-                    getConfigValue("mcp.disabledTools.docker-gateway") || [];
-                  servers.push({
-                    id: "docker-gateway",
-                    name: "Docker MCP Gateway",
-                    description: "Docker MCP Gateway (unified catalog)",
-                    status:
-                      stats.connectedServers > 0 ? "connected" : "disconnected",
-                    enabled: true,
-                    toolCount: gatewayTools.length,
-                    tools: gatewayTools.map((t) => ({
-                      name: t.name,
-                      description: t.description,
-                      serverName: t.serverName,
-                      enabled: !disabledTools.includes(t.name),
-                    })),
-                  });
-                }
 
                 this.currentWebView?.webview.postMessage({
                   command: "mcp-servers-data",
@@ -2429,11 +2411,13 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 );
 
                 // Update the server config
-                const currentServers = getConfigValue("mcp.servers") || {};
+                const currentServers = JSON.parse(
+                  JSON.stringify(getConfigValue("codebuddy.mcp.servers") || {}),
+                );
                 if (currentServers[serverName]) {
                   currentServers[serverName].enabled = enabled;
                   await vscode.workspace
-                    .getConfiguration("ola-code-buddy")
+                    .getConfiguration("codebuddy")
                     .update(
                       "mcp.servers",
                       currentServers,
@@ -2447,12 +2431,21 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   data: { serverName, enabled },
                 });
 
-                // Reload MCP service if needed
+                // Reload MCP service
+                const mcpService = MCPService.getInstance();
                 if (!enabled) {
-                  const mcpService = MCPService.getInstance();
                   const client = mcpService.getClient(serverName);
                   if (client) {
                     await client.disconnect();
+                  }
+                } else {
+                  // Re-enable: reconnect the server
+                  try {
+                    await mcpService.reload();
+                  } catch (reloadError: any) {
+                    this.logger.warn(
+                      `Server "${serverName}" enabled but connection failed: ${reloadError.message}`,
+                    );
                   }
                 }
               } catch (error: any) {
@@ -2467,27 +2460,35 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   `Toggling MCP tool ${serverName}.${toolName}: ${enabled}`,
                 );
 
-                // Get current disabled tools for this server
-                const disabledToolsKey = `mcp.disabledTools.${serverName}`;
-                let disabledTools: string[] =
-                  getConfigValue(disabledToolsKey) || [];
+                // Get the full disabledTools object, deep copy to allow mutation
+                const allDisabled: Record<string, string[]> = JSON.parse(
+                  JSON.stringify(
+                    getConfigValue("codebuddy.mcp.disabledTools") || {},
+                  ),
+                );
+                let disabledTools: string[] = allDisabled[serverName] || [];
 
                 if (enabled) {
-                  // Remove from disabled list
                   disabledTools = disabledTools.filter((t) => t !== toolName);
                 } else {
-                  // Add to disabled list
                   if (!disabledTools.includes(toolName)) {
                     disabledTools.push(toolName);
                   }
                 }
 
-                // Update config
+                // Update entry (remove key entirely if empty)
+                if (disabledTools.length > 0) {
+                  allDisabled[serverName] = disabledTools;
+                } else {
+                  delete allDisabled[serverName];
+                }
+
+                // Persist the entire object
                 await vscode.workspace
-                  .getConfiguration("ola-code-buddy")
+                  .getConfiguration("codebuddy")
                   .update(
-                    disabledToolsKey,
-                    disabledTools,
+                    "mcp.disabledTools",
+                    allDisabled,
                     vscode.ConfigurationTarget.Global,
                   );
 
@@ -2508,11 +2509,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 await mcpService.refreshTools();
 
                 // Re-fetch and send updated data
-                const stats = mcpService.getStat();
                 const allTools = await mcpService.getAllTools();
-                const serverConfigs = getConfigValue("mcp.servers") || {};
+                const serverConfigs =
+                  getConfigValue("codebuddy.mcp.servers") || {};
 
-                const servers = Object.entries(serverConfigs).map(
+                const allServerConfigs: Record<string, any> = {
+                  ...mcpService.getServerConfigs(),
+                  ...serverConfigs,
+                };
+
+                const servers = Object.entries(allServerConfigs).map(
                   ([id, config]: [string, any]) => {
                     const serverTools = allTools.filter(
                       (t) => t.serverName === id,
@@ -2535,8 +2541,9 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                         status = "error";
                     }
 
-                    const disabledTools =
-                      getConfigValue(`mcp.disabledTools.${id}`) || [];
+                    const allDisabledToolsRefresh: Record<string, string[]> =
+                      getConfigValue("codebuddy.mcp.disabledTools") || {};
+                    const disabledTools = allDisabledToolsRefresh[id] || [];
 
                     return {
                       id,
@@ -2556,33 +2563,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     };
                   },
                 );
-
-                // Docker gateway fallback
-                if (
-                  Object.keys(serverConfigs).length === 0 &&
-                  stats.isGatewayMode
-                ) {
-                  const gatewayTools = allTools.filter(
-                    (t) => t.serverName === "docker-gateway",
-                  );
-                  const disabledTools =
-                    getConfigValue("mcp.disabledTools.docker-gateway") || [];
-                  servers.push({
-                    id: "docker-gateway",
-                    name: "Docker MCP Gateway",
-                    description: "Docker MCP Gateway (unified catalog)",
-                    status:
-                      stats.connectedServers > 0 ? "connected" : "disconnected",
-                    enabled: true,
-                    toolCount: gatewayTools.length,
-                    tools: gatewayTools.map((t) => ({
-                      name: t.name,
-                      description: t.description,
-                      serverName: t.serverName,
-                      enabled: !disabledTools.includes(t.name),
-                    })),
-                  });
-                }
 
                 this.currentWebView?.webview.postMessage({
                   command: "mcp-servers-data",
@@ -2636,6 +2616,117 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 "@ext:fiatinnovations.ola-code-buddy mcp",
               );
               break;
+
+            case "mcp-get-presets": {
+              const currentServers =
+                getConfigValue("codebuddy.mcp.servers") || {};
+              const presets = MCP_PRESETS.map((p) => ({
+                ...p,
+                installed: !!currentServers[p.id],
+              }));
+              this.currentWebView?.webview.postMessage({
+                command: "mcp-presets-data",
+                data: { presets },
+              });
+              break;
+            }
+
+            case "mcp-add-preset": {
+              try {
+                const { presetId } = message.message || {};
+                const preset = MCP_PRESETS.find((p) => p.id === presetId);
+                if (!preset) {
+                  throw new Error(`Unknown MCP preset: ${presetId}`);
+                }
+
+                const currentServers = JSON.parse(
+                  JSON.stringify(getConfigValue("codebuddy.mcp.servers") || {}),
+                );
+                currentServers[preset.id] = { ...preset.config };
+
+                await vscode.workspace
+                  .getConfiguration("codebuddy")
+                  .update(
+                    "mcp.servers",
+                    currentServers,
+                    vscode.ConfigurationTarget.Global,
+                  );
+
+                this.logger.info(`Added MCP preset server: ${preset.name}`);
+
+                // Notify UI immediately — config is saved
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-preset-added",
+                  data: { presetId, name: preset.name },
+                });
+
+                // Reload MCP service in the background — connection may take time
+                try {
+                  const mcpService = MCPService.getInstance();
+                  await mcpService.reload();
+                } catch (reloadError: any) {
+                  this.logger.warn(
+                    `MCP preset "${preset.name}" saved but server connection failed: ${reloadError.message}. It will connect on next use.`,
+                  );
+                }
+              } catch (error: any) {
+                this.logger.error("Failed to add MCP preset:", error);
+                vscode.window.showErrorMessage(
+                  `Failed to add MCP preset: ${error.message}`,
+                );
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-preset-error",
+                  data: { error: error.message },
+                });
+              }
+              break;
+            }
+
+            case "mcp-remove-preset": {
+              try {
+                const { presetId } = message.message || {};
+                const currentServers = JSON.parse(
+                  JSON.stringify(getConfigValue("codebuddy.mcp.servers") || {}),
+                );
+
+                if (currentServers[presetId]) {
+                  delete currentServers[presetId];
+                  await vscode.workspace
+                    .getConfiguration("codebuddy")
+                    .update(
+                      "mcp.servers",
+                      currentServers,
+                      vscode.ConfigurationTarget.Global,
+                    );
+
+                  // Disconnect and reload
+                  const mcpService = MCPService.getInstance();
+                  const client = mcpService.getClient(presetId);
+                  if (client) {
+                    await client.disconnect();
+                  }
+                  await mcpService.reload();
+
+                  this.logger.info(`Removed MCP preset server: ${presetId}`);
+                } else {
+                  this.logger.info(
+                    `MCP preset server not found (already removed): ${presetId}`,
+                  );
+                }
+
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-preset-removed",
+                  data: { presetId },
+                });
+              } catch (error: any) {
+                this.logger.error("Failed to remove MCP preset:", error);
+                this.currentWebView?.webview.postMessage({
+                  command: "mcp-preset-error",
+                  data: { error: error.message },
+                });
+              }
+              break;
+            }
 
             // Rules & Subagents Commands
             case "rules-get-all":

@@ -349,6 +349,11 @@ export class MCPService implements vscode.Disposable {
     return this.clients.get(serverName);
   }
 
+  /** Expose the merged server configs (docker-gateway + user-defined). */
+  getServerConfigs(): MCPServersConfig {
+    return this.serverConfigs;
+  }
+
   async getAllTools(): Promise<MCPTool[]> {
     this.logger.debug("getAllTools called");
 
@@ -414,9 +419,23 @@ export class MCPService implements vscode.Disposable {
       await Promise.all(loadPromises);
     }
 
-    // Return all tools (flattened from the multi-value map)
-    const tools = Array.from(this.toolsByName.values()).flat();
-    this.logger.debug(`getAllTools returning ${tools.length} tools`);
+    // Return all tools, filtering out disabled ones
+    const allTools = Array.from(this.toolsByName.values()).flat();
+    const disabledSets = new Map<string, Set<string>>();
+    for (const tool of allTools) {
+      if (!disabledSets.has(tool.serverName)) {
+        disabledSets.set(
+          tool.serverName,
+          this.getDisabledTools(tool.serverName),
+        );
+      }
+    }
+    const tools = allTools.filter(
+      (t) => !disabledSets.get(t.serverName)?.has(t.name),
+    );
+    this.logger.debug(
+      `getAllTools returning ${tools.length} tools (${allTools.length - tools.length} disabled)`,
+    );
     return tools;
   }
 
@@ -525,33 +544,46 @@ export class MCPService implements vscode.Disposable {
   }
 
   private loadConfiguration(): MCPServersConfig {
-    const servers = getConfigValue("mcp.servers");
+    const servers = getConfigValue("codebuddy.mcp.servers");
     this.logger.debug(
       `loadConfiguration - mcp.servers from config: ${JSON.stringify(servers)}`,
     );
+
+    // Start with docker-gateway as default
+    const result: MCPServersConfig = {
+      "docker-gateway": {
+        command: "docker",
+        args: ["mcp", "gateway", "run"],
+        description: "Docker MCP Gateway (all Catalog tools)",
+        enabled: true,
+      },
+    };
 
     if (!servers || Object.keys(servers).length === 0) {
       this.logger.info(
         "No custom MCP configuration found, using Docker Gateway default",
       );
-      this.logger.debug("Using default docker-gateway config");
-      return {
-        "docker-gateway": {
-          command: "docker",
-          args: ["mcp", "gateway", "run"],
-          description: "Docker MCP Gateway (all Catalog tools)",
-          enabled: true,
-        },
-      };
+      return result;
     }
 
-    // Deep copy to avoid proxy mutation issues
+    // Deep copy to avoid proxy mutation issues and merge with gateway
     const serversCopy: MCPServersConfig = JSON.parse(JSON.stringify(servers));
+    Object.assign(result, serversCopy);
 
     this.logger.info(
-      `Found ${Object.keys(serversCopy).length} configured MCP Server(s)`,
+      `Found ${Object.keys(result).length} configured MCP Server(s) (including Docker Gateway)`,
     );
-    return serversCopy;
+    return result;
+  }
+
+  /**
+   * Get the set of disabled tool names for a given server.
+   */
+  getDisabledTools(serverName: string): Set<string> {
+    const allDisabled: Record<string, string[]> =
+      getConfigValue("codebuddy.mcp.disabledTools") || {};
+    const disabled = allDisabled[serverName] || [];
+    return new Set(disabled);
   }
 
   private async checkDockerMCP(): Promise<boolean> {
