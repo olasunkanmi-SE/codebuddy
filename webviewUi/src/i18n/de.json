@@ -1,0 +1,428 @@
+{
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "add": "Hinzufügen",
+    "remove": "Entfernen",
+    "configure": "Konfigurieren",
+    "refresh": "Aktualisieren",
+    "loading": "Laden...",
+    "install": "Installieren",
+    "enable": "Aktivieren",
+    "enabled": "Aktiviert",
+    "use": "Verwenden",
+    "approve": "Genehmigen",
+    "deny": "Ablehnen",
+    "dismiss": "Verwerfen",
+    "details": "Details",
+    "export": "Exportieren",
+    "import": "Importieren",
+    "processing": "Verarbeitung",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "failed": "Fehlgeschlagen",
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "error": "Fehler",
+    "new": "NEU",
+    "beta": "Beta",
+    "free": "Kostenlos",
+    "justNow": "gerade eben",
+    "minutesAgo": "vor {{count}} Min.",
+    "hoursAgo": "vor {{count}} Std.",
+    "daysAgo": "vor {{count}} Tagen",
+    "yesterday": "Gestern",
+    "now": "jetzt",
+    "seconds": "{{count}}s",
+    "minutes": "{{count}}m",
+    "allFeatures": "Alle Funktionen",
+    "voteForFeature": "Für diese Funktion abstimmen",
+    "comingSoon": "Demnächst verfügbar",
+    "goToSettings": "Zu Einstellungen",
+    "available": "Verfügbar",
+    "reader": "Reader",
+    "saved": "Gespeichert",
+    "unsaved": "Speichern",
+    "unsave": "Nicht mehr speichern",
+    "saveForLater": "Für später speichern"
+  },
+
+  "chat": {
+    "inputPlaceholderActive": "Frag CodeBuddy...",
+    "inputPlaceholderDisabled": "Agent arbeitet...",
+    "defaultAvatar": "B",
+    "tabChat": "CHAT",
+    "tabFaq": "FAQ",
+    "contextLabel": "Kontext: ",
+    "activeWorkspace": "Aktiver Arbeitsbereich: ",
+    "approveAction": "Aktion genehmigen",
+    "stopRun": "Ausführung stoppen",
+    "stopNoActiveRun": "Stoppen (keine aktive Ausführung)",
+    "approveToolPrompt": "{{toolName}} genehmigen um fortzufahren — {{description}}",
+    "readyToRun": "Bereit zur Ausführung",
+    "contextAddedFromReader": "📎 **Kontext vom Reader hinzugefügt:**",
+    "processingRequest": "Anfrage wird verarbeitet",
+    "defaultUsername": "CodeBuddy-Benutzer"
+  },
+
+  "welcome": {
+    "greetingWithName": "Willkommen zurück, {{username}}",
+    "greetingDefault": "Willkommen bei CodeBuddy",
+    "subtitle": "KI-gestützter Multi-Agenten-Programmierassistent mit verschiedenen LLM-Anbietern, lokaler Modellunterstützung und autonomer Aufgabenausführung",
+    "tipsTitle": "Was Sie tun können",
+    "tipsHint": "Schauen Sie in die FAQ und EINSTELLUNGEN, um Ihren KI-Assistenten zu konfigurieren",
+    "featureAgentMode": "Agentenmodus",
+    "featureAgentModeDesc": "Autonome Ausführung mit Dateibearbeitung, Terminalbefehlen und Websuche",
+    "featureAskMode": "Fragemodus",
+    "featureAskModeDesc": "Schnelle Fragen und Antworten ohne Dateiänderungen",
+    "featureProviders": "9 KI-Anbieter",
+    "featureProvidersDesc": "Groq, Gemini, Claude, GPT-4, DeepSeek, Qwen und lokale Modelle über Ollama",
+    "featureDiffReview": "Diff-Überprüfung",
+    "featureDiffReviewDesc": "Änderungen vor der Anwendung überprüfen und genehmigen/ablehnen",
+    "featureMCP": "MCP-Tools",
+    "featureMCPDesc": "Erweitern mit GitHub, GitLab und benutzerdefinierten Integrationen",
+    "featureMentions": "@ Erwähnungen",
+    "featureMentionsDesc": "Verwende @dateiname, um bestimmte Dateien als Kontext einzubeziehen"
+  },
+
+  "webview": {
+    "tooltipSettings": "Einstellungen",
+    "tooltipSessions": "Sitzungen",
+    "tooltipNotifications": "Benachrichtigungen",
+    "tooltipUpdates": "Updates",
+    "tooltipObservability": "Beobachtbarkeit",
+    "tooltipOpenBrowser": "Browser öffnen (Rechtsklick für Verlauf)",
+    "tooltipIncreaseFontSize": "Schriftgröße erhöhen",
+    "tooltipDecreaseFontSize": "Schriftgröße verringern",
+    "fontSizeIncrease": "A+",
+    "fontSizeDecrease": "A-",
+    "browsingHistoryHeader": "Letzte Seiten",
+    "browsingHistoryEmpty": "Kein Browserverlauf",
+    "browserTypeReader": "Smart Reader (Empfohlen)",
+    "browserTypeSimple": "Einfacher Browser",
+    "browserTypeSystem": "Systembrowser"
+  },
+
+  "settings": {
+    "title": "Einstellungen",
+    "closeSettings": "Einstellungen schließen",
+    "searchPlaceholder": "Einstellungen durchsuchen...",
+    "searchKeyHint": "⌘F",
+    "noSettingsFound": "Keine Einstellungen gefunden",
+
+    "categories": {
+      "account": "Konto",
+      "accountDesc": "Kontoeinstellungen verwalten",
+      "general": "Allgemein",
+      "generalDesc": "Allgemeine Anwendungseinstellungen",
+      "browser": "Browser",
+      "browserDesc": "Browser- und Link-Öffnungseinstellungen",
+      "agents": "Agenten",
+      "agentsDesc": "KI-Agentenverhalten konfigurieren",
+      "mcp": "MCP",
+      "mcpDesc": "Model Context Protocol Server",
+      "connectors": "Konnektoren",
+      "connectorsDesc": "Verbindung zu externen Diensten",
+      "conversation": "Konversation",
+      "conversationDesc": "Chat- und Konversationseinstellungen",
+      "models": "Modelle",
+      "modelsDesc": "KI-Modellkonfiguration",
+      "context": "Kontext",
+      "contextDesc": "Arbeitsbereich-Kontexteinstellungen",
+      "rules": "Regeln & Unteragenten",
+      "rulesDesc": "Benutzerdefinierte Regeln und Unteragenten-Konfiguration",
+      "privacy": "Datenschutz",
+      "privacyDesc": "Datenschutz- und Dateneinstellungen",
+      "betaCategory": "Beta",
+      "betaDesc": "Beta-Funktionen und Experimente",
+      "coworker": "Mitarbeiter",
+      "coworkerDesc": "Tägliche Automatisierungen und Produktivitätstools",
+      "about": "Über",
+      "aboutDesc": "Über diese Erweiterung"
+    },
+
+    "general": {
+      "sectionBasics": "Grundlagen",
+      "sectionPreferences": "Einstellungen",
+      "theme": "Design",
+      "fontFamily": "Schriftart",
+      "fontSize": "Schriftgröße",
+      "language": "Sprache",
+      "codeBuddyMode": "CodeBuddy-Modus",
+      "nickname": "Spitzname",
+      "nicknamePlaceholder": "Spitznamen eingeben",
+      "nicknameDesc": "Ihr Anzeigename im Chat",
+      "enableStreaming": "Streaming aktivieren",
+      "enableStreamingDesc": "Antworten in Echtzeit streamen",
+      "codeBuddySettings": "CodeBuddy-Einstellungen",
+      "shortcutSettings": "Tastenkürzel",
+      "importConfiguration": "Konfiguration importieren"
+    },
+
+    "account": {
+      "defaultUser": "CodeBuddy-Benutzer",
+      "defaultEmail": "user@codebuddy.dev",
+      "freePlan": "Kostenloser Plan",
+      "editProfile": "Profil bearbeiten",
+      "sectionSubscription": "Abonnement",
+      "sectionAccountActions": "Kontoaktionen",
+      "signOut": "Abmelden",
+      "deleteAccount": "Konto löschen"
+    },
+
+    "agents": {
+      "sectionAgentMode": "Agentenmodus",
+      "sectionPermissions": "Berechtigungen",
+      "sectionAdvanced": "Erweitert",
+      "codeBuddyMode": "CodeBuddy-Modus",
+      "currentAgentStatus": "Aktueller Agentenstatus",
+      "autoApproveActions": "Aktionen automatisch genehmigen",
+      "autoApproveDesc": "Bestätigung für Werkzeugausführungen überspringen",
+      "allowFileEdits": "Dateibearbeitung erlauben",
+      "allowFileEditsDesc": "Agent darf Dateien ändern",
+      "allowTerminalAccess": "Terminalzugriff erlauben",
+      "allowTerminalDesc": "Agent darf Terminalbefehle ausführen",
+      "verboseLogging": "Ausführliche Protokollierung",
+      "verboseLoggingDesc": "Detaillierte Agentenaktivitätsprotokolle anzeigen",
+      "modeAgent": "Agentenmodus",
+      "modeAsk": "Fragemodus"
+    },
+
+    "mcp": {
+      "sectionMCPServers": "MCP-Server",
+      "sectionConnectedServers": "Verbundene Server",
+      "sectionRecommendedServers": "Empfohlene Server",
+      "refreshTools": "Tools aktualisieren",
+      "refreshing": "Wird aktualisiert...",
+      "openSettings": "Einstellungen öffnen",
+      "loadingMCPServers": "MCP-Server werden geladen...",
+      "noMCPServersConfigured": "Keine MCP-Server konfiguriert",
+      "installed": "Installiert",
+      "adding": "Wird hinzugefügt..."
+    },
+
+    "models": {
+      "sectionAIModelSelection": "KI-Modellauswahl",
+      "sectionActiveModel": "Aktives Modell",
+      "sectionLocalModels": "Lokale Modelle (Docker)",
+      "sectionAPIConfiguration": "API-Konfiguration",
+      "primaryModel": "Primäres Modell",
+      "contextWindow": "Kontextfenster",
+      "contextWindowValue": "128K Token",
+      "responseSpeed": "Antwortgeschwindigkeit",
+      "responseSpeedValue": "Schnell",
+      "capabilities": "Fähigkeiten",
+      "capabilitiesValue": "Code, Chat, Analyse",
+      "enabling": "Wird aktiviert...",
+      "startServer": "Server starten",
+      "starting": "Wird gestartet...",
+      "running": "Läuft",
+      "pull": "Herunterladen",
+      "pulling": "Wird heruntergeladen...",
+      "pulled": "Heruntergeladen",
+      "configureInSettings": "In Einstellungen konfigurieren",
+      "errorPrefix": "Fehler: "
+    },
+
+    "conversation": {
+      "sectionChatBehavior": "Chat-Verhalten",
+      "sectionDisplay": "Anzeige",
+      "sectionHistoryManagement": "Verlaufsverwaltung",
+      "enableStreaming": "Streaming aktivieren",
+      "enableStreamingDesc": "KI-Antworten Token für Token streamen",
+      "compactMode": "Kompaktmodus",
+      "compactModeDesc": "Abstände zwischen Nachrichten verringern",
+      "clearChatHistory": "Chatverlauf löschen",
+      "clearChatHistoryDesc": "Alle gespeicherten Konversationen dauerhaft löschen",
+      "clearHistory": "Verlauf löschen"
+    },
+
+    "context": {
+      "sectionWorkspaceIndexing": "Arbeitsbereich-Indizierung",
+      "sectionContextConfiguration": "Kontextkonfiguration",
+      "indexCodebase": "Codebasis indizieren",
+      "indexCodebaseDesc": "Arbeitsbereich für besseren Kontext indizieren",
+      "reindexWorkspace": "Arbeitsbereich neu indizieren",
+      "reindex": "Neu indizieren",
+      "contextWindowSize": "Kontextfenstergröße",
+      "includeHiddenFiles": "Versteckte Dateien einbeziehen",
+      "maxFileSize": "Max. Dateigröße (MB)",
+      "indexed": "Indiziert",
+      "notIndexed": "Nicht indiziert"
+    },
+
+    "rules": {
+      "sectionCustomRules": "Benutzerdefinierte Regeln",
+      "sectionSubagents": "Unteragenten",
+      "sectionSystemPrompt": "Systemaufforderung",
+      "projectRules": "Projektregeln",
+      "customSystemPrompt": "Benutzerdefinierte Systemaufforderung",
+      "noCustomRules": "Keine benutzerdefinierten Regeln",
+      "noCustomRulesDesc": "Erstellen Sie Regeln, um anzupassen, wie CodeBuddy Code für Ihr Projekt generiert",
+      "addRule": "Regel hinzufügen",
+      "saveChanges": "Änderungen speichern"
+    },
+
+    "privacy": {
+      "sectionDataCollection": "Datenerfassung",
+      "sectionLocalData": "Lokale Daten",
+      "anonymousTelemetry": "Anonyme Telemetrie",
+      "anonymousTelemetryDesc": "Helfen Sie, CodeBuddy durch Nutzungsdaten zu verbessern",
+      "clearChatHistory": "Chatverlauf löschen",
+      "clearCache": "Cache leeren",
+      "clearAllData": "Alle Daten löschen"
+    },
+
+    "about": {
+      "appName": "CodeBuddy",
+      "tagline": "Ihr KI-gestützter Programmierbegleiter. Besseren Code schreiben, schneller.",
+      "sectionResources": "Ressourcen",
+      "sectionUpdates": "Updates",
+      "sectionLicense": "Lizenz",
+      "sectionCredits": "Danksagungen",
+      "githubRepository": "GitHub-Repository",
+      "documentation": "Dokumentation",
+      "changelog": "Änderungsprotokoll",
+      "reportAnIssue": "Problem melden",
+      "checkForUpdates": "Nach Updates suchen",
+      "mitLicense": "MIT-Lizenz",
+      "builtWithLove": "Mit ❤️ gebaut"
+    },
+
+    "coworker": {
+      "sectionProductivityAutomations": "Produktivitätsautomatisierungen",
+      "dailyStandup": "Tägliches Standup",
+      "dailyStandupDesc": "Automatisierte tägliche Fortschrittsberichte",
+      "codeHealthCheck": "Code-Gesundheitscheck",
+      "codeHealthCheckDesc": "Periodische Code-Qualitätsanalyse",
+      "dependencyCheck": "Abhängigkeitsprüfung",
+      "dependencyCheckDesc": "Veraltete Abhängigkeiten überwachen",
+      "gitWatchdog": "Git-Watchdog",
+      "gitWatchdogDesc": "Git-Anomalien und Probleme überwachen",
+      "triggerNow": "Jetzt ausführen"
+    },
+
+    "browserSettings": {
+      "sectionLinkOpeningPreferences": "Link-Öffnungseinstellungen",
+      "defaultBrowser": "Standardbrowser",
+      "defaultBrowserDesc": "Wählen Sie, wie Links von CodeBuddy geöffnet werden"
+    }
+  },
+
+  "observability": {
+    "title": "Beobachtbarkeit",
+    "tabDashboard": "Dashboard",
+    "tabLogs": "Protokolle",
+    "tabTraces": "Traces",
+    "sectionSystemPerformance": "Systemleistung",
+    "sectionMCPInfrastructure": "MCP-Infrastruktur",
+    "noLogsYet": "Noch keine Protokolle",
+    "noTracesCaptured": "Keine Traces erfasst",
+    "sendTestTrace": "Test-Trace senden",
+    "clearTraces": "Traces löschen"
+  },
+
+  "sessions": {
+    "title": "Sitzungen",
+    "newSession": "Neue Sitzung",
+    "noSessionsYet": "Noch keine Sitzungen.",
+    "startNewConversation": "Starte eine neue Konversation!",
+    "messagesCount": "{{count}} Nachrichten •"
+  },
+
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "noNotifications": "Keine Benachrichtigungen",
+    "markAllRead": "Alle als gelesen markieren",
+    "clearAll": "Alle löschen"
+  },
+
+  "updates": {
+    "title": "Updates",
+    "closeUpdates": "Updates schließen"
+  },
+
+  "news": {
+    "greeting": "Hallo {{userName}},",
+    "refreshing": "Wird aktualisiert...",
+    "refresh": "Aktualisieren",
+    "summary": "Zusammenfassung",
+    "topNews": "Top-Nachrichten",
+    "openInSmartReader": "Im Smart Reader öffnen",
+    "noNewsAvailable": "Keine Nachrichten verfügbar. Versuche zu aktualisieren.",
+    "downloads": "Downloads"
+  },
+
+  "pendingChanges": {
+    "title": "Dateiänderungen",
+    "tabRecent": "Kürzlich ({{count}})",
+    "tabPending": "Ausstehend ({{count}})",
+    "noPendingChanges": "Keine ausstehenden Änderungen",
+    "noRecentChanges": "Keine kürzlichen Änderungen",
+    "viewDiff": "Diff anzeigen",
+    "applyChange": "Änderung anwenden",
+    "rejectChange": "Änderung ablehnen"
+  },
+
+  "agentTimeline": {
+    "title": "Agent",
+    "statusWorking": "Arbeitet",
+    "statusReady": "Bereit",
+    "thinking": "Denkt nach",
+    "nextSteps": "Nächste Schritte",
+    "actions": "Aktionen",
+    "noActionsYet": "Noch keine Aktionen.",
+    "preparingResponse": "Antwort wird vorbereitet..."
+  },
+
+  "agentActivityFeed": {
+    "completedActions": "{{count}} {{actionWord}} abgeschlossen",
+    "actionSingular": "Aktion",
+    "actionPlural": "Aktionen",
+    "working": "Arbeitet...",
+    "toolsInUse": "Verwendete Werkzeuge"
+  },
+
+  "errors": {
+    "requestCouldNotBeCompleted": "Anfrage konnte nicht abgeschlossen werden",
+    "suggestionsTitle": "Vorschläge",
+    "oopsSomethingWentWrong": "Ups! Etwas ist schiefgelaufen.",
+    "pleaseTryAgainLater": "Bitte versuchen Sie es später erneut."
+  },
+
+  "searchResults": {
+    "searching": "Suche...",
+    "sourcesTitle": "Quellen",
+    "sourcesFound": "{{count}} gefunden",
+    "noRelevantResults": "Keine relevanten Ergebnisse für diese Abfrage gefunden."
+  },
+
+  "fileMention": {
+    "placeholder": "@ eingeben, um Dateien zu erwähnen...",
+    "currentFile": "Aktuelle Datei",
+    "loadingFiles": "Arbeitsbereichsdateien werden geladen...",
+    "noFilesMatching": "Keine Dateien passend zu \"{{query}}\""
+  },
+
+  "extensions": {
+    "title": "Erweiterungen & Integrationen",
+    "subtitle": "CodeBuddy mit MCP-Servern, benutzerdefinierten Agenten und Drittanbieter-Integrationen erweitern",
+    "addServer": "Server hinzufügen",
+    "noMCPServersInstalled": "Keine MCP-Server installiert"
+  },
+
+  "options": {
+    "languages": {
+      "en": "Englisch",
+      "es": "Spanisch",
+      "fr": "Französisch",
+      "de": "Deutsch",
+      "zh-cn": "Chinesisch",
+      "ja": "Japanisch",
+      "yo": "Yoruba"
+    }
+  }
+}

@@ -3,6 +3,7 @@
 import { VSCodeButton, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import { codeBuddyMode, faqItems, modelOptions, themeOptions } from "../constants/constant";
 import { IWebviewMessage, useStreamingChat } from "../hooks/useStreamingChat";
@@ -390,9 +391,11 @@ interface ConfigData {
   codeHealthEnabled?: boolean;
   dependencyCheckEnabled?: boolean;
   browserType?: 'reader' | 'simple' | 'system';
+  language?: string;
 }
 
 export const WebviewUI = () => {
+  const { i18n } = useTranslation();
   // State variables
   const [selectedTheme, setSelectedTheme] = useState("tokyo night");
   const [selectedModel, setSelectedModel] = useState("Groq");
@@ -420,6 +423,7 @@ export const WebviewUI = () => {
   const [codeHealthEnabled, setCodeHealthEnabled] = useState(true);
   const [dependencyCheckEnabled, setDependencyCheckEnabled] = useState(true);
   const [gitWatchdogEnabled, setGitWatchdogEnabled] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [browserType, setBrowserType] = useState<'reader' | 'simple' | 'system'>('reader');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [fileChangesPanelCollapsed, setFileChangesPanelCollapsed] = useState(true);
@@ -587,6 +591,12 @@ export const WebviewUI = () => {
         setDependencyGraph(message.graph);
         break; */
 
+      case "set-locale":
+        if (message.locale) {
+          i18n.changeLanguage(message.locale);
+        }
+        break;
+
       case "onConfigurationChange": {
         const data = JSON.parse(message.message);
         if (data.enableStreaming !== undefined) {
@@ -672,6 +682,10 @@ export const WebviewUI = () => {
         }
         if (data.browserType !== undefined) {
           setBrowserType(data.browserType);
+        }
+        if (data.language) {
+          setSelectedLanguage(data.language);
+          i18n.changeLanguage(data.language);
         }
         break;
       }
@@ -1009,7 +1023,7 @@ export const WebviewUI = () => {
   // Settings context values for the new settings panel
   const settingsValues = useMemo<SettingsValues>(() => ({
     theme: selectedTheme,
-    language: 'en',
+    language: selectedLanguage,
     keymap: 'default',
     nickname: username,
     codeBuddyMode: selectedCodeBuddyMode,
@@ -1036,7 +1050,7 @@ export const WebviewUI = () => {
     customRules: customRules,
     customSystemPrompt: customSystemPrompt,
     subagents: subagents,
-  }), [selectedTheme, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents, dailyStandupEnabled, codeHealthEnabled, dependencyCheckEnabled, gitWatchdogEnabled, browserType]);
+  }), [selectedTheme, selectedLanguage, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents, dailyStandupEnabled, codeHealthEnabled, dependencyCheckEnabled, gitWatchdogEnabled, browserType]);
 
   const settingsOptions = useMemo<SettingsOptions>(() => ({
     themeOptions: themeOptions,
@@ -1058,8 +1072,10 @@ export const WebviewUI = () => {
       setSelectedTheme(value);
       vsCode.postMessage({ command: "theme-change-event", message: value });
     },
-    onLanguageChange: (_value: string) => {
-      // Coming soon - language change
+    onLanguageChange: (value: string) => {
+      setSelectedLanguage(value);
+      i18n.changeLanguage(value);
+      vsCode.postMessage({ command: "language-change-event", message: value });
     },
     onKeymapChange: (_value: string) => {
       // Coming soon - keymap change

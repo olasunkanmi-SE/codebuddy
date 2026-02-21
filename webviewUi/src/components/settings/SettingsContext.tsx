@@ -134,8 +134,9 @@ const DEFAULT_LANGUAGE_OPTIONS: SelectOption[] = [
   { value: 'es', label: 'Spanish' },
   { value: 'fr', label: 'French' },
   { value: 'de', label: 'German' },
-  { value: 'zh', label: 'Chinese' },
+  { value: 'zh-cn', label: 'Chinese' },
   { value: 'ja', label: 'Japanese' },
+  { value: 'yo', label: 'Yoruba' },
 ];
 
 const DEFAULT_KEYMAP_OPTIONS: SelectOption[] = [

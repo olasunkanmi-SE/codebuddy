@@ -1,0 +1,263 @@
+{
+  "common": {
+    "save": "Fi pamọ́",
+    "cancel": "Fagilé",
+    "close": "Pa dé",
+    "edit": "Ṣàtúnṣe",
+    "delete": "Pa rẹ́",
+    "add": "Fi kún",
+    "remove": "Yọ kúrò",
+    "configure": "Ṣètò",
+    "refresh": "Ṣe àtúnṣe",
+    "loading": "Ń gbé kalẹ̀...",
+    "install": "Fi sórí ẹ̀rọ́",
+    "enable": "Mú ṣiṣẹ́",
+    "enabled": "Ti ṣiṣẹ́",
+    "use": "Lo",
+    "approve": "Fọwọ́ sí",
+    "deny": "Kọ̀",
+    "dismiss": "Fi sílẹ̀",
+    "details": "Àlàyé",
+    "export": "Kó jáde",
+    "import": "Kó wọlé",
+    "processing": "Ń ṣiṣẹ́",
+    "copy": "Ṣe àdàkọ",
+    "copied": "Ti dàkọ!",
+    "failed": "Kò yọrí sí",
+    "active": "Ṣiṣẹ́",
+    "inactive": "Kò ṣiṣẹ́",
+    "error": "Àṣìṣe",
+    "new": "TUNTUN",
+    "beta": "Àdánwò",
+    "free": "Ọ̀fẹ́",
+    "justNow": "báyìí",
+    "minutesAgo": "ìṣẹ́jú {{count}} sẹ́yìn",
+    "hoursAgo": "wákàtí {{count}} sẹ́yìn",
+    "daysAgo": "ọjọ́ {{count}} sẹ́yìn",
+    "yesterday": "Àná",
+    "now": "báyìí",
+    "allFeatures": "Gbogbo Àwọn Ẹ̀yà",
+    "voteForFeature": "Dìbò fún ẹ̀yà yìí",
+    "comingSoon": "Ó ń bọ̀ láìpẹ́",
+    "goToSettings": "Lọ sí Ètò",
+    "available": "Wà",
+    "reader": "Olùka",
+    "saved": "Ti fi pamọ́",
+    "unsaved": "Fi pamọ́",
+    "saveForLater": "Fi pamọ́ fún ìgbà mìíràn"
+  },
+
+  "chat": {
+    "inputPlaceholderActive": "Bi CodeBuddy lérè...",
+    "inputPlaceholderDisabled": "Aṣojú ń ṣiṣẹ́...",
+    "tabChat": "ÌFỌ̀RỌWÁNILẸ́NWÒ",
+    "tabFaq": "ÀWỌN ÌBÉ̀RÈ",
+    "contextLabel": "Àyíká: ",
+    "activeWorkspace": "Ibi iṣẹ́ tó ń ṣiṣẹ́: ",
+    "approveAction": "Fọwọ́ sí ìṣe",
+    "stopRun": "Da ṣíṣe dúró",
+    "approveToolPrompt": "Fọwọ́ sí {{toolName}} láti tẹ̀síwájú — {{description}}",
+    "readyToRun": "Ṣetán láti ṣiṣẹ́",
+    "processingRequest": "Ń ṣiṣẹ́ lórí ìbéèrè",
+    "defaultUsername": "Olùlò CodeBuddy"
+  },
+
+  "welcome": {
+    "greetingWithName": "Ẹ kú àbọ̀, {{username}}",
+    "greetingDefault": "Ẹ kú abọ̀ sí CodeBuddy",
+    "subtitle": "Olùrànlọ́wọ́ ìkọ̀wé kóòdù tó ní àwọn aṣojú púpọ̀ tí AI ń darí, pẹ̀lú àwọn olùpèsè LLM oríṣiríṣi, àtìlẹ́yìn àwọn àwòṣe àdúgbò, àti ṣíṣe iṣẹ́ aládàáṣe",
+    "tipsTitle": "Ohun Tí O Lè Ṣe",
+    "tipsHint": "Wo apá FAQ àti ÈTÒ láti ṣètò olùrànlọ́wọ́ AI rẹ",
+    "featureAgentMode": "Ipò Aṣojú",
+    "featureAgentModeDesc": "Ṣíṣe aládàáṣe pẹ̀lú àtúnṣe fáìlì, àṣẹ tẹ́mínà, àti wíwá lórí ayélujára",
+    "featureAskMode": "Ipò Ìbéèrè",
+    "featureAskModeDesc": "Ìbéèrè àti ìdáhùn yíyára láì yí àwọn fáìlì padà",
+    "featureProviders": "Olùpèsè AI mẹ́sàn-án",
+    "featureDiffReview": "Àyẹ̀wò Ìyàtọ̀",
+    "featureDiffReviewDesc": "Ṣàyẹ̀wò kí o sì fọwọ́ sí/kọ̀ àwọn àyípadà kí wọ́n tó kan rẹ̀",
+    "featureMCP": "Àwọn Irinṣẹ́ MCP",
+    "featureMCPDesc": "Fàgùn pẹ̀lú GitHub, GitLab, àti àwọn ìsopọ̀ àdáni",
+    "featureMentions": "@ Àsọ̀yé",
+    "featureMentionsDesc": "Lo @orúkọ fáìlì láti fi àwọn fáìlì kan pàtó sí gẹ́gẹ́ bíi àyíká"
+  },
+
+  "webview": {
+    "tooltipSettings": "Ètò",
+    "tooltipSessions": "Àwọn Ìgbà",
+    "tooltipNotifications": "Àwọn Ìfitọ́nà",
+    "tooltipUpdates": "Àwọn Ìmúdójúìwọ̀n",
+    "tooltipObservability": "Àkíyèsí",
+    "tooltipOpenBrowser": "Ṣí Ẹ̀rọ Ìṣàwárí (tẹ ọ̀tún fún ìtàn)",
+    "tooltipIncreaseFontSize": "Mú Ìwọ̀n Lẹ́tà Tóbi Sí i",
+    "tooltipDecreaseFontSize": "Mú Ìwọ̀n Lẹ́tà Kéré Sí i",
+    "browsingHistoryHeader": "Àwọn Ojú-Ìwé Àìpẹ́",
+    "browsingHistoryEmpty": "Kò sí ìtàn ìṣàwárí",
+    "browserTypeReader": "Olùka Ọlọ́gbọ́n (A ṣe ìmọ̀ràn)",
+    "browserTypeSimple": "Ẹ̀rọ Ìṣàwárí Ìrọ̀rùn",
+    "browserTypeSystem": "Ẹ̀rọ Ìṣàwárí Ètò"
+  },
+
+  "settings": {
+    "title": "Ètò",
+    "closeSettings": "Pa ètò dé",
+    "searchPlaceholder": "Ṣàwárí ètò...",
+    "noSettingsFound": "A kò rí ètò kankan",
+
+    "categories": {
+      "account": "Àkọọ́lẹ̀",
+      "accountDesc": "Ṣàkóso ètò àkọọ́lẹ̀ rẹ",
+      "general": "Àkọ́kọ́",
+      "generalDesc": "Ètò àkọ́kọ́ ohun-èlò",
+      "browser": "Ẹ̀rọ Ìṣàwárí",
+      "browserDesc": "Àwọn àṣàyàn ẹ̀rọ ìṣàwárí àti ṣíṣí ìsopọ̀",
+      "agents": "Àwọn Aṣojú",
+      "agentsDesc": "Ṣètò ìwà aṣojú AI",
+      "mcp": "MCP",
+      "mcpDesc": "Àwọn ẹ̀rọ olùpèsè ìlànà àyíká àwòṣe",
+      "connectors": "Àwọn Asopọ̀",
+      "connectorsDesc": "Sopọ̀ sí àwọn iṣẹ́ ìta",
+      "conversation": "Ìfọ̀rọ̀wérọ̀",
+      "conversationDesc": "Ètò ìjíròrò àti ìfọ̀rọ̀wérọ̀",
+      "models": "Àwọn Àwòṣe",
+      "modelsDesc": "Ètò àwòṣe AI",
+      "context": "Àyíká",
+      "contextDesc": "Ètò àyíká ibi iṣẹ́",
+      "rules": "Àwọn Òfin àti Abẹ́-aṣojú",
+      "rulesDesc": "Àwọn òfin àdáni àti ètò abẹ́-aṣojú",
+      "privacy": "Ìpamọ́",
+      "privacyDesc": "Ètò ìpamọ́ àti dátà",
+      "coworker": "Alábàáṣiṣẹ́pọ̀",
+      "coworkerDesc": "Àwọn ìmúṣiṣẹ́ aládàáṣe ojoojúmọ́ àti irinṣẹ́ ìmúṣiṣẹ́pọ̀",
+      "about": "Nípa",
+      "aboutDesc": "Nípa ẹ̀yà yìí"
+    },
+
+    "general": {
+      "sectionBasics": "Ìpìlẹ̀",
+      "sectionPreferences": "Àṣàyàn",
+      "theme": "Àkòrí",
+      "fontFamily": "Ìdílé Lẹ́tà",
+      "fontSize": "Ìwọ̀n Lẹ́tà",
+      "language": "Èdè",
+      "codeBuddyMode": "Ipò CodeBuddy",
+      "nickname": "Orúkọ àpèjẹ",
+      "nicknamePlaceholder": "Tẹ orúkọ àpèjẹ",
+      "nicknameDesc": "Orúkọ rẹ nínú ìjíròrò",
+      "enableStreaming": "Mú Ìtàn-ṣíṣe Ṣiṣẹ́",
+      "enableStreamingDesc": "Tan ìdáhùn ní àkókó gidi"
+    },
+
+    "agents": {
+      "sectionAgentMode": "Ipò Aṣojú",
+      "sectionPermissions": "Àwọn Ìyọ̀nda",
+      "sectionAdvanced": "Ìlọsíwájú",
+      "autoApproveActions": "Fọwọ́ Sí Ìṣe Láifọwọ́yí",
+      "allowFileEdits": "Gbà Àtúnṣe Fáìlì Láyè",
+      "allowTerminalAccess": "Gbà Àṣẹ Tẹ́mínà Láyè",
+      "verboseLogging": "Ìgbékalẹ̀ Ní Kíkún",
+      "modeAgent": "Ipò Aṣojú",
+      "modeAsk": "Ipò Ìbéèrè"
+    },
+
+    "models": {
+      "sectionAIModelSelection": "Àṣàyàn Àwòṣe AI",
+      "sectionActiveModel": "Àwòṣe Tó Ń Ṣiṣẹ́",
+      "sectionLocalModels": "Àwọn Àwòṣe Àdúgbò (Docker)",
+      "sectionAPIConfiguration": "Ètò API",
+      "primaryModel": "Àwòṣe Àkọ́kọ́",
+      "contextWindow": "Fèrèsé Àyíká",
+      "responseSpeed": "Ìyára Ìdáhùn",
+      "responseSpeedValue": "Yára",
+      "startServer": "Bẹ̀rẹ̀ Ẹ̀rọ olùpèsè",
+      "running": "Ń ṣiṣẹ́",
+      "configureInSettings": "Ṣètò nínú Ètò"
+    },
+
+    "about": {
+      "appName": "CodeBuddy",
+      "tagline": "Ẹlẹ́gbẹ́ ìkọ̀wé kóòdù rẹ tí AI ń darí. Kọ kóòdù tó dára jùlọ, ní ìyára.",
+      "builtWithLove": "A kọ́ rẹ̀ pẹ̀lú ❤️"
+    },
+
+    "coworker": {
+      "sectionProductivityAutomations": "Àwọn Ìmúṣiṣẹ́ Aládàáṣe Ìmúṣiṣẹ́pọ̀",
+      "dailyStandup": "Ìdúró Ojoojúmọ́",
+      "dailyStandupDesc": "Àkópọ̀ ìlọsíwájú ojoojúmọ́ aládàáṣe",
+      "codeHealthCheck": "Àyẹ̀wò Ìlera Kóòdù",
+      "dependencyCheck": "Àyẹ̀wò Gbígbáralé",
+      "triggerNow": "Ṣe Ní Báyìí"
+    }
+  },
+
+  "observability": {
+    "title": "Àkíyèsí",
+    "tabDashboard": "Pánẹ́ẹ̀lì",
+    "tabLogs": "Àkọsílẹ̀",
+    "tabTraces": "Àwọn Ọ̀nà",
+    "noLogsYet": "Kò sí àkọsílẹ̀ síbẹ̀",
+    "noTracesCaptured": "Kò sí ọ̀nà tí a mú"
+  },
+
+  "sessions": {
+    "title": "Àwọn Ìgbà",
+    "newSession": "Ìgbà Tuntun",
+    "noSessionsYet": "Kò sí ìgbà kankan síbẹ̀.",
+    "startNewConversation": "Bẹ̀rẹ̀ ìfọ̀rọ̀wérọ̀ tuntun!"
+  },
+
+  "notifications": {
+    "title": "Àwọn Ìfitọ́nà",
+    "noNotifications": "Kò sí ìfitọ́nà",
+    "markAllRead": "Sàmì gbogbo wọn bíi tí a ti ka",
+    "clearAll": "Pa gbogbo rẹ̀"
+  },
+
+  "news": {
+    "greeting": "E kú {{userName}},",
+    "refresh": "Ṣe àtúnṣe",
+    "summary": "Àkópọ̀",
+    "topNews": "Ìròyìn Pàtàkì",
+    "openInSmartReader": "Ṣí nínú Olùka Ọlọ́gbọ́n",
+    "noNewsAvailable": "Kò sí ìròyìn. Gbìyànjú ṣe àtúnṣe."
+  },
+
+  "pendingChanges": {
+    "title": "Àwọn Àyípadà Fáìlì",
+    "noPendingChanges": "Kò sí àyípadà tó ń dúró",
+    "viewDiff": "Wo ìyàtọ̀",
+    "applyChange": "Lo àyípadà",
+    "rejectChange": "Kọ àyípadà"
+  },
+
+  "agentTimeline": {
+    "title": "Aṣojú",
+    "statusWorking": "Ń ṣiṣẹ́",
+    "statusReady": "Ṣetán",
+    "thinking": "Ń ronú",
+    "noActionsYet": "Kò sí ìṣe kankan síbẹ̀."
+  },
+
+  "errors": {
+    "requestCouldNotBeCompleted": "A kò lè parí ìbéèrè náà",
+    "oopsSomethingWentWrong": "Hà! Nǹkan kan ṣẹlẹ̀.",
+    "pleaseTryAgainLater": "Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn."
+  },
+
+  "fileMention": {
+    "placeholder": "Tẹ @ láti sọ̀rọ̀ fáìlì...",
+    "currentFile": "Fáìlì Lọ́wọ́lọ́wọ́",
+    "loadingFiles": "Ń gbé àwọn fáìlì ibi iṣẹ́ kalẹ̀..."
+  },
+
+  "options": {
+    "languages": {
+      "en": "Èdè Gẹ̀ẹ́sì",
+      "es": "Èdè Sípáníìṣì",
+      "fr": "Èdè Faransé",
+      "de": "Èdè Jámánì",
+      "zh": "Èdè Ṣáínà",
+      "ja": "Èdè Jàpáànù",
+      "yo": "Èdè Yorùbá"
+    }
+  }
+}

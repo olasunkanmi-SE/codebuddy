@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import styled, { keyframes } from "styled-components";
 
 interface WelcomeScreenProps {
@@ -95,8 +96,9 @@ const TipItem = styled.div`
 `;
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ username }) => {
+  const { t } = useTranslation();
   const [displayedText, setDisplayedText] = useState("");
-  const greeting = username ? `Welcome back, ${username}` : "Welcome to CodeBuddy";
+  const greeting = username ? t("welcome.greetingWithName", { username }) : t("welcome.greetingDefault");
 
   useEffect(() => {
     let currentIndex = 0;
@@ -118,19 +120,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ username }) => {
       <WelcomeTitle>{displayedText}</WelcomeTitle>
 
       <WelcomeSubtitle>
-        AI-powered multi-agent coding assistant with different LLM providers, local model support, and autonomous task execution
+        {t("welcome.subtitle")}
       </WelcomeSubtitle>
 
       <TipsContainer>
-        <TipsTitle>What You Can Do</TipsTitle>
+        <TipsTitle>{t("welcome.tipsTitle")}</TipsTitle>
         <TipsList>
-          <TipItem>Check out the FAQ and SETTINGS section to configure your AI assistant</TipItem>
-          <TipItem><strong>Agent Mode</strong> — Autonomous execution with file edits, terminal commands, and web search</TipItem>
-          <TipItem><strong>Ask Mode</strong> — Quick Q&A without modifying files</TipItem>
-          <TipItem><strong>9 AI Providers</strong> — Groq, Gemini, Claude, GPT-4, DeepSeek, Qwen, and local models via Ollama</TipItem>
-          <TipItem><strong>Diff Review</strong> — Review and approve/reject changes before they're applied</TipItem>
-          <TipItem><strong>MCP Tools</strong> — Extend with GitHub, GitLab, and custom integrations</TipItem>
-          <TipItem><strong>@ Mentions</strong> — Use @filename to include specific files as context</TipItem>
+          <TipItem>{t("welcome.tipsHint")}</TipItem>
+          <TipItem><strong>{t("welcome.featureAgentMode")}</strong> — {t("welcome.featureAgentModeDesc")}</TipItem>
+          <TipItem><strong>{t("welcome.featureAskMode")}</strong> — {t("welcome.featureAskModeDesc")}</TipItem>
+          <TipItem><strong>{t("welcome.featureProviders")}</strong> — {t("welcome.featureProvidersDesc")}</TipItem>
+          <TipItem><strong>{t("welcome.featureDiffReview")}</strong> — {t("welcome.featureDiffReviewDesc")}</TipItem>
+          <TipItem><strong>{t("welcome.featureMCP")}</strong> — {t("welcome.featureMCPDesc")}</TipItem>
+          <TipItem><strong>{t("welcome.featureMentions")}</strong> — {t("welcome.featureMentionsDesc")}</TipItem>
         </TipsList>
       </TipsContainer>
     </WelcomeContainer>

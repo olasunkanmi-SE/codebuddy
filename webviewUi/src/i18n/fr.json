@@ -1,0 +1,263 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "add": "Ajouter",
+    "remove": "Retirer",
+    "configure": "Configurer",
+    "refresh": "Actualiser",
+    "loading": "Chargement...",
+    "install": "Installer",
+    "enable": "Activer",
+    "enabled": "Activé",
+    "use": "Utiliser",
+    "approve": "Approuver",
+    "deny": "Refuser",
+    "dismiss": "Ignorer",
+    "details": "Détails",
+    "export": "Exporter",
+    "import": "Importer",
+    "processing": "Traitement",
+    "copy": "Copier",
+    "copied": "Copié !",
+    "failed": "Échoué",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "error": "Erreur",
+    "new": "NOUVEAU",
+    "beta": "Bêta",
+    "free": "Gratuit",
+    "justNow": "à l'instant",
+    "minutesAgo": "il y a {{count}}min",
+    "hoursAgo": "il y a {{count}}h",
+    "daysAgo": "il y a {{count}}j",
+    "yesterday": "Hier",
+    "now": "maintenant",
+    "allFeatures": "Toutes les Fonctionnalités",
+    "voteForFeature": "Voter pour cette fonctionnalité",
+    "comingSoon": "Bientôt disponible",
+    "goToSettings": "Aller aux Paramètres",
+    "available": "Disponible",
+    "reader": "Lecteur",
+    "saved": "Enregistré",
+    "unsaved": "Enregistrer",
+    "saveForLater": "Enregistrer pour plus tard"
+  },
+
+  "chat": {
+    "inputPlaceholderActive": "Demandez à CodeBuddy...",
+    "inputPlaceholderDisabled": "L'agent travaille...",
+    "tabChat": "CHAT",
+    "tabFaq": "FAQ",
+    "contextLabel": "Contexte : ",
+    "activeWorkspace": "Espace de travail actif : ",
+    "approveAction": "Approuver l'action",
+    "stopRun": "Arrêter l'exécution",
+    "approveToolPrompt": "Approuver {{toolName}} pour continuer — {{description}}",
+    "readyToRun": "Prêt à exécuter",
+    "processingRequest": "Traitement de la demande",
+    "defaultUsername": "Utilisateur CodeBuddy"
+  },
+
+  "welcome": {
+    "greetingWithName": "Bon retour, {{username}}",
+    "greetingDefault": "Bienvenue sur CodeBuddy",
+    "subtitle": "Assistant de codage multi-agent propulsé par l'IA avec différents fournisseurs LLM, support de modèles locaux et exécution autonome de tâches",
+    "tipsTitle": "Ce Que Vous Pouvez Faire",
+    "tipsHint": "Consultez la FAQ et la section PARAMÈTRES pour configurer votre assistant IA",
+    "featureAgentMode": "Mode Agent",
+    "featureAgentModeDesc": "Exécution autonome avec édition de fichiers, commandes terminal et recherche web",
+    "featureAskMode": "Mode Question",
+    "featureAskModeDesc": "Questions-réponses rapides sans modifier les fichiers",
+    "featureProviders": "9 Fournisseurs d'IA",
+    "featureDiffReview": "Revue de Différences",
+    "featureDiffReviewDesc": "Revoyez et approuvez/rejetez les changements avant leur application",
+    "featureMCP": "Outils MCP",
+    "featureMCPDesc": "Étendez avec GitHub, GitLab et des intégrations personnalisées",
+    "featureMentions": "@ Mentions",
+    "featureMentionsDesc": "Utilisez @nom_fichier pour inclure des fichiers spécifiques comme contexte"
+  },
+
+  "webview": {
+    "tooltipSettings": "Paramètres",
+    "tooltipSessions": "Sessions",
+    "tooltipNotifications": "Notifications",
+    "tooltipUpdates": "Mises à jour",
+    "tooltipObservability": "Observabilité",
+    "tooltipOpenBrowser": "Ouvrir le Navigateur (clic droit pour l'historique)",
+    "tooltipIncreaseFontSize": "Augmenter la Taille de Police",
+    "tooltipDecreaseFontSize": "Réduire la Taille de Police",
+    "browsingHistoryHeader": "Pages Récentes",
+    "browsingHistoryEmpty": "Aucun historique de navigation",
+    "browserTypeReader": "Lecteur Intelligent (Recommandé)",
+    "browserTypeSimple": "Navigateur Simple",
+    "browserTypeSystem": "Navigateur Système"
+  },
+
+  "settings": {
+    "title": "Paramètres",
+    "closeSettings": "Fermer les paramètres",
+    "searchPlaceholder": "Rechercher dans les paramètres...",
+    "noSettingsFound": "Aucun paramètre trouvé",
+
+    "categories": {
+      "account": "Compte",
+      "accountDesc": "Gérer les paramètres de votre compte",
+      "general": "Général",
+      "generalDesc": "Paramètres généraux de l'application",
+      "browser": "Navigateur",
+      "browserDesc": "Préférences du navigateur et d'ouverture des liens",
+      "agents": "Agents",
+      "agentsDesc": "Configurer le comportement de l'agent IA",
+      "mcp": "MCP",
+      "mcpDesc": "Serveurs de Protocole de Contexte de Modèle",
+      "connectors": "Connecteurs",
+      "connectorsDesc": "Connexion aux services externes",
+      "conversation": "Conversation",
+      "conversationDesc": "Paramètres de chat et de conversation",
+      "models": "Modèles",
+      "modelsDesc": "Configuration des modèles d'IA",
+      "context": "Contexte",
+      "contextDesc": "Paramètres de contexte de l'espace de travail",
+      "rules": "Règles et Sous-agents",
+      "rulesDesc": "Règles personnalisées et configuration des sous-agents",
+      "privacy": "Confidentialité",
+      "privacyDesc": "Paramètres de confidentialité et de données",
+      "coworker": "Collègue",
+      "coworkerDesc": "Automatisations quotidiennes et outils de productivité",
+      "about": "À propos",
+      "aboutDesc": "À propos de cette extension"
+    },
+
+    "general": {
+      "sectionBasics": "Base",
+      "sectionPreferences": "Préférences",
+      "theme": "Thème",
+      "fontFamily": "Police",
+      "fontSize": "Taille de Police",
+      "language": "Langue",
+      "codeBuddyMode": "Mode CodeBuddy",
+      "nickname": "Surnom",
+      "nicknamePlaceholder": "Entrez votre surnom",
+      "nicknameDesc": "Votre nom affiché dans le chat",
+      "enableStreaming": "Activer le Streaming",
+      "enableStreamingDesc": "Diffuser les réponses en temps réel"
+    },
+
+    "agents": {
+      "sectionAgentMode": "Mode Agent",
+      "sectionPermissions": "Permissions",
+      "sectionAdvanced": "Avancé",
+      "autoApproveActions": "Approbation Automatique",
+      "allowFileEdits": "Autoriser l'Édition de Fichiers",
+      "allowTerminalAccess": "Autoriser l'Accès au Terminal",
+      "verboseLogging": "Journalisation Détaillée",
+      "modeAgent": "Mode Agent",
+      "modeAsk": "Mode Question"
+    },
+
+    "models": {
+      "sectionAIModelSelection": "Sélection du Modèle IA",
+      "sectionActiveModel": "Modèle Actif",
+      "sectionLocalModels": "Modèles Locaux (Docker)",
+      "sectionAPIConfiguration": "Configuration API",
+      "primaryModel": "Modèle Principal",
+      "contextWindow": "Fenêtre de Contexte",
+      "responseSpeed": "Vitesse de Réponse",
+      "responseSpeedValue": "Rapide",
+      "startServer": "Démarrer le Serveur",
+      "running": "En cours",
+      "configureInSettings": "Configurer dans les Paramètres"
+    },
+
+    "about": {
+      "appName": "CodeBuddy",
+      "tagline": "Votre compagnon de codage propulsé par l'IA. Écrivez du meilleur code, plus vite.",
+      "builtWithLove": "Fait avec ❤️"
+    },
+
+    "coworker": {
+      "sectionProductivityAutomations": "Automatisations de Productivité",
+      "dailyStandup": "Standup Quotidien",
+      "dailyStandupDesc": "Résumés quotidiens automatiques de progression",
+      "codeHealthCheck": "Vérification de Santé du Code",
+      "dependencyCheck": "Vérification des Dépendances",
+      "triggerNow": "Exécuter Maintenant"
+    }
+  },
+
+  "observability": {
+    "title": "Observabilité",
+    "tabDashboard": "Tableau de Bord",
+    "tabLogs": "Journaux",
+    "tabTraces": "Traces",
+    "noLogsYet": "Aucun journal pour le moment",
+    "noTracesCaptured": "Aucune trace capturée"
+  },
+
+  "sessions": {
+    "title": "Sessions",
+    "newSession": "Nouvelle Session",
+    "noSessionsYet": "Aucune session pour le moment.",
+    "startNewConversation": "Commencez une nouvelle conversation !"
+  },
+
+  "notifications": {
+    "title": "Notifications",
+    "noNotifications": "Aucune notification",
+    "markAllRead": "Tout marquer comme lu",
+    "clearAll": "Tout effacer"
+  },
+
+  "news": {
+    "greeting": "Bonjour {{userName}},",
+    "refresh": "Actualiser",
+    "summary": "Résumé",
+    "topNews": "Actualités",
+    "openInSmartReader": "Ouvrir dans le Lecteur Intelligent",
+    "noNewsAvailable": "Aucune actualité disponible. Essayez d'actualiser."
+  },
+
+  "pendingChanges": {
+    "title": "Modifications de Fichiers",
+    "noPendingChanges": "Aucune modification en attente",
+    "viewDiff": "Voir la différence",
+    "applyChange": "Appliquer la modification",
+    "rejectChange": "Rejeter la modification"
+  },
+
+  "agentTimeline": {
+    "title": "Agent",
+    "statusWorking": "En cours",
+    "statusReady": "Prêt",
+    "thinking": "Réflexion",
+    "noActionsYet": "Aucune action pour le moment."
+  },
+
+  "errors": {
+    "requestCouldNotBeCompleted": "La demande n'a pas pu être complétée",
+    "oopsSomethingWentWrong": "Oups ! Quelque chose s'est mal passé.",
+    "pleaseTryAgainLater": "Veuillez réessayer plus tard."
+  },
+
+  "fileMention": {
+    "placeholder": "Tapez @ pour mentionner des fichiers...",
+    "currentFile": "Fichier Actuel",
+    "loadingFiles": "Chargement des fichiers de l'espace de travail..."
+  },
+
+  "options": {
+    "languages": {
+      "en": "Anglais",
+      "es": "Espagnol",
+      "fr": "Français",
+      "de": "Allemand",
+      "zh": "Chinois",
+      "ja": "Japonais",
+      "yo": "Yoruba"
+    }
+  }
+}

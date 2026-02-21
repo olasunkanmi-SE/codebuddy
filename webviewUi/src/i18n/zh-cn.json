@@ -1,0 +1,311 @@
+{
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "edit": "编辑",
+    "delete": "删除",
+    "add": "添加",
+    "remove": "移除",
+    "configure": "配置",
+    "refresh": "刷新",
+    "loading": "加载中...",
+    "install": "安装",
+    "enable": "启用",
+    "enabled": "已启用",
+    "use": "使用",
+    "approve": "批准",
+    "deny": "拒绝",
+    "dismiss": "忽略",
+    "details": "详情",
+    "export": "导出",
+    "import": "导入",
+    "processing": "处理中",
+    "copy": "复制",
+    "copied": "已复制！",
+    "failed": "失败",
+    "active": "活跃",
+    "inactive": "非活跃",
+    "error": "错误",
+    "new": "新",
+    "beta": "测试版",
+    "free": "免费",
+    "justNow": "刚刚",
+    "minutesAgo": "{{count}}分钟前",
+    "hoursAgo": "{{count}}小时前",
+    "daysAgo": "{{count}}天前",
+    "yesterday": "昨天",
+    "now": "现在",
+    "seconds": "{{count}}秒",
+    "minutes": "{{count}}分",
+    "allFeatures": "所有功能",
+    "voteForFeature": "为此功能投票",
+    "comingSoon": "即将推出",
+    "goToSettings": "前往设置",
+    "available": "可用",
+    "reader": "阅读器",
+    "saved": "已保存",
+    "unsaved": "保存",
+    "unsave": "取消保存",
+    "saveForLater": "稍后阅读"
+  },
+
+  "chat": {
+    "inputPlaceholderActive": "向 CodeBuddy 提问...",
+    "inputPlaceholderDisabled": "代理正在工作...",
+    "defaultAvatar": "用",
+    "tabChat": "聊天",
+    "tabFaq": "常见问题",
+    "contextLabel": "上下文：",
+    "activeWorkspace": "当前工作区：",
+    "approveAction": "批准操作",
+    "stopRun": "停止运行",
+    "stopNoActiveRun": "停止（无活跃运行）",
+    "approveToolPrompt": "批准 {{toolName}} 继续 — {{description}}",
+    "readyToRun": "准备运行",
+    "contextAddedFromReader": "📎 **从阅读器添加的上下文：**",
+    "processingRequest": "处理请求中",
+    "defaultUsername": "CodeBuddy 用户"
+  },
+
+  "welcome": {
+    "greetingWithName": "欢迎回来，{{username}}",
+    "greetingDefault": "欢迎使用 CodeBuddy",
+    "subtitle": "AI 驱动的多代理编码助手，支持多种 LLM 提供商、本地模型和自主任务执行",
+    "tipsTitle": "你可以做什么",
+    "tipsHint": "查看常见问题和设置部分来配置你的 AI 助手",
+    "featureAgentMode": "代理模式",
+    "featureAgentModeDesc": "自主执行，包括文件编辑、终端命令和网络搜索",
+    "featureAskMode": "提问模式",
+    "featureAskModeDesc": "快速问答，不修改文件",
+    "featureProviders": "9 个 AI 提供商",
+    "featureProvidersDesc": "Groq、Gemini、Claude、GPT-4、DeepSeek、Qwen 以及通过 Ollama 的本地模型",
+    "featureDiffReview": "差异审查",
+    "featureDiffReviewDesc": "在更改应用前审查并批准/拒绝",
+    "featureMCP": "MCP 工具",
+    "featureMCPDesc": "通过 GitHub、GitLab 和自定义集成进行扩展",
+    "featureMentions": "@ 提及",
+    "featureMentionsDesc": "使用 @文件名 将特定文件作为上下文"
+  },
+
+  "webview": {
+    "tooltipSettings": "设置",
+    "tooltipSessions": "会话",
+    "tooltipNotifications": "通知",
+    "tooltipUpdates": "更新",
+    "tooltipObservability": "可观测性",
+    "tooltipOpenBrowser": "打开浏览器（右键查看历史）",
+    "tooltipIncreaseFontSize": "增大字体",
+    "tooltipDecreaseFontSize": "减小字体",
+    "browsingHistoryHeader": "最近页面",
+    "browsingHistoryEmpty": "暂无浏览历史",
+    "browserTypeReader": "智能阅读器（推荐）",
+    "browserTypeSimple": "简单浏览器",
+    "browserTypeSystem": "系统浏览器"
+  },
+
+  "settings": {
+    "title": "设置",
+    "closeSettings": "关闭设置",
+    "searchPlaceholder": "搜索设置...",
+    "noSettingsFound": "未找到设置",
+
+    "categories": {
+      "account": "账户",
+      "accountDesc": "管理你的账户设置",
+      "general": "通用",
+      "generalDesc": "通用应用程序设置",
+      "browser": "浏览器",
+      "browserDesc": "浏览器和链接打开偏好",
+      "agents": "代理",
+      "agentsDesc": "配置 AI 代理行为",
+      "mcp": "MCP",
+      "mcpDesc": "模型上下文协议服务器",
+      "connectors": "连接器",
+      "connectorsDesc": "连接外部服务",
+      "conversation": "对话",
+      "conversationDesc": "聊天和对话设置",
+      "models": "模型",
+      "modelsDesc": "AI 模型配置",
+      "context": "上下文",
+      "contextDesc": "工作区上下文设置",
+      "rules": "规则与子代理",
+      "rulesDesc": "自定义规则和子代理配置",
+      "privacy": "隐私",
+      "privacyDesc": "隐私和数据设置",
+      "betaCategory": "测试版",
+      "betaDesc": "测试功能和实验",
+      "coworker": "协作者",
+      "coworkerDesc": "日常自动化和生产力工具",
+      "about": "关于",
+      "aboutDesc": "关于此扩展"
+    },
+
+    "general": {
+      "sectionBasics": "基本",
+      "sectionPreferences": "偏好",
+      "theme": "主题",
+      "fontFamily": "字体",
+      "fontSize": "字号",
+      "language": "语言",
+      "codeBuddyMode": "CodeBuddy 模式",
+      "nickname": "昵称",
+      "nicknamePlaceholder": "输入昵称",
+      "nicknameDesc": "你在聊天中显示的名称",
+      "enableStreaming": "启用流式传输",
+      "enableStreamingDesc": "实时流式传输响应"
+    },
+
+    "agents": {
+      "sectionAgentMode": "代理模式",
+      "sectionPermissions": "权限",
+      "sectionAdvanced": "高级",
+      "autoApproveActions": "自动批准操作",
+      "autoApproveDesc": "跳过工具执行确认",
+      "allowFileEdits": "允许文件编辑",
+      "allowFileEditsDesc": "允许代理修改文件",
+      "allowTerminalAccess": "允许终端访问",
+      "allowTerminalDesc": "允许代理执行终端命令",
+      "verboseLogging": "详细日志",
+      "verboseLoggingDesc": "显示详细的代理活动日志",
+      "modeAgent": "代理模式",
+      "modeAsk": "提问模式"
+    },
+
+    "models": {
+      "sectionAIModelSelection": "AI 模型选择",
+      "sectionActiveModel": "当前模型",
+      "sectionLocalModels": "本地模型 (Docker)",
+      "sectionAPIConfiguration": "API 配置",
+      "primaryModel": "主要模型",
+      "contextWindow": "上下文窗口",
+      "responseSpeed": "响应速度",
+      "responseSpeedValue": "快速",
+      "capabilities": "能力",
+      "capabilitiesValue": "代码、聊天、分析",
+      "startServer": "启动服务器",
+      "running": "运行中",
+      "configureInSettings": "在设置中配置"
+    },
+
+    "conversation": {
+      "sectionChatBehavior": "聊天行为",
+      "sectionDisplay": "显示",
+      "sectionHistoryManagement": "历史管理",
+      "enableStreaming": "启用流式传输",
+      "compactMode": "紧凑模式",
+      "compactModeDesc": "减少消息间距",
+      "clearChatHistory": "清除聊天历史",
+      "clearHistory": "清除历史"
+    },
+
+    "rules": {
+      "sectionCustomRules": "自定义规则",
+      "sectionSubagents": "子代理",
+      "sectionSystemPrompt": "系统提示",
+      "noCustomRules": "无自定义规则",
+      "addRule": "添加规则",
+      "saveChanges": "保存更改"
+    },
+
+    "about": {
+      "appName": "CodeBuddy",
+      "tagline": "你的 AI 编码伙伴。更好更快地编写代码。",
+      "builtWithLove": "用 ❤️ 打造"
+    },
+
+    "coworker": {
+      "sectionProductivityAutomations": "生产力自动化",
+      "dailyStandup": "每日站会",
+      "dailyStandupDesc": "自动化每日进度摘要",
+      "codeHealthCheck": "代码健康检查",
+      "codeHealthCheckDesc": "定期代码质量分析",
+      "dependencyCheck": "依赖检查",
+      "dependencyCheckDesc": "监控过时的依赖项",
+      "triggerNow": "立即执行"
+    }
+  },
+
+  "observability": {
+    "title": "可观测性",
+    "tabDashboard": "仪表板",
+    "tabLogs": "日志",
+    "tabTraces": "链路追踪",
+    "noLogsYet": "暂无日志",
+    "noTracesCaptured": "暂无链路追踪",
+    "sendTestTrace": "发送测试追踪",
+    "clearTraces": "清除追踪"
+  },
+
+  "sessions": {
+    "title": "会话",
+    "newSession": "新建会话",
+    "noSessionsYet": "暂无会话。",
+    "startNewConversation": "开始一个新对话！"
+  },
+
+  "notifications": {
+    "title": "通知",
+    "noNotifications": "无通知",
+    "markAllRead": "全部标记已读",
+    "clearAll": "全部清除"
+  },
+
+  "updates": {
+    "title": "更新",
+    "closeUpdates": "关闭更新"
+  },
+
+  "news": {
+    "greeting": "你好 {{userName}}，",
+    "refreshing": "更新中...",
+    "refresh": "刷新",
+    "summary": "摘要",
+    "topNews": "头条新闻",
+    "openInSmartReader": "在智能阅读器中打开",
+    "noNewsAvailable": "暂无新闻。请尝试刷新。"
+  },
+
+  "pendingChanges": {
+    "title": "文件更改",
+    "noPendingChanges": "无待处理更改",
+    "noRecentChanges": "无近期更改",
+    "viewDiff": "查看差异",
+    "applyChange": "应用更改",
+    "rejectChange": "拒绝更改"
+  },
+
+  "agentTimeline": {
+    "title": "代理",
+    "statusWorking": "工作中",
+    "statusReady": "就绪",
+    "thinking": "思考中",
+    "noActionsYet": "暂无操作。",
+    "preparingResponse": "准备回复..."
+  },
+
+  "errors": {
+    "requestCouldNotBeCompleted": "请求无法完成",
+    "suggestionsTitle": "建议",
+    "oopsSomethingWentWrong": "哎呀！出了点问题。",
+    "pleaseTryAgainLater": "请稍后再试。"
+  },
+
+  "fileMention": {
+    "placeholder": "输入 @ 来提及文件...",
+    "currentFile": "当前文件",
+    "loadingFiles": "正在加载工作区文件..."
+  },
+
+  "options": {
+    "languages": {
+      "en": "英语",
+      "es": "西班牙语",
+      "fr": "法语",
+      "de": "德语",
+      "zh": "中文",
+      "ja": "日语",
+      "yo": "约鲁巴语"
+    }
+  }
+}
