@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
+import * as l10n from "@vscode/l10n";
 import { APP_CONFIG, CODEBUDDY_ACTIONS } from "./application/constant";
 import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
 import { Comments } from "./commands/comment";
@@ -153,8 +154,10 @@ async function initializeWebViewProviders(
 
     if (apiKeys.length > 0) {
       vscode.window.showErrorMessage(
-        `${apiKeys} APIkeys may be required \n
-            Check out the FAQ and SETTINGS section to configure your AI assistant`,
+        l10n.t(
+          "{0} API keys may be required. Check out the FAQ and SETTINGS section to configure your AI assistant.",
+          apiKeys,
+        ),
       );
     }
 
@@ -167,13 +170,28 @@ async function initializeWebViewProviders(
       error,
     );
     vscode.window.showWarningMessage(
-      "CodeBuddy: WebView initialization failed, some features may be limited",
+      l10n.t(
+        "CodeBuddy: WebView initialization failed, some features may be limited",
+      ),
     );
   }
 }
 
 export async function activate(context: vscode.ExtensionContext) {
   try {
+    // Initialize l10n with the user's preferred language
+    const savedLanguage =
+      vscode.workspace.getConfiguration().get<string>("codebuddy.language") ||
+      "en";
+    if (savedLanguage !== "en") {
+      const bundleUri = vscode.Uri.joinPath(
+        context.extensionUri,
+        "l10n",
+        `bundle.l10n.${savedLanguage}.json`,
+      );
+      l10n.config({ uri: bundleUri.toString() });
+    }
+
     // Initialize Terminal with extension path early for Docker Compose support
     const terminal = Terminal.getInstance();
     terminal.setExtensionPath(context.extensionPath);
@@ -260,7 +278,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Show early status
     vscode.window.setStatusBarMessage(
-      "$(loading~spin) CodeBuddy: Initializing...",
+      l10n.t("$(loading~spin) CodeBuddy: Initializing..."),
       3000,
     );
 
@@ -398,7 +416,9 @@ export async function activate(context: vscode.ExtensionContext) {
               title,
             );
           } else {
-            vscode.window.showErrorMessage("Change not found or expired.");
+            vscode.window.showErrorMessage(
+              l10n.t("Change not found or expired."),
+            );
           }
         },
       ),
@@ -420,14 +440,14 @@ export async function activate(context: vscode.ExtensionContext) {
             const success = await diffReviewService.applyChange(id);
             if (success) {
               vscode.window.showInformationMessage(
-                "Change applied successfully.",
+                l10n.t("Change applied successfully."),
               );
               // Optionally close the diff editor?
               // vscode.commands.executeCommand("workbench.action.closeActiveEditor");
             }
           } else {
             vscode.window.showErrorMessage(
-              "Could not determine change ID to apply.",
+              l10n.t("Could not determine change ID to apply."),
             );
           }
         },
@@ -446,7 +466,9 @@ export async function activate(context: vscode.ExtensionContext) {
           }
           if (id) {
             diffReviewService.removePendingChange(id);
-            vscode.window.showInformationMessage("Change rejected/discarded.");
+            vscode.window.showInformationMessage(
+              l10n.t("Change rejected/discarded."),
+            );
             vscode.commands.executeCommand(
               "workbench.action.closeActiveEditor",
             );
@@ -693,18 +715,20 @@ export async function activate(context: vscode.ExtensionContext) {
       },
       "CodeBuddy.clearCache": async () => {
         const choice = await vscode.window.showWarningMessage(
-          "Are you sure you want to clear the codebase analysis cache? This will require re-analysis next time.",
-          "Clear Cache",
-          "Cancel",
+          l10n.t(
+            "Are you sure you want to clear the codebase analysis cache? This will require re-analysis next time.",
+          ),
+          l10n.t("Clear Cache"),
+          l10n.t("Cancel"),
         );
 
-        if (choice === "Clear Cache") {
+        if (choice === l10n.t("Clear Cache")) {
           try {
             const persistentCodebaseService =
               PersistentCodebaseUnderstandingService.getInstance();
             await persistentCodebaseService.clearCache();
             vscode.window.showInformationMessage(
-              "✅ Codebase analysis cache cleared successfully",
+              l10n.t("Codebase analysis cache cleared successfully"),
             );
           } catch (error: any) {
             vscode.window.showErrorMessage(
@@ -715,12 +739,14 @@ export async function activate(context: vscode.ExtensionContext) {
       },
       "CodeBuddy.refreshAnalysis": async () => {
         const choice = await vscode.window.showInformationMessage(
-          "This will refresh the codebase analysis. It may take some time.",
-          "Refresh Now",
-          "Cancel",
+          l10n.t(
+            "This will refresh the codebase analysis. It may take some time.",
+          ),
+          l10n.t("Refresh Now"),
+          l10n.t("Cancel"),
         );
 
-        if (choice === "Refresh Now") {
+        if (choice === l10n.t("Refresh Now")) {
           try {
             const persistentCodebaseService =
               PersistentCodebaseUnderstandingService.getInstance();
@@ -728,7 +754,7 @@ export async function activate(context: vscode.ExtensionContext) {
             await vscode.window.withProgress(
               {
                 location: vscode.ProgressLocation.Notification,
-                title: "Refreshing codebase analysis...",
+                title: l10n.t("Refreshing codebase analysis..."),
                 cancellable: true,
               },
               async (progress, token) => {
@@ -849,7 +875,10 @@ export async function activate(context: vscode.ExtensionContext) {
   } catch (error: any) {
     logger.error(`Extension activation failed: ${error.message}`, error);
     vscode.window.showErrorMessage(
-      `CodeBuddy: Activation failed — ${error.message || "unknown error"}. Check Output > CodeBuddy for details.`,
+      l10n.t(
+        "CodeBuddy: Activation failed — {0}. Check Output > CodeBuddy for details.",
+        error.message || "unknown error",
+      ),
     );
   }
 }
@@ -863,12 +892,12 @@ async function restartExtension(context: vscode.ExtensionContext) {
 
     // Show confirmation dialog
     const choice = await vscode.window.showInformationMessage(
-      "Are you sure you want to restart the CodeBuddy extension?",
-      "Restart",
-      "Cancel",
+      l10n.t("Are you sure you want to restart the CodeBuddy extension?"),
+      l10n.t("Restart"),
+      l10n.t("Cancel"),
     );
 
-    if (choice === "Restart") {
+    if (choice === l10n.t("Restart")) {
       // Clear extension state
       clearFileStorageData();
 
@@ -887,13 +916,13 @@ async function restartExtension(context: vscode.ExtensionContext) {
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
-          title: "Restarting CodeBuddy...",
+          title: l10n.t("Restarting CodeBuddy..."),
           cancellable: false,
         },
         async (progress) => {
-          progress.report({ increment: 50, message: "Cleaning up..." });
+          progress.report({ increment: 50, message: l10n.t("Cleaning up...") });
           await new Promise((resolve) => setTimeout(resolve, 500));
-          progress.report({ increment: 100, message: "Reloading..." });
+          progress.report({ increment: 100, message: l10n.t("Reloading...") });
           await vscode.commands.executeCommand("workbench.action.reloadWindow");
         },
       );
@@ -901,7 +930,7 @@ async function restartExtension(context: vscode.ExtensionContext) {
   } catch (error: any) {
     logger.error("Error restarting extension:", error);
     vscode.window.showErrorMessage(
-      "Failed to restart extension. Please reload VS Code manually.",
+      l10n.t("Failed to restart extension. Please reload VS Code manually."),
     );
   }
 }

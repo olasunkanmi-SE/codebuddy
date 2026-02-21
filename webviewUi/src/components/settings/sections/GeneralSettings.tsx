@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   SettingsSection,
   SectionTitle,
@@ -20,6 +21,7 @@ interface GeneralSettingsProps {
 
 export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _searchQuery }) => {
   const { values, options, handlers } = useSettings();
+  const { t } = useTranslation();
 
   const handleOpenCodeBuddySettings = () => {
     handlers.postMessage({ command: 'open-codebuddy-settings' });
@@ -28,11 +30,11 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
   return (
     <>
       <SettingsSection>
-        <SectionTitle>Basics</SectionTitle>
+        <SectionTitle>{t("settings.general.sectionBasics")}</SectionTitle>
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>Theme</SettingLabel>
+            <SettingLabel>{t("settings.general.theme")}</SettingLabel>
             <SettingDescription>Select a color theme for syntax highlighting</SettingDescription>
           </SettingInfo>
           <SettingControl>
@@ -51,7 +53,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>Font Family</SettingLabel>
+            <SettingLabel>{t("settings.general.fontFamily")}</SettingLabel>
             <SettingDescription>Select your preferred font for the chat interface</SettingDescription>
           </SettingInfo>
           <SettingControl>
@@ -70,7 +72,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>Font Size</SettingLabel>
+            <SettingLabel>{t("settings.general.fontSize")}</SettingLabel>
             <SettingDescription>Select your preferred font size for the chat interface</SettingDescription>
           </SettingInfo>
           <SettingControl>
@@ -89,15 +91,13 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>Language</SettingLabel>
+            <SettingLabel>{t("settings.general.language")}</SettingLabel>
             <SettingDescription>Select the language for button labels and other in-app text</SettingDescription>
           </SettingInfo>
           <SettingControl>
             <Select 
               value={values.language} 
               onChange={(e) => handlers.onLanguageChange(e.target.value)} 
-              disabled
-              title="Coming soon"
             >
               {options.languageOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -110,7 +110,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>CodeBuddy Mode</SettingLabel>
+            <SettingLabel>{t("settings.general.codeBuddyMode")}</SettingLabel>
             <SettingDescription>Switch between Agent mode (autonomous) and Ask mode (conversational)</SettingDescription>
           </SettingInfo>
           <SettingControl>
@@ -129,17 +129,17 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
       </SettingsSection>
 
       <SettingsSection>
-        <SectionTitle>Preferences</SectionTitle>
+        <SectionTitle>{t("settings.general.sectionPreferences")}</SectionTitle>
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>Nickname</SettingLabel>
-            <SettingDescription>Your display name shown in chat conversations</SettingDescription>
+            <SettingLabel>{t("settings.general.nickname")}</SettingLabel>
+            <SettingDescription>{t("settings.general.nicknameDesc")}</SettingDescription>
           </SettingInfo>
           <SettingControl>
             <Input
               type="text"
-              placeholder="Enter nickname"
+              placeholder={t("settings.general.nicknamePlaceholder")}
               value={values.nickname || values.username}
               onChange={(e) => handlers.onNicknameChange(e.target.value)}
               maxLength={20}
@@ -149,8 +149,8 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>Enable Streaming</SettingLabel>
-            <SettingDescription>Stream AI responses in real-time as they are generated</SettingDescription>
+            <SettingLabel>{t("settings.general.enableStreaming")}</SettingLabel>
+            <SettingDescription>{t("settings.general.enableStreamingDesc")}</SettingDescription>
           </SettingInfo>
           <SettingControl>
             <Toggle 
@@ -162,17 +162,17 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>CodeBuddy Settings</SettingLabel>
+            <SettingLabel>{t("settings.general.codeBuddySettings")}</SettingLabel>
             <SettingDescription>Configure API keys, models, and other CodeBuddy extension settings</SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Button onClick={handleOpenCodeBuddySettings}>Go to Settings</Button>
+            <Button onClick={handleOpenCodeBuddySettings}>{t("common.goToSettings")}</Button>
           </SettingControl>
         </SettingsRow>
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>Shortcut Settings</SettingLabel>
+            <SettingLabel>{t("settings.general.shortcutSettings")}</SettingLabel>
             <SettingDescription>Customize shortcut keys for various operations in the IDE</SettingDescription>
           </SettingInfo>
           <SettingControl>
@@ -193,13 +193,13 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>Import Configuration</SettingLabel>
+            <SettingLabel>{t("settings.general.importConfiguration")}</SettingLabel>
             <SettingDescription>
               Import all extensions, settings, and keybindings configurations from VSCode or Cursor
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
-            <Button disabled title="Coming soon">Import</Button>
+            <Button disabled title="Coming soon">{t("common.import")}</Button>
           </SettingControl>
         </SettingsRow>
       </SettingsSection>

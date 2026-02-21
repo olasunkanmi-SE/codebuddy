@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as l10n from "@vscode/l10n";
 import { Orchestrator } from "../orchestrator";
 import {
   FolderEntry,
@@ -1404,6 +1405,60 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   message.message,
                   vscode.ConfigurationTarget.Global,
                 );
+              break;
+
+            case "language-change-event":
+              // Handle language change and store in VS Code settings
+              this.logger.info(`Language changed to: ${message.message}`);
+              await vscode.workspace
+                .getConfiguration()
+                .update(
+                  "codebuddy.language",
+                  message.message,
+                  vscode.ConfigurationTarget.Global,
+                );
+              // Reconfigure l10n to use the selected language bundle
+              if (message.message && message.message !== "en") {
+                const bundleUri = vscode.Uri.joinPath(
+                  this._extensionUri,
+                  "l10n",
+                  `bundle.l10n.${message.message}.json`,
+                );
+                l10n.config({ uri: bundleUri.toString() });
+              } else {
+                // Reset to default (English) - empty contents
+                l10n.config({ contents: "{}" });
+              }
+              // Suggest changing VS Code display language for full localization
+              if (
+                message.message !== "en" &&
+                message.message !== vscode.env.language
+              ) {
+                const langMap: Record<string, string> = {
+                  es: "Spanish",
+                  fr: "French",
+                  de: "German",
+                  ja: "Japanese",
+                  "zh-cn": "Chinese (Simplified)",
+                  yo: "Yoruba",
+                };
+                const langName = langMap[message.message] || message.message;
+                vscode.window
+                  .showInformationMessage(
+                    l10n.t(
+                      "To also translate right-click menu commands, change VS Code's display language to {0}.",
+                      langName,
+                    ),
+                    l10n.t("Change Display Language"),
+                  )
+                  .then((choice) => {
+                    if (choice) {
+                      vscode.commands.executeCommand(
+                        "workbench.action.configureLocale",
+                      );
+                    }
+                  });
+              }
               break;
 
             case "font-size-change-event":

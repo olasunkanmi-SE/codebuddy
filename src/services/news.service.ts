@@ -40,20 +40,27 @@ const ENGINEERING_BLOG_FEEDS = [
     name: "Pinterest Engineering",
     url: "https://medium.com/feed/pinterest-engineering",
   },
+  // Cloud & Infrastructure Engineering
+  {
+    name: "Cloudflare Blog",
+    url: "https://blog.cloudflare.com/rss/",
+  },
   // Human Side of Tech & Leadership
   {
     name: "The Engineering Manager",
     url: "https://theengineeringmanager.com/feed/",
   },
-  { name: "Lara Hogan’s Blog", url: "https://larahogan.me/feed.xml" },
   { name: "Rands in Repose", url: "https://randsinrepose.com/feed/" },
   {
     name: "Irrational Exuberance (Will Larson)",
     url: "https://lethain.com/feeds.xml",
   },
   { name: "LeadDev", url: "https://leaddev.com/feed" },
-  { name: "Jellyfish Blog", url: "https://jellyfish.co/blog/feed" },
   { name: "StaffEng", url: "https://staffeng.com/rss" },
+  {
+    name: "Charity Majors (CTO Craft)",
+    url: "https://charity.wtf/feed/",
+  },
   // Substack & Independent - Architecture & Leadership
   {
     name: "The Pragmatic Engineer",
@@ -70,10 +77,25 @@ const ENGINEERING_BLOG_FEEDS = [
     url: "https://cutlefish.substack.com/feed",
   },
   { name: "Martin Fowler", url: "https://martinfowler.com/feed.atom" },
-  { name: "Julia Evans (jvns)", url: "https://jvns.ca/atom.xml" },
   { name: "LangChain Blog", url: "https://blog.langchain.dev/rss/" },
-  { name: "Towards Data Science", url: "https://towardsdatascience.com/feed" },
-  // AI Agents & Research
+  // System Design & Architecture
+  {
+    name: "High Scalability",
+    url: "https://highscalability.com/feed/",
+  },
+  {
+    name: "InfoQ",
+    url: "https://feed.infoq.com/",
+  },
+  {
+    name: "The New Stack",
+    url: "https://thenewstack.io/feed/",
+  },
+  {
+    name: "Architecture Notes",
+    url: "https://architecturenotes.co/rss/",
+  },
+  // AI Agents, LLMs & Research
   { name: "Google Research", url: "https://research.google/blog/rss" },
   { name: "Hugging Face", url: "https://huggingface.co/blog/feed.xml" },
   {
@@ -83,6 +105,26 @@ const ENGINEERING_BLOG_FEEDS = [
   {
     name: "Lil'Log (Lilian Weng)",
     url: "https://lilianweng.github.io/index.xml",
+  },
+  {
+    name: "Anthropic Research",
+    url: "https://www.anthropic.com/research/rss.xml",
+  },
+  {
+    name: "DeepMind Blog",
+    url: "https://deepmind.google/blog/rss.xml",
+  },
+  {
+    name: "Meta AI Blog",
+    url: "https://ai.meta.com/blog/rss/",
+  },
+  {
+    name: "AI Snake Oil",
+    url: "https://www.aisnakeoil.com/feed",
+  },
+  {
+    name: "Simon Willison's Weblog",
+    url: "https://simonwillison.net/atom/everything/",
   },
 ];
 

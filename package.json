@@ -1,13 +1,13 @@
 {
   "name": "ola-code-buddy",
-  "displayName": "CodeBuddy: Autonomous AI Software Engineer",
+  "displayName": "%displayName%",
   "author": {
     "name": "Oyinlola Olasunkanmi Raymond",
     "email": "oyinolasunkanmi@gmail.com",
     "url": "https://github.com/olasunkanmi-SE/codebuddy"
   },
   "publisher": "fiatinnovations",
-  "description": "CodeBuddy is an autonomous AI software engineer for Visual Studio Code. It goes beyond simple code completion to plan, execute, debug, and deploy complex software tasks using a multi-agent architecture. Features include deep codebase understanding, self-healing workflows, and seamless integration with external tools via MCP.",
+  "description": "%description%",
   "version": "4.1.2",
   "engines": {
     "vscode": "^1.78.0"
@@ -47,6 +47,7 @@
     "productivity"
   ],
   "homepage": "https://github.com/olasunkanmi-SE/codebuddy#readme",
+  "l10n": "./l10n",
   "main": "./dist/extension.js",
   "contributes": {
     "views": {
@@ -55,7 +56,7 @@
           "icon": "images/codebuddylogo.png",
           "type": "webview",
           "id": "chatView",
-          "name": "Chat"
+          "name": "%view.chat.name%"
         }
       ]
     },
@@ -152,142 +153,142 @@
     "commands": [
       {
         "command": "codebuddy.indexWorkspace",
-        "title": "Index Workspace for Semantic Search",
+        "title": "%commands.indexWorkspace%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.commentCode",
-        "title": "Add Comment to Selected Code",
+        "title": "%commands.commentCode%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.reviewCode",
-        "title": "Review Selected Code",
+        "title": "%commands.reviewCode%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.codeRefactor",
-        "title": "Refactor Selected Code",
+        "title": "%commands.codeRefactor%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.codeOptimize",
-        "title": "Optimize Selected Code",
+        "title": "%commands.codeOptimize%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.explain",
-        "title": "Explain This Code",
+        "title": "%commands.explain%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.generateCommitMessage",
-        "title": "Generate Commit Message",
+        "title": "%commands.generateCommitMessage%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.inLineChat",
-        "title": "Inline Chat",
+        "title": "%commands.inLineChat%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.interviewMe",
-        "title": "Interview Me",
+        "title": "%commands.interviewMe%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.generateMermaidDiagram",
-        "title": "Generate Architectural Diagram",
+        "title": "%commands.generateMermaidDiagram%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.codebaseAnalysis",
-        "title": "Analyze Codebase & Answer Questions",
+        "title": "%commands.codebaseAnalysis%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.reviewPR",
-        "title": "Review Pull Request",
+        "title": "%commands.reviewPR%",
         "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.triggerDailyStandup",
-        "title": "Trigger Daily Standup",
+        "title": "%commands.triggerDailyStandup%",
         "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.triggerCodeHealth",
-        "title": "Trigger Code Health Check",
+        "title": "%commands.triggerCodeHealth%",
         "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.triggerDependencyCheck",
-        "title": "Trigger Dependency Check",
+        "title": "%commands.triggerDependencyCheck%",
         "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.triggerGitWatchdog",
-        "title": "Trigger Git Watchdog",
+        "title": "%commands.triggerGitWatchdog%",
         "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.createBranchFromJira",
-        "title": "Jira Tickets (List, Branch, View)",
+        "title": "%commands.createBranchFromJira%",
         "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.createBranchFromGitLab",
-        "title": "GitLab Issues (List, Branch, View)",
+        "title": "%commands.createBranchFromGitLab%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.rules.open",
-        "title": "Open Project Rules",
+        "title": "%commands.rulesOpen%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.rules.init",
-        "title": "Initialize Project Rules",
+        "title": "%commands.rulesInit%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.rules.reload",
-        "title": "Reload Project Rules",
+        "title": "%commands.rulesReload%",
         "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.completion.toggle",
-        "title": "Toggle Inline Completions",
+        "title": "%commands.completionToggle%",
         "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.completion.openSettings",
-        "title": "Configure Completion Settings",
+        "title": "%commands.completionOpenSettings%",
         "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.applyChange",
-        "title": "Apply Change",
+        "title": "%commands.applyChange%",
         "icon": "$(check)"
       },
       {
         "command": "codebuddy.rejectChange",
-        "title": "Discard Change",
+        "title": "%commands.rejectChange%",
         "icon": "$(close)"
       },
       {
         "command": "CodeBuddy.openInReader",
-        "title": "Open URL in Smart Reader",
+        "title": "%commands.openInReader%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.openSelectionInReader",
-        "title": "Open Selection in Smart Reader",
+        "title": "%commands.openSelectionInReader%",
         "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.openLastBrowsedInReader",
-        "title": "Open Current Page in Smart Reader",
+        "title": "%commands.openLastBrowsedInReader%",
         "category": "CodeBuddy"
       }
     ],
@@ -376,7 +377,7 @@
               "Local"
             ],
             "default": "Groq",
-            "description": "Select Model"
+            "description": "%config.selectModel%"
           },
           "tavily.apiKey": {
             "type": [
@@ -384,7 +385,7 @@
               "null"
             ],
             "default": "apiKey",
-            "markdownDescription": "Enter your [API Key](https://app.tavily.com/home) for Tavily."
+            "markdownDescription": "%config.tavilyApiKey%"
           },
           "google.gemini.apiKeys": {
             "type": [
@@ -392,7 +393,7 @@
               "null"
             ],
             "default": "apiKey",
-            "markdownDescription": "Enter your [API Key](https://aistudio.google.com/app/apikey) for Gemini."
+            "markdownDescription": "%config.geminiApiKey%"
           },
           "google.gemini.model": {
             "type": [
@@ -400,7 +401,7 @@
               "null"
             ],
             "default": "gemini-2.5-pro",
-            "markdownDescription": "Provide the name of the model you want to use. Choose from the [base models](https://ai.google.dev/models/gemini) or your own [tuned model](https://ai.google.dev/docs/model_tuning_guidance)."
+            "markdownDescription": "%config.geminiModel%"
           },
           "groq.llama3.apiKey": {
             "type": [
@@ -408,7 +409,7 @@
               "null"
             ],
             "default": "apiKey",
-            "markdownDescription": "Enter your [API Key](https://console.groq.com/keys) Groq"
+            "markdownDescription": "%config.groqApiKey%"
           },
           "groq.llama3.model": {
             "type": [
@@ -416,7 +417,7 @@
               "null"
             ],
             "default": "llama-3.1-70b-versatile",
-            "markdownDescription": "Provide the name of the Groq model you want to use. Choose from the ..."
+            "markdownDescription": "%config.groqModel%"
           },
           "anthropic.model": {
             "type": [
@@ -424,7 +425,7 @@
               "null"
             ],
             "default": "claude-sonnet-4-5",
-            "markdownDescription": "Provide the name of the Anthropic model you want to use. Choose from the ..."
+            "markdownDescription": "%config.anthropicModel%"
           },
           "anthropic.apiKey": {
             "type": [
@@ -432,7 +433,7 @@
               "null"
             ],
             "default": "apiKey",
-            "markdownDescription": "Enter your [API Key](https://docs.anthropic.com/en/docs/about-claude/models) Anthropic"
+            "markdownDescription": "%config.anthropicApiKey%"
           },
           "deepseek.model": {
             "type": [
@@ -440,7 +441,7 @@
               "null"
             ],
             "default": "deepseek-chat",
-            "markdownDescription": "Provide the name of the Deepseek model you want to use (e.g., deepseek-chat (V3), deepseek-reasoner (R1))."
+            "markdownDescription": "%config.deepseekModel%"
           },
           "deepseek.apiKey": {
             "type": [
@@ -448,7 +449,7 @@
               "null"
             ],
             "default": "apiKey",
-            "markdownDescription": "Enter your Deepseek API Key"
+            "markdownDescription": "%config.deepseekApiKey%"
           },
           "qwen.model": {
             "type": [
@@ -456,7 +457,7 @@
               "null"
             ],
             "default": "qwen-max",
-            "markdownDescription": "Provide the name of the Qwen model you want to use (e.g., qwen-max, qwen-plus, qwen3-coder-plus, qwen3-coder-max)."
+            "markdownDescription": "%config.qwenModel%"
           },
           "qwen.apiKey": {
             "type": [
@@ -464,7 +465,7 @@
               "null"
             ],
             "default": "apiKey",
-            "markdownDescription": "Enter your Qwen (DashScope) API Key"
+            "markdownDescription": "%config.qwenApiKey%"
           },
           "glm.model": {
             "type": [
@@ -472,7 +473,7 @@
               "null"
             ],
             "default": "glm-4",
-            "markdownDescription": "Provide the name of the GLM model you want to use (e.g., glm-4, glm-4-plus, glm-4v)."
+            "markdownDescription": "%config.glmModel%"
           },
           "glm.apiKey": {
             "type": [
@@ -480,7 +481,7 @@
               "null"
             ],
             "default": "apiKey",
-            "markdownDescription": "Enter your GLM (Zhipu AI) API Key"
+            "markdownDescription": "%config.glmApiKey%"
           },
           "openai.model": {
             "type": [
@@ -488,7 +489,7 @@
               "null"
             ],
             "default": "gpt-4o",
-            "markdownDescription": "Provide the name of the OpenAI model you want to use."
+            "markdownDescription": "%config.openaiModel%"
           },
           "openai.apiKey": {
             "type": [
@@ -496,7 +497,7 @@
               "null"
             ],
             "default": "apiKey",
-            "markdownDescription": "Enter your OpenAI API Key"
+            "markdownDescription": "%config.openaiApiKey%"
           },
           "local.model": {
             "type": [
@@ -504,7 +505,7 @@
               "null"
             ],
             "default": "qwen2.5-coder",
-            "markdownDescription": "Provide the name of the Local model you want to use (e.g., qwen2.5-coder, llama3.2, gemma3, mistral)."
+            "markdownDescription": "%config.localModel%"
           },
           "local.baseUrl": {
             "type": [
@@ -512,7 +513,7 @@
               "null"
             ],
             "default": "http://localhost:11434/v1",
-            "markdownDescription": "Enter the Base URL for your Local LLM. For Ollama use http://localhost:11434/v1, for Docker Model Runner use http://localhost:12434/engines/llama.cpp/v1."
+            "markdownDescription": "%config.localBaseUrl%"
           },
           "local.apiKey": {
             "type": [
@@ -520,7 +521,7 @@
               "null"
             ],
             "default": "not-needed",
-            "markdownDescription": "Enter your Local LLM API Key (if required)."
+            "markdownDescription": "%config.localApiKey%"
           },
           "font.family": {
             "type": "string",
@@ -537,7 +538,7 @@
               "Inconsolata"
             ],
             "default": "JetBrains Mono",
-            "description": "Select preffered font family"
+            "description": "%config.fontFamily%"
           },
           "chatview.theme": {
             "type": "string",
@@ -553,7 +554,7 @@
               "tokyo night"
             ],
             "default": "Atom One Dark",
-            "description": "Select preffered chat view theme"
+            "description": "%config.chatviewTheme%"
           },
           "chatview.font.size": {
             "type": [
@@ -561,47 +562,47 @@
               "number"
             ],
             "default": 16,
-            "description": "Enter your preferred font size (default is 16)"
+            "description": "%config.fontSize%"
           },
           "codebuddy.enableStreaming": {
             "type": "boolean",
             "default": true,
-            "description": "Enable streaming responses from AI models"
+            "description": "%config.enableStreaming%"
           },
           "codebuddy.compactMode": {
             "type": "boolean",
             "default": false,
-            "description": "Reduce spacing between messages for a denser view"
+            "description": "%config.compactMode%"
           },
           "codebuddy.nickname": {
             "type": "string",
             "default": "",
-            "description": "Your display name shown in chat conversations"
+            "description": "%config.nickname%"
           },
           "codebuddy.autoApprove": {
             "type": "boolean",
             "default": false,
-            "description": "Automatically approve agent actions without confirmation"
+            "description": "%config.autoApprove%"
           },
           "codebuddy.allowFileEdits": {
             "type": "boolean",
             "default": true,
-            "description": "Allow the agent to create, modify, and delete files"
+            "description": "%config.allowFileEdits%"
           },
           "codebuddy.allowTerminal": {
             "type": "boolean",
             "default": true,
-            "description": "Allow the agent to execute terminal commands"
+            "description": "%config.allowTerminal%"
           },
           "codebuddy.verboseLogging": {
             "type": "boolean",
             "default": false,
-            "description": "Show detailed agent activity logs for debugging"
+            "description": "%config.verboseLogging%"
           },
           "codebuddy.indexCodebase": {
             "type": "boolean",
             "default": false,
-            "description": "Enable vector database indexing for semantic code search"
+            "description": "%config.indexCodebase%"
           },
           "codebuddy.contextWindow": {
             "type": "string",
@@ -613,27 +614,27 @@
               "128k"
             ],
             "default": "16k",
-            "description": "Maximum context window size for AI requests"
+            "description": "%config.contextWindow%"
           },
           "codebuddy.includeHidden": {
             "type": "boolean",
             "default": false,
-            "description": "Include hidden files (starting with .) in context gathering"
+            "description": "%config.includeHidden%"
           },
           "codebuddy.maxFileSize": {
             "type": "string",
             "default": "1",
-            "description": "Maximum file size in MB for context gathering"
+            "description": "%config.maxFileSize%"
           },
           "codebuddy.requireDiffApproval": {
             "type": "boolean",
             "default": false,
-            "description": "Require manual approval before agent file changes are applied"
+            "description": "%config.requireDiffApproval%"
           },
           "codebuddy.completion.enabled": {
             "type": "boolean",
             "default": true,
-            "description": "Enable inline code completions (ghost text)"
+            "description": "%config.completionEnabled%"
           },
           "codebuddy.completion.provider": {
             "type": "string",
@@ -648,12 +649,12 @@
               "Local"
             ],
             "default": "Local",
-            "description": "Provider for inline completions (can be different from chat provider)"
+            "description": "%config.completionProvider%"
           },
           "codebuddy.completion.model": {
             "type": "string",
             "default": "qwen2.5-coder",
-            "description": "Model to use for completions (e.g., qwen2.5-coder, deepseek-coder)"
+            "description": "%config.completionModel%"
           },
           "codebuddy.completion.apiKey": {
             "type": [
@@ -661,18 +662,18 @@
               "null"
             ],
             "default": "",
-            "description": "API key for completion provider (optional, falls back to main key if empty)"
+            "description": "%config.completionApiKey%"
           },
           "codebuddy.completion.debounceMs": {
             "type": "number",
             "default": 300,
             "minimum": 50,
-            "description": "Delay in milliseconds before triggering a completion"
+            "description": "%config.completionDebounceMs%"
           },
           "codebuddy.completion.maxTokens": {
             "type": "number",
             "default": 128,
-            "description": "Maximum tokens to generate for a completion"
+            "description": "%config.completionMaxTokens%"
           },
           "codebuddy.completion.triggerMode": {
             "type": "string",
@@ -681,32 +682,32 @@
               "manual"
             ],
             "default": "automatic",
-            "description": "How completions are triggered (automatic on type, or manual hotkey)"
+            "description": "%config.completionTriggerMode%"
           },
           "codebuddy.completion.multiLine": {
             "type": "boolean",
             "default": true,
-            "description": "Allow multi-line completions"
+            "description": "%config.completionMultiLine%"
           },
           "codebuddy.rules.enabled": {
             "type": "boolean",
             "default": true,
-            "description": "Enable project rules from .codebuddy/rules.md file"
+            "description": "%config.rulesEnabled%"
           },
           "codebuddy.rules.maxTokens": {
             "type": "number",
             "default": 2000,
-            "description": "Maximum tokens allowed for project rules (rules exceeding this will be truncated)"
+            "description": "%config.rulesMaxTokens%"
           },
           "codebuddy.rules.showIndicator": {
             "type": "boolean",
             "default": true,
-            "description": "Show indicator in UI when project rules are active"
+            "description": "%config.rulesShowIndicator%"
           },
           "rules.customRules": {
             "type": "array",
             "default": [],
-            "description": "Custom rules for code generation. Each rule is appended to the agent's system prompt.",
+            "description": "%config.customRules%",
             "items": {
               "type": "object",
               "properties": {
@@ -734,12 +735,12 @@
           "rules.customSystemPrompt": {
             "type": "string",
             "default": "",
-            "description": "Additional instructions appended to the base system prompt"
+            "description": "%config.customSystemPrompt%"
           },
           "rules.subagents": {
             "type": "object",
             "default": {},
-            "description": "Subagent configuration. Keys are subagent IDs, values contain enabled state.",
+            "description": "%config.subagents%",
             "additionalProperties": {
               "type": "object",
               "properties": {
@@ -752,35 +753,49 @@
           "codebuddy.connectors.states": {
             "type": "object",
             "default": {},
-            "description": "Stores the connection status and configuration of external connectors",
+            "description": "%config.connectorStates%",
             "scope": "application"
           },
           "codebuddy.mcp.servers": {
             "type": "object",
             "default": {},
-            "description": "Stores the configuration of MCP servers",
+            "description": "%config.mcpServers%",
             "scope": "application"
           },
           "codebuddy.mcp.disabledTools": {
             "type": "object",
             "default": {},
-            "description": "Per-server lists of disabled MCP tool names",
+            "description": "%config.mcpDisabledTools%",
             "scope": "application"
           },
           "codebuddy.automations.dailyStandup.enabled": {
             "type": "boolean",
             "default": true,
-            "description": "Enable or disable the Daily Standup automation (8:00 AM)"
+            "description": "%config.dailyStandupEnabled%"
           },
           "codebuddy.automations.codeHealth.enabled": {
             "type": "boolean",
             "default": true,
-            "description": "Enable or disable the Daily Code Health Check (9:00 AM)"
+            "description": "%config.codeHealthEnabled%"
           },
           "codebuddy.automations.dependencyCheck.enabled": {
             "type": "boolean",
             "default": true,
-            "description": "Enable or disable the Daily Dependency Check (11:00 AM)"
+            "description": "%config.dependencyCheckEnabled%"
+          },
+          "codebuddy.language": {
+            "type": "string",
+            "enum": [
+              "en",
+              "es",
+              "fr",
+              "de",
+              "zh-cn",
+              "ja",
+              "yo"
+            ],
+            "default": "en",
+            "description": "%config.language%"
           },
           "codebuddy.browserType": {
             "type": "string",
@@ -790,7 +805,7 @@
               "system"
             ],
             "default": "system",
-            "description": "Choose how to open news links and other external URLs."
+            "description": "%config.browserType%"
           }
         }
       }
@@ -814,13 +829,13 @@
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
+    "@types/fast-levenshtein": "^0.0.4",
     "@types/jsdom": "^21.1.7",
     "@types/markdown-it": "^13.0.7",
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.2.5",
-    "@types/readable-stream": "^4.0.11",
-    "@types/fast-levenshtein": "^0.0.4",
     "@types/node-fetch": "^2.6.11",
+    "@types/readable-stream": "^4.0.11",
     "@types/sinon": "^17.0.3",
     "@types/sql.js": "^1.4.9",
     "@types/vscode": "^1.78.0",
@@ -853,6 +868,7 @@
     "@opentelemetry/exporter-metrics-otlp-http": "^0.212.0",
     "@opentelemetry/sdk-trace-base": "^2.5.1",
     "@traceloop/node-server-sdk": "^0.22.7",
+    "@vscode/l10n": "^0.0.18",
     "@vscode/ripgrep": "^1.17.0",
     "apache-arrow": "18.1.0",
     "axios": "^1.7.9",

@@ -1,0 +1,263 @@
+{
+  "common": {
+    "save": "保存",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "edit": "編集",
+    "delete": "削除",
+    "add": "追加",
+    "remove": "削除",
+    "configure": "設定",
+    "refresh": "更新",
+    "loading": "読み込み中...",
+    "install": "インストール",
+    "enable": "有効化",
+    "enabled": "有効",
+    "use": "使用",
+    "approve": "承認",
+    "deny": "拒否",
+    "dismiss": "閉じる",
+    "details": "詳細",
+    "export": "エクスポート",
+    "import": "インポート",
+    "processing": "処理中",
+    "copy": "コピー",
+    "copied": "コピー完了！",
+    "failed": "失敗",
+    "active": "アクティブ",
+    "inactive": "非アクティブ",
+    "error": "エラー",
+    "new": "新規",
+    "beta": "ベータ",
+    "free": "無料",
+    "justNow": "たった今",
+    "minutesAgo": "{{count}}分前",
+    "hoursAgo": "{{count}}時間前",
+    "daysAgo": "{{count}}日前",
+    "yesterday": "昨日",
+    "now": "今",
+    "allFeatures": "すべての機能",
+    "voteForFeature": "この機能に投票",
+    "comingSoon": "近日公開",
+    "goToSettings": "設定へ移動",
+    "available": "利用可能",
+    "reader": "リーダー",
+    "saved": "保存済み",
+    "unsaved": "保存",
+    "saveForLater": "後で読む"
+  },
+
+  "chat": {
+    "inputPlaceholderActive": "CodeBuddyに質問...",
+    "inputPlaceholderDisabled": "エージェント作業中...",
+    "tabChat": "チャット",
+    "tabFaq": "よくある質問",
+    "contextLabel": "コンテキスト：",
+    "activeWorkspace": "アクティブなワークスペース：",
+    "approveAction": "アクションを承認",
+    "stopRun": "実行停止",
+    "approveToolPrompt": "{{toolName}} の実行を承認 — {{description}}",
+    "readyToRun": "実行準備完了",
+    "processingRequest": "リクエスト処理中",
+    "defaultUsername": "CodeBuddy ユーザー"
+  },
+
+  "welcome": {
+    "greetingWithName": "おかえりなさい、{{username}}",
+    "greetingDefault": "CodeBuddyへようこそ",
+    "subtitle": "AI搭載のマルチエージェントコーディングアシスタント。複数のLLMプロバイダー、ローカルモデルサポート、自律タスク実行に対応",
+    "tipsTitle": "できること",
+    "tipsHint": "FAQと設定セクションでAIアシスタントを設定してください",
+    "featureAgentMode": "エージェントモード",
+    "featureAgentModeDesc": "ファイル編集、ターミナルコマンド、ウェブ検索を含む自律実行",
+    "featureAskMode": "質問モード",
+    "featureAskModeDesc": "ファイルを変更せずに素早い質問と回答",
+    "featureProviders": "9つのAIプロバイダー",
+    "featureDiffReview": "差分レビュー",
+    "featureDiffReviewDesc": "変更が適用される前に確認・承認/拒否",
+    "featureMCP": "MCPツール",
+    "featureMCPDesc": "GitHub、GitLab、カスタム統合で拡張",
+    "featureMentions": "@ メンション",
+    "featureMentionsDesc": "@ファイル名で特定のファイルをコンテキストとして参照"
+  },
+
+  "webview": {
+    "tooltipSettings": "設定",
+    "tooltipSessions": "セッション",
+    "tooltipNotifications": "通知",
+    "tooltipUpdates": "アップデート",
+    "tooltipObservability": "オブザーバビリティ",
+    "tooltipOpenBrowser": "ブラウザを開く（右クリックで履歴）",
+    "tooltipIncreaseFontSize": "フォントサイズを大きく",
+    "tooltipDecreaseFontSize": "フォントサイズを小さく",
+    "browsingHistoryHeader": "最近のページ",
+    "browsingHistoryEmpty": "閲覧履歴はありません",
+    "browserTypeReader": "スマートリーダー（推奨）",
+    "browserTypeSimple": "シンプルブラウザ",
+    "browserTypeSystem": "システムブラウザ"
+  },
+
+  "settings": {
+    "title": "設定",
+    "closeSettings": "設定を閉じる",
+    "searchPlaceholder": "設定を検索...",
+    "noSettingsFound": "設定が見つかりません",
+
+    "categories": {
+      "account": "アカウント",
+      "accountDesc": "アカウント設定の管理",
+      "general": "一般",
+      "generalDesc": "一般的なアプリケーション設定",
+      "browser": "ブラウザ",
+      "browserDesc": "ブラウザとリンクの開き方の設定",
+      "agents": "エージェント",
+      "agentsDesc": "AIエージェントの動作設定",
+      "mcp": "MCP",
+      "mcpDesc": "モデルコンテキストプロトコルサーバー",
+      "connectors": "コネクタ",
+      "connectorsDesc": "外部サービスへの接続",
+      "conversation": "会話",
+      "conversationDesc": "チャットと会話の設定",
+      "models": "モデル",
+      "modelsDesc": "AIモデルの設定",
+      "context": "コンテキスト",
+      "contextDesc": "ワークスペースコンテキストの設定",
+      "rules": "ルールとサブエージェント",
+      "rulesDesc": "カスタムルールとサブエージェントの設定",
+      "privacy": "プライバシー",
+      "privacyDesc": "プライバシーとデータの設定",
+      "coworker": "コワーカー",
+      "coworkerDesc": "日常の自動化と生産性ツール",
+      "about": "概要",
+      "aboutDesc": "この拡張機能について"
+    },
+
+    "general": {
+      "sectionBasics": "基本",
+      "sectionPreferences": "環境設定",
+      "theme": "テーマ",
+      "fontFamily": "フォント",
+      "fontSize": "フォントサイズ",
+      "language": "言語",
+      "codeBuddyMode": "CodeBuddyモード",
+      "nickname": "ニックネーム",
+      "nicknamePlaceholder": "ニックネームを入力",
+      "nicknameDesc": "チャットでの表示名",
+      "enableStreaming": "ストリーミングを有効化",
+      "enableStreamingDesc": "リアルタイムでレスポンスをストリーミング"
+    },
+
+    "agents": {
+      "sectionAgentMode": "エージェントモード",
+      "sectionPermissions": "権限",
+      "sectionAdvanced": "詳細",
+      "autoApproveActions": "アクションの自動承認",
+      "allowFileEdits": "ファイル編集を許可",
+      "allowTerminalAccess": "ターミナルアクセスを許可",
+      "verboseLogging": "詳細ログ",
+      "modeAgent": "エージェントモード",
+      "modeAsk": "質問モード"
+    },
+
+    "models": {
+      "sectionAIModelSelection": "AIモデルの選択",
+      "sectionActiveModel": "アクティブモデル",
+      "sectionLocalModels": "ローカルモデル（Docker）",
+      "sectionAPIConfiguration": "API設定",
+      "primaryModel": "プライマリモデル",
+      "contextWindow": "コンテキストウィンドウ",
+      "responseSpeed": "応答速度",
+      "responseSpeedValue": "高速",
+      "startServer": "サーバー起動",
+      "running": "実行中",
+      "configureInSettings": "設定で構成"
+    },
+
+    "about": {
+      "appName": "CodeBuddy",
+      "tagline": "AI搭載のコーディングパートナー。より良いコードを、より速く。",
+      "builtWithLove": "❤️ で作られました"
+    },
+
+    "coworker": {
+      "sectionProductivityAutomations": "生産性自動化",
+      "dailyStandup": "デイリースタンドアップ",
+      "dailyStandupDesc": "自動化された毎日の進捗概要",
+      "codeHealthCheck": "コードヘルスチェック",
+      "dependencyCheck": "依存関係チェック",
+      "triggerNow": "今すぐ実行"
+    }
+  },
+
+  "observability": {
+    "title": "オブザーバビリティ",
+    "tabDashboard": "ダッシュボード",
+    "tabLogs": "ログ",
+    "tabTraces": "トレース",
+    "noLogsYet": "ログはまだありません",
+    "noTracesCaptured": "キャプチャされたトレースはありません"
+  },
+
+  "sessions": {
+    "title": "セッション",
+    "newSession": "新規セッション",
+    "noSessionsYet": "セッションはまだありません。",
+    "startNewConversation": "新しい会話を始めましょう！"
+  },
+
+  "notifications": {
+    "title": "通知",
+    "noNotifications": "通知はありません",
+    "markAllRead": "すべて既読にする",
+    "clearAll": "すべてクリア"
+  },
+
+  "news": {
+    "greeting": "こんにちは {{userName}}さん、",
+    "refresh": "更新",
+    "summary": "概要",
+    "topNews": "トップニュース",
+    "openInSmartReader": "スマートリーダーで開く",
+    "noNewsAvailable": "ニュースはありません。更新してください。"
+  },
+
+  "pendingChanges": {
+    "title": "ファイルの変更",
+    "noPendingChanges": "保留中の変更はありません",
+    "viewDiff": "差分を表示",
+    "applyChange": "変更を適用",
+    "rejectChange": "変更を拒否"
+  },
+
+  "agentTimeline": {
+    "title": "エージェント",
+    "statusWorking": "作業中",
+    "statusReady": "準備完了",
+    "thinking": "思考中",
+    "noActionsYet": "まだアクションはありません。"
+  },
+
+  "errors": {
+    "requestCouldNotBeCompleted": "リクエストを完了できませんでした",
+    "oopsSomethingWentWrong": "おっと！問題が発生しました。",
+    "pleaseTryAgainLater": "しばらくしてからもう一度お試しください。"
+  },
+
+  "fileMention": {
+    "placeholder": "@ を入力してファイルをメンション...",
+    "currentFile": "現在のファイル",
+    "loadingFiles": "ワークスペースファイルを読み込み中..."
+  },
+
+  "options": {
+    "languages": {
+      "en": "英語",
+      "es": "スペイン語",
+      "fr": "フランス語",
+      "de": "ドイツ語",
+      "zh": "中国語",
+      "ja": "日本語",
+      "yo": "ヨルバ語"
+    }
+  }
+}
