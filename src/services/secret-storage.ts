@@ -9,6 +9,8 @@ export class SecretStorageService implements vscode.Disposable {
   private readonly logger: Logger;
   private readonly disposables: vscode.Disposable[] = [];
   protected readonly orchestrator: Orchestrator;
+  private static instance: SecretStorageService | undefined;
+  private apiKeyCache = new Map<string, string>();
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.localStorage = context.secrets;
@@ -19,8 +21,32 @@ export class SecretStorageService implements vscode.Disposable {
       enableTelemetry: true,
     });
     this.orchestrator = Orchestrator.getInstance();
+    SecretStorageService.instance = this;
     this.registerDisposables();
     this.publishPreferences();
+  }
+
+  /**
+   * Initialize the singleton instance with the extension context.
+   * Must be called once during extension activation before any API key access.
+   */
+  static initialize(context: vscode.ExtensionContext): SecretStorageService {
+    if (!SecretStorageService.instance) {
+      new SecretStorageService(context);
+    }
+    return SecretStorageService.instance!;
+  }
+
+  /**
+   * Get the singleton instance. Throws if not yet initialized.
+   */
+  static getInstance(): SecretStorageService {
+    if (!SecretStorageService.instance) {
+      throw new Error(
+        "SecretStorageService not initialized. Call initialize() first.",
+      );
+    }
+    return SecretStorageService.instance;
   }
 
   registerDisposables() {
@@ -165,6 +191,17 @@ export class SecretStorageService implements vscode.Disposable {
   async handleSecretStorageChange(event: vscode.SecretStorageChangeEvent) {
     const value = await this.localStorage.get(event.key);
     this.logger.info(`${event.key}'s value has been changed in SecretStorage`);
+
+    // Update API key cache when a stored API key changes
+    if (event.key.startsWith("apikey:")) {
+      const configKey = event.key.substring("apikey:".length);
+      if (value) {
+        this.apiKeyCache.set(configKey, value);
+      } else {
+        this.apiKeyCache.delete(configKey);
+      }
+    }
+
     return value;
   }
 
@@ -197,6 +234,24 @@ export class SecretStorageService implements vscode.Disposable {
     for (const change of Object.values(APP_CONFIG)) {
       if (event.affectsConfiguration(change)) {
         this.logConfigurationChange(change, "");
+
+        // Auto-persist API key changes from VS Code settings to SecretStorage.
+        // This ensures that if a user enters an API key in the regular settings,
+        // it is securely moved to the OS keychain for better protection.
+        if (change.endsWith("apiKey") || change.endsWith("apiKeys")) {
+          const newValue = vscode.workspace
+            .getConfiguration()
+            .get<string>(change);
+          if (
+            newValue &&
+            newValue !== "apiKey" &&
+            newValue !== "not-needed" &&
+            newValue !== ""
+          ) {
+            await this.storeApiKey(change, newValue);
+            this.logger.info(`Updated API key in secure storage for ${change}`);
+          }
+        }
       }
     }
   }
@@ -240,9 +295,81 @@ export class SecretStorageService implements vscode.Disposable {
   }
 
   /**
+   * Migrate API keys from VS Code settings to OS-level SecretStorage.
+   * Called once during extension activation. Handles three cases:
+   * - First run: copies settings values into SecretStorage.
+   * - Subsequent runs: loads existing SecretStorage values into cache.
+   * - Offline edits: if a user changed a key in settings.json while the
+   *   extension was inactive, the new value is synced to SecretStorage.
+   * Original settings values are left unchanged for backward compatibility.
+   */
+  async migrateApiKeys(): Promise<void> {
+    const apiKeyConfigs = [
+      APP_CONFIG.geminiKey,
+      APP_CONFIG.groqApiKey,
+      APP_CONFIG.anthropicApiKey,
+      APP_CONFIG.deepseekApiKey,
+      APP_CONFIG.openaiApiKey,
+      APP_CONFIG.qwenApiKey,
+      APP_CONFIG.glmApiKey,
+      APP_CONFIG.tavilyApiKey,
+      APP_CONFIG.localApiKey,
+    ];
+
+    for (const configKey of apiKeyConfigs) {
+      const existingSecret = await this.get(`apikey:${configKey}`);
+      const settingsValue = vscode.workspace
+        .getConfiguration()
+        .get<string>(configKey);
+      const isValidSettingsValue =
+        settingsValue &&
+        settingsValue !== "apiKey" &&
+        settingsValue !== "not-needed" &&
+        settingsValue !== "";
+
+      if (
+        existingSecret &&
+        isValidSettingsValue &&
+        settingsValue !== existingSecret
+      ) {
+        // Settings value was changed while extension was inactive — sync to SecretStorage
+        await this.add(`apikey:${configKey}`, settingsValue);
+        this.apiKeyCache.set(configKey, settingsValue);
+        this.logger.info(
+          `Synced updated API key for ${configKey} to secure storage`,
+        );
+      } else if (existingSecret) {
+        this.apiKeyCache.set(configKey, existingSecret);
+      } else if (isValidSettingsValue) {
+        // First-time migration from settings to SecretStorage
+        await this.add(`apikey:${configKey}`, settingsValue);
+        this.apiKeyCache.set(configKey, settingsValue);
+        this.logger.info(`Migrated API key for ${configKey} to secure storage`);
+      }
+    }
+  }
+
+  /**
+   * Get an API key from the secure cache (populated from OS keychain on init).
+   * Returns undefined if no key is stored for this config key.
+   */
+  getApiKey(configKey: string): string | undefined {
+    return this.apiKeyCache.get(configKey);
+  }
+
+  /**
+   * Store an API key in SecretStorage (OS keychain) and update the local cache.
+   */
+  async storeApiKey(configKey: string, value: string): Promise<void> {
+    await this.add(`apikey:${configKey}`, value);
+    this.apiKeyCache.set(configKey, value);
+  }
+
+  /**
    * Disposes of all disposables (event listeners, etc.) managed by this service.
    */
   public dispose(): void {
     this.disposables.forEach((d) => d.dispose());
+    SecretStorageService.instance = undefined;
   }
 }

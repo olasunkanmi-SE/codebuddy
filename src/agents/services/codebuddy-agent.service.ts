@@ -10,6 +10,7 @@ import {
 import { StreamManager } from "./stream-manager.service";
 import { ResultSynthesizerService } from "./result-synthesizer.service";
 import { AgentRunningGuardService } from "../../services/agent-running-guard.service";
+import { InputValidator } from "../../services/input-validator";
 
 // Tool descriptions for user-friendly feedback
 const TOOL_DESCRIPTIONS: Record<
@@ -302,6 +303,27 @@ export class CodeBuddyAgentService {
     onChunk?: (chunk: any) => void,
     requestId?: string,
   ) {
+    // Validate input for prompt injection and other security issues
+    const validation = InputValidator.getInstance().validateInput(userMessage);
+
+    if (validation.blocked) {
+      yield {
+        type: StreamEventType.ERROR,
+        content:
+          "Your message was blocked because it contains potentially unsafe instructions. Please rephrase your request.",
+        metadata: { reason: "input_blocked", warnings: validation.warnings },
+      };
+      return;
+    }
+
+    // Use the sanitized input for processing
+    const sanitizedMessage = validation.sanitizedInput;
+    if (validation.warnings.length > 0) {
+      this.logger.warn(
+        `Input validation warnings: ${validation.warnings.join("; ")}`,
+      );
+    }
+
     const conversationId = threadId ?? `thread-${Date.now()}`;
     const streamManger = new StreamManager({
       maxBufferSize: 10,
@@ -348,7 +370,7 @@ export class CodeBuddyAgentService {
     const span = tracer.startSpan("streamAgent", {
       attributes: {
         thread_id: conversationId,
-        user_message: userMessage.substring(0, 500),
+        user_message: sanitizedMessage.substring(0, 500),
       },
     });
 
@@ -391,7 +413,7 @@ export class CodeBuddyAgentService {
       };
       let streamIterator = (
         await agent.stream(
-          { messages: [{ role: "user", content: userMessage }] },
+          { messages: [{ role: "user", content: sanitizedMessage }] },
           config,
         )
       )[Symbol.asyncIterator]();

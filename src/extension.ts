@@ -1,13 +1,7 @@
-import { setupInstrumentation } from "./instrumentation"; // Moved call to tail end
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { Orchestrator } from "./orchestrator";
-import {
-  APP_CONFIG,
-  CODEBUDDY_ACTIONS,
-  generativeAiModels,
-} from "./application/constant";
+import { APP_CONFIG, CODEBUDDY_ACTIONS } from "./application/constant";
 import { architecturalRecommendationCommand } from "./commands/architectural-recommendation";
 import { Comments } from "./commands/comment";
 import { ExplainCode } from "./commands/explain";
@@ -23,42 +17,40 @@ import { indexWorkspaceCommand } from "./commands/index-workspace";
 import { InLineChat } from "./commands/inline-chat";
 import { InterviewMe } from "./commands/interview-me";
 import { OptimizeCode } from "./commands/optimize";
+import { ReviewPR } from "./commands/pr/review-pr";
 import { RefactorCode } from "./commands/refactor";
 import { ReviewCode } from "./commands/review";
-import { ReviewPR } from "./commands/pr/review-pr";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
+import { LocalObservabilityService } from "./infrastructure/observability/telemetry";
+import { setupInstrumentation } from "./instrumentation"; // Moved call to tail end
 import { Memory } from "./memory/base";
-import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
-import { ProjectRulesService } from "./services/project-rules.service";
-import { SqliteDatabaseService } from "./services/sqlite-database.service";
-import { SchedulerService } from "./services/scheduler.service";
+import { Orchestrator } from "./orchestrator";
+import { AgentRunningGuardService } from "./services/agent-running-guard.service";
+import { CompletionStatusBarService } from "./services/completion-status-bar.service";
 import { ContextRetriever } from "./services/context-retriever";
 import { InlineCompletionService } from "./services/inline-completion.service";
-import { CompletionStatusBarService } from "./services/completion-status-bar.service";
 import { OutputManager } from "./services/output-manager";
-import {
-  getAPIKeyAndModel,
-  getConfigValue,
-  setConfigValue,
-} from "./utils/utils";
+import { PersistentCodebaseUnderstandingService } from "./services/persistent-codebase-understanding.service";
+import { ProjectRulesService } from "./services/project-rules.service";
+import { SchedulerService } from "./services/scheduler.service";
+import { SqliteDatabaseService } from "./services/sqlite-database.service";
 import { Terminal } from "./utils/terminal";
-import { LocalObservabilityService } from "./infrastructure/observability/telemetry";
-import { AgentRunningGuardService } from "./services/agent-running-guard.service";
+import { getConfigValue } from "./utils/utils";
 
-import { DiffReviewService } from "./services/diff-review.service";
-import { SecretStorageService } from "./services/secret-storage";
-import { AstIndexingService } from "./services/ast-indexing.service";
-import { StandupService } from "./services/standup.service";
-import { CodeHealthTask } from "./services/tasks/code-health.task";
-import { DependencyCheckTask } from "./services/tasks/dependency-check.task";
-import { GitWatchdogTask } from "./services/tasks/git-watchdog.task";
-import { createBranchFromJiraCommand } from "./commands/create-branch-from-jira";
 import { createBranchFromGitLabCommand } from "./commands/create-branch-from-gitlab";
+import { createBranchFromJiraCommand } from "./commands/create-branch-from-jira";
 import {
   openInReaderCommand,
   openSelectionInReaderCommand,
 } from "./commands/open-reader";
+import { AstIndexingService } from "./services/ast-indexing.service";
+import { DiffReviewService } from "./services/diff-review.service";
+import { SecretStorageService } from "./services/secret-storage";
+import { StandupService } from "./services/standup.service";
+import { CodeHealthTask } from "./services/tasks/code-health.task";
+import { DependencyCheckTask } from "./services/tasks/dependency-check.task";
+import { GitWatchdogTask } from "./services/tasks/git-watchdog.task";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -75,64 +67,73 @@ async function initializeWebViewProviders(
   context: vscode.ExtensionContext,
   selectedGenerativeAiModel: any,
 ) {
-  const { WebViewProviderManager } =
-    await import("./webview-providers/manager");
-  const providerManager = WebViewProviderManager.getInstance(context);
-  const modelConfigurations: any = {
-    Anthropic: {
-      key: APP_CONFIG.anthropicApiKey,
-      model: APP_CONFIG.anthropicModel,
-      provider: () => import("./webview-providers/anthropic"),
-    },
-    Deepseek: {
-      key: APP_CONFIG.deepseekApiKey,
-      model: APP_CONFIG.deepseekModel,
-      provider: () => import("./webview-providers/deepseek"),
-    },
-    Gemini: {
-      key: APP_CONFIG.geminiKey,
-      model: APP_CONFIG.geminiModel,
-      provider: () => import("./webview-providers/gemini"),
-    },
-    Groq: {
-      key: APP_CONFIG.groqApiKey,
-      model: APP_CONFIG.groqModel,
-      provider: () => import("./webview-providers/groq"),
-    },
-    OpenAI: {
-      key: APP_CONFIG.openaiApiKey,
-      model: APP_CONFIG.openaiModel,
-      provider: () => import("./webview-providers/openai"),
-    },
-    Qwen: {
-      key: APP_CONFIG.qwenApiKey,
-      model: APP_CONFIG.qwenModel,
-      provider: () => import("./webview-providers/qwen"),
-    },
-    GLM: {
-      key: APP_CONFIG.glmApiKey,
-      model: APP_CONFIG.glmModel,
-      provider: () => import("./webview-providers/glm"),
-    },
-    Local: {
-      key: APP_CONFIG.localApiKey,
-      model: APP_CONFIG.localModel,
-      provider: () => import("./webview-providers/local"),
-    },
-  };
-
-  vscode.commands.executeCommand("setContext", "isModelSelected", true);
   try {
+    logger.info(
+      `Initializing WebView providers for model: ${selectedGenerativeAiModel}`,
+    );
+    const { WebViewProviderManager } =
+      await import("./webview-providers/manager");
+    const providerManager = WebViewProviderManager.getInstance(context);
+    const modelConfigurations: any = {
+      Anthropic: {
+        key: APP_CONFIG.anthropicApiKey,
+        model: APP_CONFIG.anthropicModel,
+        provider: () => import("./webview-providers/anthropic"),
+      },
+      Deepseek: {
+        key: APP_CONFIG.deepseekApiKey,
+        model: APP_CONFIG.deepseekModel,
+        provider: () => import("./webview-providers/deepseek"),
+      },
+      Gemini: {
+        key: APP_CONFIG.geminiKey,
+        model: APP_CONFIG.geminiModel,
+        provider: () => import("./webview-providers/gemini"),
+      },
+      Groq: {
+        key: APP_CONFIG.groqApiKey,
+        model: APP_CONFIG.groqModel,
+        provider: () => import("./webview-providers/groq"),
+      },
+      OpenAI: {
+        key: APP_CONFIG.openaiApiKey,
+        model: APP_CONFIG.openaiModel,
+        provider: () => import("./webview-providers/openai"),
+      },
+      Qwen: {
+        key: APP_CONFIG.qwenApiKey,
+        model: APP_CONFIG.qwenModel,
+        provider: () => import("./webview-providers/qwen"),
+      },
+      GLM: {
+        key: APP_CONFIG.glmApiKey,
+        model: APP_CONFIG.glmModel,
+        provider: () => import("./webview-providers/glm"),
+      },
+      Local: {
+        key: APP_CONFIG.localApiKey,
+        model: APP_CONFIG.localModel,
+        provider: () => import("./webview-providers/local"),
+      },
+    };
+
+    vscode.commands.executeCommand("setContext", "isModelSelected", true);
     let apiKeys = "";
     for (const [key, value] of Object.entries(modelConfigurations)) {
-      if (getConfigValue((value as any).key) === "apiKey") {
+      const configKey = (value as any).key;
+      const hasSecretKey =
+        SecretStorageService.getInstance().getApiKey(configKey);
+      const settingsKey = getConfigValue(configKey);
+      if (!hasSecretKey && (!settingsKey || settingsKey === "apiKey")) {
         apiKeys += `${key}, `;
       }
     }
 
     if (selectedGenerativeAiModel in modelConfigurations) {
       const modelConfig = modelConfigurations[selectedGenerativeAiModel];
-      const apiKey = getConfigValue(modelConfig.key);
+      const apiKey =
+        SecretStorageService.getInstance().getApiKey(modelConfig.key) ||
+        getConfigValue(modelConfig.key);
       const apiModel = getConfigValue(modelConfig.model);
 
       // Ensure the provider class is loaded before initializing
@@ -161,7 +162,10 @@ async function initializeWebViewProviders(
     (globalThis as any).providerManager = providerManager;
     context.subscriptions.push(providerManager);
   } catch (error: any) {
-    logger.error("Failed to initialize WebView providers:", error);
+    logger.error(
+      `Failed to initialize WebView providers (model: ${selectedGenerativeAiModel}): ${error.message}`,
+      error,
+    );
     vscode.window.showWarningMessage(
       "CodeBuddy: WebView initialization failed, some features may be limited",
     );
@@ -178,6 +182,11 @@ export async function activate(context: vscode.ExtensionContext) {
     AstIndexingService.getInstance(context);
     logger.info("AST Indexing Service initialized");
 
+    // Initialize Secret Storage Service (must be before webview providers for secure API key access)
+    const secretStorageService = SecretStorageService.initialize(context);
+    await secretStorageService.migrateApiKeys();
+    context.subscriptions.push(secretStorageService);
+
     // Use dynamic import for DeveloperAgent to ensure it's loaded AFTER telemetry initialization
     const { DeveloperAgent } = await import("./agents/developer/agent");
     new DeveloperAgent({});
@@ -192,10 +201,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Start Scheduler Service
     SchedulerService.getInstance().start();
-
-    // Initialize Secret Storage Service for user preferences
-    const secretStorageService = new SecretStorageService(context);
-    context.subscriptions.push(secretStorageService);
 
     // Initialize ContextRetriever for semantic search
     const contextRetriever = ContextRetriever.initialize(context);
@@ -842,12 +847,10 @@ export async function activate(context: vscode.ExtensionContext) {
       logger.error("Failed to initialize observability:", obsError);
     }
   } catch (error: any) {
-    console.log("abcde", error);
-    // Memory.clear();
+    logger.error(`Extension activation failed: ${error.message}`, error);
     vscode.window.showErrorMessage(
-      "An Error occured while setting up generative AI model",
+      `CodeBuddy: Activation failed — ${error.message || "unknown error"}. Check Output > CodeBuddy for details.`,
     );
-    logger.info(error);
   }
 }
 

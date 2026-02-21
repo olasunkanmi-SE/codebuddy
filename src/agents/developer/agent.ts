@@ -4,7 +4,8 @@ import { ChatGroq } from "@langchain/groq";
 import { ChatOpenAI } from "@langchain/openai";
 import { BaseStore } from "@langchain/langgraph";
 import { rgPath } from "@vscode/ripgrep";
-import { spawnSync } from "child_process";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import {
   BackendProtocol,
   CompositeBackend,
@@ -30,6 +31,8 @@ import {
 import { ToolProvider } from "../langgraph/tools/provider";
 import { DEVELOPER_SYSTEM_PROMPT } from "./prompts";
 import { createDeveloperSubagents } from "./subagents";
+
+const execFileAsync = promisify(execFile);
 
 export class DeveloperAgent {
   private config: ICodeBuddyAgentConfig;
@@ -148,22 +151,30 @@ export class DeveloperAgent {
 
     return createVscodeFsBackendFactory({
       rootDir: workspacePath || "",
+      // opts.extraArgs and opts.glob are sourced from internal deepagents
+      // configuration only — never from unsanitized user input.
       ripgrepSearch: async (opts) => {
-        const result = spawnSync(
-          rgPath,
-          [
-            "-n",
-            "-H",
-            ...(opts.extraArgs || []),
-            ...(opts.glob ? ["-g", opts.glob] : []),
-            opts.pattern,
-            opts.cwd,
-          ],
-          { encoding: "utf-8", maxBuffer: opts.maxBuffer },
-        );
-
-        if (result.error) throw result.error;
-        return result.stdout;
+        try {
+          const { stdout } = await execFileAsync(
+            rgPath,
+            [
+              "-n",
+              "-H",
+              ...(opts.extraArgs || []),
+              ...(opts.glob ? ["-g", opts.glob] : []),
+              opts.pattern,
+              opts.cwd,
+            ],
+            { encoding: "utf-8", maxBuffer: opts.maxBuffer },
+          );
+          return stdout;
+        } catch (error: any) {
+          // ripgrep exits with code 1 when no matches are found
+          if (error.code === 1) {
+            return "";
+          }
+          throw error;
+        }
       },
       disableSpawnFallback: false,
       useRipgrep: true,

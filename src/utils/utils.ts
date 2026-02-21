@@ -11,6 +11,7 @@ import { Memory } from "../memory/base";
 import * as crypto from "crypto";
 import { Buffer } from "buffer";
 import { spawn } from "child_process";
+import { SecretStorageService } from "../services/secret-storage";
 
 type GetConfigValueType<T> = (key: string) => T | undefined;
 
@@ -231,6 +232,19 @@ export const showInfoMessage = (message?: string): void => {
 export const getAPIKeyAndModel = (
   model: string,
 ): { apiKey: string; model?: string; baseUrl?: string } => {
+  // Read API keys from OS keychain (SecretStorage) first, fall back to settings.
+  // SecretStorageService may not be initialized yet if called during provider module load.
+  const getSecureApiKey = (configKey: string): string | undefined => {
+    try {
+      return (
+        SecretStorageService.getInstance().getApiKey(configKey) ||
+        getConfigValue(configKey)
+      );
+    } catch {
+      return getConfigValue(configKey);
+    }
+  };
+
   const {
     geminiKey,
     groqApiKey,
@@ -257,42 +271,42 @@ export const getAPIKeyAndModel = (
 
   switch (lowerCaseModel) {
     case "gemini":
-      apiKey = getConfigValue(geminiKey);
+      apiKey = getSecureApiKey(geminiKey);
       modelName = getConfigValue(geminiModel);
       break;
     case "groq":
-      apiKey = getConfigValue(groqApiKey);
+      apiKey = getSecureApiKey(groqApiKey);
       modelName = getConfigValue(groqModel);
       baseUrl = "https://api.groq.com/openai/v1";
       break;
     case "anthropic":
-      apiKey = getConfigValue(anthropicApiKey);
+      apiKey = getSecureApiKey(anthropicApiKey);
       modelName = getConfigValue(anthropicModel);
       break;
     case "tavily":
-      apiKey = getConfigValue(tavilyApiKey);
+      apiKey = getSecureApiKey(tavilyApiKey);
       break;
     case "openai":
-      apiKey = getConfigValue(openaiApiKey);
+      apiKey = getSecureApiKey(openaiApiKey);
       modelName = getConfigValue(openaiModel);
       break;
     case "qwen":
-      apiKey = getConfigValue(qwenApiKey);
+      apiKey = getSecureApiKey(qwenApiKey);
       modelName = getConfigValue(qwenModel);
       baseUrl = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
       break;
     case "glm":
-      apiKey = getConfigValue(glmApiKey);
+      apiKey = getSecureApiKey(glmApiKey);
       modelName = getConfigValue(glmModel);
       baseUrl = "https://open.bigmodel.cn/api/paas/v4";
       break;
     case "deepseek":
-      apiKey = getConfigValue(APP_CONFIG.deepseekApiKey);
+      apiKey = getSecureApiKey(APP_CONFIG.deepseekApiKey);
       modelName = getConfigValue(APP_CONFIG.deepseekModel);
       baseUrl = "https://api.deepseek.com";
       break;
     case "local":
-      apiKey = getConfigValue(localApiKey) || "not-needed";
+      apiKey = getSecureApiKey(localApiKey) || "not-needed";
       modelName = getConfigValue(localModel);
       baseUrl = getConfigValue(APP_CONFIG.localBaseUrl);
       break;
