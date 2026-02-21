@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { vscode } from "../utils/vscode";
 
 interface IParseURL {
   url: string;
@@ -48,7 +49,11 @@ const UrlCardList: React.FC<UrlCardProps> = ({ metadatas }) => {
         <a
           key={item.url}
           href={item.url.startsWith("http") ? item.url : `https://${item.url}`}
-          target="_blank"
+          onClick={(e) => {
+            e.preventDefault();
+            const url = item.url.startsWith("http") ? item.url : `https://${item.url}`;
+            vscode.postMessage({ command: "openExternal", text: url });
+          }}
           rel="noopener noreferrer"
           className="url-card"
           onMouseEnter={() => setHoveredIndex(index)}

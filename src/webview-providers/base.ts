@@ -574,6 +574,38 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   // Track the current active file path for context inclusion
   private currentActiveFilePath: string | undefined;
 
+  private async handleBrowserOpen(
+    url: string,
+    browserType?: string,
+  ): Promise<void> {
+    const browserPref =
+      browserType ||
+      vscode.workspace
+        .getConfiguration("codebuddy")
+        .get<string>("browserType", "simple");
+
+    const { NewsReaderService: BrowserReaderService } =
+      await import("../services/news-reader.service");
+
+    // Track the URL for "Open in Reader" bridge
+    BrowserReaderService.getInstance().lastBrowsedUrl = url;
+
+    // Track in browsing history for all browser types
+    const reader = BrowserReaderService.getInstance();
+    reader.browsingHistory = [
+      { url, title: url, timestamp: Date.now() },
+      ...reader.browsingHistory.filter((h) => h.url !== url),
+    ].slice(0, 50);
+
+    if (browserPref === "reader") {
+      BrowserReaderService.getInstance().openReader(url);
+    } else if (browserPref === "system") {
+      vscode.env.openExternal(vscode.Uri.parse(url));
+    } else {
+      vscode.commands.executeCommand("simpleBrowser.show", url);
+    }
+  }
+
   private async synchronizeNews(): Promise<void> {
     try {
       // Use getNews() instead of getUnreadNews() to include saved items
@@ -1027,6 +1059,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 const { NewsReaderService } =
                   await import("../services/news-reader.service");
 
+                // Track in browsing history
+                const extReader = NewsReaderService.getInstance();
+                extReader.lastBrowsedUrl = message.text;
+                extReader.browsingHistory = [
+                  {
+                    url: message.text,
+                    title: message.text,
+                    timestamp: Date.now(),
+                  },
+                  ...extReader.browsingHistory.filter(
+                    (h) => h.url !== message.text,
+                  ),
+                ].slice(0, 50);
+
                 if (browserType === "reader") {
                   NewsReaderService.getInstance().openReader(message.text);
                 } else {
@@ -1051,6 +1097,74 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
               }
               break;
+            case "openInReader":
+              if (message.text) {
+                const { NewsReaderService } =
+                  await import("../services/news-reader.service");
+                NewsReaderService.getInstance().openReader(message.text);
+              }
+              break;
+            case "promptOpenBrowser": {
+              const url = await vscode.window.showInputBox({
+                prompt: "Enter URL to open",
+                placeHolder: "https://example.com",
+                value: "https://",
+                validateInput: (text) => {
+                  if (!text.trim()) return "URL is required";
+                  try {
+                    new URL(text);
+                    return null;
+                  } catch {
+                    return "Please enter a valid URL";
+                  }
+                },
+              });
+              if (url) {
+                // Forward to the openBrowser handler
+                const fakeMsg = { text: url, browserType: message.browserType };
+                this.currentWebView?.webview.postMessage({ type: "__noop" });
+                // Re-dispatch as openBrowser
+                await this.handleBrowserOpen(fakeMsg.text, fakeMsg.browserType);
+              }
+              break;
+            }
+            case "openBrowser":
+              if (message.text) {
+                await this.handleBrowserOpen(message.text, message.browserType);
+              }
+              break;
+            case "store-reader-context":
+              if (message.text) {
+                const { NewsReaderService } =
+                  await import("../services/news-reader.service");
+                const reader = NewsReaderService.getInstance();
+                reader.currentArticle = {
+                  title: reader.currentArticle?.title || "Reader Selection",
+                  content: message.text,
+                  url: reader.currentArticle?.url || "reader-selection",
+                };
+                // Persist to chat history so it survives reloads
+                const readerContent = `📎 **Context added from Reader:**\n\n${message.text}\n\n*This content will be included as context in your next message to the AI.*`;
+                await this.agentService.addChatMessage("agentId", {
+                  content: readerContent,
+                  type: "model",
+                  sessionId: this.currentSessionId ?? undefined,
+                });
+              }
+              break;
+            case "get-browsing-history": {
+              const { NewsReaderService: HistoryReaderService } =
+                await import("../services/news-reader.service");
+              const history =
+                HistoryReaderService.getInstance().browsingHistory;
+              if (this.currentWebView) {
+                await this.currentWebView.webview.postMessage({
+                  type: "browsing-history",
+                  history,
+                });
+              }
+              break;
+            }
             case "toggle-saved-news": {
               const { id } = message;
               if (id) {

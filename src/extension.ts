@@ -762,6 +762,45 @@ export async function activate(context: vscode.ExtensionContext) {
       "CodeBuddy.openSelectionInReader": async () => {
         await openSelectionInReaderCommand();
       },
+      "CodeBuddy.openLastBrowsedInReader": async () => {
+        const { NewsReaderService } =
+          await import("./services/news-reader.service");
+        const reader = NewsReaderService.getInstance();
+        const url = reader.lastBrowsedUrl;
+        if (url) {
+          await reader.openReader(url);
+        } else {
+          await openInReaderCommand();
+        }
+      },
+      "codebuddy.appendToChat": async (snippet: string) => {
+        try {
+          const manager = (globalThis as any).providerManager;
+          const provider = manager?.getCurrentProvider();
+          if (provider?.currentWebView?.webview) {
+            await provider.currentWebView.webview.postMessage({
+              type: "append-to-chat",
+              text: snippet,
+            });
+          }
+        } catch (error: any) {
+          logger.error("Failed to append to chat:", error);
+        }
+      },
+      "codebuddy.sendMessage": async (message: string) => {
+        try {
+          const manager = (globalThis as any).providerManager;
+          const provider = manager?.getCurrentProvider();
+          if (provider?.currentWebView?.webview) {
+            await provider.currentWebView.webview.postMessage({
+              type: "send-message",
+              text: message,
+            });
+          }
+        } catch (error: any) {
+          logger.error("Failed to send message:", error);
+        }
+      },
       "CodeBuddy.rules.reload": async () => {
         await projectRulesService.reloadRules();
       },

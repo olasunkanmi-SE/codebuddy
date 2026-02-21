@@ -17,6 +17,14 @@ export class NewsReaderService implements vscode.Disposable {
     | { title: string; content: string; url: string }
     | undefined;
 
+  // Track browsing state
+  public lastBrowsedUrl: string | undefined;
+  public browsingHistory: Array<{
+    url: string;
+    title: string;
+    timestamp: number;
+  }> = [];
+
   private constructor() {
     this.logger = Logger.initialize("NewsReaderService", {});
     this.cacheManager = new EnhancedCacheManager({
@@ -121,6 +129,12 @@ export class NewsReaderService implements vscode.Disposable {
             url: url,
           };
 
+          // Track in browsing history
+          this.browsingHistory = [
+            { url, title: article.title || url, timestamp: Date.now() },
+            ...this.browsingHistory.filter((h) => h.url !== url),
+          ].slice(0, 50);
+
           const readerHtml = this.getReaderHtml({ ...article, url });
 
           // Cache the result
@@ -184,6 +198,16 @@ export class NewsReaderService implements vscode.Disposable {
                 );
               }
               break;
+            case "add-to-chat":
+              if (message.text) {
+                this.sendToChatWebview(message.text, message.title);
+              }
+              break;
+            case "summarize-article":
+              if (message.text) {
+                this.summarizeArticle(message.text, message.title);
+              }
+              break;
           }
         },
         undefined,
@@ -193,6 +217,55 @@ export class NewsReaderService implements vscode.Disposable {
 
     this.currentPanel.title = title;
     this.currentPanel.webview.html = html;
+  }
+
+  /**
+   * Send selected content from the reader to the chat webview
+   */
+  private async sendToChatWebview(text: string, title?: string): Promise<void> {
+    try {
+      // Update currentArticle so the AI receives this as context with the next message
+      const articleUrl = this.currentArticle?.url || "reader-selection";
+      this.currentArticle = {
+        title: title || "Reader Selection",
+        content: text,
+        url: articleUrl,
+      };
+
+      const snippet = title
+        ? `**[From Reader: ${title}]**\n\n${text}`
+        : `**[From Reader]**\n\n${text}`;
+
+      await vscode.commands.executeCommand("codebuddy.appendToChat", snippet);
+      vscode.window.showInformationMessage("Content added to chat context");
+    } catch (error) {
+      this.logger.error("Failed to send content to chat", error);
+      vscode.window.showErrorMessage("Failed to add content to chat");
+    }
+  }
+
+  /**
+   * Send article to chat with a summarization prompt
+   */
+  private async summarizeArticle(text: string, title?: string): Promise<void> {
+    try {
+      const articleUrl = this.currentArticle?.url || "reader-selection";
+      this.currentArticle = {
+        title: title || "Article",
+        content: text,
+        url: articleUrl,
+      };
+
+      const prompt = title
+        ? `Please summarize the following article titled "${title}":\n\n${text}`
+        : `Please summarize the following article:\n\n${text}`;
+
+      await vscode.commands.executeCommand("codebuddy.sendMessage", prompt);
+      vscode.window.showInformationMessage("Summarizing article...");
+    } catch (error) {
+      this.logger.error("Failed to summarize article", error);
+      vscode.window.showErrorMessage("Failed to summarize article");
+    }
   }
 
   private getReaderHtml(article: {
@@ -422,6 +495,12 @@ export class NewsReaderService implements vscode.Disposable {
             <span class="url-text">${article.url}</span>
         </div>
         <div class="browser-actions">
+            <button class="browser-btn" id="add-to-chat-btn" title="Add Selection to Chat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
+            </button>
+            <button class="browser-btn" id="summarize-btn" title="Summarize Article with AI">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            </button>
             <button class="browser-btn" id="open-external-btn" title="Open in System Browser">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </button>
@@ -441,6 +520,8 @@ export class NewsReaderService implements vscode.Disposable {
     </div>
 
     <div id="context-menu">
+        <div class="menu-item" id="menu-add-to-chat">Add to Chat</div>
+        <div class="menu-item" id="menu-open-reader">Open Link in Smart Reader</div>
         <div class="menu-item" id="menu-open-new">Open in System Browser</div>
         <div class="menu-item" id="menu-copy-link">Copy Link Address</div>
     </div>
@@ -448,9 +529,12 @@ export class NewsReaderService implements vscode.Disposable {
     <script>
         const vscode = acquireVsCodeApi();
         const contextMenu = document.getElementById('context-menu');
+        const addToChatMenuItem = document.getElementById('menu-add-to-chat');
+        const openReaderItem = document.getElementById('menu-open-reader');
         const openNewItem = document.getElementById('menu-open-new');
         const copyLinkItem = document.getElementById('menu-copy-link');
         let currentLink = null;
+        let contextMenuSelectedText = null;
 
         // Handle regular clicks
         document.addEventListener('click', (e) => {
@@ -469,12 +553,18 @@ export class NewsReaderService implements vscode.Disposable {
 
         // Handle right-click (context menu)
         document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const selection = window.getSelection();
+            contextMenuSelectedText = selection && selection.toString().trim() ? selection.toString().trim() : null;
             const link = e.target.closest('a');
-            if (link) {
-                e.preventDefault();
-                currentLink = link.href;
-                
-                // Position menu
+            currentLink = link ? link.href : null;
+
+            // Show menu if there's a link or selected text
+            if (currentLink || contextMenuSelectedText) {
+                addToChatMenuItem.style.display = contextMenuSelectedText ? 'block' : 'none';
+                openReaderItem.style.display = currentLink ? 'block' : 'none';
+                openNewItem.style.display = currentLink ? 'block' : 'none';
+                copyLinkItem.style.display = currentLink ? 'block' : 'none';
                 contextMenu.style.left = e.clientX + 'px';
                 contextMenu.style.top = e.clientY + 'px';
                 contextMenu.style.display = 'block';
@@ -482,6 +572,20 @@ export class NewsReaderService implements vscode.Disposable {
         });
 
         // Menu actions
+        addToChatMenuItem.addEventListener('click', () => {
+            if (contextMenuSelectedText) {
+                vscode.postMessage({ command: 'add-to-chat', text: contextMenuSelectedText, title: document.querySelector('h1')?.textContent || '' });
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        openReaderItem.addEventListener('click', () => {
+            if (currentLink) {
+                vscode.postMessage({ command: 'open', url: currentLink });
+                contextMenu.style.display = 'none';
+            }
+        });
+
         openNewItem.addEventListener('click', () => {
             if (currentLink) {
                 vscode.postMessage({ command: 'open-new', url: currentLink });
@@ -501,8 +605,27 @@ export class NewsReaderService implements vscode.Disposable {
             vscode.postMessage({ command: 'open', url: '${article.url}' });
         });
 
+        document.getElementById('add-to-chat-btn').addEventListener('click', () => {
+            const selection = window.getSelection();
+            const selectedText = selection && selection.toString().trim() ? selection.toString().trim() : null;
+            if (selectedText) {
+                vscode.postMessage({ command: 'add-to-chat', text: selectedText, title: document.querySelector('h1')?.textContent || '' });
+            } else {
+                // Send the full article content if nothing is selected
+                const content = document.querySelector('.content')?.textContent || '';
+                const title = document.querySelector('h1')?.textContent || '';
+                vscode.postMessage({ command: 'add-to-chat', text: content.substring(0, 5000), title: title });
+            }
+        });
+
         document.getElementById('open-external-btn').addEventListener('click', () => {
             vscode.postMessage({ command: 'open-new', url: '${article.url}' });
+        });
+
+        document.getElementById('summarize-btn').addEventListener('click', () => {
+            const content = document.querySelector('.content')?.textContent || '';
+            const title = document.querySelector('h1')?.textContent || '';
+            vscode.postMessage({ command: 'summarize-article', text: content.substring(0, 5000), title: title });
         });
     </script>
 </body>

@@ -152,95 +152,118 @@
     "commands": [
       {
         "command": "codebuddy.indexWorkspace",
-        "title": "CodeBuddy: Index Workspace for Semantic Search"
+        "title": "Index Workspace for Semantic Search",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.commentCode",
-        "title": "CodeBuddy. Add comment to selected code."
+        "title": "Add Comment to Selected Code",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.reviewCode",
-        "title": "CodeBuddy. Review these selected code."
+        "title": "Review Selected Code",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.codeRefactor",
-        "title": "CodeBuddy. Refactor these selected code."
+        "title": "Refactor Selected Code",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.codeOptimize",
-        "title": "CodeBuddy. Optimize these selected code."
+        "title": "Optimize Selected Code",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.explain",
-        "title": "CodeBuddy. Explain this code"
+        "title": "Explain This Code",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.generateCommitMessage",
-        "title": "CodeBuddy. Generate commit message"
+        "title": "Generate Commit Message",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.inLineChat",
-        "title": "CodeBuddy. Inline chat"
+        "title": "Inline Chat",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.interviewMe",
-        "title": "CodeBuddy. Interview Me."
+        "title": "Interview Me",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.generateMermaidDiagram",
-        "title": "CodeBuddy. Generate Architectural Diagram."
+        "title": "Generate Architectural Diagram",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.codebaseAnalysis",
-        "title": "CodeBuddy. Analyze Codebase & Answer Questions"
+        "title": "Analyze Codebase & Answer Questions",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.reviewPR",
-        "title": "CodeBuddy: Review Pull Request"
+        "title": "Review Pull Request",
+        "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.triggerDailyStandup",
-        "title": "CodeBuddy: Trigger Daily Standup"
+        "title": "Trigger Daily Standup",
+        "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.triggerCodeHealth",
-        "title": "CodeBuddy: Trigger Code Health Check"
+        "title": "Trigger Code Health Check",
+        "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.triggerDependencyCheck",
-        "title": "CodeBuddy: Trigger Dependency Check"
+        "title": "Trigger Dependency Check",
+        "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.triggerGitWatchdog",
-        "title": "CodeBuddy: Trigger Git Watchdog"
+        "title": "Trigger Git Watchdog",
+        "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.createBranchFromJira",
-        "title": "CodeBuddy: Jira Tickets (List, Branch, View)"
+        "title": "Jira Tickets (List, Branch, View)",
+        "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.createBranchFromGitLab",
-        "title": "CodeBuddy: GitLab Issues (List, Branch, View)"
+        "title": "GitLab Issues (List, Branch, View)",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.rules.open",
-        "title": "CodeBuddy: Open Project Rules"
+        "title": "Open Project Rules",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.rules.init",
-        "title": "CodeBuddy: Initialize Project Rules"
+        "title": "Initialize Project Rules",
+        "category": "CodeBuddy"
       },
       {
         "command": "CodeBuddy.rules.reload",
-        "title": "CodeBuddy: Reload Project Rules"
+        "title": "Reload Project Rules",
+        "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.completion.toggle",
-        "title": "CodeBuddy: Toggle Inline Completions"
+        "title": "Toggle Inline Completions",
+        "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.completion.openSettings",
-        "title": "CodeBuddy: Configure Completion Settings"
+        "title": "Configure Completion Settings",
+        "category": "CodeBuddy"
       },
       {
         "command": "codebuddy.applyChange",
@@ -260,6 +283,11 @@
       {
         "command": "CodeBuddy.openSelectionInReader",
         "title": "Open Selection in Smart Reader",
+        "category": "CodeBuddy"
+      },
+      {
+        "command": "CodeBuddy.openLastBrowsedInReader",
+        "title": "Open Current Page in Smart Reader",
         "category": "CodeBuddy"
       }
     ],
