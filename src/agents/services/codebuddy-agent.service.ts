@@ -1,4 +1,5 @@
 import { Command, InMemoryStore, MemorySaver } from "@langchain/langgraph";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { createAdvancedDeveloperAgent } from "../developer/agent";
 import {
@@ -343,6 +344,13 @@ export class CodeBuddyAgentService {
     ]);
     const maxDurationMs = 5 * 60 * 1000; // 5 minute timeout
     const startTime = Date.now();
+    const tracer = trace.getTracer("codebuddy-agent-service");
+    const span = tracer.startSpan("streamAgent", {
+      attributes: {
+        thread_id: conversationId,
+        user_message: userMessage.substring(0, 500),
+      },
+    });
 
     let eventCount = 0;
     let totalToolInvocations = 0;
@@ -582,6 +590,14 @@ export class CodeBuddyAgentService {
                     itemCount: this.countResultItems(message.content),
                   };
 
+                  // Add OpenTelemetry event for tool completion
+                  span.addEvent("tool_end", {
+                    "tool.name": toolName,
+                    "tool.result_summary": toolActivity.result.summary,
+                    "node.name": nodeName,
+                    duration_ms: toolActivity.endTime - toolActivity.startTime,
+                  });
+
                   yield {
                     type: StreamEventType.TOOL_END,
                     content: JSON.stringify(toolActivity),
@@ -750,6 +766,13 @@ export class CodeBuddyAgentService {
                     );
 
                     hasErrored = true;
+                    span.setStatus({
+                      code: SpanStatusCode.ERROR,
+                      message: `Infinite loop detected editing file: ${filePath}`,
+                    });
+                    span.setAttribute("error.reason", "file_edit_loop");
+                    span.setAttribute("error.file_path", filePath);
+
                     yield {
                       type: StreamEventType.ERROR,
                       content: `I've tried to edit the same file (${filePath.split("/").pop()}) ${fileCount} times. The edit may not be matching correctly or there's an issue with the file content. I'll stop here - please try the edit manually or check if the file content matches what I expect.`,
@@ -773,6 +796,12 @@ export class CodeBuddyAgentService {
                   );
 
                   hasErrored = true;
+                  span.setStatus({
+                    code: SpanStatusCode.ERROR,
+                    message: `Tool loop detected for ${toolCall.name}`,
+                  });
+                  span.setAttribute("error.reason", "tool_loop_detected");
+                  span.setAttribute("error.tool", toolCall.name);
 
                   // Provide specific error messages based on tool type
                   let errorMessage: string;
@@ -813,6 +842,14 @@ export class CodeBuddyAgentService {
               );
               toolActivity.status = "running";
               pendingToolCalls.set(toolCall.name, toolActivity);
+
+              // Add OpenTelemetry span attribute for tool usage
+              span.addEvent("tool_start", {
+                "tool.name": toolCall.name,
+                "tool.args": JSON.stringify(toolCall.args),
+                "node.name": nodeName,
+                is_middleware: isMiddlewareNode,
+              });
 
               streamManger.addToolEvent(toolCall.name, true, toolCall);
 
@@ -917,8 +954,26 @@ export class CodeBuddyAgentService {
         },
       };
       agentState = forceStopReason ? "completed" : "completed";
+
+      // Final status check and end span
+      if (hasErrored) {
+        span.setStatus({ code: SpanStatusCode.ERROR });
+      } else {
+        span.setStatus({ code: SpanStatusCode.OK });
+      }
+      span.setAttribute("agent.final_state", agentState);
+      span.setAttribute("agent.event_count", eventCount);
+      span.setAttribute("agent.tool_count", totalToolInvocations);
+      span.end();
     } catch (error: any) {
       agentState = "failed";
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error.message,
+      });
+      span.recordException(error);
+      span.end();
+
       // Mark pending tools as failed
       for (const [toolName, activity] of pendingToolCalls) {
         activity.status = "failed";

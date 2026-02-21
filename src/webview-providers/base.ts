@@ -45,6 +45,7 @@ import { NewsService } from "../services/news.service";
 import { ConnectorService } from "../services/connector.service";
 import { NotificationService } from "../services/notification.service";
 import { ObservabilityService } from "../services/observability.service";
+import { LocalObservabilityService } from "../infrastructure/observability/telemetry";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -573,6 +574,38 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   // Track the current active file path for context inclusion
   private currentActiveFilePath: string | undefined;
 
+  private async handleBrowserOpen(
+    url: string,
+    browserType?: string,
+  ): Promise<void> {
+    const browserPref =
+      browserType ||
+      vscode.workspace
+        .getConfiguration("codebuddy")
+        .get<string>("browserType", "simple");
+
+    const { NewsReaderService: BrowserReaderService } =
+      await import("../services/news-reader.service");
+
+    // Track the URL for "Open in Reader" bridge
+    BrowserReaderService.getInstance().lastBrowsedUrl = url;
+
+    // Track in browsing history for all browser types
+    const reader = BrowserReaderService.getInstance();
+    reader.browsingHistory = [
+      { url, title: url, timestamp: Date.now() },
+      ...reader.browsingHistory.filter((h) => h.url !== url),
+    ].slice(0, 50);
+
+    if (browserPref === "reader") {
+      BrowserReaderService.getInstance().openReader(url);
+    } else if (browserPref === "system") {
+      vscode.env.openExternal(vscode.Uri.parse(url));
+    } else {
+      vscode.commands.executeCommand("simpleBrowser.show", url);
+    }
+  }
+
   private async synchronizeNews(): Promise<void> {
     try {
       // Use getNews() instead of getUnreadNews() to include saved items
@@ -1026,6 +1059,20 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 const { NewsReaderService } =
                   await import("../services/news-reader.service");
 
+                // Track in browsing history
+                const extReader = NewsReaderService.getInstance();
+                extReader.lastBrowsedUrl = message.text;
+                extReader.browsingHistory = [
+                  {
+                    url: message.text,
+                    title: message.text,
+                    timestamp: Date.now(),
+                  },
+                  ...extReader.browsingHistory.filter(
+                    (h) => h.url !== message.text,
+                  ),
+                ].slice(0, 50);
+
                 if (browserType === "reader") {
                   NewsReaderService.getInstance().openReader(message.text);
                 } else {
@@ -1050,6 +1097,74 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
               }
               break;
+            case "openInReader":
+              if (message.text) {
+                const { NewsReaderService } =
+                  await import("../services/news-reader.service");
+                NewsReaderService.getInstance().openReader(message.text);
+              }
+              break;
+            case "promptOpenBrowser": {
+              const url = await vscode.window.showInputBox({
+                prompt: "Enter URL to open",
+                placeHolder: "https://example.com",
+                value: "https://",
+                validateInput: (text) => {
+                  if (!text.trim()) return "URL is required";
+                  try {
+                    new URL(text);
+                    return null;
+                  } catch {
+                    return "Please enter a valid URL";
+                  }
+                },
+              });
+              if (url) {
+                // Forward to the openBrowser handler
+                const fakeMsg = { text: url, browserType: message.browserType };
+                this.currentWebView?.webview.postMessage({ type: "__noop" });
+                // Re-dispatch as openBrowser
+                await this.handleBrowserOpen(fakeMsg.text, fakeMsg.browserType);
+              }
+              break;
+            }
+            case "openBrowser":
+              if (message.text) {
+                await this.handleBrowserOpen(message.text, message.browserType);
+              }
+              break;
+            case "store-reader-context":
+              if (message.text) {
+                const { NewsReaderService } =
+                  await import("../services/news-reader.service");
+                const reader = NewsReaderService.getInstance();
+                reader.currentArticle = {
+                  title: reader.currentArticle?.title || "Reader Selection",
+                  content: message.text,
+                  url: reader.currentArticle?.url || "reader-selection",
+                };
+                // Persist to chat history so it survives reloads
+                const readerContent = `📎 **Context added from Reader:**\n\n${message.text}\n\n*This content will be included as context in your next message to the AI.*`;
+                await this.agentService.addChatMessage("agentId", {
+                  content: readerContent,
+                  type: "model",
+                  sessionId: this.currentSessionId ?? undefined,
+                });
+              }
+              break;
+            case "get-browsing-history": {
+              const { NewsReaderService: HistoryReaderService } =
+                await import("../services/news-reader.service");
+              const history =
+                HistoryReaderService.getInstance().browsingHistory;
+              if (this.currentWebView) {
+                await this.currentWebView.webview.postMessage({
+                  type: "browsing-history",
+                  history,
+                });
+              }
+              break;
+            }
             case "toggle-saved-news": {
               const { id } = message;
               if (id) {
@@ -1567,6 +1682,79 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 type: "observability-metrics",
                 metrics,
               });
+              break;
+            }
+
+            case "observability-get-traces": {
+              const traces = ObservabilityService.getInstance().getTraces();
+              this.logger.info(
+                `[WEBVIEW] Sending ${traces.length} traces to webview`,
+              );
+
+              // Sanitize traces to avoid circular references and ensure serializability
+              const sanitizedTraces = traces.map((span) => ({
+                name: span.name,
+                context: span.spanContext(),
+                parentSpanId: (span as any).parentSpanId,
+                startTime: span.startTime,
+                endTime: span.endTime,
+                attributes: span.attributes,
+                status: span.status,
+                events: span.events,
+                links: span.links,
+                kind: span.kind,
+                duration: [
+                  span.endTime[0] - span.startTime[0],
+                  span.endTime[1] - span.startTime[1],
+                ],
+              }));
+
+              await this.currentWebView?.webview.postMessage({
+                type: "observability-traces",
+                traces: sanitizedTraces,
+              });
+              break;
+            }
+
+            case "observability-clear-traces": {
+              ObservabilityService.getInstance().clearTraces();
+              await this.currentWebView?.webview.postMessage({
+                type: "observability-traces",
+                traces: [],
+              });
+              break;
+            }
+
+            case "observability-send-test-trace": {
+              this.logger.info(
+                "Received observability-send-test-trace command",
+              );
+              LocalObservabilityService.getInstance().createTestSpan(
+                "manual_webview_test_span",
+              );
+              // Wait a bit for the span to end and be captured
+              setTimeout(async () => {
+                const traces = ObservabilityService.getInstance().getTraces();
+                this.logger.info(
+                  `[WEBVIEW] Sending ${traces.length} traces after test span`,
+                );
+                const sanitizedTraces = traces.map((span) => ({
+                  name: span.name,
+                  context: span.spanContext(),
+                  parentSpanId: (span as any).parentSpanId,
+                  startTime: span.startTime,
+                  endTime: span.endTime,
+                  attributes: span.attributes,
+                  status: span.status,
+                  events: span.events,
+                  links: span.links,
+                  kind: span.kind,
+                }));
+                await this.currentWebView?.webview.postMessage({
+                  type: "observability-traces",
+                  traces: sanitizedTraces,
+                });
+              }, 500);
               break;
             }
 

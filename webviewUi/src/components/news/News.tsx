@@ -18,6 +18,7 @@ interface NewsProps {
   onMarkAsRead: (id: number) => void;
   onRefresh?: () => void;
   onOpenUrl: (url: string) => void;
+  onOpenInReader: (url: string) => void;
   onToggleSaved: (id: number) => void;
   onDelete: (id: number) => void;
   userName?: string;
@@ -206,7 +207,7 @@ const ActionButton = styled.button<{ $active?: boolean; $danger?: boolean }>`
   `}
 `;
 
-export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onToggleSaved, onDelete, userName = "Ola" }) => {
+export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onOpenInReader, onToggleSaved, onDelete, userName = "Ola" }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = () => {
@@ -331,6 +332,14 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onT
                 </ItemContent>
                 <ActionButtons>
                   <ActionButton 
+                    title="Open in Smart Reader"
+                    onClick={() => onOpenInReader(item.url)}
+                    style={{ opacity: 1 }}
+                  >
+                    <span className="codicon codicon-book"></span>
+                    <span style={{ marginLeft: '4px', fontSize: '11px' }}>Reader</span>
+                  </ActionButton>
+                  <ActionButton 
                     title={item.saved ? "Unsave" : "Save for later"} 
                     $active={!!item.saved} 
                     onClick={() => item.id && onToggleSaved(item.id)}
@@ -367,6 +376,14 @@ export const News: React.FC<NewsProps> = ({ newsItems, onRefresh, onOpenUrl, onT
                     </ItemLink>
                   </ItemContent>
                   <ActionButtons>
+                    <ActionButton 
+                      title="Open in Smart Reader"
+                      onClick={() => onOpenInReader(item.url)}
+                      style={{ opacity: 1 }}
+                    >
+                      <span className="codicon codicon-book"></span>
+                      <span style={{ marginLeft: '4px', fontSize: '11px' }}>Reader</span>
+                    </ActionButton>
                     <ActionButton 
                       title={item.saved ? "Unsave" : "Save for later"} 
                       $active={!!item.saved} 

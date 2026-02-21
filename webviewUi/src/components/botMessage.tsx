@@ -1,10 +1,11 @@
  
 import DOMPurify from "dompurify";
-import React from "react";
+import React, { useCallback } from "react";
 import { DownloadIcon } from "./downloadIcon";
 import { IParseURL, parseUrl } from "../utils/parseUrl";
 import UrlCardList from "./urlCardList";
 import { ThinkingComponent } from "./thinkingComponent";
+import { vscode } from "../utils/vscode";
 
 interface BotMessageProps {
   content: string;
@@ -121,9 +122,19 @@ export const BotMessage: React.FC<BotMessageProps> = ({
   //   );
   // }
   
+  // Intercept link clicks and route through the extension's browser setting
+  const handleLinkClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const link = target.closest("a");
+    if (link && link.href) {
+      e.preventDefault();
+      vscode.postMessage({ command: "openExternal", text: link.href });
+    }
+  }, []);
+
   // Show normal message with streaming cursor if applicable
   return (
-    <div className="bot-message">
+    <div className="bot-message" onClick={handleLinkClick}>
       <div className="bot-message-actions">
         <div className="action-buttons">
           <DownloadIcon onClick={handleCopyMarkdown} />
