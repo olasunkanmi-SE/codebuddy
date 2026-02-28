@@ -9,6 +9,16 @@ export class PRPromptBuilder {
 - **Files Modified**: ${details.changedFiles.length} files
 - **Changed Files**: 
 ${details.changedFiles.map((file) => `  - ${file}`).join("\n")}
+${
+  details.diffStats
+    ? `
+## Change Statistics
+\`\`\`
+${details.diffStats.trim()}
+\`\`\`
+`
+    : ""
+}
 
 ## Review Areas
 Analyze for: **Code Quality** (readability, SOLID principles), **Security** (input validation, auth), **Performance** (algorithms, memory), **Architecture** (design patterns, complexity), **Testing** (coverage, edge cases).

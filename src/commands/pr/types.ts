@@ -4,6 +4,7 @@ export interface ChangeDetails {
   branchInfo: string;
   changedFiles: string[];
   diffContent: string;
+  diffStats?: string;
 }
 
 export interface IChangeProvider {

@@ -13,7 +13,7 @@ export class GroqLLM
   implements vscode.Disposable, ICodeCompleter
 {
   private static instance: GroqLLM;
-  private readonly groq: Groq;
+  private groq: Groq;
 
   constructor(protected config: ILlmConfig) {
     super(config);
@@ -23,8 +23,15 @@ export class GroqLLM
   static getInstance(config: ILlmConfig) {
     if (!GroqLLM.instance) {
       GroqLLM.instance = new GroqLLM(config);
+    } else {
+      GroqLLM.instance.updateConfig(config);
     }
     return GroqLLM.instance;
+  }
+
+  public updateConfig(config: ILlmConfig) {
+    this.config = config;
+    this.groq = new Groq({ apiKey: this.config.apiKey });
   }
 
   async generateEmbeddings(text: string): Promise<number[]> {

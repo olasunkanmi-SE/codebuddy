@@ -28,7 +28,7 @@ export class QwenLLM
   extends BaseLLM<QwenLLMSnapshot>
   implements vscode.Disposable, ICodeCompleter
 {
-  private readonly client: OpenAI;
+  private client: OpenAI;
   private response: any;
   protected readonly orchestrator: Orchestrator;
   private readonly disposables: vscode.Disposable[] = [];
@@ -80,6 +80,12 @@ export class QwenLLM
 
   public updateConfig(config: ILlmConfig) {
     this.config = config;
+    this.client = new OpenAI({
+      apiKey: this.config.apiKey,
+      baseURL:
+        config.baseUrl ||
+        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    });
   }
 
   getEmbeddingModel(): string {

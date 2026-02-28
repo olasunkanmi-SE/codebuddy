@@ -375,6 +375,7 @@ const vsCode = vscode;
 interface ConfigData {
   username?: string;
   theme?: string;
+  selectedModel?: string;
   enableStreaming?: boolean;
   fontFamily?: string;
   fontSize?: number;
@@ -634,6 +635,9 @@ export const WebviewUI = () => {
         }
         if (data.theme) {
           setSelectedTheme(data.theme);
+        }
+        if (data.selectedModel) {
+          setSelectedModel(data.selectedModel);
         }
         if (data.enableStreaming !== undefined) {
           setEnableStreaming(data.enableStreaming);
