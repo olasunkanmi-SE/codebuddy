@@ -1270,7 +1270,11 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "create-session": {
               try {
                 const rawTitle = message.message?.title || "New Chat";
-                const title = rawTitle.replace(/<[^>]*>/g, "").trim().substring(0, 255) || "New Chat";
+                const title =
+                  rawTitle
+                    .replace(/<[^>]*>/g, "")
+                    .trim()
+                    .substring(0, 255) || "New Chat";
                 // Preserve current session's in-memory history before switching
                 if (this.currentSessionId && Memory.has("chatHistory")) {
                   Memory.set(

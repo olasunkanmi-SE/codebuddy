@@ -37,14 +37,14 @@ export class Memory {
     // Clean up expired entry
     if (entry) {
       Memory.bank.delete(key);
-      Memory.sessionCacheLRU = Memory.sessionCacheLRU.filter(k => k !== key);
+      Memory.sessionCacheLRU = Memory.sessionCacheLRU.filter((k) => k !== key);
     }
     return undefined;
   }
 
   static delete(key: string): boolean | undefined {
     if (Memory.bank.has(key)) {
-      Memory.sessionCacheLRU = Memory.sessionCacheLRU.filter(k => k !== key);
+      Memory.sessionCacheLRU = Memory.sessionCacheLRU.filter((k) => k !== key);
       return Memory.bank.delete(key);
     }
     return undefined;
@@ -70,7 +70,7 @@ export class Memory {
 
   /** Promote a chatHistory:* key to most-recent and evict the oldest if over limit. */
   private static touchSessionCacheKey(key: string): void {
-    Memory.sessionCacheLRU = Memory.sessionCacheLRU.filter(k => k !== key);
+    Memory.sessionCacheLRU = Memory.sessionCacheLRU.filter((k) => k !== key);
     Memory.sessionCacheLRU.push(key);
     while (Memory.sessionCacheLRU.length > Memory.MAX_SESSION_CACHE_ENTRIES) {
       const evicted = Memory.sessionCacheLRU.shift();
