@@ -12,9 +12,9 @@ export class GitWatchdogTask {
   private logger: Logger;
   private gitService: GitService;
 
-  constructor() {
-    this.logger = Logger.initialize("GitWatchdogTask", {});
-    this.gitService = GitService.getInstance();
+  constructor(deps?: { logger?: Logger; gitService?: GitService }) {
+    this.logger = deps?.logger ?? Logger.initialize("GitWatchdogTask", {});
+    this.gitService = deps?.gitService ?? GitService.getInstance();
   }
 
   public async execute(): Promise<void> {

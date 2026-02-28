@@ -6,6 +6,7 @@ import {
   VulnerabilitySummary,
 } from "./i-package-manager";
 import { runCommand, CommandResult } from "./command-runner";
+import { parseStandardAuditJson } from "./audit-parser";
 
 export class PnpmPackageManager implements IPackageManager {
   readonly name = "pnpm";
@@ -25,7 +26,11 @@ export class PnpmPackageManager implements IPackageManager {
   async getOutdatedPackages(cwd: string): Promise<OutdatedPackage[]> {
     const results: OutdatedPackage[] = [];
     try {
-      const stdout = await runCommand(cwd, "pnpm outdated --format json");
+      const stdout = await runCommand(cwd, "pnpm", [
+        "outdated",
+        "--format",
+        "json",
+      ]);
       this.parseOutdated(stdout, results);
     } catch (e) {
       // pnpm outdated exits with non-zero when there are outdated packages
@@ -38,20 +43,27 @@ export class PnpmPackageManager implements IPackageManager {
 
   private parseOutdated(json: string, results: OutdatedPackage[]): void {
     try {
-      // pnpm outdated --format json returns an array of objects or a record
-      const parsed = JSON.parse(json);
-      const entries = Array.isArray(parsed)
+      const parsed: unknown = JSON.parse(json);
+      const entries: unknown[] = Array.isArray(parsed)
         ? parsed
-        : Object.entries(parsed).map(([name, info]: [string, any]) => ({
-            name,
-            ...info,
-          }));
+        : typeof parsed === "object" && parsed !== null
+          ? Object.entries(parsed as Record<string, unknown>).map(
+              ([name, info]) => ({
+                name,
+                ...(typeof info === "object" && info !== null ? info : {}),
+              }),
+            )
+          : [];
 
       for (const entry of entries) {
-        const name = entry.name || entry.packageName || "";
-        const current = entry.current || "N/A";
-        const latest = entry.latest || "N/A";
-        const wanted = entry.wanted || "N/A";
+        if (typeof entry !== "object" || entry === null) continue;
+        const e = entry as Record<string, unknown>;
+        const name =
+          (typeof e.name === "string" ? e.name : null) ??
+          (typeof e.packageName === "string" ? e.packageName : "");
+        const current = typeof e.current === "string" ? e.current : "N/A";
+        const latest = typeof e.latest === "string" ? e.latest : "N/A";
+        const wanted = typeof e.wanted === "string" ? e.wanted : "N/A";
         if (current !== latest) {
           results.push({ name, current, wanted, latest });
         }
@@ -66,35 +78,14 @@ export class PnpmPackageManager implements IPackageManager {
   ): Promise<{ vulnerabilities: VulnerabilitySummary[]; total: number }> {
     const result = { vulnerabilities: [] as VulnerabilitySummary[], total: 0 };
     try {
-      const stdout = await runCommand(cwd, "pnpm audit --json");
-      this.parseAudit(stdout, result);
+      const stdout = await runCommand(cwd, "pnpm", ["audit", "--json"]);
+      parseStandardAuditJson(stdout, result);
     } catch (e) {
       if (e instanceof CommandResult && e.stdout.trim()) {
-        this.parseAudit(e.stdout, result);
+        parseStandardAuditJson(e.stdout, result);
       }
     }
     return result;
-  }
-
-  private parseAudit(
-    json: string,
-    result: { vulnerabilities: VulnerabilitySummary[]; total: number },
-  ): void {
-    try {
-      // pnpm audit --json mirrors npm audit output format
-      const audit = JSON.parse(json);
-      const meta =
-        audit.metadata?.vulnerabilities || audit.vulnerabilities || {};
-      for (const severity of ["critical", "high", "moderate", "low"]) {
-        const count = meta[severity] || 0;
-        if (count > 0) {
-          result.vulnerabilities.push({ severity, count });
-          result.total += count;
-        }
-      }
-    } catch {
-      // Could not parse
-    }
   }
 
   async isLockfileSynced(

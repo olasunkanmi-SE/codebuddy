@@ -32,10 +32,14 @@ export class StandupService {
 
   private outputChannel: vscode.OutputChannel;
 
-  private constructor() {
-    this.logger = Logger.initialize("StandupService", {});
-    this.agentService = AgentService.getInstance();
-    this.gitService = GitService.getInstance();
+  private constructor(deps?: {
+    logger?: Logger;
+    agentService?: AgentService;
+    gitService?: GitService;
+  }) {
+    this.logger = deps?.logger ?? Logger.initialize("StandupService", {});
+    this.agentService = deps?.agentService ?? AgentService.getInstance();
+    this.gitService = deps?.gitService ?? GitService.getInstance();
     this.outputChannel = vscode.window.createOutputChannel("CodeBuddy Standup");
   }
 
@@ -81,11 +85,11 @@ export class StandupService {
       .map((doc) => vscode.workspace.asRelativePath(doc.uri));
 
     // 3. Get Active Errors
-    // Note: getDiagnostics() iterates all diagnostics from all language extensions.
-    // In very large workspaces this may be slow; we cap the result at 5 entries below.
+    // Cap at MAX_DIAGNOSTICS to avoid perf issues in large workspaces.
+    const MAX_DIAGNOSTICS = 50;
     const activeErrors: { file: string; message: string; severity: string }[] =
       [];
-    for (const [uri, diagnostics] of vscode.languages.getDiagnostics()) {
+    outer: for (const [uri, diagnostics] of vscode.languages.getDiagnostics()) {
       for (const diag of diagnostics) {
         if (diag.severity === vscode.DiagnosticSeverity.Error) {
           activeErrors.push({
@@ -93,6 +97,7 @@ export class StandupService {
             message: diag.message,
             severity: "Error",
           });
+          if (activeErrors.length >= MAX_DIAGNOSTICS) break outer;
         }
       }
     }

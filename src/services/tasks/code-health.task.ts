@@ -23,10 +23,10 @@ export class CodeHealthTask {
   private outputChannel: vscode.OutputChannel;
   private dbService: SqliteDatabaseService;
 
-  constructor() {
-    this.logger = Logger.initialize("CodeHealthTask", {});
+  constructor(deps?: { logger?: Logger; dbService?: SqliteDatabaseService }) {
+    this.logger = deps?.logger ?? Logger.initialize("CodeHealthTask", {});
     this.outputChannel = vscode.window.createOutputChannel("CodeBuddy Health");
-    this.dbService = SqliteDatabaseService.getInstance();
+    this.dbService = deps?.dbService ?? SqliteDatabaseService.getInstance();
     this.ensureHealthTable();
   }
 

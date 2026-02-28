@@ -25,7 +25,7 @@ export class YarnPackageManager implements IPackageManager {
   async getOutdatedPackages(cwd: string): Promise<OutdatedPackage[]> {
     const results: OutdatedPackage[] = [];
     try {
-      const stdout = await runCommand(cwd, "yarn outdated --json");
+      const stdout = await runCommand(cwd, "yarn", ["outdated", "--json"]);
       this.parseOutdated(stdout, results);
     } catch (e) {
       // yarn outdated exits with non-zero when there are outdated packages
@@ -66,7 +66,7 @@ export class YarnPackageManager implements IPackageManager {
   ): Promise<{ vulnerabilities: VulnerabilitySummary[]; total: number }> {
     const result = { vulnerabilities: [] as VulnerabilitySummary[], total: 0 };
     try {
-      const stdout = await runCommand(cwd, "yarn audit --json");
+      const stdout = await runCommand(cwd, "yarn", ["audit", "--json"]);
       this.parseAudit(stdout, result);
     } catch (e) {
       if (e instanceof CommandResult && e.stdout.trim()) {

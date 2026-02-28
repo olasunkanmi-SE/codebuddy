@@ -7,12 +7,12 @@ export class EndOfDaySummaryTask {
   private outputChannel: vscode.OutputChannel;
   private gitService: GitService;
 
-  constructor() {
-    this.logger = Logger.initialize("EndOfDaySummaryTask", {});
+  constructor(deps?: { logger?: Logger; gitService?: GitService }) {
+    this.logger = deps?.logger ?? Logger.initialize("EndOfDaySummaryTask", {});
     this.outputChannel = vscode.window.createOutputChannel(
       "CodeBuddy Daily Summary",
     );
-    this.gitService = GitService.getInstance();
+    this.gitService = deps?.gitService ?? GitService.getInstance();
   }
 
   public async execute(): Promise<void> {
@@ -33,13 +33,14 @@ export class EndOfDaySummaryTask {
     const filesTouched = await this.getFilesTouchedToday(rootPath);
 
     // 3. Current error count
-    // Note: getDiagnostics() iterates all workspace diagnostics from all language extensions.
-    // In very large workspaces this may be slow.
+    // Cap iteration to avoid perf issues in large workspaces.
+    const MAX_DIAGNOSTICS = 500;
     let errorCount = 0;
-    for (const [, diagnostics] of vscode.languages.getDiagnostics()) {
+    outer: for (const [, diagnostics] of vscode.languages.getDiagnostics()) {
       for (const diag of diagnostics) {
         if (diag.severity === vscode.DiagnosticSeverity.Error) {
           errorCount++;
+          if (errorCount >= MAX_DIAGNOSTICS) break outer;
         }
       }
     }

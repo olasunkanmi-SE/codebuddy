@@ -6,6 +6,7 @@ import {
   VulnerabilitySummary,
 } from "./i-package-manager";
 import { runCommand, CommandResult } from "./command-runner";
+import { parseStandardAuditJson } from "./audit-parser";
 
 export class NpmPackageManager implements IPackageManager {
   readonly name = "npm";
@@ -25,7 +26,7 @@ export class NpmPackageManager implements IPackageManager {
   async getOutdatedPackages(cwd: string): Promise<OutdatedPackage[]> {
     const results: OutdatedPackage[] = [];
     try {
-      const stdout = await runCommand(cwd, "npm outdated --json");
+      const stdout = await runCommand(cwd, "npm", ["outdated", "--json"]);
       this.parseOutdated(stdout, results);
     } catch (e) {
       // npm outdated exits with code 1 when there are outdated packages
@@ -38,15 +39,19 @@ export class NpmPackageManager implements IPackageManager {
 
   private parseOutdated(json: string, results: OutdatedPackage[]): void {
     try {
-      const outdated = JSON.parse(json);
-      for (const [name, info] of Object.entries(outdated) as [string, any][]) {
-        if (info.current !== info.latest) {
-          results.push({
-            name,
-            current: info.current || "N/A",
-            wanted: info.wanted || "N/A",
-            latest: info.latest || "N/A",
-          });
+      const outdated: unknown = JSON.parse(json);
+      if (typeof outdated !== "object" || outdated === null) return;
+      for (const [name, info] of Object.entries(
+        outdated as Record<string, unknown>,
+      )) {
+        if (typeof info !== "object" || info === null) continue;
+        const entry = info as Record<string, unknown>;
+        const current =
+          typeof entry.current === "string" ? entry.current : "N/A";
+        const wanted = typeof entry.wanted === "string" ? entry.wanted : "N/A";
+        const latest = typeof entry.latest === "string" ? entry.latest : "N/A";
+        if (current !== latest) {
+          results.push({ name, current, wanted, latest });
         }
       }
     } catch {
@@ -59,34 +64,14 @@ export class NpmPackageManager implements IPackageManager {
   ): Promise<{ vulnerabilities: VulnerabilitySummary[]; total: number }> {
     const result = { vulnerabilities: [] as VulnerabilitySummary[], total: 0 };
     try {
-      const stdout = await runCommand(cwd, "npm audit --json");
-      this.parseAudit(stdout, result);
+      const stdout = await runCommand(cwd, "npm", ["audit", "--json"]);
+      parseStandardAuditJson(stdout, result);
     } catch (e) {
       if (e instanceof CommandResult && e.stdout.trim()) {
-        this.parseAudit(e.stdout, result);
+        parseStandardAuditJson(e.stdout, result);
       }
     }
     return result;
-  }
-
-  private parseAudit(
-    json: string,
-    result: { vulnerabilities: VulnerabilitySummary[]; total: number },
-  ): void {
-    try {
-      const audit = JSON.parse(json);
-      const meta =
-        audit.metadata?.vulnerabilities || audit.vulnerabilities || {};
-      for (const severity of ["critical", "high", "moderate", "low"]) {
-        const count = meta[severity] || 0;
-        if (count > 0) {
-          result.vulnerabilities.push({ severity, count });
-          result.total += count;
-        }
-      }
-    } catch {
-      // Could not parse
-    }
   }
 
   async isLockfileSynced(
