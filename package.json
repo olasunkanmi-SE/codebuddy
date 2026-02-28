@@ -232,6 +232,11 @@
         "category": "CodeBuddy"
       },
       {
+        "command": "codebuddy.triggerEndOfDaySummary",
+        "title": "%commands.triggerEndOfDaySummary%",
+        "category": "CodeBuddy"
+      },
+      {
         "command": "codebuddy.createBranchFromJira",
         "title": "%commands.createBranchFromJira%",
         "category": "CodeBuddy"
@@ -782,6 +787,16 @@
             "type": "boolean",
             "default": true,
             "description": "%config.dependencyCheckEnabled%"
+          },
+          "codebuddy.automations.gitWatchdog.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.gitWatchdogEnabled%"
+          },
+          "codebuddy.automations.endOfDaySummary.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.endOfDaySummaryEnabled%"
           },
           "codebuddy.language": {
             "type": "string",

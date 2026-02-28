@@ -54,6 +54,7 @@ import { StandupService } from "./services/standup.service";
 import { CodeHealthTask } from "./services/tasks/code-health.task";
 import { DependencyCheckTask } from "./services/tasks/dependency-check.task";
 import { GitWatchdogTask } from "./services/tasks/git-watchdog.task";
+import { EndOfDaySummaryTask } from "./services/tasks/end-of-day-summary.task";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -331,6 +332,13 @@ export async function activate(context: vscode.ExtensionContext) {
         async () => {
           logger.info("Manually triggering Git Watchdog...");
           await new GitWatchdogTask().execute();
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.triggerEndOfDaySummary",
+        async () => {
+          logger.info("Manually triggering End-of-Day Summary...");
+          await new EndOfDaySummaryTask().execute();
         },
       ),
       vscode.commands.registerCommand(

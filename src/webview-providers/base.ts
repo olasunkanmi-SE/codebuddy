@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
-import { Orchestrator } from "../orchestrator";
+import { MessageHandler } from "../agents/handlers/message-handler";
+import { CodeBuddyAgentService } from "../agents/services/codebuddy-agent.service";
 import {
   FolderEntry,
   IContextInfo,
@@ -7,6 +8,8 @@ import {
 import { VectorDbConfigurationManager } from "../config/vector-db.config";
 import { IEventPayload } from "../emitter/interface";
 import { Logger } from "../infrastructure/logger/logger";
+import { GroqLLM } from "../llms/groq/groq";
+import { Orchestrator } from "../orchestrator";
 import { AgentService } from "../services/agent-state";
 import { ChatHistoryManager } from "../services/chat-history-manager";
 import { CodebaseUnderstandingService } from "../services/codebase-understanding.service";
@@ -18,21 +21,17 @@ import { FileService } from "../services/file-system";
 import { InputValidator } from "../services/input-validator";
 import { PerformanceProfiler } from "../services/performance-profiler.service";
 import { ProductionSafeguards } from "../services/production-safeguards.service";
+import { QuestionClassifierService } from "../services/question-classifier.service";
 import { LogLevel } from "../services/telemetry";
 import { UserFeedbackService } from "../services/user-feedback.service";
 import { WorkspaceService } from "../services/workspace-service";
 import {
   formatText,
+  generateUUID,
   getAPIKeyAndModel,
   getConfigValue,
-  generateUUID,
 } from "../utils/utils";
 import { getWebviewContent } from "../webview/chat";
-import { QuestionClassifierService } from "../services/question-classifier.service";
-import { GroqLLM } from "../llms/groq/groq";
-import { Role } from "../llms/message";
-import { MessageHandler } from "../agents/handlers/message-handler";
-import { CodeBuddyAgentService } from "../agents/services/codebuddy-agent.service";
 
 import { NewsService } from "../services/news.service";
 
@@ -42,23 +41,23 @@ import {
 } from "../services/notification.service";
 import { ObservabilityService } from "../services/observability.service";
 
-import { MessageHandlerRegistry, HandlerContext } from "./handlers/types";
+import { ChatHistoryPruningService } from "../services/chat-history-pruning.service";
+import { ContextEnhancementService } from "../services/context-enhancement.service";
 import {
-  SettingsHandler,
+  BrowserHandler,
+  ConnectorHandler,
+  DiffReviewHandler,
   DockerHandler,
   MCPHandler,
-  ConnectorHandler,
   NewsHandler,
-  BrowserHandler,
   NotificationHandler,
-  SessionHandler,
-  DiffReviewHandler,
   ObservabilityHandler,
-  RulesHandler,
   PerformanceHandler,
+  RulesHandler,
+  SessionHandler,
+  SettingsHandler,
 } from "./handlers";
-import { ContextEnhancementService } from "../services/context-enhancement.service";
-import { ChatHistoryPruningService } from "../services/chat-history-pruning.service";
+import { HandlerContext, MessageHandlerRegistry } from "./handlers/types";
 
 export interface ImessageAndSystemInstruction {
   systemInstruction: string;
@@ -576,6 +575,10 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       ),
       "codebuddy.automations.gitWatchdog.enabled": config.get<boolean>(
         "automations.gitWatchdog.enabled",
+        true,
+      ),
+      "codebuddy.automations.endOfDaySummary.enabled": config.get<boolean>(
+        "automations.endOfDaySummary.enabled",
         true,
       ),
       "codebuddy.browserType": config.get<string>("browserType", "system"),

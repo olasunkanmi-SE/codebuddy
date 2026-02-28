@@ -6,6 +6,7 @@ import { CodeHealthTask } from "./tasks/code-health.task";
 import { DependencyCheckTask } from "./tasks/dependency-check.task";
 import { StandupService } from "./standup.service";
 import { GitWatchdogTask } from "./tasks/git-watchdog.task";
+import { EndOfDaySummaryTask } from "./tasks/end-of-day-summary.task";
 
 export class SchedulerService {
   private static instance: SchedulerService;
@@ -16,6 +17,7 @@ export class SchedulerService {
   private standupService: StandupService;
   private dependencyCheckTask: DependencyCheckTask;
   private gitWatchdogTask: GitWatchdogTask;
+  private endOfDaySummaryTask: EndOfDaySummaryTask;
   private lastCleanupDate: string = "";
 
   private constructor() {
@@ -25,6 +27,7 @@ export class SchedulerService {
     this.standupService = StandupService.getInstance();
     this.dependencyCheckTask = new DependencyCheckTask();
     this.gitWatchdogTask = new GitWatchdogTask();
+    this.endOfDaySummaryTask = new EndOfDaySummaryTask();
   }
 
   public static getInstance(): SchedulerService {
@@ -153,6 +156,19 @@ export class SchedulerService {
           this.logger.info("Executing scheduled task: git_watchdog");
           await this.gitWatchdogTask.execute();
         });
+      }
+
+      // --- Task 8: End-of-Day Summary (5:30 PM) ---
+      if (currentHour >= 17) {
+        const eodConfig = vscode.workspace.getConfiguration(
+          "codebuddy.automations",
+        );
+        if (eodConfig.get<boolean>("endOfDaySummary.enabled", true)) {
+          await this.tryRunTask("end_of_day_summary", async () => {
+            this.logger.info("Executing scheduled task: end_of_day_summary");
+            await this.endOfDaySummaryTask.execute();
+          });
+        }
       }
     } catch (error) {
       this.logger.error("Error in Scheduler Service", error);

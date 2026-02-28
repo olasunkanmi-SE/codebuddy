@@ -424,6 +424,7 @@ export const WebviewUI = () => {
   const [codeHealthEnabled, setCodeHealthEnabled] = useState(true);
   const [dependencyCheckEnabled, setDependencyCheckEnabled] = useState(true);
   const [gitWatchdogEnabled, setGitWatchdogEnabled] = useState(true);
+  const [endOfDaySummaryEnabled, setEndOfDaySummaryEnabled] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [browserType, setBrowserType] = useState<'reader' | 'simple' | 'system'>('reader');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -616,11 +617,11 @@ export const WebviewUI = () => {
         if (data["codebuddy.automations.dependencyCheck.enabled"] !== undefined) {
           setDependencyCheckEnabled(data["codebuddy.automations.dependencyCheck.enabled"]);
         }
-        if (data["codebuddy.browserType"] !== undefined) {
-          setBrowserType(data["codebuddy.browserType"]);
-        }
         if (data["codebuddy.automations.gitWatchdog.enabled"] !== undefined) {
           setGitWatchdogEnabled(data["codebuddy.automations.gitWatchdog.enabled"]);
+        }
+        if (data["codebuddy.automations.endOfDaySummary.enabled"] !== undefined) {
+          setEndOfDaySummaryEnabled(data["codebuddy.automations.endOfDaySummary.enabled"]);
         }
         if (data["codebuddy.browserType"] !== undefined) {
           setBrowserType(data["codebuddy.browserType"]);
@@ -1052,6 +1053,7 @@ export const WebviewUI = () => {
     codeHealthEnabled: codeHealthEnabled,
     dependencyCheckEnabled: dependencyCheckEnabled,
     gitWatchdogEnabled: gitWatchdogEnabled,
+    endOfDaySummaryEnabled: endOfDaySummaryEnabled,
     browserType: browserType,
     selectedModel: selectedModel,
     username: username,
@@ -1059,7 +1061,7 @@ export const WebviewUI = () => {
     customRules: customRules,
     customSystemPrompt: customSystemPrompt,
     subagents: subagents,
-  }), [selectedTheme, selectedLanguage, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents, dailyStandupEnabled, codeHealthEnabled, dependencyCheckEnabled, gitWatchdogEnabled, browserType]);
+  }), [selectedTheme, selectedLanguage, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents, dailyStandupEnabled, codeHealthEnabled, dependencyCheckEnabled, gitWatchdogEnabled, endOfDaySummaryEnabled, browserType]);
 
   const settingsOptions = useMemo<SettingsOptions>(() => ({
     themeOptions: themeOptions,
@@ -1167,6 +1169,10 @@ export const WebviewUI = () => {
     onGitWatchdogChange: (enabled: boolean) => {
       setGitWatchdogEnabled(enabled);
       vsCode.postMessage({ command: "git-watchdog-change-event", message: enabled });
+    },
+    onEndOfDaySummaryChange: (enabled: boolean) => {
+      setEndOfDaySummaryEnabled(enabled);
+      vsCode.postMessage({ command: "end-of-day-summary-change-event", message: enabled });
     },
     onBrowserTypeChange: (value: 'reader' | 'simple' | 'system') => {
       setBrowserType(value);
