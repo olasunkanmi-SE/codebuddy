@@ -7,21 +7,29 @@ import { Memory } from "./base";
  * Wraps the generic `Memory` store and adds:
  * - A `chatHistory:${sessionId}` naming convention (callers pass plain sessionIds).
  * - Bounded LRU eviction so at most `MAX_ENTRIES` sessions are cached.
+ * - Tracking of the currently active session via `_activeSessionId`.
  *
- * The *active* LLM history is still stored under the plain `"chatHistory"` key
- * in `Memory`; this class only manages the per-session slots.
+ * The active LLM history is written to `Memory` under the `"chatHistory"` key
+ * for backward-compatibility with LLM providers that read it directly.
  */
 export class ChatHistoryCache {
-  private static maxEntries = 10;
+  private static MAX_ENTRIES = 10;
   private static readonly KEY_PREFIX = "chatHistory:";
   /** Access-ordered list of sessionIds (most-recent at end). */
   private static lru: string[] = [];
+  /** The session whose history is currently loaded as the active LLM context. */
+  private static _activeSessionId: string | null = null;
 
   private constructor() {}
 
   /** Allow callers (e.g. config changes) to adjust the max cached sessions. */
   static setMaxEntries(max: number): void {
-    ChatHistoryCache.maxEntries = Math.max(1, max);
+    ChatHistoryCache.MAX_ENTRIES = Math.max(1, max);
+  }
+
+  /** Return the ID of the currently active session (or `null`). */
+  static getActiveSessionId(): string | null {
+    return ChatHistoryCache._activeSessionId;
   }
 
   private static cacheKey(sessionId: string): string {
@@ -64,27 +72,37 @@ export class ChatHistoryCache {
     ChatHistoryCache.lru = [];
   }
 
-  // --- Active session helpers (thin wrappers around the plain "chatHistory" key) ---
+  // --- Active session management ───────────────────────────────────────
 
   /** Get the currently active LLM history. */
   static getActive(): LlmChatMessage[] {
     return Memory.get("chatHistory") ?? [];
   }
 
-  /** Set the currently active LLM history. */
-  static setActive(history: LlmChatMessage[]): void {
+  /** Activate `sessionId` with the given history as the current LLM context. */
+  static setActive(sessionId: string, history: LlmChatMessage[]): void {
     Memory.set("chatHistory", history);
+    ChatHistoryCache._activeSessionId = sessionId;
   }
 
-  /** Save the active history under `currentSessionId`, then load `targetSessionId`. */
-  static swap(
-    currentSessionId: string | null,
-    targetHistory: LlmChatMessage[],
-  ): void {
-    if (currentSessionId && Memory.has("chatHistory")) {
-      ChatHistoryCache.set(currentSessionId, Memory.get("chatHistory"));
+  /** Clear the active session state (e.g. after the active session is deleted). */
+  static deactivate(): void {
+    Memory.delete("chatHistory");
+    ChatHistoryCache._activeSessionId = null;
+  }
+
+  /**
+   * Persist the current active session's history into the per-session cache,
+   * then activate `targetSessionId` with `targetHistory`.
+   */
+  static swap(targetSessionId: string, targetHistory: LlmChatMessage[]): void {
+    if (ChatHistoryCache._activeSessionId) {
+      ChatHistoryCache.set(
+        ChatHistoryCache._activeSessionId,
+        ChatHistoryCache.getActive(),
+      );
     }
-    ChatHistoryCache.setActive(targetHistory);
+    ChatHistoryCache.setActive(targetSessionId, targetHistory);
   }
 
   // --- internals ---
@@ -95,7 +113,7 @@ export class ChatHistoryCache {
     );
     ChatHistoryCache.lru.push(sessionId);
 
-    while (ChatHistoryCache.lru.length > ChatHistoryCache.maxEntries) {
+    while (ChatHistoryCache.lru.length > ChatHistoryCache.MAX_ENTRIES) {
       const evicted = ChatHistoryCache.lru.shift();
       if (evicted) {
         Memory.delete(ChatHistoryCache.cacheKey(evicted));

@@ -12,6 +12,8 @@ export interface DbChatMessage {
 export interface LlmChatMessage {
   role: "user" | "assistant";
   content: string;
+  /** Original DB timestamp, preserved so cached history can display accurate times. */
+  originalTimestamp?: number;
 }
 
 /** The shape the webview expects when rendering chat bubbles. */

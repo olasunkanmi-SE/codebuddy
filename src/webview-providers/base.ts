@@ -395,6 +395,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     return history.map((msg) => ({
       role: msg.type === "user" ? "user" : "assistant",
       content: msg.content,
+      originalTimestamp: msg.timestamp,
     }));
   }
 
@@ -419,7 +420,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     return llmHistory.map((msg) => ({
       type: msg.role === "user" ? "user" : "bot",
       content: msg.content,
-      timestamp: Date.now(),
+      timestamp: msg.originalTimestamp || Date.now(),
       alias: "O",
       language: "text",
     }));
@@ -434,13 +435,13 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   private async loadSessionHistory(
     targetSessionId: string,
   ): Promise<{ formattedHistory: WebviewChatMessage[] }> {
-    // 1. Preserve outgoing session
-    ChatHistoryCache.swap(this.currentSessionId, []);
+    // 1. Preserve outgoing session, activate target with empty history
+    ChatHistoryCache.swap(targetSessionId, []);
 
     // 2. Try in-memory cache first (cache-aside)
     const cached = ChatHistoryCache.get(targetSessionId);
     if (cached) {
-      ChatHistoryCache.setActive(cached);
+      ChatHistoryCache.setActive(targetSessionId, cached);
       return { formattedHistory: this.formatLlmHistoryForWebview(cached) };
     }
 
@@ -452,7 +453,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       );
       if (history.length > 0) {
         const llmHistory = this.formatHistoryForLlm(history);
-        ChatHistoryCache.setActive(llmHistory);
+        ChatHistoryCache.setActive(targetSessionId, llmHistory);
         ChatHistoryCache.set(targetSessionId, llmHistory);
         return { formattedHistory: this.formatHistoryForWebview(history) };
       }
@@ -463,7 +464,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       );
     }
 
-    ChatHistoryCache.setActive([]);
+    ChatHistoryCache.setActive(targetSessionId, []);
     return { formattedHistory: [] };
   }
 
@@ -1326,12 +1327,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     .replace(/<[^>]*>/g, "")
                     .trim()
                     .substring(0, 255) || "New Chat";
-                // Preserve current session's in-memory history
-                ChatHistoryCache.swap(this.currentSessionId, []);
                 const sessionId = await this.agentService.createSession(
                   "agentId",
                   title,
                 );
+                // Preserve current session's in-memory history, then activate new session
+                ChatHistoryCache.swap(sessionId, []);
                 this.currentSessionId = sessionId;
                 const sessions = await this.agentService.getSessions("agentId");
                 await this.currentWebView?.webview.postMessage({
@@ -1385,7 +1386,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 ChatHistoryCache.delete(sessionId);
                 if (this.currentSessionId === sessionId) {
                   this.currentSessionId = null;
-                  ChatHistoryCache.setActive([]);
+                  ChatHistoryCache.deactivate();
                 }
                 const sessions = await this.agentService.getSessions("agentId");
                 this.logger.info(
