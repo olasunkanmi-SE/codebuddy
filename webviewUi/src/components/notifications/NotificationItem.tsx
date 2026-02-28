@@ -4,7 +4,13 @@ import { INotificationItem } from "./types";
 
 // Simple time ago utility
 const timeAgo = (dateStr: string) => {
-  const date = new Date(dateStr);
+  // SQLite timestamps may lack a timezone indicator — treat as UTC
+  let normalized = dateStr;
+  if (normalized && !normalized.endsWith("Z") && !normalized.includes("+")) {
+    normalized = normalized.replace(" ", "T") + "Z";
+  }
+  const date = new Date(normalized);
+  if (isNaN(date.getTime())) return "";
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
@@ -83,10 +89,16 @@ const Source = styled.div`
 interface Props {
   notification: INotificationItem;
   onClick: () => void;
+  onDelete: () => void;
 }
 
-export const NotificationItem: React.FC<Props> = ({ notification, onClick }) => {
+export const NotificationItem: React.FC<Props> = ({ notification, onClick, onDelete }) => {
   const timeDisplay = timeAgo(notification.timestamp);
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete();
+  };
 
   return (
     <ItemContainer
@@ -96,7 +108,39 @@ export const NotificationItem: React.FC<Props> = ({ notification, onClick }) => 
     >
       <Header>
         <Title>{notification.title}</Title>
-        <Time>{timeDisplay}</Time>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <Time>{timeDisplay}</Time>
+          <button
+            onClick={handleDelete}
+            title="Delete notification"
+            aria-label="Delete notification"
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--vscode-descriptionForeground)",
+              cursor: "pointer",
+              padding: "2px",
+              borderRadius: "4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: 0.6,
+              transition: "opacity 0.2s, color 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = "1";
+              e.currentTarget.style.color = "var(--vscode-errorForeground)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = "0.6";
+              e.currentTarget.style.color = "var(--vscode-descriptionForeground)";
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor">
+              <path d="M12 4L4 12M4 4l8 8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
       </Header>
       <Message>{notification.message}</Message>
       {notification.source && <Source>{notification.source}</Source>}

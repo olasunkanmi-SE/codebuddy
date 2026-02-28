@@ -3,8 +3,15 @@ import * as cp from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { Logger } from "../infrastructure/logger/logger";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 
-export const createBranchFromGitLabCommand = async () => {
+export const createBranchFromGitLabCommand = async (
+  notificationService: NotificationService,
+) => {
+  const ns = notificationService;
   const logger = Logger.initialize("CreateBranchFromGitLab", {});
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders) {
@@ -34,6 +41,12 @@ export const createBranchFromGitLabCommand = async () => {
           vscode.Uri.parse("https://gitlab.com/gitlab-org/cli#installation"),
         );
       }
+      ns.addNotification(
+        "error",
+        "GitLab CLI Not Found",
+        "GitLab CLI (glab) is not installed. Install it to use GitLab features.",
+        NotificationSource.GitLab,
+      );
       return;
     }
   }
@@ -188,12 +201,18 @@ export const createBranchFromGitLabCommand = async () => {
                   { cwd: rootPath },
                   (gitErr, gitOut, gitStderr) => {
                     if (gitErr) {
-                      vscode.window.showErrorMessage(
-                        `Failed to create branch: ${gitStderr || gitErr.message}`,
+                      ns.addNotification(
+                        "error",
+                        "Branch Creation Failed",
+                        `Failed to create branch from GitLab issue: ${gitStderr || gitErr.message}`,
+                        NotificationSource.Git,
                       );
                     } else {
-                      vscode.window.showInformationMessage(
+                      ns.addNotification(
+                        "success",
+                        "Branch Created",
                         `Created and checked out branch: ${confirmName}`,
+                        NotificationSource.Git,
                       );
                     }
                   },
@@ -208,7 +227,12 @@ export const createBranchFromGitLabCommand = async () => {
           }
         } catch (err: any) {
           logger.error("Failed to fetch issues", err);
-          vscode.window.showErrorMessage(`Failed to fetch issues: ${err}`);
+          ns.addNotification(
+            "error",
+            "GitLab Issue Fetch Failed",
+            `Failed to fetch GitLab issues: ${err}`,
+            NotificationSource.GitLab,
+          );
         }
       },
     );

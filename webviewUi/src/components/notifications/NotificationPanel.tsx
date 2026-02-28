@@ -129,6 +129,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
   onMarkAsRead,
   onMarkAllAsRead,
   onClearAll,
+  onDelete,
 }) => {
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -201,6 +202,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                 key={notification.id}
                 notification={notification}
                 onClick={() => onMarkAsRead(notification.id)}
+                onDelete={() => onDelete(notification.id)}
               />
             ))
           )}
@@ -214,7 +216,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
             >
               Mark all read
             </VSCodeButton>
-            <VSCodeButton appearance="icon" onClick={onClearAll}>
+            <VSCodeButton appearance="secondary" onClick={onClearAll}>
               Clear all
             </VSCodeButton>
           </Footer>

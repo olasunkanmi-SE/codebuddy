@@ -8,6 +8,10 @@ import {
   MCPToolResult,
 } from "./types";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 
 export class MCPClient {
   private client: Client;
@@ -18,12 +22,14 @@ export class MCPClient {
   private toolCacheExpiry = 0;
   private readonly CACHE_TTL_MS = 5 * 60 * 1000;
   private readonly logger: Logger;
+  private readonly notificationService: NotificationService;
   private reconnectAttempts = 0;
   private readonly MAX_RECONNECT_ATTEMPTS = 3;
 
   constructor(
     private readonly serverName: string,
     private readonly config: MCPServerConfig,
+    notificationService?: NotificationService,
   ) {
     this.logger = Logger.initialize(`MCPClient:${serverName}`, {
       minLevel: LogLevel.DEBUG,
@@ -31,6 +37,8 @@ export class MCPClient {
       enableFile: true,
       enableTelemetry: true,
     });
+    this.notificationService =
+      notificationService ?? NotificationService.getInstance();
 
     this.client = new Client(
       { name: "CodeBuddy-Client", version: "1.0.0" },
@@ -174,6 +182,12 @@ export class MCPClient {
     if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
       this.logger.error(
         `Max reconnection attempts reached for ${this.serverName}`,
+      );
+      this.notificationService.addNotification(
+        "error",
+        "MCP Reconnection Failed",
+        `MCP server "${this.serverName}" disconnected and could not reconnect after ${this.MAX_RECONNECT_ATTEMPTS} attempts.`,
+        NotificationSource.MCP,
       );
       return;
     }

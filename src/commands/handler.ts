@@ -33,6 +33,10 @@ import {
 import { Memory } from "../memory/base";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 import { architecturalRecommendationCommand } from "./architectural-recommendation";
 import { trace, SpanStatusCode, SpanKind, Tracer } from "@opentelemetry/api";
 
@@ -47,10 +51,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   protected error?: string;
   protected logger: Logger;
   private readonly tracer: Tracer;
+  protected readonly notificationService: NotificationService;
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,
     errorMessage?: string,
+    notificationService?: NotificationService,
   ) {
     this.context = _context;
     this.error = errorMessage;
@@ -62,6 +68,8 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     });
     this.orchestrator = Orchestrator.getInstance();
     this.tracer = trace.getTracer("codebuddy-commands");
+    this.notificationService =
+      notificationService ?? NotificationService.getInstance();
   }
 
   /**
@@ -298,8 +306,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       return { generativeAi: config.generativeAi, model, modelName };
     } catch (error: any) {
       this.logger.error("Error creating model:", error);
-      vscode.window.showErrorMessage(
-        "An error occurred while creating the model. Please try again.",
+      this.notificationService.addNotification(
+        "error",
+        "Model Creation Failed",
+        error?.message ||
+          "Failed to create model. Check your API configuration.",
+        NotificationSource.Commands,
       );
     }
   }
@@ -419,8 +431,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       });
       span.recordException(error);
       this.logger.error("Error generating response:", error);
-      vscode.window.showErrorMessage(
-        "An error occurred while generating the response. Please try again.",
+      this.notificationService.addNotification(
+        "error",
+        "Response Generation Failed",
+        error?.message ||
+          "Failed to generate a response. Please check your API key and model settings.",
+        NotificationSource.Commands,
       );
     } finally {
       span.end();
@@ -803,6 +819,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           type: "onStreamError",
           payload: { requestId, error: error.message },
         });
+        this.notificationService.addNotification(
+          "error",
+          "Command Streaming Failed",
+          error?.message || "An error occurred while streaming the response.",
+          NotificationSource.Commands,
+        );
         return;
       }
 
@@ -825,6 +847,13 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       this.logger.error(
         "Error while passing model response to the webview",
         error,
+      );
+      this.notificationService.addNotification(
+        "error",
+        "Command Execution Failed",
+        error?.message ||
+          "An unexpected error occurred while executing the command.",
+        NotificationSource.Commands,
       );
     } finally {
       span.end();

@@ -45,7 +45,10 @@ import { DockerModelService } from "../services/docker/DockerModelService";
 import { ProjectRulesService } from "../services/project-rules.service";
 import { NewsService } from "../services/news.service";
 import { ConnectorService } from "../services/connector.service";
-import { NotificationService } from "../services/notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 import { ObservabilityService } from "../services/observability.service";
 import { LocalObservabilityService } from "../infrastructure/observability/telemetry";
 import { ChatHistoryCache } from "../memory/chat-history-cache";
@@ -100,12 +103,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected promptBuilderService: EnhancedPromptBuilderService;
   private readonly groqLLM: GroqLLM | null;
   private readonly codeBuddyAgent: MessageHandler;
+  protected readonly notificationService: NotificationService;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
     context: vscode.ExtensionContext,
+    notificationService?: NotificationService,
   ) {
     const { apiKey: modelKey, model } = getAPIKeyAndModel("groq");
     const config = {
@@ -163,6 +168,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     this.promptBuilderService = new EnhancedPromptBuilderService(context);
     this.codeBuddyAgent = MessageHandler.getInstance();
+    this.notificationService =
+      notificationService ?? NotificationService.getInstance();
   }
 
   registerDisposables() {
@@ -171,7 +178,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
 
     this.disposables.push(
-      NotificationService.getInstance().onDidNotificationChange(() => {
+      this.notificationService.onDidNotificationChange(() => {
         this.synchronizeNotifications();
       }),
     );
@@ -914,20 +921,43 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     )
                   : JSON.stringify(message.message);
 
-                const fullResponse =
-                  await this.codeBuddyAgent.handleUserMessage(
-                    payload,
-                    message.metaData,
-                  );
+                try {
+                  const fullResponse =
+                    await this.codeBuddyAgent.handleUserMessage(
+                      payload,
+                      message.metaData,
+                    );
 
-                // Save agent response to history
-                if (fullResponse) {
-                  await this.agentService.addChatMessage("agentId", {
-                    content: fullResponse,
-                    type: "model",
-                    sessionId: this.currentSessionId,
-                    metadata: { threadId: message.metaData?.threadId },
-                  });
+                  // Save agent response to history
+                  if (fullResponse) {
+                    await this.agentService.addChatMessage("agentId", {
+                      content: fullResponse,
+                      type: "model",
+                      sessionId: this.currentSessionId,
+                      metadata: { threadId: message.metaData?.threadId },
+                    });
+                  }
+                } catch (agentError: unknown) {
+                  let errorMessage = "An unknown error occurred in Agent mode";
+                  if (agentError instanceof Error) {
+                    errorMessage = agentError.message;
+                  } else if (typeof agentError === "string") {
+                    errorMessage = agentError;
+                  }
+                  this.logger.error("Agent mode error", agentError);
+                  try {
+                    this.notificationService.addNotification(
+                      "error",
+                      "Agent Error",
+                      errorMessage,
+                      NotificationSource.Agent,
+                    );
+                  } catch (notificationError: unknown) {
+                    this.logger.error(
+                      "Failed to display agent error notification",
+                      notificationError,
+                    );
+                  }
                 }
                 return;
               }
@@ -1036,12 +1066,33 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   type: "model",
                   sessionId: this.currentSessionId,
                 });
-              } catch (error: any) {
+              } catch (error: unknown) {
+                let streamErrorMessage =
+                  "An error occurred while generating a response";
+                if (error instanceof Error) {
+                  streamErrorMessage = error.message;
+                } else if (typeof error === "string") {
+                  streamErrorMessage = error;
+                }
                 this.logger.error("Error during streaming", error);
                 await this.currentWebView?.webview.postMessage({
                   type: "onStreamError",
-                  payload: { requestId, error: error.message },
+                  payload: { requestId, error: streamErrorMessage },
                 });
+
+                try {
+                  this.notificationService.addNotification(
+                    "error",
+                    "Response Failed",
+                    streamErrorMessage,
+                    NotificationSource.Chat,
+                  );
+                } catch (notificationError: unknown) {
+                  this.logger.error(
+                    "Failed to display stream error notification",
+                    notificationError,
+                  );
+                }
                 return; // Stop processing
               }
 
@@ -1794,19 +1845,25 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "notifications-mark-read":
               if (message.ids && Array.isArray(message.ids)) {
                 for (const id of message.ids) {
-                  await NotificationService.getInstance().markAsRead(id);
+                  await this.notificationService.markAsRead(id);
                 }
               } else if (message.id) {
-                await NotificationService.getInstance().markAsRead(message.id);
+                await this.notificationService.markAsRead(message.id);
               }
               await this.synchronizeNotifications();
               break;
             case "notifications-mark-all-read":
-              await NotificationService.getInstance().markAllAsRead();
+              await this.notificationService.markAllAsRead();
               await this.synchronizeNotifications();
               break;
             case "notifications-clear-all":
-              await NotificationService.getInstance().clearAll();
+              await this.notificationService.clearAll();
+              await this.synchronizeNotifications();
+              break;
+            case "notifications-delete":
+              if (message.id) {
+                await this.notificationService.deleteNotification(message.id);
+              }
               await this.synchronizeNotifications();
               break;
 
@@ -3779,10 +3836,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       return;
     }
     try {
-      const notifications =
-        await NotificationService.getInstance().getNotifications();
-      const unreadCount =
-        await NotificationService.getInstance().getUnreadCount();
+      const notifications = await this.notificationService.getNotifications();
+      const unreadCount = await this.notificationService.getUnreadCount();
 
       this.logger.info(
         `synchronizeNotifications: Sending ${notifications.length} notifications, unread: ${unreadCount}`,

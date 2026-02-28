@@ -2,6 +2,20 @@ import * as vscode from "vscode";
 import { Logger } from "../infrastructure/logger/logger";
 import { SqliteDatabaseService } from "./sqlite-database.service";
 
+export enum NotificationSource {
+  System = "System",
+  Commands = "Commands",
+  Git = "Git",
+  Chat = "Chat",
+  MCP = "MCP",
+  ModelManager = "Model Manager",
+  Workspace = "Workspace",
+  GitLab = "GitLab",
+  Jira = "Jira",
+  PRReview = "PR Review",
+  Agent = "Agent",
+}
+
 export interface NotificationItem {
   id: number;
   type: "info" | "warning" | "error" | "success";
@@ -38,13 +52,13 @@ export class NotificationService {
     type: "info" | "warning" | "error" | "success",
     title: string,
     message: string,
-    source = "System",
+    source: NotificationSource = NotificationSource.System,
   ): Promise<void> {
     try {
       await this.dbService.initialize();
       this.dbService.executeSqlCommand(
         `INSERT INTO notifications (type, title, message, source, read_status, timestamp) 
-         VALUES (?, ?, ?, ?, 0, datetime('now'))`,
+         VALUES (?, ?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
         [type, title, message, source],
       );
       this.logger.info(`Added notification: ${title}`);
@@ -124,6 +138,22 @@ export class NotificationService {
       this._onDidNotificationChange.fire();
     } catch (error) {
       this.logger.error("Failed to mark all notifications as read", error);
+    }
+  }
+
+  /**
+   * Delete a single notification
+   */
+  public async deleteNotification(id: number): Promise<void> {
+    try {
+      await this.dbService.initialize();
+      this.dbService.executeSqlCommand(
+        `DELETE FROM notifications WHERE id = ?`,
+        [id],
+      );
+      this._onDidNotificationChange.fire();
+    } catch (error) {
+      this.logger.error(`Failed to delete notification ${id}`, error);
     }
   }
 

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { CodeCommandHandler } from "./handler";
 import { GitActions } from "../services/git-actions";
 import { formatText } from "../utils/utils";
+import { NotificationSource } from "../services/notification.service";
 
 export class GenerateCommitMessage extends CodeCommandHandler {
   private readonly gitActions: GitActions;
@@ -19,8 +20,11 @@ export class GenerateCommitMessage extends CodeCommandHandler {
       return await this.gitActions.getStagedDifferenceSummary();
     } catch (error: any) {
       this.logger.error("Error getting staged differences:", error);
-      vscode.window.showErrorMessage(
-        "Failed to get staged changes. Please ensure you have staged changes.",
+      this.notificationService.addNotification(
+        "error",
+        "Staged Changes Not Found",
+        "Failed to get staged changes. Ensure you have staged files for commit.",
+        NotificationSource.Git,
       );
       throw error;
     }

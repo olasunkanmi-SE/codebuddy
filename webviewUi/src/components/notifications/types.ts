@@ -15,4 +15,5 @@ export interface NotificationPanelProps {
   onMarkAsRead: (id: number) => void;
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
+  onDelete: (id: number) => void;
 }

@@ -3,8 +3,15 @@ import * as cp from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { Logger } from "../infrastructure/logger/logger";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 
-export const createBranchFromJiraCommand = async () => {
+export const createBranchFromJiraCommand = async (
+  notificationService: NotificationService,
+) => {
+  const ns = notificationService;
   const logger = Logger.initialize("CreateBranchFromJira", {});
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders) {
@@ -187,12 +194,18 @@ export const createBranchFromJiraCommand = async () => {
                   { cwd: rootPath },
                   (gitErr, gitOut, gitStderr) => {
                     if (gitErr) {
-                      vscode.window.showErrorMessage(
-                        `Failed to create branch: ${gitStderr || gitErr.message}`,
+                      ns.addNotification(
+                        "error",
+                        "Branch Creation Failed",
+                        `Failed to create branch from Jira ticket: ${gitStderr || gitErr.message}`,
+                        NotificationSource.Git,
                       );
                     } else {
-                      vscode.window.showInformationMessage(
+                      ns.addNotification(
+                        "success",
+                        "Branch Created",
                         `Created and checked out branch: ${confirmName}`,
+                        NotificationSource.Git,
                       );
                     }
                   },
@@ -207,7 +220,12 @@ export const createBranchFromJiraCommand = async () => {
           }
         } catch (err: any) {
           logger.error("Failed to fetch tickets", err);
-          vscode.window.showErrorMessage(`Failed to fetch tickets: ${err}`);
+          ns.addNotification(
+            "error",
+            "Jira Ticket Fetch Failed",
+            `Failed to fetch Jira tickets: ${err}`,
+            NotificationSource.Jira,
+          );
         }
       },
     );

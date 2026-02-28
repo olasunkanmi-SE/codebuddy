@@ -6,6 +6,10 @@ import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
 import { ChatHistoryManager } from "../services/chat-history-manager";
 import { formatText, getAPIKeyAndModel } from "../utils/utils";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 import { AnthropicWebViewProvider } from "./anthropic";
 import { BaseWebViewProvider } from "./base";
 import { DeepseekWebViewProvider } from "./deepseek";
@@ -39,12 +43,16 @@ export class WebViewProviderManager implements vscode.Disposable {
 
   static readonly AgentId = "agentId"; // TODO This is hardcoded for now,in upcoming versions, requests will be tagged to respective agents.
   private readonly logger: Logger;
+  private readonly notificationService: NotificationService;
 
   private constructor(
     private readonly extensionContext: vscode.ExtensionContext,
+    notificationService?: NotificationService,
   ) {
     this.orchestrator = Orchestrator.getInstance();
     this.chatHistoryManager = ChatHistoryManager.getInstance();
+    this.notificationService =
+      notificationService ?? NotificationService.getInstance();
     this.registerProviders();
     this.registerWebViewProvider();
     // Don't register event listeners immediately - do it lazily
@@ -150,10 +158,12 @@ export class WebViewProviderManager implements vscode.Disposable {
 
   public static getInstance(
     extensionContext: vscode.ExtensionContext,
+    notificationService?: NotificationService,
   ): WebViewProviderManager {
     if (!WebViewProviderManager.instance) {
       WebViewProviderManager.instance = new WebViewProviderManager(
         extensionContext,
+        notificationService,
       );
     }
     return WebViewProviderManager.instance;
@@ -283,8 +293,41 @@ export class WebViewProviderManager implements vscode.Disposable {
           modelName,
         }),
       );
-    } catch (error: any) {
-      this.logger.error(`Error switching provider: ${error}`);
+
+      try {
+        this.notificationService.addNotification(
+          "success",
+          "Model Switched",
+          `Successfully switched to ${modelName}`,
+          NotificationSource.ModelManager,
+        );
+      } catch (notificationError: unknown) {
+        this.logger.error(
+          "Failed to display model switch success notification",
+          notificationError,
+        );
+      }
+    } catch (error: unknown) {
+      const switchErrorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error switching provider: ${switchErrorMessage}`,
+        error,
+      );
+
+      try {
+        this.notificationService.addNotification(
+          "error",
+          "Model Switch Failed",
+          `Failed to switch to ${modelName}: ${switchErrorMessage || "Unknown error"}`,
+          NotificationSource.ModelManager,
+        );
+      } catch (notificationError: unknown) {
+        this.logger.error(
+          "Failed to display model switch error notification",
+          notificationError,
+        );
+      }
       await this.orchestrator.publish(
         "onModelChangeSuccess",
         JSON.stringify({
@@ -292,7 +335,7 @@ export class WebViewProviderManager implements vscode.Disposable {
           modelName,
         }),
       );
-      throw new Error(error);
+      throw error instanceof Error ? error : new Error(switchErrorMessage);
     }
   }
 
@@ -324,9 +367,17 @@ export class WebViewProviderManager implements vscode.Disposable {
         this.logger.warn(`${modelName} APIkey is required`);
       }
       await this.switchProvider(modelName, apiKey, model, false);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.logger.error("Error handling model change", error);
-      throw new Error(error.message);
+      this.notificationService.addNotification(
+        "error",
+        "Model Change Failed",
+        errorMessage || "An error occurred while changing the model.",
+        NotificationSource.ModelManager,
+      );
+      throw error instanceof Error ? error : new Error(errorMessage);
     }
   }
 
@@ -347,8 +398,15 @@ export class WebViewProviderManager implements vscode.Disposable {
       } else {
         this.logger.warn("Webview not available for chat history restoration");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error("Failed to restore chat history:", error);
+
+      this.notificationService.addNotification(
+        "warning",
+        "Chat History Restoration Failed",
+        "Failed to restore previous chat history. Starting with a fresh session.",
+        NotificationSource.Chat,
+      );
 
       // Send empty history to prevent UI hanging
       if (this.webviewView?.webview) {

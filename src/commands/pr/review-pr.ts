@@ -7,7 +7,7 @@ import { formatText } from "../../utils/utils";
 import { GitCliProvider } from "./git-cli.provider";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { PRPromptBuilder } from "./pr-prompt-builder.service";
-
+import { NotificationSource } from "../../services/notification.service";
 export class ReviewPR extends CodeCommandHandler {
   private readonly changeDetector: ChangeDetector;
   private readonly promptBuilder: PRPromptBuilder;
@@ -73,8 +73,13 @@ export class ReviewPR extends CodeCommandHandler {
       return this.promptBuilder.build(changeDetails);
     } catch (error) {
       this.logger.error("Error generating PR review prompt:", error);
-      vscode.window.showErrorMessage(
-        error instanceof Error ? error.message : "An unknown error occurred.",
+      this.notificationService.addNotification(
+        "error",
+        "PR Review Failed",
+        error instanceof Error
+          ? error.message
+          : "Failed to generate PR review prompt.",
+        NotificationSource.PRReview,
       );
       return this.promptBuilder.buildErrorPrompt(error);
     }

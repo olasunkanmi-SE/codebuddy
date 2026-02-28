@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
-import { NotificationService } from "./notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "./notification.service";
 
 export interface UserFeedbackOptions {
   enableStatusBar?: boolean;
@@ -236,7 +239,7 @@ export class UserFeedbackService implements vscode.Disposable {
   ): Promise<string | undefined> {
     // Add to notification center
     NotificationService.getInstance()
-      .addNotification("success", "Success", message, "System")
+      .addNotification("success", "Success", message, NotificationSource.System)
       .catch((err) => this.logger.error("Failed to add notification", err));
 
     if (!this.options.enableToastNotifications) {
@@ -262,7 +265,7 @@ export class UserFeedbackService implements vscode.Disposable {
   ): Promise<string | undefined> {
     // Add to notification center
     NotificationService.getInstance()
-      .addNotification("warning", "Warning", message, "System")
+      .addNotification("warning", "Warning", message, NotificationSource.System)
       .catch((err) => this.logger.error("Failed to add notification", err));
 
     if (!this.options.enableToastNotifications) {
@@ -288,7 +291,7 @@ export class UserFeedbackService implements vscode.Disposable {
   ): Promise<string | undefined> {
     // Add to notification center
     NotificationService.getInstance()
-      .addNotification("error", "Error", message, "System")
+      .addNotification("error", "Error", message, NotificationSource.System)
       .catch((err) => this.logger.error("Failed to add notification", err));
 
     if (!this.options.enableToastNotifications) {

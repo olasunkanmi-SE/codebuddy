@@ -36,8 +36,8 @@ const SettingsToggleButton = styled.button`
   z-index: 100;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 6px;
+  padding: 5px;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.7);
   display: flex;
@@ -59,13 +59,13 @@ const SettingsToggleButton = styled.button`
 // Styled component for sessions toggle button
 const SessionsToggleButton = styled.button`
   position: fixed;
-  top: 56px;
+  top: 44px;
   left: 12px;
   z-index: 100;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 6px;
+  padding: 5px;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.7);
   display: flex;
@@ -85,7 +85,7 @@ const SessionsToggleButton = styled.button`
 `;
 
 // Sessions icon component
-const SessionsIcon = ({ size = 18 }: { size?: number }) => (
+const SessionsIcon = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
   </svg>
@@ -94,13 +94,13 @@ const SessionsIcon = ({ size = 18 }: { size?: number }) => (
 // Styled component for notification toggle button
 const NotificationToggleButton = styled.button`
   position: fixed;
-  top: 100px;
+  top: 76px;
   left: 12px;
   z-index: 100;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 6px;
+  padding: 5px;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.7);
   display: flex;
@@ -121,28 +121,28 @@ const NotificationToggleButton = styled.button`
 
 const FontSizeGroup = styled.div`
   position: fixed;
-  top: 276px;
+  top: 204px;
   left: 12px;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 `;
 
 const FontSizeButton = styled.button`
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 8px;
-  width: 36px;
-  height: 36px;
+  border-radius: 6px;
+  padding: 4px;
+  width: 26px;
+  height: 26px;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 11px;
   transition: all 0.15s ease;
 
   &:hover {
@@ -156,7 +156,7 @@ const FontSizeButton = styled.button`
   }
 `;
 
-const NotificationIcon = ({ size = 18 }: { size?: number }) => (
+const NotificationIcon = ({ size = 14 }: { size?: number }) => (
   <svg
     width={size}
     height={size}
@@ -173,7 +173,7 @@ const NotificationIcon = ({ size = 18 }: { size?: number }) => (
 );
 
 // Book icon component for Updates
-const BookIcon = ({ size = 18 }: { size?: number }) => (
+const BookIcon = ({ size = 14 }: { size?: number }) => (
   <svg
     width={size}
     height={size}
@@ -190,7 +190,7 @@ const BookIcon = ({ size = 18 }: { size?: number }) => (
 );
 
 // Browser icon component
-const BrowserIcon = ({ size = 18 }: { size?: number }) => (
+const BrowserIcon = ({ size = 14 }: { size?: number }) => (
   <svg
     width={size}
     height={size}
@@ -210,13 +210,13 @@ const BrowserIcon = ({ size = 18 }: { size?: number }) => (
 // Styled component for observability toggle button
 const ObservabilityToggleButton = styled.button`
   position: fixed;
-  top: 188px;
+  top: 140px;
   left: 12px;
   z-index: 100;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 6px;
+  padding: 5px;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.7);
   display: flex;
@@ -236,7 +236,7 @@ const ObservabilityToggleButton = styled.button`
 `;
 
 // Observability icon component
-const ObservabilityIcon = ({ size = 18 }: { size?: number }) => (
+const ObservabilityIcon = ({ size = 14 }: { size?: number }) => (
   <svg
     width={size}
     height={size}
@@ -254,13 +254,13 @@ const ObservabilityIcon = ({ size = 18 }: { size?: number }) => (
 // Styled component for browser toggle button
 const BrowserToggleButton = styled.button`
   position: fixed;
-  top: 232px;
+  top: 172px;
   left: 12px;
   z-index: 100;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 6px;
+  padding: 5px;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.7);
   display: flex;
@@ -282,8 +282,8 @@ const BrowserToggleButton = styled.button`
 // Browsing history dropdown
 const BrowsingHistoryDropdown = styled.div`
   position: fixed;
-  top: 232px;
-  left: 52px;
+  top: 172px;
+  left: 40px;
   z-index: 200;
   background: var(--vscode-menu-background, #1e1e2e);
   border: 1px solid var(--vscode-menu-border, rgba(255, 255, 255, 0.15));
@@ -343,13 +343,13 @@ const HistoryHeader = styled.div`
 // Styled component for updates toggle button
 const UpdatesToggleButton = styled.button`
   position: fixed;
-  top: 144px;
+  top: 108px;
   left: 12px;
   z-index: 100;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 6px;
+  padding: 5px;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.7);
   display: flex;
@@ -967,15 +967,19 @@ export const WebviewUI = () => {
 
   // Notification handlers
   const handleNotificationMarkAsRead = useCallback((id: number) => {
-    vsCode.postMessage({ command: "notification-mark-read", id });
+    vsCode.postMessage({ command: "notifications-mark-read", id });
   }, []);
 
   const handleNotificationMarkAllAsRead = useCallback(() => {
-    vsCode.postMessage({ command: "notification-mark-all-read" });
+    vsCode.postMessage({ command: "notifications-mark-all-read" });
   }, []);
 
   const handleNotificationClearAll = useCallback(() => {
     vsCode.postMessage({ command: "notifications-clear-all" });
+  }, []);
+
+  const handleNotificationDelete = useCallback((id: number) => {
+    vsCode.postMessage({ command: "notifications-delete", id });
   }, []);
 
   const handleIncreaseFontSize = useCallback(() => {
@@ -1208,7 +1212,7 @@ export const WebviewUI = () => {
         aria-label="Open settings"
         title="Settings"
       >
-        <SettingsGearIcon />
+        <SettingsGearIcon size={14} />
       </SettingsToggleButton>
 
 
@@ -1230,7 +1234,7 @@ export const WebviewUI = () => {
         aria-label="Open sessions"
         title="Sessions"
       >
-        <SessionsIcon size={18} />
+        <SessionsIcon size={14} />
       </SessionsToggleButton>
 
       {/* Sessions Panel */}
@@ -1251,20 +1255,20 @@ export const WebviewUI = () => {
         aria-label="Open notifications"
         title="Notifications"
       >
-        <NotificationIcon size={18} />
+        <NotificationIcon size={14} />
         {unreadNotificationCount > 0 && (
           <span
             style={{
               position: "absolute",
-              top: "-5px",
-              right: "-5px",
+              top: "-4px",
+              right: "-4px",
               background: "var(--vscode-activityBarBadge-background)",
               color: "var(--vscode-activityBarBadge-foreground)",
-              fontSize: "10px",
+              fontSize: "9px",
               fontWeight: "bold",
               borderRadius: "50%",
-              minWidth: "16px",
-              height: "16px",
+              minWidth: "14px",
+              height: "14px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -1293,6 +1297,7 @@ export const WebviewUI = () => {
         onMarkAsRead={handleNotificationMarkAsRead}
         onMarkAllAsRead={handleNotificationMarkAllAsRead}
         onClearAll={handleNotificationClearAll}
+        onDelete={handleNotificationDelete}
       />
 
       {/* Updates Toggle Button */}
@@ -1301,7 +1306,7 @@ export const WebviewUI = () => {
         aria-label="Open updates"
         title="Updates"
       >
-        <BookIcon size={18} />
+        <BookIcon size={14} />
       </UpdatesToggleButton>
 
       {/* Updates Panel */}
@@ -1324,7 +1329,7 @@ export const WebviewUI = () => {
         aria-label="Open observability"
         title="Observability"
       >
-        <ObservabilityIcon size={18} />
+        <ObservabilityIcon size={14} />
       </ObservabilityToggleButton>
 
       {/* Browser Toggle Button */}
@@ -1334,7 +1339,7 @@ export const WebviewUI = () => {
         aria-label="Open browser"
         title="Open Browser (right-click for history)"
       >
-        <BrowserIcon size={18} />
+        <BrowserIcon size={14} />
       </BrowserToggleButton>
 
       {/* Browsing History Dropdown */}
