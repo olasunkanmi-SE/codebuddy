@@ -1269,7 +1269,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
             case "create-session": {
               try {
-                const title = message.message?.title || "New Chat";
+                const rawTitle = message.message?.title || "New Chat";
+                const title = rawTitle.replace(/<[^>]*>/g, "").trim().substring(0, 255) || "New Chat";
                 // Preserve current session's in-memory history before switching
                 if (this.currentSessionId && Memory.has("chatHistory")) {
                   Memory.set(
@@ -1321,34 +1322,42 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 // Update current session tracking
                 this.currentSessionId = sessionId;
                 // Restore target session's in-memory history if cached, otherwise load from DB
-                const history = await this.agentService.getSessionHistory(
-                  "agentId",
-                  sessionId,
-                );
-                if (Memory.has(`chatHistory:${sessionId}`)) {
-                  Memory.set(
-                    "chatHistory",
-                    Memory.get(`chatHistory:${sessionId}`),
-                  );
-                } else if (history.length > 0) {
-                  const llmHistory = history.map((msg: any) => ({
-                    role: msg.type === "user" ? "user" : "assistant",
+                let formattedHistory: any[];
+                const cachedLlmHistory = Memory.get(`chatHistory:${sessionId}`);
+                if (cachedLlmHistory) {
+                  Memory.set("chatHistory", cachedLlmHistory);
+                  formattedHistory = cachedLlmHistory.map((msg: any) => ({
+                    type: msg.role === "user" ? "user" : "bot",
                     content: msg.content,
+                    timestamp: Date.now(),
+                    alias: "O",
+                    language: "text",
                   }));
-                  Memory.set("chatHistory", llmHistory);
-                  Memory.set(`chatHistory:${sessionId}`, llmHistory);
                 } else {
-                  Memory.set("chatHistory", []);
+                  const history = await this.agentService.getSessionHistory(
+                    "agentId",
+                    sessionId,
+                  );
+                  if (history.length > 0) {
+                    const llmHistory = history.map((msg: any) => ({
+                      role: msg.type === "user" ? "user" : "assistant",
+                      content: msg.content,
+                    }));
+                    Memory.set("chatHistory", llmHistory);
+                    Memory.set(`chatHistory:${sessionId}`, llmHistory);
+                    formattedHistory = history.map((msg: any) => ({
+                      type: msg.type === "user" ? "user" : "bot",
+                      content: msg.content,
+                      timestamp: msg.timestamp || Date.now(),
+                      alias: msg.metadata?.alias || "O",
+                      language: msg.metadata?.language || "text",
+                      metadata: msg.metadata,
+                    }));
+                  } else {
+                    Memory.set("chatHistory", []);
+                    formattedHistory = [];
+                  }
                 }
-                // Convert to webview format
-                const formattedHistory = history.map((msg: any) => ({
-                  type: msg.type === "user" ? "user" : "bot",
-                  content: msg.content,
-                  timestamp: msg.timestamp || Date.now(),
-                  alias: msg.metadata?.alias || "O",
-                  language: msg.metadata?.language || "text",
-                  metadata: msg.metadata,
-                }));
                 await this.currentWebView?.webview.postMessage({
                   type: "session-switched",
                   sessionId,
@@ -1370,9 +1379,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
                 await this.agentService.deleteSession("agentId", sessionId);
                 this.logger.info(`Deleted session from database: ${sessionId}`);
+                // Evict cached history for the deleted session
+                Memory.delete(`chatHistory:${sessionId}`);
                 // If we deleted the current session, clear tracking
                 if (this.currentSessionId === sessionId) {
                   this.currentSessionId = null;
+                  Memory.set("chatHistory", []);
                 }
                 const sessions = await this.agentService.getSessions("agentId");
                 this.logger.info(

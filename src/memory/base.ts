@@ -2,8 +2,11 @@ import { MEMORY_CACHE_OPTIONS } from "../application/constant";
 
 export class Memory {
   private static readonly MAX_MEMORY_ITEMS = 3;
+  private static readonly MAX_SESSION_CACHE_ENTRIES = 10;
   private static bank: Map<string, any>;
   private static instance: Memory;
+  /** Tracks access order for chatHistory:* keys (most-recent at end). */
+  private static sessionCacheLRU: string[] = [];
 
   constructor() {
     Memory.bank = new Map();
@@ -16,20 +19,32 @@ export class Memory {
 
   static set(key: string, value: any): Map<string, any> {
     const expiry = Date.now() + MEMORY_CACHE_OPTIONS.sessionTTL;
-    return Memory.bank.set(key, { value, expiry });
+    const result = Memory.bank.set(key, { value, expiry });
+    if (key.startsWith("chatHistory:")) {
+      Memory.touchSessionCacheKey(key);
+    }
+    return result;
   }
 
   static get(key: string): any {
     const entry = Memory.bank.get(key);
     if (entry && Date.now() < entry.expiry) {
+      if (key.startsWith("chatHistory:")) {
+        Memory.touchSessionCacheKey(key);
+      }
       return entry.value;
+    }
+    // Clean up expired entry
+    if (entry) {
+      Memory.bank.delete(key);
+      Memory.sessionCacheLRU = Memory.sessionCacheLRU.filter(k => k !== key);
     }
     return undefined;
   }
 
   static delete(key: string): boolean | undefined {
-    const cached = Memory.get(key);
-    if (cached) {
+    if (Memory.bank.has(key)) {
+      Memory.sessionCacheLRU = Memory.sessionCacheLRU.filter(k => k !== key);
       return Memory.bank.delete(key);
     }
     return undefined;
@@ -44,11 +59,25 @@ export class Memory {
   }
 
   static has(key: string): boolean {
-    return Memory.bank.has(key);
+    // Check expiry so callers don't see stale entries
+    return Memory.get(key) !== undefined;
   }
 
   static clear(): void {
+    Memory.sessionCacheLRU = [];
     return Memory.bank.clear();
+  }
+
+  /** Promote a chatHistory:* key to most-recent and evict the oldest if over limit. */
+  private static touchSessionCacheKey(key: string): void {
+    Memory.sessionCacheLRU = Memory.sessionCacheLRU.filter(k => k !== key);
+    Memory.sessionCacheLRU.push(key);
+    while (Memory.sessionCacheLRU.length > Memory.MAX_SESSION_CACHE_ENTRIES) {
+      const evicted = Memory.sessionCacheLRU.shift();
+      if (evicted) {
+        Memory.bank.delete(evicted);
+      }
+    }
   }
 
   static createSnapShot(): Memory {
