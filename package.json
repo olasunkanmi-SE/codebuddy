@@ -232,6 +232,11 @@
         "category": "CodeBuddy"
       },
       {
+        "command": "codebuddy.triggerEndOfDaySummary",
+        "title": "%commands.triggerEndOfDaySummary%",
+        "category": "CodeBuddy"
+      },
+      {
         "command": "codebuddy.createBranchFromJira",
         "title": "%commands.createBranchFromJira%",
         "category": "CodeBuddy"
@@ -782,6 +787,42 @@
             "type": "boolean",
             "default": true,
             "description": "%config.dependencyCheckEnabled%"
+          },
+          "codebuddy.automations.gitWatchdog.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.gitWatchdogEnabled%"
+          },
+          "codebuddy.automations.gitWatchdog.protectedBranches": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": ["main", "master", "develop", "dev", "feature/*", "release/*", "hotfix/*"],
+            "description": "%config.gitWatchdogProtectedBranches%"
+          },
+          "codebuddy.automations.codeHealth.hotspotMinChanges": {
+            "type": "number",
+            "default": 3,
+            "minimum": 1,
+            "description": "%config.codeHealthHotspotMinChanges%"
+          },
+          "codebuddy.automations.codeHealth.largeFileThreshold": {
+            "type": "number",
+            "default": 300,
+            "minimum": 50,
+            "description": "%config.codeHealthLargeFileThreshold%"
+          },
+          "codebuddy.automations.codeHealth.maxTodoItems": {
+            "type": "number",
+            "default": 50,
+            "minimum": 10,
+            "description": "%config.codeHealthMaxTodoItems%"
+          },
+          "codebuddy.automations.endOfDaySummary.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.endOfDaySummaryEnabled%"
           },
           "codebuddy.language": {
             "type": "string",

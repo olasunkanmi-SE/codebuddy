@@ -19,6 +19,7 @@
   "commands.triggerCodeHealth": "Trigger Code Health Check",
   "commands.triggerDependencyCheck": "Trigger Dependency Check",
   "commands.triggerGitWatchdog": "Trigger Git Watchdog",
+  "commands.triggerEndOfDaySummary": "Trigger End-of-Day Summary",
   "commands.createBranchFromJira": "Jira Tickets (List, Branch, View)",
   "commands.createBranchFromGitLab": "GitLab Issues (List, Branch, View)",
   "commands.rulesOpen": "Open Project Rules",
@@ -85,6 +86,12 @@
   "config.dailyStandupEnabled": "Enable or disable the Daily Standup automation (8:00 AM)",
   "config.codeHealthEnabled": "Enable or disable the Daily Code Health Check (9:00 AM)",
   "config.dependencyCheckEnabled": "Enable or disable the Daily Dependency Check (11:00 AM)",
+  "config.gitWatchdogEnabled": "Enable or disable the Git Watchdog (every 2 hours)",
+  "config.gitWatchdogProtectedBranches": "Branches to protect from stale branch cleanup suggestions. Use exact names (main) or prefix patterns (feature/*).",
+  "config.codeHealthHotspotMinChanges": "Minimum number of changes in the last 30 days for a file to be considered a hotspot.",
+  "config.codeHealthLargeFileThreshold": "Minimum number of lines for a file to be considered 'large' in the Code Health report.",
+  "config.codeHealthMaxTodoItems": "Maximum number of TODO/FIXME/HACK items to list in the Code Health report.",
+  "config.endOfDaySummaryEnabled": "Enable or disable the End-of-Day Summary automation (5:30 PM)",
   "config.browserType": "Choose how to open news links and other external URLs.",
   "config.language": "Display language for the CodeBuddy interface."
 }

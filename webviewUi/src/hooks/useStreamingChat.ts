@@ -55,7 +55,6 @@ export interface IWebviewMessage {
   type: "user" | "bot";
   content: string;
   language?: string;
-  alias?: string;
   senderInitial?: string;
   isStreaming?: boolean;
   timestamp?: number;
@@ -166,7 +165,6 @@ export const useStreamingChat = (
         isStreaming: true,
         timestamp: Date.now(),
         language: payload.language || "Typescript",
-        alias: payload.alias || "O",
       });
     },
     [enableStreaming],
@@ -245,7 +243,6 @@ export const useStreamingChat = (
           content: errorContent,
           timestamp: Date.now(),
           language: prev?.language || "text",
-          alias: prev?.alias || "O",
           timelineSnapshot: snapshot,
         };
         setCompletedMessages((prevCompleted) => [
@@ -528,7 +525,6 @@ export const useStreamingChat = (
         type: "bot",
         content: payload.message || payload.content || "",
         language: payload.language || "Typescript",
-        alias: payload.alias || "O",
         isStreaming: false,
         timestamp: Date.now(),
       };
@@ -550,7 +546,6 @@ export const useStreamingChat = (
         type: "user",
         content,
         timestamp: Date.now(),
-        alias: metadata?.alias || "O",
         ...metadata,
       };
       setCompletedMessages((prev) => [...prev, userMessage]);

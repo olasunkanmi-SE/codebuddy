@@ -47,17 +47,25 @@ export const CoWorkerSettings: React.FC<CoWorkerSettingsProps> = ({ searchQuery:
     });
   };
 
+  const handleTriggerEndOfDay = () => {
+    handlers.postMessage({ 
+      command: 'execute-command',
+      commandId: 'codebuddy.triggerEndOfDaySummary'
+    });
+  };
+
   return (
     <>
       <SettingsSection>
-        <SectionTitle>Productivity Automations</SectionTitle>
+        <SectionTitle>Morning Briefing</SectionTitle>
         
         <SettingsRow>
           <SettingInfo>
             <SettingLabel>Daily Standup</SettingLabel>
             <SettingDescription>
-              Generates a summary of your recent work, active tasks, and blockers.
-              (Scheduled: Daily at 8:00 AM)
+              Generates a morning briefing with git activity summary, recent commits,
+              uncommitted changes, active errors, and Jira/GitLab tickets. Includes
+              clipboard export as Markdown for standups. (Scheduled: Daily at 8:00 AM)
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
@@ -73,13 +81,18 @@ export const CoWorkerSettings: React.FC<CoWorkerSettingsProps> = ({ searchQuery:
             </div>
           </SettingControl>
         </SettingsRow>
+      </SettingsSection>
 
+      <SettingsSection>
+        <SectionTitle>Codebase Pulse</SectionTitle>
+        
         <SettingsRow>
           <SettingInfo>
             <SettingLabel>Code Health Check</SettingLabel>
             <SettingDescription>
-              Scans your workspace for TODOs, large files, and potential issues.
-              (Scheduled: Daily at 9:00 AM)
+              Scans for TODOs/FIXMEs with file locations, detects large files, identifies
+              hotspot files (most-changed in 30 days), and tracks health trends over time
+              in a weekly sparkline. (Scheduled: Daily at 9:00 AM)
             </SettingDescription>
           </SettingInfo>
           <SettingControl>
@@ -98,9 +111,11 @@ export const CoWorkerSettings: React.FC<CoWorkerSettingsProps> = ({ searchQuery:
 
         <SettingsRow>
           <SettingInfo>
-            <SettingLabel>Dependency Check</SettingLabel>
+            <SettingLabel>Dependency Guardian</SettingLabel>
             <SettingDescription>
-              Checks for outdated or wildcard dependencies in your project.
+              Audits packages for wildcard versions, runs npm audit for security
+              vulnerabilities (critical/high/moderate), detects outdated packages with
+              major version drift, and checks lockfile sync. Offers one-click "npm audit fix".
               (Scheduled: Daily at 11:00 AM)
             </SettingDescription>
           </SettingInfo>
@@ -117,12 +132,18 @@ export const CoWorkerSettings: React.FC<CoWorkerSettingsProps> = ({ searchQuery:
             </div>
           </SettingControl>
         </SettingsRow>
+      </SettingsSection>
 
+      <SettingsSection>
+        <SectionTitle>Git Guardian</SectionTitle>
+        
         <SettingsRow>
           <SettingInfo>
             <SettingLabel>Git Watchdog</SettingLabel>
             <SettingDescription>
-              Reminds you to commit your changes if you have been coding for a while without saving.
+              Monitors uncommitted changes with file-level detail (staged/modified/untracked),
+              detects stale merged branches for cleanup, warns when your branch falls behind
+              upstream, and offers one-click commit message generation.
               (Scheduled: Every 2 Hours)
             </SettingDescription>
           </SettingInfo>
@@ -139,7 +160,34 @@ export const CoWorkerSettings: React.FC<CoWorkerSettingsProps> = ({ searchQuery:
             </div>
           </SettingControl>
         </SettingsRow>
+      </SettingsSection>
 
+      <SettingsSection>
+        <SectionTitle>Daily Wrap-up</SectionTitle>
+        
+        <SettingsRow>
+          <SettingInfo>
+            <SettingLabel>End-of-Day Summary</SettingLabel>
+            <SettingDescription>
+              Auto-generates a summary of your day's work: commits made, files touched,
+              lines changed (+/-), remaining errors, and uncommitted work.
+              Copy as Markdown for team updates or personal journaling.
+              (Scheduled: Daily at 5:30 PM)
+            </SettingDescription>
+          </SettingInfo>
+          <SettingControl>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Toggle 
+                checked={values.endOfDaySummaryEnabled} 
+                onChange={(checked: boolean) => handlers.onEndOfDaySummaryChange(checked)} 
+                title={values.endOfDaySummaryEnabled ? "Disable End-of-Day Summary" : "Enable End-of-Day Summary"}
+              />
+              <Button onClick={handleTriggerEndOfDay}>
+                Trigger Now
+              </Button>
+            </div>
+          </SettingControl>
+        </SettingsRow>
       </SettingsSection>
     </>
   );

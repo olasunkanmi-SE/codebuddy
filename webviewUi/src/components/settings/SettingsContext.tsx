@@ -52,6 +52,7 @@ export interface SettingsValues {
   codeHealthEnabled: boolean;
   dependencyCheckEnabled: boolean;
   gitWatchdogEnabled: boolean;
+  endOfDaySummaryEnabled: boolean;
 
   // Browser
   browserType: 'reader' | 'simple' | 'system';
@@ -110,6 +111,7 @@ export interface SettingsHandlers {
   onCodeHealthChange: (enabled: boolean) => void;
   onDependencyCheckChange: (enabled: boolean) => void;
   onGitWatchdogChange: (enabled: boolean) => void;
+  onEndOfDaySummaryChange: (enabled: boolean) => void;
   onBrowserTypeChange: (value: 'reader' | 'simple' | 'system') => void;
   onUsernameChange: (value: string) => void;
   // Rules & Subagents handlers
@@ -228,6 +230,7 @@ const defaultContextValue: SettingsContextType = {
     codeHealthEnabled: true,
     dependencyCheckEnabled: true,
     gitWatchdogEnabled: true,
+    endOfDaySummaryEnabled: true,
     browserType: 'system',
     username: '',
     accountType: 'Free',
@@ -273,6 +276,7 @@ const defaultContextValue: SettingsContextType = {
     onCodeHealthChange: () => {},
     onDependencyCheckChange: () => {},
     onGitWatchdogChange: () => {},
+    onEndOfDaySummaryChange: () => {},
     onBrowserTypeChange: () => {},
     onUsernameChange: () => {},
     postMessage: () => {},

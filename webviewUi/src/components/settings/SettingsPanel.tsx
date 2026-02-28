@@ -133,6 +133,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     codeHealthEnabled: true,
     dependencyCheckEnabled: true,
     gitWatchdogEnabled: true,
+    endOfDaySummaryEnabled: true,
     browserType: 'system',
   };
 
@@ -179,6 +180,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     onCodeHealthChange: () => {},
     onDependencyCheckChange: () => {},
     onGitWatchdogChange: () => {},
+    onEndOfDaySummaryChange: () => {},
     onBrowserTypeChange: () => {},
   };
 

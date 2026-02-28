@@ -11,7 +11,6 @@ export type SettingsCategory =
   | "rules"
   | "privacy"
   | "beta"
-  | "coworker"
   | "about";
 
 export interface SettingsCategoryInfo {
@@ -121,12 +120,6 @@ export const SETTINGS_CATEGORIES: SettingsCategoryInfo[] = [
     label: "Beta",
     icon: "flask",
     description: "Beta features and experiments",
-  },
-  {
-    id: "coworker",
-    label: "Co-Worker",
-    icon: "clock",
-    description: "Daily automations and productivity tools",
   },
   {
     id: "about",

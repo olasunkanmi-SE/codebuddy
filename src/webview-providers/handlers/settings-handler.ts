@@ -18,6 +18,13 @@ const SETTING_MAP: Record<string, string> = {
   "max-file-size-change-event": "codebuddy.maxFileSize",
   "font-size-change-event": "chatview.font.size",
   "font-family-change-event": "font.family",
+  "daily-standup-change-event": "codebuddy.automations.dailyStandup.enabled",
+  "code-health-change-event": "codebuddy.automations.codeHealth.enabled",
+  "dependency-check-change-event":
+    "codebuddy.automations.dependencyCheck.enabled",
+  "git-watchdog-change-event": "codebuddy.automations.gitWatchdog.enabled",
+  "end-of-day-summary-change-event":
+    "codebuddy.automations.endOfDaySummary.enabled",
 };
 
 export class SettingsHandler implements WebviewMessageHandler {
