@@ -48,6 +48,7 @@ import { ConnectorService } from "../services/connector.service";
 import { NotificationService } from "../services/notification.service";
 import { ObservabilityService } from "../services/observability.service";
 import { LocalObservabilityService } from "../infrastructure/observability/telemetry";
+import { Memory } from "../memory/base";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -403,6 +404,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
           metadata: msg.metadata,
         }));
 
+        // Seed in-memory cache with this session's history for LLM providers
+        const llmHistory = history.map((msg: any) => ({
+          role: msg.type === "user" ? "user" : "assistant",
+          content: msg.content,
+        }));
+        Memory.set("chatHistory", llmHistory);
+        Memory.set(`chatHistory:${sessionId}`, llmHistory);
+
         this.logger.debug(
           `Synchronized ${history.length} messages for session ${sessionId}`,
         );
@@ -414,6 +423,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
         });
       } else {
         this.logger.debug(`No messages found for session ${sessionId}`);
+        // Empty session — set empty history
+        Memory.set("chatHistory", []);
         // Send empty history to clear webview
         await this.currentWebView?.webview.postMessage({
           type: "chat-history",
@@ -994,9 +1005,6 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               if (this.currentSessionId) {
                 // Sync history for the current session
                 await this.synchronizeSessionHistory(this.currentSessionId);
-              } else {
-                // Sync legacy chat history if no active session
-                await this.synchronizeChatHistoryFromDatabase();
               }
               await this.synchronizeNews();
               await this.synchronizeNotifications();
@@ -1262,12 +1270,21 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "create-session": {
               try {
                 const title = message.message?.title || "New Chat";
+                // Preserve current session's in-memory history before switching
+                if (this.currentSessionId && Memory.has("chatHistory")) {
+                  Memory.set(
+                    `chatHistory:${this.currentSessionId}`,
+                    Memory.get("chatHistory"),
+                  );
+                }
                 const sessionId = await this.agentService.createSession(
                   "agentId",
                   title,
                 );
                 // Update current session tracking
                 this.currentSessionId = sessionId;
+                // Start new session with empty history
+                Memory.set("chatHistory", []);
                 const sessions = await this.agentService.getSessions("agentId");
                 await this.currentWebView?.webview.postMessage({
                   type: "session-created",
@@ -1294,13 +1311,35 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   throw new Error("Session ID is required");
                 }
                 await this.agentService.switchSession("agentId", sessionId);
+                // Preserve current session's in-memory history before switching
+                if (this.currentSessionId && Memory.has("chatHistory")) {
+                  Memory.set(
+                    `chatHistory:${this.currentSessionId}`,
+                    Memory.get("chatHistory"),
+                  );
+                }
                 // Update current session tracking
                 this.currentSessionId = sessionId;
-                // Get the history for this session
+                // Restore target session's in-memory history if cached, otherwise load from DB
                 const history = await this.agentService.getSessionHistory(
                   "agentId",
                   sessionId,
                 );
+                if (Memory.has(`chatHistory:${sessionId}`)) {
+                  Memory.set(
+                    "chatHistory",
+                    Memory.get(`chatHistory:${sessionId}`),
+                  );
+                } else if (history.length > 0) {
+                  const llmHistory = history.map((msg: any) => ({
+                    role: msg.type === "user" ? "user" : "assistant",
+                    content: msg.content,
+                  }));
+                  Memory.set("chatHistory", llmHistory);
+                  Memory.set(`chatHistory:${sessionId}`, llmHistory);
+                } else {
+                  Memory.set("chatHistory", []);
+                }
                 // Convert to webview format
                 const formattedHistory = history.map((msg: any) => ({
                   type: msg.type === "user" ? "user" : "bot",
