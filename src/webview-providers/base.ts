@@ -293,6 +293,29 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     // Note: publishWorkSpace is called when webview signals "webview-ready"
   }
 
+  /** Return the current session ID so it can be transferred during a model switch. */
+  public getSessionId(): string | null {
+    return this.currentSessionId;
+  }
+
+  /**
+   * Lightweight attach for model switches: re-use the existing webview HTML
+   * and only wire up the message handler + transfer session state.
+   * This avoids a full React remount which the user perceives as a "new session".
+   */
+  async attachToExistingWebview(
+    webviewView: vscode.WebviewView,
+    sessionId: string | null,
+  ): Promise<void> {
+    _view = webviewView;
+    BaseWebViewProvider.webView = webviewView;
+    this.currentWebView = webviewView;
+    this.currentSessionId = sessionId;
+
+    this.registerDisposables();
+    this.setupMessageHandler(this.currentWebView);
+  }
+
   /**
    * Synchronize provider's chatHistory array with database on startup
    * This ensures the provider has immediate access to persistent chat data
