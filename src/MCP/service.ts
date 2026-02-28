@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { getConfigValue } from "../utils/utils";
 import { MCPClient } from "./client";
+import { NotificationService } from "../services/notification.service";
 import {
   MCPServerConfig,
   MCPServersConfig,
@@ -389,6 +390,12 @@ export class MCPService implements vscode.Disposable {
           vscode.window.showWarningMessage(
             "CodeBuddy MCP: Docker MCP gateway not detected. Start Docker Desktop (with MCP enabled) or install the MCP CLI, then retry.",
           );
+          NotificationService.getInstance().addNotification(
+            "warning",
+            "Docker MCP Unavailable",
+            "Docker MCP gateway not detected. Start Docker Desktop or install the MCP CLI.",
+            "MCP",
+          );
         }
         return [];
       }
@@ -656,8 +663,20 @@ export class MCPService implements vscode.Disposable {
           this.logger.info(
             `Connected to Docker Gateway - unified MCP catalog ready`,
           );
+          NotificationService.getInstance().addNotification(
+            "success",
+            "MCP Gateway Connected",
+            "Docker MCP Gateway is ready with unified tool catalog.",
+            "MCP",
+          );
         } else {
           this.logger.info(`Connected to Server: ${serverName}`);
+          NotificationService.getInstance().addNotification(
+            "success",
+            "MCP Server Connected",
+            `Successfully connected to MCP server: ${serverName}`,
+            "MCP",
+          );
         }
         return;
       } catch (error: any) {
@@ -667,6 +686,12 @@ export class MCPService implements vscode.Disposable {
           this.logger.error(
             `Failed to connect to ${serverName} after ${maxRetries} attempts`,
             error,
+          );
+          NotificationService.getInstance().addNotification(
+            "error",
+            "MCP Connection Failed",
+            `Failed to connect to ${serverName} after ${maxRetries} attempts: ${error.message || error}`,
+            "MCP",
           );
           throw error;
         }

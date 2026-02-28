@@ -33,6 +33,7 @@ import {
 import { Memory } from "../memory/base";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
+import { NotificationService } from "../services/notification.service";
 import { architecturalRecommendationCommand } from "./architectural-recommendation";
 import { trace, SpanStatusCode, SpanKind, Tracer } from "@opentelemetry/api";
 
@@ -47,6 +48,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   protected error?: string;
   protected logger: Logger;
   private readonly tracer: Tracer;
+  private readonly notificationService: NotificationService;
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,
@@ -62,6 +64,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     });
     this.orchestrator = Orchestrator.getInstance();
     this.tracer = trace.getTracer("codebuddy-commands");
+    this.notificationService = NotificationService.getInstance();
   }
 
   /**
@@ -301,6 +304,13 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       vscode.window.showErrorMessage(
         "An error occurred while creating the model. Please try again.",
       );
+      this.notificationService.addNotification(
+        "error",
+        "Model Creation Failed",
+        error?.message ||
+          "Failed to create model. Check your API configuration.",
+        "Commands",
+      );
     }
   }
 
@@ -421,6 +431,13 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       this.logger.error("Error generating response:", error);
       vscode.window.showErrorMessage(
         "An error occurred while generating the response. Please try again.",
+      );
+      this.notificationService.addNotification(
+        "error",
+        "Response Generation Failed",
+        error?.message ||
+          "Failed to generate a response. Please check your API key and model settings.",
+        "Commands",
       );
     } finally {
       span.end();
@@ -803,6 +820,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           type: "onStreamError",
           payload: { requestId, error: error.message },
         });
+        this.notificationService.addNotification(
+          "error",
+          "Command Streaming Failed",
+          error?.message || "An error occurred while streaming the response.",
+          "Commands",
+        );
         return;
       }
 
@@ -825,6 +848,13 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       this.logger.error(
         "Error while passing model response to the webview",
         error,
+      );
+      this.notificationService.addNotification(
+        "error",
+        "Command Execution Failed",
+        error?.message ||
+          "An unexpected error occurred while executing the command.",
+        "Commands",
       );
     } finally {
       span.end();

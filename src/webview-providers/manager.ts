@@ -40,12 +40,14 @@ export class WebViewProviderManager implements vscode.Disposable {
 
   static readonly AgentId = "agentId"; // TODO This is hardcoded for now,in upcoming versions, requests will be tagged to respective agents.
   private readonly logger: Logger;
+  private readonly notificationService: NotificationService;
 
   private constructor(
     private readonly extensionContext: vscode.ExtensionContext,
   ) {
     this.orchestrator = Orchestrator.getInstance();
     this.chatHistoryManager = ChatHistoryManager.getInstance();
+    this.notificationService = NotificationService.getInstance();
     this.registerProviders();
     this.registerWebViewProvider();
     // Don't register event listeners immediately - do it lazily
@@ -285,25 +287,40 @@ export class WebViewProviderManager implements vscode.Disposable {
         }),
       );
 
-      NotificationService.getInstance()
-        .addNotification(
+      try {
+        this.notificationService.addNotification(
           "success",
           "Model Switched",
           `Successfully switched to ${modelName}`,
           "Model Manager",
-        )
-        .catch(() => {});
-    } catch (error: any) {
-      this.logger.error(`Error switching provider: ${error}`);
+        );
+      } catch (notificationError: unknown) {
+        this.logger.error(
+          "Failed to display model switch success notification",
+          notificationError,
+        );
+      }
+    } catch (error: unknown) {
+      const switchErrorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error switching provider: ${switchErrorMessage}`,
+        error,
+      );
 
-      NotificationService.getInstance()
-        .addNotification(
+      try {
+        this.notificationService.addNotification(
           "error",
           "Model Switch Failed",
-          `Failed to switch to ${modelName}: ${error.message || error}`,
+          `Failed to switch to ${modelName}: ${switchErrorMessage || "Unknown error"}`,
           "Model Manager",
-        )
-        .catch(() => {});
+        );
+      } catch (notificationError: unknown) {
+        this.logger.error(
+          "Failed to display model switch error notification",
+          notificationError,
+        );
+      }
       await this.orchestrator.publish(
         "onModelChangeSuccess",
         JSON.stringify({
@@ -311,7 +328,7 @@ export class WebViewProviderManager implements vscode.Disposable {
           modelName,
         }),
       );
-      throw new Error(error);
+      throw new Error(switchErrorMessage);
     }
   }
 
@@ -345,6 +362,12 @@ export class WebViewProviderManager implements vscode.Disposable {
       await this.switchProvider(modelName, apiKey, model, false);
     } catch (error: any) {
       this.logger.error("Error handling model change", error);
+      this.notificationService.addNotification(
+        "error",
+        "Model Change Failed",
+        error?.message || "An error occurred while changing the model.",
+        "Model Manager",
+      );
       throw new Error(error.message);
     }
   }
@@ -368,6 +391,13 @@ export class WebViewProviderManager implements vscode.Disposable {
       }
     } catch (error: any) {
       this.logger.error("Failed to restore chat history:", error);
+
+      this.notificationService.addNotification(
+        "warning",
+        "Chat History Restoration Failed",
+        "Failed to restore previous chat history. Starting with a fresh session.",
+        "Chat",
+      );
 
       // Send empty history to prevent UI hanging
       if (this.webviewView?.webview) {

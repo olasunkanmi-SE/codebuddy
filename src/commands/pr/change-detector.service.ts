@@ -2,6 +2,7 @@
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { IChangeProvider, ChangeDetails } from "./types";
+import { NotificationService } from "../../services/notification.service";
 
 export class ChangeDetector {
   private readonly logger: Logger;
@@ -33,6 +34,12 @@ export class ChangeDetector {
     // Final fallback if no providers succeed
     vscode.window.showWarningMessage(
       "Could not detect any Git changes. The review might be less accurate.",
+    );
+    NotificationService.getInstance().addNotification(
+      "warning",
+      "No Git Changes Detected",
+      "Could not detect Git changes for PR review. The review may be less accurate.",
+      "PR Review",
     );
     return {
       branchInfo: `Current branch vs ${targetBranch} (No changes detected)`,

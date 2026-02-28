@@ -8,6 +8,7 @@ import {
   MCPToolResult,
 } from "./types";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { NotificationService } from "../services/notification.service";
 
 export class MCPClient {
   private client: Client;
@@ -174,6 +175,12 @@ export class MCPClient {
     if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
       this.logger.error(
         `Max reconnection attempts reached for ${this.serverName}`,
+      );
+      NotificationService.getInstance().addNotification(
+        "error",
+        "MCP Reconnection Failed",
+        `MCP server "${this.serverName}" disconnected and could not reconnect after ${this.MAX_RECONNECT_ATTEMPTS} attempts.`,
+        "MCP",
       );
       return;
     }

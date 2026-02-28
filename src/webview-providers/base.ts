@@ -100,6 +100,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   protected promptBuilderService: EnhancedPromptBuilderService;
   private readonly groqLLM: GroqLLM | null;
   private readonly codeBuddyAgent: MessageHandler;
+  protected readonly notificationService: NotificationService;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -163,6 +164,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     this.promptBuilderService = new EnhancedPromptBuilderService(context);
     this.codeBuddyAgent = MessageHandler.getInstance();
+    this.notificationService = NotificationService.getInstance();
   }
 
   registerDisposables() {
@@ -930,13 +932,24 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                       metadata: { threadId: message.metaData?.threadId },
                     });
                   }
-                } catch (agentError: any) {
+                } catch (agentError: unknown) {
+                  const errorMessage =
+                    agentError instanceof Error
+                      ? agentError.message
+                      : String(agentError);
                   this.logger.error("Agent mode error", agentError);
-                  NotificationService.getInstance().addNotification(
-                    "error",
-                    "Agent Error",
-                    agentError?.message || "An error occurred in Agent mode",
-                  );
+                  try {
+                    this.notificationService.addNotification(
+                      "error",
+                      "Agent Error",
+                      errorMessage || "An unknown error occurred in Agent mode",
+                    );
+                  } catch (notificationError: unknown) {
+                    this.logger.error(
+                      "Failed to display agent error notification",
+                      notificationError,
+                    );
+                  }
                 }
                 return;
               }
@@ -1045,22 +1058,29 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   type: "model",
                   sessionId: this.currentSessionId,
                 });
-              } catch (error: any) {
+              } catch (error: unknown) {
+                const streamErrorMessage =
+                  error instanceof Error ? error.message : String(error);
                 this.logger.error("Error during streaming", error);
                 await this.currentWebView?.webview.postMessage({
                   type: "onStreamError",
-                  payload: { requestId, error: error.message },
+                  payload: { requestId, error: streamErrorMessage },
                 });
 
-                NotificationService.getInstance()
-                  .addNotification(
+                try {
+                  this.notificationService.addNotification(
                     "error",
                     "Response Failed",
-                    error.message ||
+                    streamErrorMessage ||
                       "An error occurred while generating a response",
                     "Chat",
-                  )
-                  .catch(() => {});
+                  );
+                } catch (notificationError: unknown) {
+                  this.logger.error(
+                    "Failed to display stream error notification",
+                    notificationError,
+                  );
+                }
                 return; // Stop processing
               }
 
@@ -1826,6 +1846,14 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               break;
             case "notifications-clear-all":
               await NotificationService.getInstance().clearAll();
+              await this.synchronizeNotifications();
+              break;
+            case "notifications-delete":
+              if (message.id) {
+                await NotificationService.getInstance().deleteNotification(
+                  message.id,
+                );
+              }
               await this.synchronizeNotifications();
               break;
 

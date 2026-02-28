@@ -978,6 +978,10 @@ export const WebviewUI = () => {
     vsCode.postMessage({ command: "notifications-clear-all" });
   }, []);
 
+  const handleNotificationDelete = useCallback((id: number) => {
+    vsCode.postMessage({ command: "notifications-delete", id });
+  }, []);
+
   const handleIncreaseFontSize = useCallback(() => {
     setFontSize(prev => {
       const newSize = Math.min(prev + 1, 24);
@@ -1293,6 +1297,7 @@ export const WebviewUI = () => {
         onMarkAsRead={handleNotificationMarkAsRead}
         onMarkAllAsRead={handleNotificationMarkAllAsRead}
         onClearAll={handleNotificationClearAll}
+        onDelete={handleNotificationDelete}
       />
 
       {/* Updates Toggle Button */}
