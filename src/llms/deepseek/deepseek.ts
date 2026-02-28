@@ -24,7 +24,7 @@ export class DeepseekLLM
   extends BaseLLM<DeepseekLLMSnapshot>
   implements vscode.Disposable
 {
-  private readonly client: OpenAI;
+  private client: OpenAI;
   private response: any;
   protected readonly orchestrator: Orchestrator;
   private readonly disposables: vscode.Disposable[] = [];
@@ -75,9 +75,10 @@ export class DeepseekLLM
 
   public updateConfig(config: ILlmConfig) {
     this.config = config;
-    // We might want to re-initialize the client if API key or Base URL changes,
-    // but the OpenAI client is read-only.
-    // However, since we use `this.config.model` in generateText, updating `this.config` is enough for model switching.
+    this.client = new OpenAI({
+      apiKey: this.config.apiKey,
+      baseURL: config.baseUrl || "https://api.deepseek.com/v1",
+    });
   }
 
   getEmbeddingModel(): string {

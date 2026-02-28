@@ -45,21 +45,6 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   context: vscode.ExtensionContext;
   protected readonly orchestrator: Orchestrator;
   protected error?: string;
-  private readonly generativeAi: string;
-  private readonly geminiApiKey: string;
-  private readonly geminiModel: string;
-  private readonly groqApiKey: string;
-  private readonly groqModel: string;
-  private readonly anthropicModel: string;
-  private readonly anthropicApiKey: string;
-  private readonly xGrokApiKey: string;
-  private readonly xGrokModel: string;
-  private readonly openaiApiKey: string;
-  private readonly openaiModel: string;
-  private readonly qwenApiKey: string;
-  private readonly qwenModel: string;
-  private readonly glmApiKey: string;
-  private readonly glmModel: string;
   protected logger: Logger;
   private readonly tracer: Tracer;
   constructor(
@@ -69,38 +54,6 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   ) {
     this.context = _context;
     this.error = errorMessage;
-    const {
-      generativeAi,
-      geminiKey,
-      geminiModel,
-      groqApiKey,
-      groqModel,
-      anthropicModel,
-      anthropicApiKey,
-      grokApiKey,
-      grokModel,
-      openaiApiKey,
-      openaiModel,
-      qwenApiKey,
-      qwenModel,
-      glmApiKey,
-      glmModel,
-    } = APP_CONFIG;
-    this.generativeAi = getConfigValue(generativeAi);
-    this.geminiApiKey = getConfigValue(geminiKey);
-    this.geminiModel = getConfigValue(geminiModel);
-    this.groqApiKey = getConfigValue(groqApiKey);
-    this.groqModel = getConfigValue(groqModel);
-    this.anthropicModel = getConfigValue(anthropicModel);
-    this.anthropicApiKey = getConfigValue(anthropicApiKey);
-    this.xGrokApiKey = getConfigValue(grokApiKey);
-    this.xGrokModel = getConfigValue(grokModel);
-    this.openaiApiKey = getConfigValue(openaiApiKey);
-    this.openaiModel = getConfigValue(openaiModel);
-    this.qwenApiKey = getConfigValue(qwenApiKey);
-    this.qwenModel = getConfigValue(qwenModel);
-    this.glmApiKey = getConfigValue(glmApiKey);
-    this.glmModel = getConfigValue(glmModel);
     this.logger = Logger.initialize("CodeCommandHandler", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
@@ -109,6 +62,31 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     });
     this.orchestrator = Orchestrator.getInstance();
     this.tracer = trace.getTracer("codebuddy-commands");
+  }
+
+  /**
+   * Read all provider config values fresh from VS Code settings.
+   * This ensures model/provider changes take effect immediately
+   * without requiring an extension restart.
+   */
+  private getActiveConfig() {
+    return {
+      generativeAi: getConfigValue(APP_CONFIG.generativeAi) ?? "",
+      geminiApiKey: getConfigValue(APP_CONFIG.geminiKey) ?? "",
+      geminiModel: getConfigValue(APP_CONFIG.geminiModel) ?? "",
+      groqApiKey: getConfigValue(APP_CONFIG.groqApiKey) ?? "",
+      groqModel: getConfigValue(APP_CONFIG.groqModel) ?? "",
+      anthropicModel: getConfigValue(APP_CONFIG.anthropicModel) ?? "",
+      anthropicApiKey: getConfigValue(APP_CONFIG.anthropicApiKey) ?? "",
+      xGrokApiKey: getConfigValue(APP_CONFIG.grokApiKey) ?? "",
+      xGrokModel: getConfigValue(APP_CONFIG.grokModel) ?? "",
+      openaiApiKey: getConfigValue(APP_CONFIG.openaiApiKey) ?? "",
+      openaiModel: getConfigValue(APP_CONFIG.openaiModel) ?? "",
+      qwenApiKey: getConfigValue(APP_CONFIG.qwenApiKey) ?? "",
+      qwenModel: getConfigValue(APP_CONFIG.qwenModel) ?? "",
+      glmApiKey: getConfigValue(APP_CONFIG.glmApiKey) ?? "",
+      glmModel: getConfigValue(APP_CONFIG.glmModel) ?? "",
+    };
   }
 
   getApplicationConfig(configKey: string): string | undefined {
@@ -207,8 +185,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
    */
   private async sendCommandFeedback(action: string): Promise<void> {
     const feedback = this.getCommandFeedback(action);
+    const { generativeAi } = this.getActiveConfig();
 
-    switch (this.generativeAi) {
+    switch (generativeAi) {
       case generativeAiModels.GROQ:
         await GroqWebViewProvider.webView?.webview.postMessage({
           type: "codebuddy-commands",
@@ -262,16 +241,17 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     | { generativeAi: string; model: any; modelName: string }
     | undefined {
     try {
+      const config = this.getActiveConfig();
       let model;
       let modelName = "";
-      if (!this.generativeAi) {
+      if (!config.generativeAi) {
         vscodeErrorMessage(
           "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
         );
       }
-      if (this.generativeAi === generativeAiModels.GROQ) {
-        const apiKey = this.groqApiKey;
-        modelName = this.groqModel;
+      if (config.generativeAi === generativeAiModels.GROQ) {
+        const apiKey = config.groqApiKey;
+        modelName = config.groqModel;
         if (!apiKey || !modelName) {
           vscodeErrorMessage(
             "Configuration not found. Go to settings, search for Your coding buddy. Fill up the model and model name",
@@ -280,42 +260,42 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         model = this.createGroqModel(apiKey);
       }
 
-      if (this.generativeAi === generativeAiModels.GEMINI) {
-        const apiKey = this.geminiApiKey;
-        modelName = this.geminiModel;
+      if (config.generativeAi === generativeAiModels.GEMINI) {
+        const apiKey = config.geminiApiKey;
+        modelName = config.geminiModel;
         model = this.createGeminiModel(apiKey, modelName);
       }
 
-      if (this.generativeAi === generativeAiModels.ANTHROPIC) {
-        const apiKey: string = this.anthropicApiKey;
-        modelName = this.anthropicModel;
+      if (config.generativeAi === generativeAiModels.ANTHROPIC) {
+        const apiKey: string = config.anthropicApiKey;
+        modelName = config.anthropicModel;
         model = this.createAnthropicModel(apiKey);
       }
 
-      if (this.generativeAi === generativeAiModels.GROK) {
-        const apiKey: string = this.xGrokApiKey;
-        modelName = this.xGrokModel;
+      if (config.generativeAi === generativeAiModels.GROK) {
+        const apiKey: string = config.xGrokApiKey;
+        modelName = config.xGrokModel;
         model = this.createAnthropicModel(apiKey);
       }
 
-      if (this.generativeAi === generativeAiModels.OPENAI) {
-        const apiKey: string = this.openaiApiKey;
-        modelName = this.openaiModel;
+      if (config.generativeAi === generativeAiModels.OPENAI) {
+        const apiKey: string = config.openaiApiKey;
+        modelName = config.openaiModel;
         model = createOpenAIClient(apiKey);
       }
 
-      if (this.generativeAi === generativeAiModels.QWEN) {
-        const apiKey: string = this.qwenApiKey;
-        modelName = this.qwenModel;
+      if (config.generativeAi === generativeAiModels.QWEN) {
+        const apiKey: string = config.qwenApiKey;
+        modelName = config.qwenModel;
         model = QwenLLM.getInstance({ apiKey, model: modelName }).getModel();
       }
 
-      if (this.generativeAi === generativeAiModels.GLM) {
-        const apiKey: string = this.glmApiKey;
-        modelName = this.glmModel;
+      if (config.generativeAi === generativeAiModels.GLM) {
+        const apiKey: string = config.glmApiKey;
+        modelName = config.glmModel;
         model = GLMLLM.getInstance({ apiKey, model: modelName }).getModel();
       }
-      return { generativeAi: this.generativeAi, model, modelName };
+      return { generativeAi: config.generativeAi, model, modelName };
     } catch (error: any) {
       this.logger.error("Error creating model:", error);
       vscode.window.showErrorMessage(
@@ -359,7 +339,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     const span = this.tracer.startSpan("llm.generate", {
       kind: SpanKind.CLIENT,
       attributes: {
-        "llm.provider": this.generativeAi || "unknown",
+        "llm.provider": this.getActiveConfig().generativeAi || "unknown",
         "llm.action": this.action,
       },
     });
@@ -749,7 +729,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       attributes: {
         "command.action": commandAction,
         "command.has_message": !!message,
-        "command.provider": this.generativeAi || "unknown",
+        "command.provider": this.getActiveConfig().generativeAi || "unknown",
       },
     });
     try {

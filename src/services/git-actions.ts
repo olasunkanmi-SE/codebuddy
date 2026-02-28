@@ -267,9 +267,11 @@ export class GitActions {
   async getAvailableBranches(): Promise<string[]> {
     try {
       const branches = await this.git.branch(["-a"]);
-      return branches.all
+      const branchNames = branches.all
         .filter((branch) => !branch.startsWith("remotes/origin/HEAD"))
         .map((branch) => branch.replace("remotes/origin/", ""));
+      // Deduplicate since local and remote branches map to the same name
+      return [...new Set(branchNames)];
     } catch (error: any) {
       this.logger.error("Error getting available branches:", error);
       throw error;
@@ -345,10 +347,19 @@ export class GitActions {
     targetBranch = "HEAD",
   ): Promise<string[]> {
     try {
+      // Use merge-base to only show files changed on the target branch
+      // relative to where it diverged from the base branch.
+      // Without this, `git diff --name-only baseBranch targetBranch` would
+      // include files changed on the base branch after the fork point.
+      const mergeBase = await this.git.raw([
+        "merge-base",
+        targetBranch,
+        baseBranch,
+      ]);
       const diff = await this.git.raw([
         "diff",
         "--name-only",
-        baseBranch,
+        mergeBase.trim(),
         targetBranch,
       ]);
       return diff.trim().split("\n").filter(Boolean);
@@ -366,7 +377,17 @@ export class GitActions {
     targetBranch = "HEAD",
   ): Promise<string> {
     try {
-      return await this.git.raw(["diff", "--stat", baseBranch, targetBranch]);
+      const mergeBase = await this.git.raw([
+        "merge-base",
+        targetBranch,
+        baseBranch,
+      ]);
+      return await this.git.raw([
+        "diff",
+        "--stat",
+        mergeBase.trim(),
+        targetBranch,
+      ]);
     } catch (error: any) {
       this.logger.error("Error getting diff stats:", error);
       throw error;

@@ -92,12 +92,21 @@ export class SqliteVectorStore implements vscode.Disposable {
       });
 
       // Store in workspace storage (project-specific vectors)
-      const storagePath =
-        context.storageUri?.fsPath || context.globalStorageUri.fsPath;
-      if (!fs.existsSync(storagePath)) {
-        fs.mkdirSync(storagePath, { recursive: true });
+      // Falls back to global storage if no workspace is open
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      let storageDir: string;
+
+      if (workspaceFolder) {
+        storageDir = path.join(workspaceFolder.uri.fsPath, ".codebuddy");
+      } else {
+        storageDir = context.globalStorageUri.fsPath;
       }
-      this.dbPath = path.join(storagePath, "vector_store.db");
+
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+      }
+
+      this.dbPath = path.join(storageDir, "vector_store.db");
 
       // Load existing database or create new
       let data: Uint8Array | undefined;

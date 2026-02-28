@@ -15,6 +15,7 @@ export class GitCliProvider implements IChangeProvider {
     }
 
     const prDiff = await this.gitActions.getPRDifferenceSummary(targetBranch);
+    const diffStats = await this.gitActions.getDiffStats(targetBranch);
     const currentBranchInfo = await this.gitActions.getCurrentBranchInfo();
 
     vscode.window.showInformationMessage(
@@ -25,6 +26,7 @@ export class GitCliProvider implements IChangeProvider {
       branchInfo: `${currentBranchInfo.current} → ${targetBranch}`,
       changedFiles: modifiedFiles,
       diffContent: prDiff,
+      diffStats,
     };
   }
 }

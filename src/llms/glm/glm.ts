@@ -24,7 +24,7 @@ export class GLMLLM
   extends BaseLLM<GLMLLMSnapshot>
   implements vscode.Disposable
 {
-  private readonly client: OpenAI;
+  private client: OpenAI;
   private response: any;
   protected readonly orchestrator: Orchestrator;
   private readonly disposables: vscode.Disposable[] = [];
@@ -74,6 +74,10 @@ export class GLMLLM
 
   public updateConfig(config: ILlmConfig) {
     this.config = config;
+    this.client = new OpenAI({
+      apiKey: this.config.apiKey,
+      baseURL: config.baseUrl || "https://open.bigmodel.cn/api/paas/v4",
+    });
   }
 
   getEmbeddingModel(): string {

@@ -40,13 +40,6 @@ export class CompletionProviderFactory {
         (v) => v.toLowerCase() === providerTypeRaw.toLowerCase(),
       ) || CompletionProviderType.Local;
 
-    const cacheKey = `${providerType}:${config.model}`;
-
-    // Note: We might want to allow re-creating if config changes (apiKey, etc.)
-    // For now, let's trust the Singleton .getInstance() methods of LLMs to handle config updates
-    // or we just instantiate new ones if needed.
-    // However, LLM classes (LocalLLM, GroqLLM, etc.) often use Singleton pattern themselves.
-
     try {
       let llmConfig: ILlmConfig;
 

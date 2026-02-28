@@ -1212,6 +1212,18 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
               }
               break;
             case "update-model-event":
+              // Persist the selected model to VS Code settings so all
+              // consumers (commands, providers, etc.) see the new value
+              // immediately without requiring an extension restart.
+              if (message.message) {
+                await vscode.workspace
+                  .getConfiguration()
+                  .update(
+                    "generativeAi.option",
+                    message.message,
+                    vscode.ConfigurationTarget.Global,
+                  );
+              }
               await this.orchestrator.publish("onModelChange", message);
               break;
             // Publish an event instead to prevent cyclic dependendency

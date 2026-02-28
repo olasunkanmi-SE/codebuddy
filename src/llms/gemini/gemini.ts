@@ -77,8 +77,17 @@ export class GeminiLLM
   }
 
   static getInstance(config: ILlmConfig) {
-    GeminiLLM.instance ??= new GeminiLLM(config);
+    if (!GeminiLLM.instance) {
+      GeminiLLM.instance = new GeminiLLM(config);
+    } else {
+      GeminiLLM.instance.updateConfig(config);
+    }
     return GeminiLLM.instance;
+  }
+
+  public updateConfig(config: ILlmConfig) {
+    this.config = config;
+    this.model = undefined;
   }
 
   public async generateEmbeddings(text: string): Promise<number[]> {

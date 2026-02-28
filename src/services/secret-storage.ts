@@ -124,9 +124,11 @@ export class SecretStorageService implements vscode.Disposable {
       true;
     const browserType = config.get<string>("codebuddy.browserType") || "reader";
     const language = config.get<string>("codebuddy.language") || "en";
+    const selectedModel = config.get<string>("generativeAi.option") || "Groq";
     const preferences = {
       username: nickname || username,
       theme: theme || "tokyo night", // default theme
+      selectedModel,
       fontFamily,
       fontSize,
       enableStreaming,
