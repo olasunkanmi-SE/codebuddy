@@ -27,6 +27,7 @@ import { SessionsPanel, ChatSession } from "./sessions";
 import { NotificationPanel, INotificationItem } from "./notifications";
 import { UpdatesPanel } from "./updates/UpdatesPanel";
 import { ObservabilityPanel } from "./observability/ObservabilityPanel";
+import { CoWorkerPanel } from "./coworker/CoWorkerPanel";
 
 // Styled components for settings toggle
 const SettingsToggleButton = styled.button`
@@ -119,9 +120,37 @@ const NotificationToggleButton = styled.button`
   }
 `;
 
-const FontSizeGroup = styled.div`
+// Co-Worker toggle button
+const CoWorkerToggleButton = styled.button`
   position: fixed;
   top: 204px;
+  left: 12px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 5px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+const FontSizeGroup = styled.div`
+  position: fixed;
+  top: 236px;
   left: 12px;
   z-index: 100;
   display: flex;
@@ -204,6 +233,25 @@ const BrowserIcon = ({ size = 14 }: { size?: number }) => (
     <circle cx="12" cy="12" r="10" />
     <line x1="2" y1="12" x2="22" y2="12" />
     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
+// Co-Worker icon component
+const CoWorkerIcon = ({ size = 14 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="11" width="18" height="10" rx="2" />
+    <circle cx="9" cy="16" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="16" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
   </svg>
 );
 
@@ -445,6 +493,7 @@ export const WebviewUI = () => {
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [isUpdatesPanelOpen, setIsUpdatesPanelOpen] = useState(false);
   const [isObservabilityOpen, setIsObservabilityOpen] = useState(false);
+  const [isCoWorkerOpen, setIsCoWorkerOpen] = useState(false);
   const [notifications, setNotifications] = useState<INotificationItem[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
@@ -1343,6 +1392,15 @@ export const WebviewUI = () => {
         <BrowserIcon size={14} />
       </BrowserToggleButton>
 
+      {/* Co-Worker Toggle Button */}
+      <CoWorkerToggleButton
+        onClick={() => setIsCoWorkerOpen(true)}
+        aria-label="Open co-worker"
+        title="Co-Worker"
+      >
+        <CoWorkerIcon size={14} />
+      </CoWorkerToggleButton>
+
       {/* Browsing History Dropdown */}
       {isHistoryOpen && (
         <>
@@ -1376,6 +1434,22 @@ export const WebviewUI = () => {
         traces={traces}
         isOpen={isObservabilityOpen}
         onClose={() => setIsObservabilityOpen(false)}
+      />
+
+      {/* Co-Worker Panel */}
+      <CoWorkerPanel
+        isOpen={isCoWorkerOpen}
+        onClose={() => setIsCoWorkerOpen(false)}
+        dailyStandupEnabled={dailyStandupEnabled}
+        codeHealthEnabled={codeHealthEnabled}
+        dependencyCheckEnabled={dependencyCheckEnabled}
+        gitWatchdogEnabled={gitWatchdogEnabled}
+        endOfDaySummaryEnabled={endOfDaySummaryEnabled}
+        onDailyStandupChange={settingsHandlers.onDailyStandupChange}
+        onCodeHealthChange={settingsHandlers.onCodeHealthChange}
+        onDependencyCheckChange={settingsHandlers.onDependencyCheckChange}
+        onGitWatchdogChange={settingsHandlers.onGitWatchdogChange}
+        onEndOfDaySummaryChange={settingsHandlers.onEndOfDaySummaryChange}
       />
 
       <VSCodePanels className="vscodePanels" activeid="tab-1">
