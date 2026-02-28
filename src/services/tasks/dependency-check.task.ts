@@ -207,21 +207,24 @@ export class DependencyCheckTask {
     }
     actions.push("Open package.json");
 
-    (vscode.window[severity] as Function)(message, ...actions).then(
-      (selection: string | undefined) => {
-        if (selection === "View Report") {
-          this.outputChannel.show(true);
-        } else if (selection === fixLabel) {
-          const terminal = vscode.window.createTerminal(pm.auditFixCommand);
-          terminal.show();
-          terminal.sendText(pm.auditFixCommand);
-        } else if (selection === "Open package.json") {
-          vscode.workspace
-            .openTextDocument(packageJsonPath)
-            .then((doc) => vscode.window.showTextDocument(doc));
-        }
-      },
-    );
+    (
+      vscode.window[severity] as (
+        message: string,
+        ...items: string[]
+      ) => Thenable<string | undefined>
+    )(message, ...actions).then((selection: string | undefined) => {
+      if (selection === "View Report") {
+        this.outputChannel.show(true);
+      } else if (selection === fixLabel) {
+        const terminal = vscode.window.createTerminal(pm.auditFixCommand);
+        terminal.show();
+        terminal.sendText(pm.auditFixCommand);
+      } else if (selection === "Open package.json") {
+        vscode.workspace
+          .openTextDocument(packageJsonPath)
+          .then((doc) => vscode.window.showTextDocument(doc));
+      }
+    });
   }
 
   private majorVersionDiff(current: string, latest: string): number {

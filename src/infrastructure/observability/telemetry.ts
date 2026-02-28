@@ -67,8 +67,8 @@ export class LocalObservabilityService {
 
       // 1. setupInstrumentation() should already have run and registered a provider.
       // Check and create a fallback provider if needed.
-      let provider = trace.getTracerProvider() as any;
-      let unwrapped = provider?._delegate || provider;
+      const provider = trace.getTracerProvider() as any;
+      const unwrapped = provider?._delegate || provider;
       const isNoop =
         !provider ||
         provider.constructor.name === "NoopTracerProvider" ||
