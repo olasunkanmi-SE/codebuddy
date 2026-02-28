@@ -31,11 +31,8 @@ export class Memory {
     return undefined;
   }
 
-  static delete(key: string): boolean | undefined {
-    if (Memory.bank.has(key)) {
-      return Memory.bank.delete(key);
-    }
-    return undefined;
+  static delete(key: string): boolean {
+    return Memory.bank.delete(key);
   }
 
   static keys(): string[] {

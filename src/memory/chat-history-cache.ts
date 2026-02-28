@@ -1,3 +1,4 @@
+import { LlmChatMessage } from "../interfaces/chat-history.interface";
 import { Memory } from "./base";
 
 /**
@@ -11,25 +12,30 @@ import { Memory } from "./base";
  * in `Memory`; this class only manages the per-session slots.
  */
 export class ChatHistoryCache {
-  private static readonly MAX_ENTRIES = 10;
+  private static maxEntries = 10;
   private static readonly KEY_PREFIX = "chatHistory:";
   /** Access-ordered list of sessionIds (most-recent at end). */
   private static lru: string[] = [];
 
   private constructor() {}
 
+  /** Allow callers (e.g. config changes) to adjust the max cached sessions. */
+  static setMaxEntries(max: number): void {
+    ChatHistoryCache.maxEntries = Math.max(1, max);
+  }
+
   private static cacheKey(sessionId: string): string {
     return `${ChatHistoryCache.KEY_PREFIX}${sessionId}`;
   }
 
   /** Store a session's LLM history, promoting it in the LRU. */
-  static set(sessionId: string, value: any[]): void {
+  static set(sessionId: string, value: LlmChatMessage[]): void {
     Memory.set(ChatHistoryCache.cacheKey(sessionId), value);
     ChatHistoryCache.touch(sessionId);
   }
 
   /** Retrieve a session's LLM history (or `undefined` if missing / expired). */
-  static get(sessionId: string): any[] | undefined {
+  static get(sessionId: string): LlmChatMessage[] | undefined {
     const value = Memory.get(ChatHistoryCache.cacheKey(sessionId));
     if (value !== undefined) {
       ChatHistoryCache.touch(sessionId);
@@ -61,17 +67,20 @@ export class ChatHistoryCache {
   // --- Active session helpers (thin wrappers around the plain "chatHistory" key) ---
 
   /** Get the currently active LLM history. */
-  static getActive(): any[] {
+  static getActive(): LlmChatMessage[] {
     return Memory.get("chatHistory") ?? [];
   }
 
   /** Set the currently active LLM history. */
-  static setActive(history: any[]): void {
+  static setActive(history: LlmChatMessage[]): void {
     Memory.set("chatHistory", history);
   }
 
   /** Save the active history under `currentSessionId`, then load `targetSessionId`. */
-  static swap(currentSessionId: string | null, targetHistory: any[]): void {
+  static swap(
+    currentSessionId: string | null,
+    targetHistory: LlmChatMessage[],
+  ): void {
     if (currentSessionId && Memory.has("chatHistory")) {
       ChatHistoryCache.set(currentSessionId, Memory.get("chatHistory"));
     }
@@ -86,7 +95,7 @@ export class ChatHistoryCache {
     );
     ChatHistoryCache.lru.push(sessionId);
 
-    while (ChatHistoryCache.lru.length > ChatHistoryCache.MAX_ENTRIES) {
+    while (ChatHistoryCache.lru.length > ChatHistoryCache.maxEntries) {
       const evicted = ChatHistoryCache.lru.shift();
       if (evicted) {
         Memory.delete(ChatHistoryCache.cacheKey(evicted));

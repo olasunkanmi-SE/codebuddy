@@ -49,6 +49,11 @@ import { NotificationService } from "../services/notification.service";
 import { ObservabilityService } from "../services/observability.service";
 import { LocalObservabilityService } from "../infrastructure/observability/telemetry";
 import { ChatHistoryCache } from "../memory/chat-history-cache";
+import {
+  DbChatMessage,
+  LlmChatMessage,
+  WebviewChatMessage,
+} from "../interfaces/chat-history.interface";
 
 type SummaryGenerator = (historyToSummarize: any[]) => Promise<string>;
 
@@ -386,18 +391,18 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   // ── Session history helpers ──────────────────────────────────────────
 
   /** Convert raw DB history rows to the `{ role, content }` format consumed by LLM providers. */
-  private formatHistoryForLlm(
-    history: any[],
-  ): { role: string; content: string }[] {
-    return history.map((msg: any) => ({
+  private formatHistoryForLlm(history: DbChatMessage[]): LlmChatMessage[] {
+    return history.map((msg) => ({
       role: msg.type === "user" ? "user" : "assistant",
       content: msg.content,
     }));
   }
 
   /** Convert raw DB history rows to the format the webview expects. */
-  private formatHistoryForWebview(history: any[]): any[] {
-    return history.map((msg: any) => ({
+  private formatHistoryForWebview(
+    history: DbChatMessage[],
+  ): WebviewChatMessage[] {
+    return history.map((msg) => ({
       type: msg.type === "user" ? "user" : "bot",
       content: msg.content,
       timestamp: msg.timestamp || Date.now(),
@@ -409,8 +414,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
   /** Convert cached LLM history (`{ role, content }`) back to webview format. */
   private formatLlmHistoryForWebview(
-    llmHistory: { role: string; content: string }[],
-  ): any[] {
+    llmHistory: LlmChatMessage[],
+  ): WebviewChatMessage[] {
     return llmHistory.map((msg) => ({
       type: msg.role === "user" ? "user" : "bot",
       content: msg.content,
@@ -428,7 +433,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
    */
   private async loadSessionHistory(
     targetSessionId: string,
-  ): Promise<{ formattedHistory: any[] }> {
+  ): Promise<{ formattedHistory: WebviewChatMessage[] }> {
     // 1. Preserve outgoing session
     ChatHistoryCache.swap(this.currentSessionId, []);
 
@@ -440,15 +445,22 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
 
     // 3. Cache miss — load from DB
-    const history = await this.agentService.getSessionHistory(
-      "agentId",
-      targetSessionId,
-    );
-    if (history.length > 0) {
-      const llmHistory = this.formatHistoryForLlm(history);
-      ChatHistoryCache.setActive(llmHistory);
-      ChatHistoryCache.set(targetSessionId, llmHistory);
-      return { formattedHistory: this.formatHistoryForWebview(history) };
+    try {
+      const history = await this.agentService.getSessionHistory(
+        "agentId",
+        targetSessionId,
+      );
+      if (history.length > 0) {
+        const llmHistory = this.formatHistoryForLlm(history);
+        ChatHistoryCache.setActive(llmHistory);
+        ChatHistoryCache.set(targetSessionId, llmHistory);
+        return { formattedHistory: this.formatHistoryForWebview(history) };
+      }
+    } catch (error: any) {
+      this.logger.warn(
+        `Failed to load session history for ${targetSessionId}:`,
+        error,
+      );
     }
 
     ChatHistoryCache.setActive([]);
