@@ -914,20 +914,29 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     )
                   : JSON.stringify(message.message);
 
-                const fullResponse =
-                  await this.codeBuddyAgent.handleUserMessage(
-                    payload,
-                    message.metaData,
-                  );
+                try {
+                  const fullResponse =
+                    await this.codeBuddyAgent.handleUserMessage(
+                      payload,
+                      message.metaData,
+                    );
 
-                // Save agent response to history
-                if (fullResponse) {
-                  await this.agentService.addChatMessage("agentId", {
-                    content: fullResponse,
-                    type: "model",
-                    sessionId: this.currentSessionId,
-                    metadata: { threadId: message.metaData?.threadId },
-                  });
+                  // Save agent response to history
+                  if (fullResponse) {
+                    await this.agentService.addChatMessage("agentId", {
+                      content: fullResponse,
+                      type: "model",
+                      sessionId: this.currentSessionId,
+                      metadata: { threadId: message.metaData?.threadId },
+                    });
+                  }
+                } catch (agentError: any) {
+                  this.logger.error("Agent mode error", agentError);
+                  NotificationService.getInstance().addNotification(
+                    "error",
+                    "Agent Error",
+                    agentError?.message || "An error occurred in Agent mode",
+                  );
                 }
                 return;
               }
@@ -1042,6 +1051,16 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   type: "onStreamError",
                   payload: { requestId, error: error.message },
                 });
+
+                NotificationService.getInstance()
+                  .addNotification(
+                    "error",
+                    "Response Failed",
+                    error.message ||
+                      "An error occurred while generating a response",
+                    "Chat",
+                  )
+                  .catch(() => {});
                 return; // Stop processing
               }
 

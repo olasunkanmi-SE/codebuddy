@@ -6,6 +6,7 @@ import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
 import { ChatHistoryManager } from "../services/chat-history-manager";
 import { formatText, getAPIKeyAndModel } from "../utils/utils";
+import { NotificationService } from "../services/notification.service";
 import { AnthropicWebViewProvider } from "./anthropic";
 import { BaseWebViewProvider } from "./base";
 import { DeepseekWebViewProvider } from "./deepseek";
@@ -283,8 +284,26 @@ export class WebViewProviderManager implements vscode.Disposable {
           modelName,
         }),
       );
+
+      NotificationService.getInstance()
+        .addNotification(
+          "success",
+          "Model Switched",
+          `Successfully switched to ${modelName}`,
+          "Model Manager",
+        )
+        .catch(() => {});
     } catch (error: any) {
       this.logger.error(`Error switching provider: ${error}`);
+
+      NotificationService.getInstance()
+        .addNotification(
+          "error",
+          "Model Switch Failed",
+          `Failed to switch to ${modelName}: ${error.message || error}`,
+          "Model Manager",
+        )
+        .catch(() => {});
       await this.orchestrator.publish(
         "onModelChangeSuccess",
         JSON.stringify({

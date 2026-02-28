@@ -967,11 +967,11 @@ export const WebviewUI = () => {
 
   // Notification handlers
   const handleNotificationMarkAsRead = useCallback((id: number) => {
-    vsCode.postMessage({ command: "notification-mark-read", id });
+    vsCode.postMessage({ command: "notifications-mark-read", id });
   }, []);
 
   const handleNotificationMarkAllAsRead = useCallback(() => {
-    vsCode.postMessage({ command: "notification-mark-all-read" });
+    vsCode.postMessage({ command: "notifications-mark-all-read" });
   }, []);
 
   const handleNotificationClearAll = useCallback(() => {
