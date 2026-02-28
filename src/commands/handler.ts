@@ -48,11 +48,12 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
   protected error?: string;
   protected logger: Logger;
   private readonly tracer: Tracer;
-  private readonly notificationService: NotificationService;
+  protected readonly notificationService: NotificationService;
   constructor(
     private readonly action: string,
     _context: vscode.ExtensionContext,
     errorMessage?: string,
+    notificationService?: NotificationService,
   ) {
     this.context = _context;
     this.error = errorMessage;
@@ -64,7 +65,8 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
     });
     this.orchestrator = Orchestrator.getInstance();
     this.tracer = trace.getTracer("codebuddy-commands");
-    this.notificationService = NotificationService.getInstance();
+    this.notificationService =
+      notificationService ?? NotificationService.getInstance();
   }
 
   /**
@@ -301,9 +303,6 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       return { generativeAi: config.generativeAi, model, modelName };
     } catch (error: any) {
       this.logger.error("Error creating model:", error);
-      vscode.window.showErrorMessage(
-        "An error occurred while creating the model. Please try again.",
-      );
       this.notificationService.addNotification(
         "error",
         "Model Creation Failed",
@@ -429,9 +428,6 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       });
       span.recordException(error);
       this.logger.error("Error generating response:", error);
-      vscode.window.showErrorMessage(
-        "An error occurred while generating the response. Please try again.",
-      );
       this.notificationService.addNotification(
         "error",
         "Response Generation Failed",

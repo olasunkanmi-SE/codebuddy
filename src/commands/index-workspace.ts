@@ -10,7 +10,10 @@ const logger = Logger.initialize("IndexWorkspace", {
   enableTelemetry: true,
 });
 
-export async function indexWorkspaceCommand(): Promise<void> {
+export async function indexWorkspaceCommand(
+  notificationService?: NotificationService,
+): Promise<void> {
+  const ns = notificationService ?? NotificationService.getInstance();
   const astIndexer = AstIndexingService.getInstance();
 
   const files = await vscode.workspace.findFiles(
@@ -19,8 +22,7 @@ export async function indexWorkspaceCommand(): Promise<void> {
   );
 
   if (files.length === 0) {
-    vscode.window.showInformationMessage("No files found to index.");
-    NotificationService.getInstance().addNotification(
+    ns.addNotification(
       "info",
       "Workspace Indexing",
       "No indexable files found in the workspace.",
@@ -55,24 +57,21 @@ export async function indexWorkspaceCommand(): Promise<void> {
         .join(", ");
 
       if (!result.embeddingsAvailable) {
-        vscode.window.showWarningMessage(summary);
-        NotificationService.getInstance().addNotification(
+        ns.addNotification(
           "warning",
           "Indexing Complete (No Embeddings)",
           summary,
           "Workspace",
         );
       } else if (result.errors > 0) {
-        vscode.window.showWarningMessage(summary);
-        NotificationService.getInstance().addNotification(
+        ns.addNotification(
           "warning",
           "Indexing Complete With Errors",
           summary,
           "Workspace",
         );
       } else {
-        vscode.window.showInformationMessage(summary);
-        NotificationService.getInstance().addNotification(
+        ns.addNotification(
           "success",
           "Workspace Indexed",
           summary,

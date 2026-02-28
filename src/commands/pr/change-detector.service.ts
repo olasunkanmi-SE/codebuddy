@@ -1,19 +1,24 @@
 // src/services/change-detection/change-detector.service.ts
-import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { IChangeProvider, ChangeDetails } from "./types";
 import { NotificationService } from "../../services/notification.service";
 
 export class ChangeDetector {
   private readonly logger: Logger;
+  private readonly notificationService: NotificationService;
 
-  constructor(private readonly providers: IChangeProvider[]) {
+  constructor(
+    private readonly providers: IChangeProvider[],
+    notificationService?: NotificationService,
+  ) {
     this.logger = Logger.initialize("ChangeDetector", {
       minLevel: LogLevel.DEBUG,
       enableConsole: true,
       enableFile: true,
       enableTelemetry: true,
     });
+    this.notificationService =
+      notificationService ?? NotificationService.getInstance();
   }
 
   async findChanges(targetBranch: string): Promise<ChangeDetails> {
@@ -32,10 +37,7 @@ export class ChangeDetector {
     }
 
     // Final fallback if no providers succeed
-    vscode.window.showWarningMessage(
-      "Could not detect any Git changes. The review might be less accurate.",
-    );
-    NotificationService.getInstance().addNotification(
+    this.notificationService.addNotification(
       "warning",
       "No Git Changes Detected",
       "Could not detect Git changes for PR review. The review may be less accurate.",

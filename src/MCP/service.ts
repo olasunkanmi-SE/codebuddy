@@ -25,6 +25,7 @@ export class MCPService implements vscode.Disposable {
   private invocationCount = 0;
   private failureCount = 0;
   private readonly logger: Logger;
+  private readonly notificationService: NotificationService;
 
   // Phase 1 : Eager check for Docker, but only needed for stdio
   private dockerAvailable = false;
@@ -34,18 +35,20 @@ export class MCPService implements vscode.Disposable {
   private dockerWarningShown = false;
   private dockerRetryInProgress = false;
 
-  constructor() {
+  constructor(notificationService?: NotificationService) {
     this.logger = Logger.initialize("MCPService", {
       minLevel: LogLevel.INFO,
       enableConsole: true,
       enableFile: true,
       enableTelemetry: true,
     });
+    this.notificationService =
+      notificationService ?? NotificationService.getInstance();
     this.initialize();
   }
 
-  static getInstance(): MCPService {
-    return (MCPService.instance ??= new MCPService());
+  static getInstance(notificationService?: NotificationService): MCPService {
+    return (MCPService.instance ??= new MCPService(notificationService));
   }
 
   async initialize(): Promise<void> {
@@ -387,10 +390,7 @@ export class MCPService implements vscode.Disposable {
       if (!this.dockerAvailable) {
         if (!this.dockerWarningShown) {
           this.dockerWarningShown = true;
-          vscode.window.showWarningMessage(
-            "CodeBuddy MCP: Docker MCP gateway not detected. Start Docker Desktop (with MCP enabled) or install the MCP CLI, then retry.",
-          );
-          NotificationService.getInstance().addNotification(
+          this.notificationService.addNotification(
             "warning",
             "Docker MCP Unavailable",
             "Docker MCP gateway not detected. Start Docker Desktop or install the MCP CLI.",
@@ -654,7 +654,11 @@ export class MCPService implements vscode.Disposable {
   ): Promise<void> {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        const client = new MCPClient(serverName, serverConfig);
+        const client = new MCPClient(
+          serverName,
+          serverConfig,
+          this.notificationService,
+        );
         await client.connect();
 
         this.clients.set(serverName, client);
@@ -663,7 +667,7 @@ export class MCPService implements vscode.Disposable {
           this.logger.info(
             `Connected to Docker Gateway - unified MCP catalog ready`,
           );
-          NotificationService.getInstance().addNotification(
+          this.notificationService.addNotification(
             "success",
             "MCP Gateway Connected",
             "Docker MCP Gateway is ready with unified tool catalog.",
@@ -671,7 +675,7 @@ export class MCPService implements vscode.Disposable {
           );
         } else {
           this.logger.info(`Connected to Server: ${serverName}`);
-          NotificationService.getInstance().addNotification(
+          this.notificationService.addNotification(
             "success",
             "MCP Server Connected",
             `Successfully connected to MCP server: ${serverName}`,
@@ -687,7 +691,7 @@ export class MCPService implements vscode.Disposable {
             `Failed to connect to ${serverName} after ${maxRetries} attempts`,
             error,
           );
-          NotificationService.getInstance().addNotification(
+          this.notificationService.addNotification(
             "error",
             "MCP Connection Failed",
             `Failed to connect to ${serverName} after ${maxRetries} attempts: ${error.message || error}`,

@@ -44,10 +44,12 @@ export class WebViewProviderManager implements vscode.Disposable {
 
   private constructor(
     private readonly extensionContext: vscode.ExtensionContext,
+    notificationService?: NotificationService,
   ) {
     this.orchestrator = Orchestrator.getInstance();
     this.chatHistoryManager = ChatHistoryManager.getInstance();
-    this.notificationService = NotificationService.getInstance();
+    this.notificationService =
+      notificationService ?? NotificationService.getInstance();
     this.registerProviders();
     this.registerWebViewProvider();
     // Don't register event listeners immediately - do it lazily
@@ -153,10 +155,12 @@ export class WebViewProviderManager implements vscode.Disposable {
 
   public static getInstance(
     extensionContext: vscode.ExtensionContext,
+    notificationService?: NotificationService,
   ): WebViewProviderManager {
     if (!WebViewProviderManager.instance) {
       WebViewProviderManager.instance = new WebViewProviderManager(
         extensionContext,
+        notificationService,
       );
     }
     return WebViewProviderManager.instance;
@@ -360,15 +364,17 @@ export class WebViewProviderManager implements vscode.Disposable {
         this.logger.warn(`${modelName} APIkey is required`);
       }
       await this.switchProvider(modelName, apiKey, model, false);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.logger.error("Error handling model change", error);
       this.notificationService.addNotification(
         "error",
         "Model Change Failed",
-        error?.message || "An error occurred while changing the model.",
+        errorMessage || "An error occurred while changing the model.",
         "Model Manager",
       );
-      throw new Error(error.message);
+      throw new Error(errorMessage);
     }
   }
 
@@ -389,7 +395,7 @@ export class WebViewProviderManager implements vscode.Disposable {
       } else {
         this.logger.warn("Webview not available for chat history restoration");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error("Failed to restore chat history:", error);
 
       this.notificationService.addNotification(

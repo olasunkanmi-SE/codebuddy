@@ -216,7 +216,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
             >
               Mark all read
             </VSCodeButton>
-            <VSCodeButton appearance="icon" onClick={onClearAll}>
+            <VSCodeButton appearance="secondary" onClick={onClearAll}>
               Clear all
             </VSCodeButton>
           </Footer>

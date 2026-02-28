@@ -113,6 +113,7 @@ export const NotificationItem: React.FC<Props> = ({ notification, onClick, onDel
           <button
             onClick={handleDelete}
             title="Delete notification"
+            aria-label="Delete notification"
             style={{
               background: "none",
               border: "none",

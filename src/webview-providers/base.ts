@@ -107,6 +107,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     protected readonly apiKey: string,
     protected readonly generativeAiModel: string,
     context: vscode.ExtensionContext,
+    notificationService?: NotificationService,
   ) {
     const { apiKey: modelKey, model } = getAPIKeyAndModel("groq");
     const config = {
@@ -164,7 +165,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
 
     this.promptBuilderService = new EnhancedPromptBuilderService(context);
     this.codeBuddyAgent = MessageHandler.getInstance();
-    this.notificationService = NotificationService.getInstance();
+    this.notificationService =
+      notificationService ?? NotificationService.getInstance();
   }
 
   registerDisposables() {
@@ -173,7 +175,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     }
 
     this.disposables.push(
-      NotificationService.getInstance().onDidNotificationChange(() => {
+      this.notificationService.onDidNotificationChange(() => {
         this.synchronizeNotifications();
       }),
     );
@@ -933,16 +935,18 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     });
                   }
                 } catch (agentError: unknown) {
-                  const errorMessage =
-                    agentError instanceof Error
-                      ? agentError.message
-                      : String(agentError);
+                  let errorMessage = "An unknown error occurred in Agent mode";
+                  if (agentError instanceof Error) {
+                    errorMessage = agentError.message;
+                  } else if (typeof agentError === "string") {
+                    errorMessage = agentError;
+                  }
                   this.logger.error("Agent mode error", agentError);
                   try {
                     this.notificationService.addNotification(
                       "error",
                       "Agent Error",
-                      errorMessage || "An unknown error occurred in Agent mode",
+                      errorMessage,
                     );
                   } catch (notificationError: unknown) {
                     this.logger.error(
@@ -1059,8 +1063,13 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   sessionId: this.currentSessionId,
                 });
               } catch (error: unknown) {
-                const streamErrorMessage =
-                  error instanceof Error ? error.message : String(error);
+                let streamErrorMessage =
+                  "An error occurred while generating a response";
+                if (error instanceof Error) {
+                  streamErrorMessage = error.message;
+                } else if (typeof error === "string") {
+                  streamErrorMessage = error;
+                }
                 this.logger.error("Error during streaming", error);
                 await this.currentWebView?.webview.postMessage({
                   type: "onStreamError",
@@ -1071,8 +1080,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   this.notificationService.addNotification(
                     "error",
                     "Response Failed",
-                    streamErrorMessage ||
-                      "An error occurred while generating a response",
+                    streamErrorMessage,
                     "Chat",
                   );
                 } catch (notificationError: unknown) {
@@ -1833,26 +1841,24 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "notifications-mark-read":
               if (message.ids && Array.isArray(message.ids)) {
                 for (const id of message.ids) {
-                  await NotificationService.getInstance().markAsRead(id);
+                  await this.notificationService.markAsRead(id);
                 }
               } else if (message.id) {
-                await NotificationService.getInstance().markAsRead(message.id);
+                await this.notificationService.markAsRead(message.id);
               }
               await this.synchronizeNotifications();
               break;
             case "notifications-mark-all-read":
-              await NotificationService.getInstance().markAllAsRead();
+              await this.notificationService.markAllAsRead();
               await this.synchronizeNotifications();
               break;
             case "notifications-clear-all":
-              await NotificationService.getInstance().clearAll();
+              await this.notificationService.clearAll();
               await this.synchronizeNotifications();
               break;
             case "notifications-delete":
               if (message.id) {
-                await NotificationService.getInstance().deleteNotification(
-                  message.id,
-                );
+                await this.notificationService.deleteNotification(message.id);
               }
               await this.synchronizeNotifications();
               break;
@@ -3826,10 +3832,8 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
       return;
     }
     try {
-      const notifications =
-        await NotificationService.getInstance().getNotifications();
-      const unreadCount =
-        await NotificationService.getInstance().getUnreadCount();
+      const notifications = await this.notificationService.getNotifications();
+      const unreadCount = await this.notificationService.getUnreadCount();
 
       this.logger.info(
         `synchronizeNotifications: Sending ${notifications.length} notifications, unread: ${unreadCount}`,

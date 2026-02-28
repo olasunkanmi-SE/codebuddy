@@ -5,7 +5,10 @@ import * as fs from "fs";
 import { Logger } from "../infrastructure/logger/logger";
 import { NotificationService } from "../services/notification.service";
 
-export const createBranchFromJiraCommand = async () => {
+export const createBranchFromJiraCommand = async (
+  notificationService?: NotificationService,
+) => {
+  const ns = notificationService ?? NotificationService.getInstance();
   const logger = Logger.initialize("CreateBranchFromJira", {});
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders) {
@@ -188,20 +191,14 @@ export const createBranchFromJiraCommand = async () => {
                   { cwd: rootPath },
                   (gitErr, gitOut, gitStderr) => {
                     if (gitErr) {
-                      vscode.window.showErrorMessage(
-                        `Failed to create branch: ${gitStderr || gitErr.message}`,
-                      );
-                      NotificationService.getInstance().addNotification(
+                      ns.addNotification(
                         "error",
                         "Branch Creation Failed",
                         `Failed to create branch from Jira ticket: ${gitStderr || gitErr.message}`,
                         "Git",
                       );
                     } else {
-                      vscode.window.showInformationMessage(
-                        `Created and checked out branch: ${confirmName}`,
-                      );
-                      NotificationService.getInstance().addNotification(
+                      ns.addNotification(
                         "success",
                         "Branch Created",
                         `Created and checked out branch: ${confirmName}`,
@@ -220,8 +217,7 @@ export const createBranchFromJiraCommand = async () => {
           }
         } catch (err: any) {
           logger.error("Failed to fetch tickets", err);
-          vscode.window.showErrorMessage(`Failed to fetch tickets: ${err}`);
-          NotificationService.getInstance().addNotification(
+          ns.addNotification(
             "error",
             "Jira Ticket Fetch Failed",
             `Failed to fetch Jira tickets: ${err}`,
