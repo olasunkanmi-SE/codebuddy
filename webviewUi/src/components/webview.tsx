@@ -546,7 +546,7 @@ export const WebviewUI = () => {
             alias: msg.alias,
             timestamp: Date.now(),
           }));
-          setMessages((prev: IWebviewMessage[]) => [...formattedMessages, ...prev]);
+          setMessages(formattedMessages);
         } catch (error: any) {
           console.error("Error parsing chat history:", error);
         }
@@ -741,6 +741,7 @@ export const WebviewUI = () => {
         if (message.sessions) {
           setSessions(message.sessions);
         }
+        clearMessages();
         break;
 
       case "session-switched": {

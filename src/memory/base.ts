@@ -24,15 +24,15 @@ export class Memory {
     if (entry && Date.now() < entry.expiry) {
       return entry.value;
     }
+    // Clean up expired entry
+    if (entry) {
+      Memory.bank.delete(key);
+    }
     return undefined;
   }
 
-  static delete(key: string): boolean | undefined {
-    const cached = Memory.get(key);
-    if (cached) {
-      return Memory.bank.delete(key);
-    }
-    return undefined;
+  static delete(key: string): boolean {
+    return Memory.bank.delete(key);
   }
 
   static keys(): string[] {
@@ -44,7 +44,8 @@ export class Memory {
   }
 
   static has(key: string): boolean {
-    return Memory.bank.has(key);
+    // Check expiry so callers don't see stale entries
+    return Memory.get(key) !== undefined;
   }
 
   static clear(): void {

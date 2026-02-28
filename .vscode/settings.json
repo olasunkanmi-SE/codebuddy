@@ -9,7 +9,7 @@
   // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
   "typescript.tsc.autoDetect": "off",
   "liveServer.settings.port": 5501,
-  "editor.fontSize": 12,
+  "editor.fontSize": 14,
   "mcp.servers": {
     "docker-gateway": {
       "command": "docker",

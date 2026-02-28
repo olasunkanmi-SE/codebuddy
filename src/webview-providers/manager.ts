@@ -247,13 +247,26 @@ export class WebViewProviderManager implements vscode.Disposable {
         return;
       }
       const chatHistory = await this.getChatHistory();
+
+      // Preserve the active session ID so it survives the provider swap
+      const previousSessionId = this.currentProvider?.getSessionId() ?? null;
+
       if (this.currentProvider) {
         this.currentProvider.dispose();
       }
       this.currentProvider = newProvider;
       this.activeProviderName = modelName;
       if (this.webviewView) {
-        await this.currentProvider.resolveWebviewView(this.webviewView);
+        if (onload) {
+          // First load — full HTML render
+          await this.currentProvider.resolveWebviewView(this.webviewView);
+        } else {
+          // Model switch — reuse existing webview, just re-attach handler
+          await this.currentProvider.attachToExistingWebview(
+            this.webviewView,
+            previousSessionId,
+          );
+        }
       }
       if (chatHistory?.length > 0 && onload) {
         await this.restoreChatHistory();
