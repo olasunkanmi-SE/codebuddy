@@ -544,7 +544,6 @@ export const WebviewUI = () => {
             type: msg.type,
             content: msg.content,
             language: msg.language,
-            alias: msg.alias,
             timestamp: Date.now(),
           }));
           setMessages(formattedMessages);
@@ -756,7 +755,6 @@ export const WebviewUI = () => {
             type: msg.type,
             content: msg.content,
             language: msg.language,
-            alias: msg.alias,
             timestamp: msg.timestamp || Date.now(),
           }));
           setMessages(formattedMessages);
@@ -812,7 +810,6 @@ export const WebviewUI = () => {
           sendMessage(message.text, {
             mode: selectedCodeBuddyMode || "Agent",
             context: [],
-            alias: "O",
             threadId,
           });
         }
@@ -918,7 +915,6 @@ export const WebviewUI = () => {
         // Force Agent mode during testing to ensure langgraph/deepagent streaming path runs
         mode: selectedCodeBuddyMode || "Agent",
         context: selectedContext.split("@"),
-        alias: "O",
         threadId,
       });
     },
@@ -1024,7 +1020,6 @@ export const WebviewUI = () => {
         <UserMessage
           key={msg.id}
           message={msg.content}
-          alias={msg.alias}
         />
       )
     );

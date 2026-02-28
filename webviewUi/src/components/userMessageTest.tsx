@@ -10,21 +10,18 @@ export const UserMessageTest: React.FC = () => {
 
       <UserMessage
         message="Hello! This is a test message from the user with the new simplified design that has a subtle background."
-        alias="John Doe"
       />
 
       <UserMessage
         message="This is a longer message that might span multiple lines. The design now focuses on simplicity with just a nice background that blends with the VS Code theme."
-        alias="Jane Smith"
       />
 
-      <UserMessage message="Short message." alias="A" />
+      <UserMessage message="Short message." />
 
-      <UserMessage message="This message has no alias set, so it should show the default 'U' avatar." />
+      <UserMessage message="This message has no alias set." />
 
       <UserMessage
         message="The simplified design is clean and focuses on readability while maintaining the VS Code aesthetic."
-        alias="Test User"
       />
     </div>
   );
