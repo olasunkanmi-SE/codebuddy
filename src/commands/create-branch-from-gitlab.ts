@@ -3,12 +3,15 @@ import * as cp from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { Logger } from "../infrastructure/logger/logger";
-import { NotificationService } from "../services/notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 
 export const createBranchFromGitLabCommand = async (
-  notificationService?: NotificationService,
+  notificationService: NotificationService,
 ) => {
-  const ns = notificationService ?? NotificationService.getInstance();
+  const ns = notificationService;
   const logger = Logger.initialize("CreateBranchFromGitLab", {});
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders) {
@@ -42,7 +45,7 @@ export const createBranchFromGitLabCommand = async (
         "error",
         "GitLab CLI Not Found",
         "GitLab CLI (glab) is not installed. Install it to use GitLab features.",
-        "GitLab",
+        NotificationSource.GitLab,
       );
       return;
     }
@@ -202,14 +205,14 @@ export const createBranchFromGitLabCommand = async (
                         "error",
                         "Branch Creation Failed",
                         `Failed to create branch from GitLab issue: ${gitStderr || gitErr.message}`,
-                        "Git",
+                        NotificationSource.Git,
                       );
                     } else {
                       ns.addNotification(
                         "success",
                         "Branch Created",
                         `Created and checked out branch: ${confirmName}`,
-                        "Git",
+                        NotificationSource.Git,
                       );
                     }
                   },
@@ -228,7 +231,7 @@ export const createBranchFromGitLabCommand = async (
             "error",
             "GitLab Issue Fetch Failed",
             `Failed to fetch GitLab issues: ${err}`,
-            "GitLab",
+            NotificationSource.GitLab,
           );
         }
       },

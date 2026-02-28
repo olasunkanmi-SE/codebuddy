@@ -1,7 +1,10 @@
 // src/services/change-detection/change-detector.service.ts
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { IChangeProvider, ChangeDetails } from "./types";
-import { NotificationService } from "../../services/notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../../services/notification.service";
 
 export class ChangeDetector {
   private readonly logger: Logger;
@@ -41,7 +44,7 @@ export class ChangeDetector {
       "warning",
       "No Git Changes Detected",
       "Could not detect Git changes for PR review. The review may be less accurate.",
-      "PR Review",
+      NotificationSource.PRReview,
     );
     return {
       branchInfo: `Current branch vs ${targetBranch} (No changes detected)`,

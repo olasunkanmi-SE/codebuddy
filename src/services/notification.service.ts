@@ -2,6 +2,20 @@ import * as vscode from "vscode";
 import { Logger } from "../infrastructure/logger/logger";
 import { SqliteDatabaseService } from "./sqlite-database.service";
 
+export enum NotificationSource {
+  System = "System",
+  Commands = "Commands",
+  Git = "Git",
+  Chat = "Chat",
+  MCP = "MCP",
+  ModelManager = "Model Manager",
+  Workspace = "Workspace",
+  GitLab = "GitLab",
+  Jira = "Jira",
+  PRReview = "PR Review",
+  Agent = "Agent",
+}
+
 export interface NotificationItem {
   id: number;
   type: "info" | "warning" | "error" | "success";
@@ -38,7 +52,7 @@ export class NotificationService {
     type: "info" | "warning" | "error" | "success",
     title: string,
     message: string,
-    source = "System",
+    source: NotificationSource = NotificationSource.System,
   ): Promise<void> {
     try {
       await this.dbService.initialize();

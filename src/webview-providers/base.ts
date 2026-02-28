@@ -45,7 +45,10 @@ import { DockerModelService } from "../services/docker/DockerModelService";
 import { ProjectRulesService } from "../services/project-rules.service";
 import { NewsService } from "../services/news.service";
 import { ConnectorService } from "../services/connector.service";
-import { NotificationService } from "../services/notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 import { ObservabilityService } from "../services/observability.service";
 import { LocalObservabilityService } from "../infrastructure/observability/telemetry";
 import { ChatHistoryCache } from "../memory/chat-history-cache";
@@ -947,6 +950,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                       "error",
                       "Agent Error",
                       errorMessage,
+                      NotificationSource.Agent,
                     );
                   } catch (notificationError: unknown) {
                     this.logger.error(
@@ -1081,7 +1085,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                     "error",
                     "Response Failed",
                     streamErrorMessage,
-                    "Chat",
+                    NotificationSource.Chat,
                   );
                 } catch (notificationError: unknown) {
                   this.logger.error(

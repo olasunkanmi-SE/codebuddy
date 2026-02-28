@@ -6,7 +6,10 @@ import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
 import { ChatHistoryManager } from "../services/chat-history-manager";
 import { formatText, getAPIKeyAndModel } from "../utils/utils";
-import { NotificationService } from "../services/notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 import { AnthropicWebViewProvider } from "./anthropic";
 import { BaseWebViewProvider } from "./base";
 import { DeepseekWebViewProvider } from "./deepseek";
@@ -296,7 +299,7 @@ export class WebViewProviderManager implements vscode.Disposable {
           "success",
           "Model Switched",
           `Successfully switched to ${modelName}`,
-          "Model Manager",
+          NotificationSource.ModelManager,
         );
       } catch (notificationError: unknown) {
         this.logger.error(
@@ -317,7 +320,7 @@ export class WebViewProviderManager implements vscode.Disposable {
           "error",
           "Model Switch Failed",
           `Failed to switch to ${modelName}: ${switchErrorMessage || "Unknown error"}`,
-          "Model Manager",
+          NotificationSource.ModelManager,
         );
       } catch (notificationError: unknown) {
         this.logger.error(
@@ -332,7 +335,7 @@ export class WebViewProviderManager implements vscode.Disposable {
           modelName,
         }),
       );
-      throw new Error(switchErrorMessage);
+      throw error instanceof Error ? error : new Error(switchErrorMessage);
     }
   }
 
@@ -372,9 +375,9 @@ export class WebViewProviderManager implements vscode.Disposable {
         "error",
         "Model Change Failed",
         errorMessage || "An error occurred while changing the model.",
-        "Model Manager",
+        NotificationSource.ModelManager,
       );
-      throw new Error(errorMessage);
+      throw error instanceof Error ? error : new Error(errorMessage);
     }
   }
 
@@ -402,7 +405,7 @@ export class WebViewProviderManager implements vscode.Disposable {
         "warning",
         "Chat History Restoration Failed",
         "Failed to restore previous chat history. Starting with a fresh session.",
-        "Chat",
+        NotificationSource.Chat,
       );
 
       // Send empty history to prevent UI hanging

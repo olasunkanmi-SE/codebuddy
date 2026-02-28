@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { CodeCommandHandler } from "./handler";
 import { GitActions } from "../services/git-actions";
 import { formatText } from "../utils/utils";
+import { NotificationSource } from "../services/notification.service";
 
 export class GenerateCommitMessage extends CodeCommandHandler {
   private readonly gitActions: GitActions;
@@ -23,7 +24,7 @@ export class GenerateCommitMessage extends CodeCommandHandler {
         "error",
         "Staged Changes Not Found",
         "Failed to get staged changes. Ensure you have staged files for commit.",
-        "Git",
+        NotificationSource.Git,
       );
       throw error;
     }

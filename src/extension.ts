@@ -48,6 +48,7 @@ import {
 import { AstIndexingService } from "./services/ast-indexing.service";
 import { DiffReviewService } from "./services/diff-review.service";
 import { SecretStorageService } from "./services/secret-storage";
+import { NotificationService } from "./services/notification.service";
 import { SqliteVectorStore } from "./services/sqlite-vector-store";
 import { StandupService } from "./services/standup.service";
 import { CodeHealthTask } from "./services/tasks/code-health.task";
@@ -297,9 +298,8 @@ export async function activate(context: vscode.ExtensionContext) {
     logger.info("✓ CodeBuddy: Core services started, UI ready");
 
     context.subscriptions.push(
-      vscode.commands.registerCommand(
-        "codebuddy.indexWorkspace",
-        indexWorkspaceCommand,
+      vscode.commands.registerCommand("codebuddy.indexWorkspace", () =>
+        indexWorkspaceCommand(NotificationService.getInstance()),
       ),
     );
 
@@ -337,14 +337,16 @@ export async function activate(context: vscode.ExtensionContext) {
         "codebuddy.createBranchFromJira",
         async () => {
           logger.info("Triggering Create Branch from Jira...");
-          await createBranchFromJiraCommand();
+          await createBranchFromJiraCommand(NotificationService.getInstance());
         },
       ),
       vscode.commands.registerCommand(
         "codebuddy.createBranchFromGitLab",
         async () => {
           logger.info("Triggering Create Branch from GitLab...");
-          await createBranchFromGitLabCommand();
+          await createBranchFromGitLabCommand(
+            NotificationService.getInstance(),
+          );
         },
       ),
     );

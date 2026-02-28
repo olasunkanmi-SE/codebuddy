@@ -33,7 +33,10 @@ import {
 import { Memory } from "../memory/base";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { Orchestrator } from "../orchestrator";
-import { NotificationService } from "../services/notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 import { architecturalRecommendationCommand } from "./architectural-recommendation";
 import { trace, SpanStatusCode, SpanKind, Tracer } from "@opentelemetry/api";
 
@@ -308,7 +311,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         "Model Creation Failed",
         error?.message ||
           "Failed to create model. Check your API configuration.",
-        "Commands",
+        NotificationSource.Commands,
       );
     }
   }
@@ -433,7 +436,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         "Response Generation Failed",
         error?.message ||
           "Failed to generate a response. Please check your API key and model settings.",
-        "Commands",
+        NotificationSource.Commands,
       );
     } finally {
       span.end();
@@ -820,7 +823,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           "error",
           "Command Streaming Failed",
           error?.message || "An error occurred while streaming the response.",
-          "Commands",
+          NotificationSource.Commands,
         );
         return;
       }
@@ -850,7 +853,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         "Command Execution Failed",
         error?.message ||
           "An unexpected error occurred while executing the command.",
-        "Commands",
+        NotificationSource.Commands,
       );
     } finally {
       span.end();

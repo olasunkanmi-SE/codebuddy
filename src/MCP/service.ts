@@ -3,7 +3,10 @@ import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { getConfigValue } from "../utils/utils";
 import { MCPClient } from "./client";
-import { NotificationService } from "../services/notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 import {
   MCPServerConfig,
   MCPServersConfig,
@@ -394,7 +397,7 @@ export class MCPService implements vscode.Disposable {
             "warning",
             "Docker MCP Unavailable",
             "Docker MCP gateway not detected. Start Docker Desktop or install the MCP CLI.",
-            "MCP",
+            NotificationSource.MCP,
           );
         }
         return [];
@@ -671,7 +674,7 @@ export class MCPService implements vscode.Disposable {
             "success",
             "MCP Gateway Connected",
             "Docker MCP Gateway is ready with unified tool catalog.",
-            "MCP",
+            NotificationSource.MCP,
           );
         } else {
           this.logger.info(`Connected to Server: ${serverName}`);
@@ -679,7 +682,7 @@ export class MCPService implements vscode.Disposable {
             "success",
             "MCP Server Connected",
             `Successfully connected to MCP server: ${serverName}`,
-            "MCP",
+            NotificationSource.MCP,
           );
         }
         return;
@@ -695,7 +698,7 @@ export class MCPService implements vscode.Disposable {
             "error",
             "MCP Connection Failed",
             `Failed to connect to ${serverName} after ${maxRetries} attempts: ${error.message || error}`,
-            "MCP",
+            NotificationSource.MCP,
           );
           throw error;
         }

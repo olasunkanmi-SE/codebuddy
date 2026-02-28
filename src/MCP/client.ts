@@ -8,7 +8,10 @@ import {
   MCPToolResult,
 } from "./types";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
-import { NotificationService } from "../services/notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 
 export class MCPClient {
   private client: Client;
@@ -184,7 +187,7 @@ export class MCPClient {
         "error",
         "MCP Reconnection Failed",
         `MCP server "${this.serverName}" disconnected and could not reconnect after ${this.MAX_RECONNECT_ATTEMPTS} attempts.`,
-        "MCP",
+        NotificationSource.MCP,
       );
       return;
     }

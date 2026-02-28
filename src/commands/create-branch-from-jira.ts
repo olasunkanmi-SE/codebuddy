@@ -3,12 +3,15 @@ import * as cp from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { Logger } from "../infrastructure/logger/logger";
-import { NotificationService } from "../services/notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 
 export const createBranchFromJiraCommand = async (
-  notificationService?: NotificationService,
+  notificationService: NotificationService,
 ) => {
-  const ns = notificationService ?? NotificationService.getInstance();
+  const ns = notificationService;
   const logger = Logger.initialize("CreateBranchFromJira", {});
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders) {
@@ -195,14 +198,14 @@ export const createBranchFromJiraCommand = async (
                         "error",
                         "Branch Creation Failed",
                         `Failed to create branch from Jira ticket: ${gitStderr || gitErr.message}`,
-                        "Git",
+                        NotificationSource.Git,
                       );
                     } else {
                       ns.addNotification(
                         "success",
                         "Branch Created",
                         `Created and checked out branch: ${confirmName}`,
-                        "Git",
+                        NotificationSource.Git,
                       );
                     }
                   },
@@ -221,7 +224,7 @@ export const createBranchFromJiraCommand = async (
             "error",
             "Jira Ticket Fetch Failed",
             `Failed to fetch Jira tickets: ${err}`,
-            "Jira",
+            NotificationSource.Jira,
           );
         }
       },

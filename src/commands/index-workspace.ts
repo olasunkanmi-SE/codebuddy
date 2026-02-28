@@ -1,7 +1,10 @@
 import * as vscode from "vscode";
 import { AstIndexingService } from "../services/ast-indexing.service";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
-import { NotificationService } from "../services/notification.service";
+import {
+  NotificationService,
+  NotificationSource,
+} from "../services/notification.service";
 
 const logger = Logger.initialize("IndexWorkspace", {
   minLevel: LogLevel.DEBUG,
@@ -11,9 +14,9 @@ const logger = Logger.initialize("IndexWorkspace", {
 });
 
 export async function indexWorkspaceCommand(
-  notificationService?: NotificationService,
+  notificationService: NotificationService,
 ): Promise<void> {
-  const ns = notificationService ?? NotificationService.getInstance();
+  const ns = notificationService;
   const astIndexer = AstIndexingService.getInstance();
 
   const files = await vscode.workspace.findFiles(
@@ -26,7 +29,7 @@ export async function indexWorkspaceCommand(
       "info",
       "Workspace Indexing",
       "No indexable files found in the workspace.",
-      "Workspace",
+      NotificationSource.Workspace,
     );
     return;
   }
@@ -61,21 +64,21 @@ export async function indexWorkspaceCommand(
           "warning",
           "Indexing Complete (No Embeddings)",
           summary,
-          "Workspace",
+          NotificationSource.Workspace,
         );
       } else if (result.errors > 0) {
         ns.addNotification(
           "warning",
           "Indexing Complete With Errors",
           summary,
-          "Workspace",
+          NotificationSource.Workspace,
         );
       } else {
         ns.addNotification(
           "success",
           "Workspace Indexed",
           summary,
-          "Workspace",
+          NotificationSource.Workspace,
         );
       }
       logger.info(summary);
