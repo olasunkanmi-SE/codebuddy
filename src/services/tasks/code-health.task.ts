@@ -1,8 +1,8 @@
 import { Logger } from "../../infrastructure/logger/logger";
 import { PersistentCodebaseUnderstandingService } from "../persistent-codebase-understanding.service";
 import { SqliteDatabaseService } from "../sqlite-database.service";
+import { GitService } from "../git.service";
 import * as vscode from "vscode";
-import * as cp from "child_process";
 
 interface TodoItem {
   file: string;
@@ -22,11 +22,17 @@ export class CodeHealthTask {
   private logger: Logger;
   private outputChannel: vscode.OutputChannel;
   private dbService: SqliteDatabaseService;
+  private gitService: GitService;
 
-  constructor(deps?: { logger?: Logger; dbService?: SqliteDatabaseService }) {
+  constructor(deps?: {
+    logger?: Logger;
+    dbService?: SqliteDatabaseService;
+    gitService?: GitService;
+  }) {
     this.logger = deps?.logger ?? Logger.initialize("CodeHealthTask", {});
     this.outputChannel = vscode.window.createOutputChannel("CodeBuddy Health");
     this.dbService = deps?.dbService ?? SqliteDatabaseService.getInstance();
+    this.gitService = deps?.gitService ?? GitService.getInstance();
     this.ensureHealthTable();
   }
 
@@ -65,9 +71,14 @@ export class CodeHealthTask {
       200,
     );
 
+    const config = vscode.workspace.getConfiguration(
+      "codebuddy.automations.codeHealth",
+    );
+    const largeFileThreshold = config.get<number>("largeFileThreshold", 300);
+    const maxTodoItems = config.get<number>("maxTodoItems", 50);
+
     let todoCount = 0;
     let largeFileCount = 0;
-    const largeFileThreshold = 300;
     const todoItems: TodoItem[] = [];
     const largeFiles: { file: string; lines: number }[] = [];
     const functionLengths: number[] = [];
@@ -84,7 +95,7 @@ export class CodeHealthTask {
           const match = lines[i].match(/(TODO|FIXME|HACK):\s*(.*)/);
           if (match) {
             todoCount++;
-            if (todoItems.length < 50) {
+            if (todoItems.length < maxTodoItems) {
               todoItems.push({
                 file: relPath,
                 line: i + 1,
@@ -187,43 +198,38 @@ export class CodeHealthTask {
     const rootPath = workspaceFolders[0].uri.fsPath;
 
     try {
-      const result = await new Promise<string>((resolve, reject) => {
-        cp.exec(
-          'git log --since="30 days ago" --pretty=format: --name-only --diff-filter=ACMR | sort | uniq -c | sort -rn | head -10',
-          { cwd: rootPath, timeout: 15000 },
-          (err, stdout) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            resolve(stdout);
-          },
-        );
-      });
+      const logOutput = await this.gitService.runGitCommand(
+        rootPath,
+        [
+          "log",
+          "--since=30 days ago",
+          "--pretty=format:",
+          "--name-only",
+          "--diff-filter=ACMR",
+        ],
+        15000,
+      );
+
+      // Count file changes in-memory instead of relying on shell piping
+      const fileChanges: Record<string, number> = {};
+      for (const line of logOutput.split("\n")) {
+        const file = line.trim();
+        if (file) {
+          fileChanges[file] = (fileChanges[file] || 0) + 1;
+        }
+      }
 
       const hotspotMinChanges = vscode.workspace
         .getConfiguration("codebuddy.automations.codeHealth")
         .get<number>("hotspotMinChanges", 3);
 
-      return result
-        .split("\n")
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0)
-        .map((line) => {
-          const match = line.match(/^\s*(\d+)\s+(.+)$/);
-          if (match) {
-            return {
-              changes: parseInt(match[1], 10),
-              file: match[2],
-            };
-          }
-          return null;
-        })
-        .filter(
-          (item): item is { file: string; changes: number } =>
-            item !== null && item.changes >= hotspotMinChanges,
-        );
-    } catch {
+      return Object.entries(fileChanges)
+        .map(([file, changes]) => ({ file, changes }))
+        .filter((item) => item.changes >= hotspotMinChanges)
+        .sort((a, b) => b.changes - a.changes)
+        .slice(0, 10);
+    } catch (e) {
+      this.logger.warn("Failed to get git hotspots", e);
       return [];
     }
   }
@@ -330,7 +336,7 @@ export class CodeHealthTask {
 
     // Large files
     this.outputChannel.appendLine(
-      `📏 Large Files (>300 lines): ${largeFileCount}`,
+      `📏 Large Files (>${vscode.workspace.getConfiguration("codebuddy.automations.codeHealth").get<number>("largeFileThreshold", 300)} lines): ${largeFileCount}`,
     );
     if (largeFiles.length > 0) {
       largeFiles.slice(0, 10).forEach((f) => {

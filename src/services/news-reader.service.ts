@@ -476,6 +476,20 @@ export class NewsReaderService implements vscode.Disposable {
             background: var(--menu-hover-bg);
             color: var(--menu-hover-fg);
         }
+
+        .font-size-label {
+            font-size: 11px;
+            opacity: 0.7;
+            min-width: 32px;
+            text-align: center;
+        }
+
+        .toolbar-separator {
+            width: 1px;
+            height: 16px;
+            background: var(--toolbar-border);
+            margin: 0 4px;
+        }
     </style>
 </head>
 <body>
@@ -498,11 +512,11 @@ export class NewsReaderService implements vscode.Disposable {
             <button class="browser-btn" id="font-decrease-btn" title="Decrease Font Size">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             </button>
-            <span id="font-size-label" style="font-size:11px;opacity:0.7;min-width:32px;text-align:center;">100%</span>
+            <span id="font-size-label" class="font-size-label">100%</span>
             <button class="browser-btn" id="font-increase-btn" title="Increase Font Size">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             </button>
-            <span style="width:1px;height:16px;background:var(--toolbar-border);margin:0 4px;"></span>
+            <span class="toolbar-separator"></span>
             <button class="browser-btn" id="add-to-chat-btn" title="Add Selection to Chat">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
             </button>

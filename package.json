@@ -807,6 +807,18 @@
             "minimum": 1,
             "description": "%config.codeHealthHotspotMinChanges%"
           },
+          "codebuddy.automations.codeHealth.largeFileThreshold": {
+            "type": "number",
+            "default": 300,
+            "minimum": 50,
+            "description": "%config.codeHealthLargeFileThreshold%"
+          },
+          "codebuddy.automations.codeHealth.maxTodoItems": {
+            "type": "number",
+            "default": 50,
+            "minimum": 10,
+            "description": "%config.codeHealthMaxTodoItems%"
+          },
           "codebuddy.automations.endOfDaySummary.enabled": {
             "type": "boolean",
             "default": true,
