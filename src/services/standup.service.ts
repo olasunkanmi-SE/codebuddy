@@ -5,6 +5,7 @@ import * as fs from "fs";
 import { Logger } from "../infrastructure/logger/logger";
 import { AgentService } from "./agent-state";
 import { ChatHistoryManager } from "./chat-history-manager";
+import { GitService } from "./git.service";
 
 export interface GitSummary {
   branch: string;
@@ -27,12 +28,14 @@ export class StandupService {
   private static instance: StandupService;
   private logger: Logger;
   private agentService: AgentService;
+  private gitService: GitService;
 
   private outputChannel: vscode.OutputChannel;
 
   private constructor() {
     this.logger = Logger.initialize("StandupService", {});
     this.agentService = AgentService.getInstance();
+    this.gitService = GitService.getInstance();
     this.outputChannel = vscode.window.createOutputChannel("CodeBuddy Standup");
   }
 
@@ -78,10 +81,12 @@ export class StandupService {
       .map((doc) => vscode.workspace.asRelativePath(doc.uri));
 
     // 3. Get Active Errors
+    // Note: getDiagnostics() iterates all diagnostics from all language extensions.
+    // In very large workspaces this may be slow; we cap the result at 5 entries below.
     const activeErrors: { file: string; message: string; severity: string }[] =
       [];
-    vscode.languages.getDiagnostics().forEach(([uri, diagnostics]) => {
-      diagnostics.forEach((diag) => {
+    for (const [uri, diagnostics] of vscode.languages.getDiagnostics()) {
+      for (const diag of diagnostics) {
         if (diag.severity === vscode.DiagnosticSeverity.Error) {
           activeErrors.push({
             file: vscode.workspace.asRelativePath(uri),
@@ -89,8 +94,8 @@ export class StandupService {
             severity: "Error",
           });
         }
-      });
-    });
+      }
+    }
 
     // 4. Get Git Summary (branch, recent commits, diff stats)
     const gitSummary = await this.getGitSummary();
@@ -144,7 +149,7 @@ export class StandupService {
     try {
       // Current branch
       const branch = (
-        await this.runGitCommand(rootPath, [
+        await this.gitService.runGitCommand(rootPath, [
           "rev-parse",
           "--abbrev-ref",
           "HEAD",
@@ -152,7 +157,7 @@ export class StandupService {
       ).trim();
 
       // Recent commits (last 24h)
-      const recentCommitsRaw = await this.runGitCommand(rootPath, [
+      const recentCommitsRaw = await this.gitService.runGitCommand(rootPath, [
         "log",
         "--since=24 hours ago",
         "--oneline",
@@ -168,14 +173,19 @@ export class StandupService {
       let diffStat = "";
       try {
         diffStat = (
-          await this.runGitCommand(rootPath, ["diff", "--stat", "HEAD~1", "--"])
+          await this.gitService.runGitCommand(rootPath, [
+            "diff",
+            "--stat",
+            "HEAD~1",
+            "--",
+          ])
         ).trim();
       } catch {
         // No previous commit or shallow clone
       }
 
       // Uncommitted changes with file-level detail
-      const statusRaw = await this.runGitCommand(rootPath, [
+      const statusRaw = await this.gitService.runGitCommand(rootPath, [
         "status",
         "--porcelain",
       ]);
@@ -190,30 +200,6 @@ export class StandupService {
       this.logger.warn("Could not fetch git summary for standup", e);
       return empty;
     }
-  }
-
-  private runGitCommand(cwd: string, args: string[]): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const git = cp.spawn("git", args, { cwd });
-      let output = "";
-      let error = "";
-
-      git.stdout.on("data", (data: Buffer) => {
-        output += data.toString();
-      });
-
-      git.stderr.on("data", (data: Buffer) => {
-        error += data.toString();
-      });
-
-      git.on("close", (code: number | null) => {
-        if (code === 0) {
-          resolve(output);
-        } else {
-          reject(new Error(`Git command failed: ${error}`));
-        }
-      });
-    });
   }
 
   private async getJiraTickets(): Promise<string[]> {

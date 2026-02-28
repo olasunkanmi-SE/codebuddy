@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { Logger } from "../../infrastructure/logger/logger";
 import * as fs from "fs/promises";
 import * as path from "path";
-import * as cp from "child_process";
+import { IPackageManager, detectPackageManager } from "../package-managers";
 
 interface DependencyReport {
   wildcardDeps: string[];
@@ -15,6 +15,7 @@ interface DependencyReport {
   vulnerabilities: { severity: string; count: number }[];
   totalVulnerabilities: number;
   lockfileSynced: boolean;
+  packageManager: string;
 }
 
 export class DependencyCheckTask {
@@ -42,15 +43,22 @@ export class DependencyCheckTask {
         continue;
       }
 
+      // Auto-detect the package manager for this workspace folder
+      const pm = await detectPackageManager(folder.uri.fsPath);
+      this.logger.info(
+        `Detected package manager: ${pm.name} for ${folder.name}`,
+      );
+
       const report: DependencyReport = {
         wildcardDeps: [],
         outdatedDeps: [],
         vulnerabilities: [],
         totalVulnerabilities: 0,
         lockfileSynced: true,
+        packageManager: pm.name,
       };
 
-      // 1. Check for wildcard versions
+      // 1. Check for wildcard versions (package.json parse — PM-agnostic)
       try {
         const content = await fs.readFile(packageJsonPath, "utf-8");
         const pkg = JSON.parse(content);
@@ -67,100 +75,29 @@ export class DependencyCheckTask {
         this.logger.warn("Error reading package.json", e);
       }
 
-      // 2. Check for outdated packages
+      // 2. Check for outdated packages via detected package manager
       try {
-        const outdatedJson = await this.runCommand(
-          folder.uri.fsPath,
-          "npm outdated --json",
-        );
-        if (outdatedJson.trim()) {
-          const outdated = JSON.parse(outdatedJson);
-          for (const [name, info] of Object.entries(outdated) as [
-            string,
-            any,
-          ][]) {
-            if (info.current !== info.latest) {
-              report.outdatedDeps.push({
-                name,
-                current: info.current || "N/A",
-                wanted: info.wanted || "N/A",
-                latest: info.latest || "N/A",
-              });
-            }
-          }
-        }
+        report.outdatedDeps = await pm.getOutdatedPackages(folder.uri.fsPath);
       } catch (e) {
-        // npm outdated exits with code 1 when there are outdated packages — parse stdout anyway
-        if (e instanceof CommandResult && e.stdout.trim()) {
-          try {
-            const outdated = JSON.parse(e.stdout);
-            for (const [name, info] of Object.entries(outdated) as [
-              string,
-              any,
-            ][]) {
-              if (info.current !== info.latest) {
-                report.outdatedDeps.push({
-                  name,
-                  current: info.current || "N/A",
-                  wanted: info.wanted || "N/A",
-                  latest: info.latest || "N/A",
-                });
-              }
-            }
-          } catch {
-            // Could not parse, skip
-          }
-        }
+        this.logger.warn(`${pm.name} outdated check failed`, e);
       }
 
-      // 3. Run npm audit for vulnerabilities
+      // 3. Run security audit via detected package manager
       try {
-        const auditJson = await this.runCommand(
-          folder.uri.fsPath,
-          "npm audit --json",
-        );
-        this.parseAuditResult(auditJson, report);
+        const audit = await pm.getAuditReport(folder.uri.fsPath);
+        report.vulnerabilities = audit.vulnerabilities;
+        report.totalVulnerabilities = audit.total;
       } catch (e) {
-        // npm audit exits with non-zero when vulnerabilities found
-        if (e instanceof CommandResult && e.stdout.trim()) {
-          this.parseAuditResult(e.stdout, report);
-        }
+        this.logger.warn(`${pm.name} audit failed`, e);
       }
 
       // 4. Check lockfile sync
-      try {
-        const lockfilePath = path.join(folder.uri.fsPath, "package-lock.json");
-        await fs.access(lockfilePath);
-        // Quick heuristic: if lockfile exists but package.json is newer, might be out of sync
-        const pkgStat = await fs.stat(packageJsonPath);
-        const lockStat = await fs.stat(lockfilePath);
-        if (pkgStat.mtimeMs > lockStat.mtimeMs) {
-          report.lockfileSynced = false;
-        }
-      } catch {
-        // No lockfile
-        report.lockfileSynced = false;
-      }
+      report.lockfileSynced = await pm.isLockfileSynced(
+        folder.uri.fsPath,
+        packageJsonPath,
+      );
 
-      this.showReport(report, folder.name, packageJsonPath);
-    }
-  }
-
-  private parseAuditResult(auditJson: string, report: DependencyReport): void {
-    try {
-      const audit = JSON.parse(auditJson);
-      const meta =
-        audit.metadata?.vulnerabilities || audit.vulnerabilities || {};
-      const severities = ["critical", "high", "moderate", "low"];
-      for (const severity of severities) {
-        const count = meta[severity] || 0;
-        if (count > 0) {
-          report.vulnerabilities.push({ severity, count });
-          report.totalVulnerabilities += count;
-        }
-      }
-    } catch {
-      // Could not parse audit result
+      this.showReport(report, folder.name, packageJsonPath, pm);
     }
   }
 
@@ -168,6 +105,7 @@ export class DependencyCheckTask {
     report: DependencyReport,
     folderName: string,
     packageJsonPath: string,
+    pm: IPackageManager,
   ): void {
     const issues: string[] = [];
 
@@ -181,7 +119,7 @@ export class DependencyCheckTask {
       issues.push(`${report.totalVulnerabilities} vulnerabilities`);
     }
     if (!report.lockfileSynced) {
-      issues.push("lockfile may be out of sync");
+      issues.push(`${pm.lockfileName} may be out of sync`);
     }
 
     if (issues.length === 0) {
@@ -193,7 +131,7 @@ export class DependencyCheckTask {
     this.outputChannel.clear();
     this.outputChannel.appendLine("=== DEPENDENCY HEALTH REPORT ===");
     this.outputChannel.appendLine(
-      `Workspace: ${folderName} | Generated: ${new Date().toLocaleString()}`,
+      `Workspace: ${folderName} | Package Manager: ${pm.name} | Generated: ${new Date().toLocaleString()}`,
     );
     this.outputChannel.appendLine("");
 
@@ -213,16 +151,14 @@ export class DependencyCheckTask {
         );
       });
       this.outputChannel.appendLine(
-        '  → Run "npm audit fix" to attempt automatic fixes',
+        `  → Run "${pm.auditFixCommand}" to attempt automatic fixes`,
       );
       this.outputChannel.appendLine("");
     }
 
     if (report.outdatedDeps.length > 0) {
       this.outputChannel.appendLine("📦 Outdated Packages:");
-      // Show up to 15 most important (sorted by version drift)
       const sorted = [...report.outdatedDeps].sort((a, b) => {
-        // Prioritize major version differences
         const aMajorDrift = this.majorVersionDiff(a.current, a.latest);
         const bMajorDrift = this.majorVersionDiff(b.current, b.latest);
         return bMajorDrift - aMajorDrift;
@@ -250,9 +186,11 @@ export class DependencyCheckTask {
 
     if (!report.lockfileSynced) {
       this.outputChannel.appendLine(
-        "🔒 Lockfile may be out of sync with package.json.",
+        `🔒 ${pm.lockfileName} may be out of sync with package.json.`,
       );
-      this.outputChannel.appendLine('  → Run "npm install" to regenerate.\n');
+      this.outputChannel.appendLine(
+        `  → Run "${pm.installCommand}" to regenerate.\n`,
+      );
     }
 
     // Notification with actions
@@ -260,11 +198,12 @@ export class DependencyCheckTask {
       report.totalVulnerabilities > 0
         ? "showWarningMessage"
         : "showInformationMessage";
-    const message = `Dependency Check: ${issues.join(", ")}.`;
+    const message = `Dependency Check (${pm.name}): ${issues.join(", ")}.`;
 
+    const fixLabel = `Run ${pm.auditFixCommand}`;
     const actions = ["View Report"];
     if (report.totalVulnerabilities > 0) {
-      actions.push("Run npm audit fix");
+      actions.push(fixLabel);
     }
     actions.push("Open package.json");
 
@@ -272,10 +211,10 @@ export class DependencyCheckTask {
       (selection: string | undefined) => {
         if (selection === "View Report") {
           this.outputChannel.show(true);
-        } else if (selection === "Run npm audit fix") {
-          const terminal = vscode.window.createTerminal("npm audit fix");
+        } else if (selection === fixLabel) {
+          const terminal = vscode.window.createTerminal(pm.auditFixCommand);
           terminal.show();
-          terminal.sendText("npm audit fix");
+          terminal.sendText(pm.auditFixCommand);
         } else if (selection === "Open package.json") {
           vscode.workspace
             .openTextDocument(packageJsonPath)
@@ -296,27 +235,5 @@ export class DependencyCheckTask {
     } catch {
       return 0;
     }
-  }
-
-  private runCommand(cwd: string, command: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      cp.exec(command, { cwd, timeout: 30000 }, (err, stdout, stderr) => {
-        if (err) {
-          reject(new CommandResult(stdout, stderr, err));
-          return;
-        }
-        resolve(stdout);
-      });
-    });
-  }
-}
-
-class CommandResult extends Error {
-  constructor(
-    public stdout: string,
-    public stderr: string,
-    public originalError: Error,
-  ) {
-    super(originalError.message);
   }
 }

@@ -793,6 +793,20 @@
             "default": true,
             "description": "%config.gitWatchdogEnabled%"
           },
+          "codebuddy.automations.gitWatchdog.protectedBranches": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": ["main", "master", "develop", "dev", "feature/*", "release/*", "hotfix/*"],
+            "description": "%config.gitWatchdogProtectedBranches%"
+          },
+          "codebuddy.automations.codeHealth.hotspotMinChanges": {
+            "type": "number",
+            "default": 3,
+            "minimum": 1,
+            "description": "%config.codeHealthHotspotMinChanges%"
+          },
           "codebuddy.automations.endOfDaySummary.enabled": {
             "type": "boolean",
             "default": true,

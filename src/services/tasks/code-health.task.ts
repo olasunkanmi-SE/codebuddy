@@ -14,7 +14,7 @@ interface TodoItem {
 interface HealthSnapshot {
   todoCount: number;
   largeFileCount: number;
-  avgComplexity: number;
+  avgFunctionsPerFile: number;
   hotspotCount: number;
 }
 
@@ -119,8 +119,8 @@ export class CodeHealthTask {
     // 3. Detect hotspots via git log churn
     const hotspots = await this.getGitHotspots();
 
-    // 4. Calculate average complexity proxy (functions per file)
-    const avgComplexity =
+    // 4. Calculate average functions per file
+    const avgFunctionsPerFile =
       functionLengths.length > 0
         ? functionLengths.reduce((a, b) => a + b, 0) / functionLengths.length
         : 0;
@@ -129,7 +129,7 @@ export class CodeHealthTask {
     const snapshot: HealthSnapshot = {
       todoCount,
       largeFileCount,
-      avgComplexity: Math.round(avgComplexity * 10) / 10,
+      avgFunctionsPerFile: Math.round(avgFunctionsPerFile * 10) / 10,
       hotspotCount: hotspots.length,
     };
     this.storeSnapshot(snapshot);
@@ -201,6 +201,10 @@ export class CodeHealthTask {
         );
       });
 
+      const hotspotMinChanges = vscode.workspace
+        .getConfiguration("codebuddy.automations.codeHealth")
+        .get<number>("hotspotMinChanges", 3);
+
       return result
         .split("\n")
         .map((l) => l.trim())
@@ -217,7 +221,7 @@ export class CodeHealthTask {
         })
         .filter(
           (item): item is { file: string; changes: number } =>
-            item !== null && item.changes >= 3,
+            item !== null && item.changes >= hotspotMinChanges,
         );
     } catch {
       return [];
@@ -231,7 +235,7 @@ export class CodeHealthTask {
         [
           snapshot.todoCount,
           snapshot.largeFileCount,
-          snapshot.avgComplexity,
+          snapshot.avgFunctionsPerFile,
           snapshot.hotspotCount,
         ],
       );
@@ -337,7 +341,7 @@ export class CodeHealthTask {
 
     this.outputChannel.appendLine("--- Snapshot ---");
     this.outputChannel.appendLine(
-      `TODOs: ${snapshot.todoCount} | Large Files: ${snapshot.largeFileCount} | Hotspots: ${snapshot.hotspotCount} | Avg functions/file: ${snapshot.avgComplexity}`,
+      `TODOs: ${snapshot.todoCount} | Large Files: ${snapshot.largeFileCount} | Hotspots: ${snapshot.hotspotCount} | Avg functions/file: ${snapshot.avgFunctionsPerFile}`,
     );
     this.outputChannel.appendLine("");
     this.outputChannel.appendLine(

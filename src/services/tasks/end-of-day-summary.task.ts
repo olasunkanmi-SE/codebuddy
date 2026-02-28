@@ -1,16 +1,18 @@
 import * as vscode from "vscode";
-import * as cp from "child_process";
 import { Logger } from "../../infrastructure/logger/logger";
+import { GitService } from "../git.service";
 
 export class EndOfDaySummaryTask {
   private logger: Logger;
   private outputChannel: vscode.OutputChannel;
+  private gitService: GitService;
 
   constructor() {
     this.logger = Logger.initialize("EndOfDaySummaryTask", {});
     this.outputChannel = vscode.window.createOutputChannel(
       "CodeBuddy Daily Summary",
     );
+    this.gitService = GitService.getInstance();
   }
 
   public async execute(): Promise<void> {
@@ -31,14 +33,16 @@ export class EndOfDaySummaryTask {
     const filesTouched = await this.getFilesTouchedToday(rootPath);
 
     // 3. Current error count
+    // Note: getDiagnostics() iterates all workspace diagnostics from all language extensions.
+    // In very large workspaces this may be slow.
     let errorCount = 0;
-    vscode.languages.getDiagnostics().forEach(([, diagnostics]) => {
-      diagnostics.forEach((diag) => {
+    for (const [, diagnostics] of vscode.languages.getDiagnostics()) {
+      for (const diag of diagnostics) {
         if (diag.severity === vscode.DiagnosticSeverity.Error) {
           errorCount++;
         }
-      });
-    });
+      }
+    }
 
     // 4. Lines changed today
     const linesChanged = await this.getLinesChangedToday(rootPath);
@@ -47,7 +51,7 @@ export class EndOfDaySummaryTask {
     let currentBranch = "";
     try {
       currentBranch = (
-        await this.runGitCommand(rootPath, [
+        await this.gitService.runGitCommand(rootPath, [
           "rev-parse",
           "--abbrev-ref",
           "HEAD",
@@ -60,7 +64,7 @@ export class EndOfDaySummaryTask {
     // 6. Uncommitted changes
     let uncommittedCount = 0;
     try {
-      const status = await this.runGitCommand(rootPath, [
+      const status = await this.gitService.runGitCommand(rootPath, [
         "status",
         "--porcelain",
       ]);
@@ -160,7 +164,7 @@ export class EndOfDaySummaryTask {
 
   private async getTodaysCommits(rootPath: string): Promise<string[]> {
     try {
-      const raw = await this.runGitCommand(rootPath, [
+      const raw = await this.gitService.runGitCommand(rootPath, [
         "log",
         "--since=midnight",
         "--oneline",
@@ -177,7 +181,7 @@ export class EndOfDaySummaryTask {
 
   private async getFilesTouchedToday(rootPath: string): Promise<string[]> {
     try {
-      const raw = await this.runGitCommand(rootPath, [
+      const raw = await this.gitService.runGitCommand(rootPath, [
         "log",
         "--since=midnight",
         "--pretty=format:",
@@ -200,7 +204,7 @@ export class EndOfDaySummaryTask {
 
   private async getLinesChangedToday(rootPath: string): Promise<string | null> {
     try {
-      const raw = await this.runGitCommand(rootPath, [
+      const raw = await this.gitService.runGitCommand(rootPath, [
         "log",
         "--since=midnight",
         "--pretty=format:",
@@ -275,29 +279,5 @@ export class EndOfDaySummaryTask {
     );
 
     return lines.join("\n");
-  }
-
-  private runGitCommand(cwd: string, args: string[]): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const git = cp.spawn("git", args, { cwd });
-      let output = "";
-      let error = "";
-
-      git.stdout.on("data", (data: Buffer) => {
-        output += data.toString();
-      });
-
-      git.stderr.on("data", (data: Buffer) => {
-        error += data.toString();
-      });
-
-      git.on("close", (code: number | null) => {
-        if (code === 0) {
-          resolve(output);
-        } else {
-          reject(new Error(`Git command failed: ${error}`));
-        }
-      });
-    });
   }
 }

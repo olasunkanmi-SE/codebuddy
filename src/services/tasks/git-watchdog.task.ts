@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import * as cp from "child_process";
 import { Logger } from "../../infrastructure/logger/logger";
+import { GitService } from "../git.service";
 
 interface BranchInfo {
   name: string;
@@ -10,9 +10,11 @@ interface BranchInfo {
 
 export class GitWatchdogTask {
   private logger: Logger;
+  private gitService: GitService;
 
   constructor() {
     this.logger = Logger.initialize("GitWatchdogTask", {});
+    this.gitService = GitService.getInstance();
   }
 
   public async execute(): Promise<void> {
@@ -27,7 +29,7 @@ export class GitWatchdogTask {
 
     try {
       // 1. Check for uncommitted changes with context
-      const status = await this.runGitCommand(rootPath, [
+      const status = await this.gitService.runGitCommand(rootPath, [
         "status",
         "--porcelain",
       ]);
@@ -53,7 +55,7 @@ export class GitWatchdogTask {
     // Check time of last commit
     let lastCommitTimeStr: string;
     try {
-      lastCommitTimeStr = await this.runGitCommand(rootPath, [
+      lastCommitTimeStr = await this.gitService.runGitCommand(rootPath, [
         "log",
         "-1",
         "--format=%ct",
@@ -86,7 +88,7 @@ export class GitWatchdogTask {
     let diffSummary = "";
     try {
       diffSummary = (
-        await this.runGitCommand(rootPath, ["diff", "--shortstat"])
+        await this.gitService.runGitCommand(rootPath, ["diff", "--shortstat"])
       ).trim();
     } catch {
       // ignore
@@ -120,18 +122,24 @@ export class GitWatchdogTask {
     try {
       // Find merged branches that haven't been cleaned up
       const currentBranch = (
-        await this.runGitCommand(rootPath, [
+        await this.gitService.runGitCommand(rootPath, [
           "rev-parse",
           "--abbrev-ref",
           "HEAD",
         ])
       ).trim();
 
-      const mergedBranchesRaw = await this.runGitCommand(rootPath, [
+      const mergedBranchesRaw = await this.gitService.runGitCommand(rootPath, [
         "branch",
         "--merged",
         "HEAD",
       ]);
+
+      const protectedBranches = vscode.workspace
+        .getConfiguration("codebuddy.automations.gitWatchdog")
+        .get<
+          string[]
+        >("protectedBranches", ["main", "master", "develop", "dev", "feature/*", "release/*", "hotfix/*"]);
 
       const staleBranches = mergedBranchesRaw
         .split("\n")
@@ -140,10 +148,7 @@ export class GitWatchdogTask {
           (b) =>
             b.length > 0 &&
             b !== currentBranch &&
-            b !== "main" &&
-            b !== "master" &&
-            b !== "develop" &&
-            b !== "dev",
+            !this.matchesAnyPattern(b, protectedBranches),
         );
 
       if (staleBranches.length >= 3) {
@@ -165,10 +170,10 @@ export class GitWatchdogTask {
   private async checkUpstreamDivergence(rootPath: string): Promise<void> {
     try {
       // Fetch quietly to get latest remote state
-      await this.runGitCommand(rootPath, ["fetch", "--quiet"]);
+      await this.gitService.runGitCommand(rootPath, ["fetch", "--quiet"]);
 
       const currentBranch = (
-        await this.runGitCommand(rootPath, [
+        await this.gitService.runGitCommand(rootPath, [
           "rev-parse",
           "--abbrev-ref",
           "HEAD",
@@ -179,7 +184,7 @@ export class GitWatchdogTask {
       let upstream: string;
       try {
         upstream = (
-          await this.runGitCommand(rootPath, [
+          await this.gitService.runGitCommand(rootPath, [
             "rev-parse",
             "--abbrev-ref",
             `${currentBranch}@{upstream}`,
@@ -190,7 +195,7 @@ export class GitWatchdogTask {
       }
 
       // Count commits behind
-      const behindRaw = await this.runGitCommand(rootPath, [
+      const behindRaw = await this.gitService.runGitCommand(rootPath, [
         "rev-list",
         "--count",
         `${currentBranch}..${upstream}`,
@@ -216,27 +221,17 @@ export class GitWatchdogTask {
     }
   }
 
-  private runGitCommand(cwd: string, args: string[]): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const git = cp.spawn("git", args, { cwd });
-      let output = "";
-      let error = "";
-
-      git.stdout.on("data", (data) => {
-        output += data.toString();
-      });
-
-      git.stderr.on("data", (data) => {
-        error += data.toString();
-      });
-
-      git.on("close", (code) => {
-        if (code === 0) {
-          resolve(output);
-        } else {
-          reject(new Error(`Git command failed: ${error}`));
-        }
-      });
+  /**
+   * Check if a branch name matches any of the given patterns.
+   * Patterns can be exact names ("main") or prefix globs ("feature/*").
+   */
+  private matchesAnyPattern(branch: string, patterns: string[]): boolean {
+    return patterns.some((pattern) => {
+      if (pattern.endsWith("/*")) {
+        const prefix = pattern.slice(0, -1); // "feature/*" → "feature/"
+        return branch.startsWith(prefix);
+      }
+      return branch === pattern;
     });
   }
 }

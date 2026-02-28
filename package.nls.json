@@ -87,6 +87,8 @@
   "config.codeHealthEnabled": "Enable or disable the Daily Code Health Check (9:00 AM)",
   "config.dependencyCheckEnabled": "Enable or disable the Daily Dependency Check (11:00 AM)",
   "config.gitWatchdogEnabled": "Enable or disable the Git Watchdog (every 2 hours)",
+  "config.gitWatchdogProtectedBranches": "Branches to protect from stale branch cleanup suggestions. Use exact names (main) or prefix patterns (feature/*).",
+  "config.codeHealthHotspotMinChanges": "Minimum number of changes in the last 30 days for a file to be considered a hotspot.",
   "config.endOfDaySummaryEnabled": "Enable or disable the End-of-Day Summary automation (5:30 PM)",
   "config.browserType": "Choose how to open news links and other external URLs.",
   "config.language": "Display language for the CodeBuddy interface."
