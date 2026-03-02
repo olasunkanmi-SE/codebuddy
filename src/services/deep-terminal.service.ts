@@ -28,10 +28,13 @@ class CircularBuffer<T> {
   /** Returns all stored items in insertion order. */
   toArray(): T[] {
     if (this.count === 0) return [];
-    const start = this.count < this.capacity ? 0 : this.head; // head is the oldest when full
-    const out: T[] = new Array(this.count);
+    const start = this.count < this.capacity ? 0 : this.head;
+    const out: T[] = [];
     for (let i = 0; i < this.count; i++) {
-      out[i] = this.buffer[(start + i) % this.capacity] as T;
+      const item = this.buffer[(start + i) % this.capacity];
+      if (item !== undefined) {
+        out.push(item);
+      }
     }
     return out;
   }
@@ -41,11 +44,13 @@ class CircularBuffer<T> {
     if (startIndex >= this.count) return [];
     const physicalStart = this.count < this.capacity ? 0 : this.head;
     const len = this.count - startIndex;
-    const out: T[] = new Array(len);
+    const out: T[] = [];
     for (let i = 0; i < len; i++) {
-      out[i] = this.buffer[
-        (physicalStart + startIndex + i) % this.capacity
-      ] as T;
+      const item =
+        this.buffer[(physicalStart + startIndex + i) % this.capacity];
+      if (item !== undefined) {
+        out.push(item);
+      }
     }
     return out;
   }
@@ -64,31 +69,52 @@ interface TerminalSession {
 }
 
 /**
- * Patterns that match dangerous or destructive shell commands.
- * Each entry is a regex tested against the normalised (trimmed, lowercase) command.
+ * Structured result returned by {@link DeepTerminalService.sendCommandAndWait}.
  */
-const BLOCKED_COMMAND_PATTERNS: readonly RegExp[] = [
+export interface CommandResult {
+  output: string;
+  /** Exit code captured if the session closed during the wait, otherwise `null`. */
+  exitCode: number | null;
+  /** `true` when exitCode is 0, `false` otherwise (including timeout without close). */
+  success: boolean;
+}
+
+/**
+ * Default set of patterns that match dangerous or destructive shell commands.
+ * Each entry is a regex tested against the normalised (trimmed, lowercase) command.
+ *
+ * The list can be extended at runtime via
+ * {@link DeepTerminalService.addBlockedPatterns}.
+ */
+const DEFAULT_BLOCKED_PATTERNS: readonly RegExp[] = [
   // Destructive file-system operations
   /\brm\s+(-[a-zA-Z]*)?\s*-[a-zA-Z]*r[a-zA-Z]*\s+\/\s*$/, // rm -rf /
   /\brm\s+(-[a-zA-Z]*)?\s*-[a-zA-Z]*r[a-zA-Z]*\s+\/\s/, // rm -rf / <path>
   /\bmkfs\b/,
   /\bdd\s+.*\bof=\/dev\//,
-  // Privilege escalation
-  /\bsudo\b/,
+  // Privilege escalation — nuanced sudo: block destructive sub-commands
+  // while allowing benign operations like package updates.
+  /\bsudo\s+rm\b/,
+  /\bsudo\s+mkfs\b/,
+  /\bsudo\s+dd\b/,
+  /\bsudo\s+chmod\b/,
+  /\bsudo\s+chown\b.*\//,
+  /\bsudo\s+shutdown\b/,
+  /\bsudo\s+reboot\b/,
+  /\bsudo\s+init\b/,
   /\bsu\s+-/,
   /\bchmod\s+[0-7]*777\s+\//,
-  // Arbitrary remote-code execution
-  /\bcurl\b.*\|\s*(ba)?sh/,
-  /\bwget\b.*\|\s*(ba)?sh/,
-  /\bcurl\b.*\|\s*python/,
-  /\bwget\b.*\|\s*python/,
-  // Fork bomb
-  /:\(\)\s*\{.*:\|:.*\}/,
+  // Arbitrary remote-code execution (including common obfuscations)
+  /\b(curl|wget)\b.*\|\s*(ba)?sh/,
+  /\b(curl|wget)\b.*\|\s*python/,
+  /\b(echo|printf)\b.*\b(base64|xxd)\b.*\|\s*(ba)?sh/,
+  // Fork bomb — general pattern
+  /:\(\)\s*\{[^}]*:\s*\|\s*:\s*\}/,
   // History / credential exfiltration
-  /\bhistory\s*\|.*curl/,
-  /\bcat\s+.*\.(ssh|gnupg|aws|npmrc|env)/,
+  /\bhistory\s*\|.*(curl|wget|nc)/,
+  /\bcat\s+.*\.(ssh|gnupg|aws|npmrc|env|kube)/,
   // Disk / system destruction
-  /\b>\/dev\/sda/,
+  /\b>\s*\/dev\/sda/,
   /\bshutdown\b/,
   /\breboot\b/,
   /\binit\s+0/,
@@ -101,6 +127,14 @@ export class DeepTerminalService extends EventEmitter {
   private readonly MAX_BUFFER_CHUNKS = 2000;
   private static readonly DEFAULT_COMMAND_TIMEOUT_MS = 10_000;
 
+  /** Runtime-extensible blocked patterns (starts with the default set). */
+  private blockedPatterns: RegExp[] = [...DEFAULT_BLOCKED_PATTERNS];
+
+  /**
+   * @param logger  Pre-initialised logger instance. When omitted the service
+   *                creates its own via `Logger.initialize` — this is safe
+   *                because `Logger.initialize` is idempotent for a given name.
+   */
   private constructor(logger?: Logger) {
     super();
     this.logger =
@@ -125,6 +159,22 @@ export class DeepTerminalService extends EventEmitter {
   }
 
   /**
+   * Appends additional blocked command patterns at runtime.
+   * Useful for administrators or plugins that need to extend the
+   * default security policy without modifying source.
+   */
+  public addBlockedPatterns(patterns: RegExp[]): void {
+    this.blockedPatterns.push(...patterns);
+  }
+
+  /**
+   * Returns a snapshot of the currently active blocked patterns.
+   */
+  public getBlockedPatterns(): readonly RegExp[] {
+    return [...this.blockedPatterns];
+  }
+
+  /**
    * Starts a new persistent terminal session.
    *
    * @param id      Unique session identifier.
@@ -137,6 +187,8 @@ export class DeepTerminalService extends EventEmitter {
       return `Session ${id} already exists.`;
     }
 
+    // /bin/bash chosen over /bin/zsh for broader cross-platform availability;
+    // override via the shellPath parameter when a different shell is preferred.
     const shell =
       shellPath ||
       (process.platform === "win32" ? "powershell.exe" : "/bin/bash");
@@ -174,12 +226,12 @@ export class DeepTerminalService extends EventEmitter {
   }
 
   /**
-   * Validates a command against the blocked-pattern list.
+   * Validates a command against the instance's blocked-pattern list.
    * @throws If the command matches a dangerous pattern.
    */
   private validateCommand(command: string): void {
     const normalised = command.trim().toLowerCase();
-    for (const pattern of BLOCKED_COMMAND_PATTERNS) {
+    for (const pattern of this.blockedPatterns) {
       if (pattern.test(normalised)) {
         const msg = `Blocked dangerous command: "${command}"`;
         this.logger.warn(msg);
@@ -229,20 +281,22 @@ export class DeepTerminalService extends EventEmitter {
   }
 
   /**
-   * Sends a command and collects stdout output until a timeout elapses
-   * with no new data, then resolves with the captured output.
+   * Sends a command and collects output until either a period of silence
+   * elapses or the hard timeout is reached, then resolves with a
+   * {@link CommandResult} containing the captured output, exit code
+   * (if the session closed during the wait), and a success flag.
    *
    * @param id         Session identifier.
    * @param command    The shell command string to send.
    * @param timeoutMs  Max time (ms) to wait for output silence before
    *                   resolving. Defaults to {@link DEFAULT_COMMAND_TIMEOUT_MS}.
-   * @returns The stdout output produced by the command.
+   * @returns A {@link CommandResult} with the command's output and status.
    */
   public async sendCommandAndWait(
     id: string,
     command: string,
     timeoutMs: number = DeepTerminalService.DEFAULT_COMMAND_TIMEOUT_MS,
-  ): Promise<string> {
+  ): Promise<CommandResult> {
     this.validateCommand(command);
 
     const session = this.sessions.get(id);
@@ -250,28 +304,35 @@ export class DeepTerminalService extends EventEmitter {
       throw new Error(`Session ${id} not found. Please start it first.`);
     }
 
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<CommandResult>((resolve, reject) => {
       const chunks: string[] = [];
       let settled = false;
       let idleTimer: ReturnType<typeof setTimeout>;
+      let exitCode: number | null = null;
 
-      const resetIdleTimer = () => {
+      const settle = (): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(hardTimer);
         clearTimeout(idleTimer);
-        idleTimer = setTimeout(
-          () => {
-            cleanup();
-            resolve(chunks.join(""));
-          },
-          Math.min(timeoutMs, 2000),
-        ); // resolve after 2s of silence
+        this.removeListener("output", onOutput);
+        this.removeListener("close", onClose);
+        resolve({
+          output: chunks.join(""),
+          exitCode,
+          success: exitCode === 0,
+        });
       };
 
-      const hardTimer = setTimeout(() => {
-        if (!settled) {
-          cleanup();
-          resolve(chunks.join(""));
-        }
-      }, timeoutMs);
+      const resetIdleTimer = (): void => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(
+          settle,
+          Math.min(timeoutMs, 2000), // resolve after 2 s of silence
+        );
+      };
+
+      const hardTimer = setTimeout(settle, timeoutMs);
 
       const onOutput = ({
         id: eventId,
@@ -279,27 +340,24 @@ export class DeepTerminalService extends EventEmitter {
       }: {
         id: string;
         text: string;
-      }) => {
-        if (eventId === id) {
+      }): void => {
+        if (eventId === id && !settled) {
           chunks.push(text);
           resetIdleTimer();
         }
       };
 
-      const onClose = ({ id: eventId }: { id: string }) => {
+      const onClose = ({
+        id: eventId,
+        code,
+      }: {
+        id: string;
+        code: number | null;
+      }): void => {
         if (eventId === id && !settled) {
-          cleanup();
-          resolve(chunks.join(""));
+          exitCode = code;
+          settle();
         }
-      };
-
-      const cleanup = () => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(hardTimer);
-        clearTimeout(idleTimer);
-        this.removeListener("output", onOutput);
-        this.removeListener("close", onClose);
       };
 
       this.on("output", onOutput);
@@ -307,12 +365,16 @@ export class DeepTerminalService extends EventEmitter {
       resetIdleTimer();
 
       session.process.stdin.write(command + "\n", (err) => {
-        if (err) {
-          cleanup();
+        if (err && !settled) {
+          settled = true;
+          clearTimeout(hardTimer);
+          clearTimeout(idleTimer);
+          this.removeListener("output", onOutput);
+          this.removeListener("close", onClose);
           reject(
             new Error(`Failed to write to session ${id} stdin: ${err.message}`),
           );
-        } else {
+        } else if (!err) {
           this.logger.info(`Sent command (await) to ${id}: ${command}`);
         }
       });
