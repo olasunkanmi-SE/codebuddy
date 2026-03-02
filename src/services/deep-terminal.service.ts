@@ -7,7 +7,7 @@ import { EventEmitter } from "events";
  * A fixed-capacity circular buffer that overwrites the oldest entries
  * when full, avoiding repeated array copies.
  */
-class CircularBuffer<T> {
+export class CircularBuffer<T> {
   private buffer: (T | undefined)[];
   private head = 0; // next write position
   private count = 0; // number of items currently stored
@@ -86,10 +86,10 @@ export interface CommandResult {
  * The list can be extended at runtime via
  * {@link DeepTerminalService.addBlockedPatterns}.
  */
-const DEFAULT_BLOCKED_PATTERNS: readonly RegExp[] = [
-  // Destructive file-system operations
-  /\brm\s+(-[a-zA-Z]*)?\s*-[a-zA-Z]*r[a-zA-Z]*\s+\/\s*$/, // rm -rf /
-  /\brm\s+(-[a-zA-Z]*)?\s*-[a-zA-Z]*r[a-zA-Z]*\s+\/\s/, // rm -rf / <path>
+export const DEFAULT_BLOCKED_PATTERNS: readonly RegExp[] = [
+  // Destructive file-system operations (including common obfuscation wrappers)
+  /(?:^|\s|;|`|\$\()(?:rm|eval\s+rm|xargs\s+rm)\s+(-[a-zA-Z]*)?\s*-[a-zA-Z]*r[a-zA-Z]*\s+\/\s*$/,
+  /(?:^|\s|;|`|\$\()(?:rm|eval\s+rm|xargs\s+rm)\s+(-[a-zA-Z]*)?\s*-[a-zA-Z]*r[a-zA-Z]*\s+\/\s/,
   /\bmkfs\b/,
   /\bdd\s+.*\bof=\/dev\//,
   // Privilege escalation — nuanced sudo: block destructive sub-commands
@@ -108,6 +108,8 @@ const DEFAULT_BLOCKED_PATTERNS: readonly RegExp[] = [
   /\b(curl|wget)\b.*\|\s*(ba)?sh/,
   /\b(curl|wget)\b.*\|\s*python/,
   /\b(echo|printf)\b.*\b(base64|xxd)\b.*\|\s*(ba)?sh/,
+  // Hex / base64 encoded pipeline execution
+  /\b(echo|printf)\b\s+['"]?([a-fA-F0-9]{2,}|[a-zA-Z0-9+/=]{4,})['"]?\s*\|\s*(base64|xxd|xargs)\s*\|\s*(ba)?sh/,
   // Fork bomb — general pattern
   /:\(\)\s*\{[^}]*:\s*\|\s*:\s*\}/,
   // History / credential exfiltration
@@ -118,6 +120,8 @@ const DEFAULT_BLOCKED_PATTERNS: readonly RegExp[] = [
   /\bshutdown\b/,
   /\breboot\b/,
   /\binit\s+0/,
+  // eval / command substitution with dangerous payloads
+  /\beval\b.*\b(rm|mkfs|dd|curl|wget)\b/,
 ];
 
 export class DeepTerminalService extends EventEmitter {
@@ -126,6 +130,8 @@ export class DeepTerminalService extends EventEmitter {
   private logger: Logger;
   private readonly MAX_BUFFER_CHUNKS = 2000;
   private static readonly DEFAULT_COMMAND_TIMEOUT_MS = 10_000;
+  /** Hard limit (bytes) on the per-command output collected by sendCommandAndWait. */
+  private static readonly MAX_WAIT_BUFFER_BYTES = 10 * 1024 * 1024; // 10 MB
 
   /** Runtime-extensible blocked patterns (starts with the default set). */
   private blockedPatterns: RegExp[] = [...DEFAULT_BLOCKED_PATTERNS];
@@ -230,7 +236,14 @@ export class DeepTerminalService extends EventEmitter {
    * @throws If the command matches a dangerous pattern.
    */
   private validateCommand(command: string): void {
-    const normalised = command.trim().toLowerCase();
+    let normalised = command.trim().toLowerCase();
+
+    // Simple de-obfuscation: strip backtick command substitutions,
+    // collapse runs of whitespace, and remove surrounding quotes to
+    // reduce the effectiveness of trivial bypass attempts.
+    normalised = normalised.replace(/`([^`]*)`/g, "$1");
+    normalised = normalised.replace(/\s+/g, " ");
+
     for (const pattern of this.blockedPatterns) {
       if (pattern.test(normalised)) {
         const msg = `Blocked dangerous command: "${command}"`;
@@ -334,6 +347,8 @@ export class DeepTerminalService extends EventEmitter {
 
       const hardTimer = setTimeout(settle, timeoutMs);
 
+      let totalBytes = 0;
+
       const onOutput = ({
         id: eventId,
         text,
@@ -342,7 +357,14 @@ export class DeepTerminalService extends EventEmitter {
         text: string;
       }): void => {
         if (eventId === id && !settled) {
-          chunks.push(text);
+          if (totalBytes < DeepTerminalService.MAX_WAIT_BUFFER_BYTES) {
+            chunks.push(text);
+            totalBytes += text.length;
+          } else if (totalBytes >= DeepTerminalService.MAX_WAIT_BUFFER_BYTES) {
+            this.logger.warn(
+              `Output for command in session ${id} exceeded ${DeepTerminalService.MAX_WAIT_BUFFER_BYTES} bytes — truncating.`,
+            );
+          }
           resetIdleTimer();
         }
       };
