@@ -2,6 +2,7 @@ import * as cp from "child_process";
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { EventEmitter } from "events";
+import { l10n } from "vscode";
 
 /**
  * A fixed-capacity circular buffer that overwrites the oldest entries
@@ -86,15 +87,23 @@ export interface CommandResult {
  * The list can be extended at runtime via
  * {@link DeepTerminalService.addBlockedPatterns}.
  */
+/**
+ * Hard-blocked patterns — always rejected, no approval possible.
+ * These represent catastrophic or irreversible system-level operations.
+ *
+ * Note: ordinary file deletion (rm, rmdir, unlink) is NOT hard-blocked;
+ * it is handled by the approval-required tier so the agent can still
+ * delete files with user consent.
+ */
 export const DEFAULT_BLOCKED_PATTERNS: readonly RegExp[] = [
-  // Destructive file-system operations (including common obfuscation wrappers)
+  // Recursive deletion of the root filesystem
   /(?:^|\s|;|`|\$\()(?:rm|eval\s+rm|xargs\s+rm)\s+(-[a-zA-Z]*)?\s*-[a-zA-Z]*r[a-zA-Z]*\s+\/\s*$/,
   /(?:^|\s|;|`|\$\()(?:rm|eval\s+rm|xargs\s+rm)\s+(-[a-zA-Z]*)?\s*-[a-zA-Z]*r[a-zA-Z]*\s+\/\s/,
+  // Disk / partition destruction
   /\bmkfs\b/,
   /\bdd\s+.*\bof=\/dev\//,
-  // Privilege escalation — nuanced sudo: block destructive sub-commands
-  // while allowing benign operations like package updates.
-  /\bsudo\s+rm\b/,
+  // Privilege escalation — block destructive sub-commands under sudo
+  // (sudo rm is approval-gated separately, not hard-blocked)
   /\bsudo\s+mkfs\b/,
   /\bsudo\s+dd\b/,
   /\bsudo\s+chmod\b/,
@@ -114,14 +123,30 @@ export const DEFAULT_BLOCKED_PATTERNS: readonly RegExp[] = [
   /:\(\)\s*\{[^}]*:\s*\|\s*:\s*\}/,
   // History / credential exfiltration
   /\bhistory\s*\|.*(curl|wget|nc)/,
-  /\bcat\s+.*\.(ssh|gnupg|aws|npmrc|env|kube)/,
+  // Block reading sensitive *system* credential files (home-dir secrets).
+  // Project-level .env / .npmrc are intentionally allowed.
+  /\bcat\s+.*(\/\.|~\/\.)(ssh|gnupg|aws|kube)\//,
+  /\bcat\s+.*\.(ssh|gnupg|aws|kube)\/.*\|\s*(curl|wget|nc)\b/,
   // Disk / system destruction
   /\b>\s*\/dev\/sda/,
-  /\bshutdown\b/,
-  /\breboot\b/,
+  /(?:^|[;&|]\s*)shutdown\b/,
+  /(?:^|[;&|]\s*)reboot\b/,
   /\binit\s+0/,
   // eval / command substitution with dangerous payloads
   /\beval\b.*\b(rm|mkfs|dd|curl|wget)\b/,
+];
+
+/**
+ * Patterns that match file-deletion commands. These are NOT blocked
+ * outright — instead, the user is prompted for approval before execution.
+ * The agent can read, write, create, and edit any file without approval;
+ * only deletion requires explicit user consent.
+ */
+export const APPROVAL_REQUIRED_PATTERNS: readonly RegExp[] = [
+  /\b(rm|rmdir|unlink)\b/,
+  /\bsudo\s+(rm|rmdir|unlink)\b/,
+  /\bfind\b.*\b-delete\b/,
+  /\bfind\b.*-exec\s+(rm|rmdir|unlink)\b/,
 ];
 
 export class DeepTerminalService extends EventEmitter {
@@ -135,6 +160,8 @@ export class DeepTerminalService extends EventEmitter {
 
   /** Runtime-extensible blocked patterns (starts with the default set). */
   private blockedPatterns: RegExp[] = [...DEFAULT_BLOCKED_PATTERNS];
+  /** Runtime-extensible approval-required patterns. */
+  private approvalPatterns: RegExp[] = [...APPROVAL_REQUIRED_PATTERNS];
 
   /**
    * @param logger  Pre-initialised logger instance. When omitted the service
@@ -178,6 +205,13 @@ export class DeepTerminalService extends EventEmitter {
    */
   public getBlockedPatterns(): readonly RegExp[] {
     return [...this.blockedPatterns];
+  }
+
+  /**
+   * Appends additional approval-required patterns at runtime.
+   */
+  public addApprovalPatterns(patterns: RegExp[]): void {
+    this.approvalPatterns.push(...patterns);
   }
 
   /**
@@ -232,18 +266,22 @@ export class DeepTerminalService extends EventEmitter {
   }
 
   /**
+   * Normalises a command string for pattern matching:
+   * strip backtick wrappers and collapse whitespace.
+   */
+  private normalise(command: string): string {
+    let n = command.trim().toLowerCase();
+    n = n.replace(/`([^`]*)`/g, "$1");
+    n = n.replace(/\s+/g, " ");
+    return n;
+  }
+
+  /**
    * Validates a command against the instance's blocked-pattern list.
-   * @throws If the command matches a dangerous pattern.
+   * @throws If the command matches a hard-blocked pattern.
    */
   private validateCommand(command: string): void {
-    let normalised = command.trim().toLowerCase();
-
-    // Simple de-obfuscation: strip backtick command substitutions,
-    // collapse runs of whitespace, and remove surrounding quotes to
-    // reduce the effectiveness of trivial bypass attempts.
-    normalised = normalised.replace(/`([^`]*)`/g, "$1");
-    normalised = normalised.replace(/\s+/g, " ");
-
+    const normalised = this.normalise(command);
     for (const pattern of this.blockedPatterns) {
       if (pattern.test(normalised)) {
         const msg = `Blocked dangerous command: "${command}"`;
@@ -253,6 +291,33 @@ export class DeepTerminalService extends EventEmitter {
         );
       }
     }
+  }
+
+  /**
+   * Checks whether a command matches a deletion / destructive pattern
+   * that requires explicit user approval before execution.
+   */
+  private requiresApproval(command: string): boolean {
+    const normalised = this.normalise(command);
+    return this.approvalPatterns.some((p) => p.test(normalised));
+  }
+
+  /**
+   * Prompts the user for approval via a modal dialog.
+   * @returns `true` if the user approved, `false` otherwise.
+   */
+  private async requestApproval(command: string): Promise<boolean> {
+    const selection = await vscode.window.showWarningMessage(
+      `CodeBuddy wants to execute a delete command:\n"${command}"`,
+      { modal: true },
+      "Execute",
+      "Cancel",
+    );
+    if (selection !== "Execute") {
+      this.logger.info(`User denied execution of command: ${command}`);
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -268,8 +333,15 @@ export class DeepTerminalService extends EventEmitter {
    * @throws If the session does not exist, stdin is not writable, or
    *         the command matches a blocked pattern.
    */
-  public sendCommand(id: string, command: string): Promise<string> {
+  public async sendCommand(id: string, command: string): Promise<string> {
     this.validateCommand(command);
+
+    if (this.requiresApproval(command)) {
+      const approved = await this.requestApproval(command);
+      if (!approved) {
+        return "Command cancelled — user denied execution.";
+      }
+    }
 
     const session = this.sessions.get(id);
     if (!session) {
@@ -311,6 +383,17 @@ export class DeepTerminalService extends EventEmitter {
     timeoutMs: number = DeepTerminalService.DEFAULT_COMMAND_TIMEOUT_MS,
   ): Promise<CommandResult> {
     this.validateCommand(command);
+
+    if (this.requiresApproval(command)) {
+      const approved = await this.requestApproval(command);
+      if (!approved) {
+        return {
+          output: "Command cancelled — user denied execution.",
+          exitCode: null,
+          success: false,
+        };
+      }
+    }
 
     const session = this.sessions.get(id);
     if (!session) {
