@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from "react";
+import DOMPurify from "dompurify";
 import styled from "styled-components";
 
 export interface FAQItem {
@@ -205,7 +206,7 @@ export const FAQAccordion: React.FC<FAQAccordionProps> = ({
                 {React.isValidElement(item.answer) ? (
                   item.answer
                 ) : (
-                  <div dangerouslySetInnerHTML={{ __html: item.answer as string }} />
+                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.answer as string) }} />
                 )}
               </AnswerContent>
             </AnswerWrapper>
