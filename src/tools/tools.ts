@@ -421,12 +421,15 @@ export class DeepTerminalTool {
           return await service.startSession(sessionId);
         case "execute": {
           if (!command) return "Error: Command required for execute action.";
-          const result = await service.executeCommand(sessionId, command);
           if (waitMs && waitMs > 0) {
-            await new Promise((r) => setTimeout(r, waitMs));
-            return result + "\nOutput:\n" + service.readOutput(sessionId);
+            const output = await service.sendCommandAndWait(
+              sessionId,
+              command,
+              waitMs,
+            );
+            return `Command sent to session ${sessionId}\nOutput:\n` + output;
           }
-          return result;
+          return await service.sendCommand(sessionId, command);
         }
         case "read":
           return service.readOutput(sessionId) || "(No new output)";
