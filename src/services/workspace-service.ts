@@ -10,6 +10,7 @@ import * as path from "path";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { randomUUID } from "crypto";
 import { Orchestrator } from "../orchestrator";
+import { CodebuddyIgnoreService } from "./codebuddy-ignore.service";
 
 export class WorkspaceService implements IWorkspaceService {
   protected readonly orchestrator: Orchestrator;
@@ -77,8 +78,16 @@ export class WorkspaceService implements IWorkspaceService {
     workspaceFiles: Record<string, string>,
   ): Promise<void> {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    const ignoreService = CodebuddyIgnoreService.getInstance();
+    const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
+      const relativePath = rootPath
+        ? path.relative(rootPath, fullPath)
+        : entry.name;
+      if (ignoreService.isIgnored(relativePath)) {
+        continue;
+      }
       if (
         entry.isDirectory() &&
         !this.excludedDirectories.some((dir) => entry.name.includes(dir))
@@ -144,12 +153,15 @@ export class WorkspaceService implements IWorkspaceService {
       return undefined;
     }
     const rootPath = workspaceFolders[0].uri;
+    const ignoreService = CodebuddyIgnoreService.getInstance();
+    const ignorePattern = ignoreService.getExcludePattern();
+    const baseExclude = "**/{node_modules,build,dist,.git,out}/**";
+    const excludePattern = ignorePattern
+      ? `{${baseExclude},${ignorePattern}}`
+      : baseExclude;
     const files = await vscode.workspace.findFiles(
       new vscode.RelativePattern(rootPath, "**/*"),
-      new vscode.RelativePattern(
-        rootPath,
-        "**/{node_modules,build,dist,.git,out}/**",
-      ),
+      new vscode.RelativePattern(rootPath, excludePattern),
     );
     return files;
   }
@@ -188,9 +200,17 @@ export class WorkspaceService implements IWorkspaceService {
     folderToFilesMap: Map<string, string[]>,
   ): Promise<void> {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    const ignoreService = CodebuddyIgnoreService.getInstance();
+    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
+      if (wsRoot) {
+        const relPath = path.relative(wsRoot, fullPath);
+        if (ignoreService.isIgnored(relPath)) {
+          continue;
+        }
+      }
       this.logger.info("Entry Name:", entry.name);
       if (
         entry.isDirectory() &&
@@ -232,9 +252,14 @@ export class WorkspaceService implements IWorkspaceService {
       children: [],
     };
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    const ignoreService = CodebuddyIgnoreService.getInstance();
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
+      const relativePath = path.relative(rootPath, fullPath);
+      if (ignoreService.isIgnored(relativePath)) {
+        continue;
+      }
 
       if (
         entry.isDirectory() &&

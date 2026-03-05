@@ -157,6 +157,11 @@
         "category": "CodeBuddy"
       },
       {
+        "command": "codebuddy.initIgnoreFile",
+        "title": "Init .codebuddyignore",
+        "category": "CodeBuddy"
+      },
+      {
         "command": "CodeBuddy.commentCode",
         "title": "%commands.commentCode%",
         "category": "CodeBuddy"
@@ -847,6 +852,79 @@
             ],
             "default": "system",
             "description": "%config.browserType%"
+          },
+          "codebuddy.vectorDb.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable vector database for semantic code search."
+          },
+          "codebuddy.vectorDb.embeddingModel": {
+            "type": "string",
+            "enum": ["gemini", "openai", "local"],
+            "default": "gemini",
+            "description": "Embedding model provider for vector database."
+          },
+          "codebuddy.vectorDb.maxTokens": {
+            "type": "number",
+            "default": 6000,
+            "description": "Maximum tokens per chunk for vector embeddings."
+          },
+          "codebuddy.vectorDb.batchSize": {
+            "type": "number",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Number of files to process per embedding batch."
+          },
+          "codebuddy.vectorDb.searchResultLimit": {
+            "type": "number",
+            "default": 8,
+            "minimum": 1,
+            "maximum": 20,
+            "description": "Maximum number of semantic search results to return."
+          },
+          "codebuddy.vectorDb.enableBackgroundProcessing": {
+            "type": "boolean",
+            "default": true,
+            "description": "Process vector embeddings in the background."
+          },
+          "codebuddy.vectorDb.enableProgressNotifications": {
+            "type": "boolean",
+            "default": true,
+            "description": "Show progress notifications during indexing."
+          },
+          "codebuddy.vectorDb.progressLocation": {
+            "type": "string",
+            "enum": ["notification", "statusBar"],
+            "default": "notification",
+            "description": "Where to show indexing progress."
+          },
+          "codebuddy.vectorDb.debounceDelay": {
+            "type": "number",
+            "default": 1000,
+            "description": "Debounce delay (ms) for re-indexing on file changes."
+          },
+          "codebuddy.vectorDb.performanceMode": {
+            "type": "string",
+            "enum": ["balanced", "performance", "memory"],
+            "default": "balanced",
+            "description": "Performance mode for vector database operations."
+          },
+          "codebuddy.vectorDb.fallbackToKeywordSearch": {
+            "type": "boolean",
+            "default": true,
+            "description": "Fall back to keyword search when vector search is unavailable."
+          },
+          "codebuddy.vectorDb.cacheEnabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable caching of vector search results."
+          },
+          "codebuddy.vectorDb.logLevel": {
+            "type": "string",
+            "enum": ["debug", "info", "warn", "error"],
+            "default": "info",
+            "description": "Log level for vector database operations."
           }
         }
       }
@@ -859,8 +937,9 @@
     "build:webview": "cd webviewUi && npm run build",
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
+    "compile:test": "tsc -p tsconfig.test.json",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
+    "pretest": "npm run compile:test && npm run lint",
     "lint": "eslint src --ext ts",
     "fix": "eslint src --ext ts --fix",
     "test": "vscode-test",

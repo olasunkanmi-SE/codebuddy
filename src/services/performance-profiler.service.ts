@@ -282,11 +282,14 @@ export class PerformanceProfiler implements vscode.Disposable {
     }
 
     // High memory usage alert
-    if (report.avgMemoryUsage > 500) {
+    // Note: VS Code extension host process heap commonly sits at 500-1200MB
+    // for extensions with AST indexing, vector stores, and webview providers.
+    // Thresholds are set relative to realistic baseline, not ideal.
+    if (report.avgMemoryUsage > 1500) {
       currentAlerts.push({
         type: "HIGH_MEMORY_USAGE",
-        severity: report.avgMemoryUsage > 1000 ? "critical" : "warning",
-        message: `Memory usage is ${report.avgMemoryUsage.toFixed(0)}MB (target: <500MB)`,
+        severity: report.avgMemoryUsage > 2000 ? "critical" : "warning",
+        message: `Memory usage is ${report.avgMemoryUsage.toFixed(0)}MB (target: <1500MB)`,
         timestamp: new Date(),
         metrics: { memoryUsage: report.avgMemoryUsage },
       });
@@ -385,6 +388,11 @@ export class PerformanceProfiler implements vscode.Disposable {
     }
   }
 
+  /** Cooldown tracking: last time a user-facing notification was shown per alert type */
+  private lastNotificationTime: Map<string, number> = new Map();
+  /** Minimum interval between user-facing notifications of the same type (5 min) */
+  private static readonly ALERT_COOLDOWN_MS = 5 * 60 * 1000;
+
   /**
    * Start continuous performance monitoring
    */
@@ -396,26 +404,34 @@ export class PerformanceProfiler implements vscode.Disposable {
       if (alerts.length > 0) {
         this.handlePerformanceAlerts(alerts);
       }
-    }, 30000); // Check every 30 seconds
+    }, 120_000); // Check every 2 minutes (was 30s — too aggressive)
   }
 
   /**
    * Handle performance alerts
    */
   private handlePerformanceAlerts(alerts: PerformanceAlert[]): void {
+    const now = Date.now();
     for (const alert of alerts) {
       this.logger.warn(
         `Performance Alert [${alert.severity.toUpperCase()}]:`,
         alert.message,
       );
 
-      // Show user notification for critical alerts
+      // Show user notification for critical alerts — with cooldown to prevent spam
       if (alert.severity === "critical") {
+        const lastShown = this.lastNotificationTime.get(alert.type) ?? 0;
+        if (now - lastShown < PerformanceProfiler.ALERT_COOLDOWN_MS) {
+          continue; // Skip — shown recently
+        }
+        this.lastNotificationTime.set(alert.type, now);
+
         vscode.window
           .showWarningMessage(
             `CodeBuddy Performance Alert: ${alert.message}`,
             "View Details",
             "Optimize Settings",
+            "Dismiss",
           )
           .then((action) => {
             if (action === "View Details") {
@@ -433,20 +449,46 @@ export class PerformanceProfiler implements vscode.Disposable {
    */
   private async showPerformanceReport(): Promise<void> {
     const report = this.getPerformanceReport();
+    const memUsage = process.memoryUsage();
 
-    const reportMessage = `
-**Vector Database Performance Report**
+    // Build report with only meaningful data
+    const lines: string[] = [
+      "**CodeBuddy Performance Report**",
+      "",
+      `• Heap Used: ${(memUsage.heapUsed / 1024 / 1024).toFixed(0)}MB`,
+      `• Heap Total: ${(memUsage.heapTotal / 1024 / 1024).toFixed(0)}MB`,
+      `• RSS: ${(memUsage.rss / 1024 / 1024).toFixed(0)}MB`,
+      `• External: ${(memUsage.external / 1024 / 1024).toFixed(0)}MB`,
+    ];
 
-• Search Latency: ${report.avgSearchLatency.toFixed(0)}ms avg, ${report.p95SearchLatency.toFixed(0)}ms P95
-• Indexing Throughput: ${report.avgIndexingThroughput.toFixed(1)} items/sec
-• Memory Usage: ${report.avgMemoryUsage.toFixed(0)}MB
-• Cache Hit Rate: ${(report.cacheHitRate * 100).toFixed(1)}%
-• Error Rate: ${(report.errorRate * 100).toFixed(2)}%
+    // Only show vector DB metrics if they have actual data
+    const hasSearchData = report.avgSearchLatency > 0;
+    const hasIndexData = report.avgIndexingThroughput > 0;
+    const hasCacheData = report.cacheHitRate > 0;
 
-**Targets**: Search <500ms, Memory <500MB, Errors <5%
-    `.trim();
+    if (hasSearchData || hasIndexData || hasCacheData) {
+      lines.push("", "**Vector DB Metrics**");
+      if (hasSearchData) {
+        lines.push(
+          `• Search Latency: ${report.avgSearchLatency.toFixed(0)}ms avg, ${report.p95SearchLatency.toFixed(0)}ms P95`,
+        );
+      }
+      if (hasIndexData) {
+        lines.push(
+          `• Indexing Throughput: ${report.avgIndexingThroughput.toFixed(1)} items/sec`,
+        );
+      }
+      if (hasCacheData) {
+        lines.push(
+          `• Cache Hit Rate: ${(report.cacheHitRate * 100).toFixed(1)}%`,
+        );
+      }
+      if (report.errorRate > 0) {
+        lines.push(`• Error Rate: ${(report.errorRate * 100).toFixed(2)}%`);
+      }
+    }
 
-    await vscode.window.showInformationMessage(reportMessage);
+    await vscode.window.showInformationMessage(lines.join("\n"));
   }
 
   /**
@@ -542,20 +584,10 @@ export class PerformanceProfiler implements vscode.Disposable {
           "Configuration is already optimal for current performance metrics",
         );
       }
-
-      this.logger.info("Configuration optimization completed", {
-        changes,
-        newBatchSize,
-        newPerformanceMode,
-        avgLatency: report.avgSearchLatency,
-        avgMemory: report.avgMemoryUsage,
-      });
     } catch (error: any) {
       this.logger.error("Failed to optimize configuration:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
       vscode.window.showErrorMessage(
-        `Failed to optimize configuration: ${errorMessage}`,
+        `Failed to optimize configuration: ${error.message ?? "Unknown error"}. Check that the codebuddy.vectorDb settings are registered.`,
       );
     }
   }

@@ -1,5 +1,9 @@
 import React, { useState } from "react";
-import { usePendingChanges, FileChange } from "../hooks/usePendingChanges";
+import {
+  usePendingChanges,
+  FileChange,
+  DiffHunk,
+} from "../hooks/usePendingChanges";
 import "./PendingChangesPanel.css";
 
 interface FileChangeItemProps {
@@ -8,7 +12,65 @@ interface FileChangeItemProps {
   onReject?: (id: string) => void;
   onViewDiff: (id: string, filePath: string) => void;
   showActions: boolean;
+  hunks?: DiffHunk[];
+  onExpandHunks?: (id: string) => void;
+  onAcceptHunk?: (changeId: string, hunkIndex: number) => void;
+  onRejectHunk?: (changeId: string, hunkIndex: number) => void;
+  onFinalizeHunks?: (changeId: string) => void;
 }
+
+const HunkView: React.FC<{
+  hunk: DiffHunk;
+  changeId: string;
+  onAccept?: (changeId: string, hunkIndex: number) => void;
+  onReject?: (changeId: string, hunkIndex: number) => void;
+}> = ({ hunk, changeId, onAccept, onReject }) => {
+  const statusClass = `hunk-status-${hunk.status}`;
+  return (
+    <div className={`hunk-item ${statusClass}`}>
+      <div className="hunk-header">
+        <span className="hunk-range">{hunk.header}</span>
+        {hunk.status === "pending" && (
+          <div className="hunk-actions">
+            {onAccept && (
+              <button
+                className="action-btn hunk-accept-btn"
+                onClick={() => onAccept(changeId, hunk.index)}
+                title="Accept this hunk"
+              >
+                ✓
+              </button>
+            )}
+            {onReject && (
+              <button
+                className="action-btn hunk-reject-btn"
+                onClick={() => onReject(changeId, hunk.index)}
+                title="Reject this hunk"
+              >
+                ✗
+              </button>
+            )}
+          </div>
+        )}
+        {hunk.status !== "pending" && (
+          <span className={`hunk-badge hunk-badge-${hunk.status}`}>
+            {hunk.status}
+          </span>
+        )}
+      </div>
+      <pre className="hunk-diff">
+        {hunk.lines.map((line, i) => (
+          <div key={i} className={`diff-line diff-line-${line.type}`}>
+            <span className="diff-prefix">
+              {line.type === "add" ? "+" : line.type === "remove" ? "-" : " "}
+            </span>
+            <span className="diff-content">{line.content}</span>
+          </div>
+        ))}
+      </pre>
+    </div>
+  );
+};
 
 const FileChangeItem: React.FC<FileChangeItemProps> = ({
   change,
@@ -16,6 +78,11 @@ const FileChangeItem: React.FC<FileChangeItemProps> = ({
   onReject,
   onViewDiff,
   showActions,
+  hunks,
+  onExpandHunks,
+  onAcceptHunk,
+  onRejectHunk,
+  onFinalizeHunks,
 }) => {
   const fileName = change.filePath.split("/").pop() || change.filePath;
   const relativePath = change.filePath.replace(/.*\/codebuddy\//, "");
@@ -44,6 +111,15 @@ const FileChangeItem: React.FC<FileChangeItemProps> = ({
         </div>
       </div>
       <div className="change-actions">
+        {showActions && change.status === "pending" && onExpandHunks && (
+          <button
+            className="action-btn hunks-btn"
+            onClick={() => onExpandHunks(change.id)}
+            title="Review individual hunks"
+          >
+            ⊞
+          </button>
+        )}
         <button
           className="action-btn view-btn"
           onClick={() => onViewDiff(change.id, change.filePath)}
@@ -57,7 +133,7 @@ const FileChangeItem: React.FC<FileChangeItemProps> = ({
               <button
                 className="action-btn apply-btn"
                 onClick={() => onApply(change.id)}
-                title="Apply change"
+                title="Apply all changes"
               >
                 ✓
               </button>
@@ -66,7 +142,7 @@ const FileChangeItem: React.FC<FileChangeItemProps> = ({
               <button
                 className="action-btn reject-btn"
                 onClick={() => onReject(change.id)}
-                title="Reject change"
+                title="Reject all changes"
               >
                 ✗
               </button>
@@ -74,6 +150,34 @@ const FileChangeItem: React.FC<FileChangeItemProps> = ({
           </>
         )}
       </div>
+      {hunks && hunks.length > 0 && (
+        <div className="hunks-container">
+          <div className="hunks-summary">
+            {hunks.length} hunk{hunks.length !== 1 ? "s" : ""} —{" "}
+            {hunks.filter((h) => h.status === "accepted").length} accepted,{" "}
+            {hunks.filter((h) => h.status === "rejected").length} rejected,{" "}
+            {hunks.filter((h) => h.status === "pending").length} pending
+          </div>
+          {hunks.map((hunk) => (
+            <HunkView
+              key={hunk.index}
+              hunk={hunk}
+              changeId={change.id}
+              onAccept={onAcceptHunk}
+              onReject={onRejectHunk}
+            />
+          ))}
+          {hunks.some((h) => h.status !== "pending") && onFinalizeHunks && (
+            <button
+              className="finalize-btn"
+              onClick={() => onFinalizeHunks(change.id)}
+              title="Apply accepted hunks and discard rejected ones"
+            >
+              Finalize Review
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -100,10 +204,15 @@ export const PendingChangesPanel: React.FC<PendingChangesPanelProps> = ({
     pendingChanges,
     recentChanges,
     isLoading,
+    changeHunks,
     applyChange,
     rejectChange,
     viewDiff,
     refreshChanges,
+    requestHunks,
+    acceptHunk,
+    rejectHunk,
+    finalizeHunkReview,
   } = usePendingChanges();
 
   const [activeTab, setActiveTab] = useState<"pending" | "recent">("recent");
@@ -172,6 +281,11 @@ export const PendingChangesPanel: React.FC<PendingChangesPanelProps> = ({
                     onReject={rejectChange}
                     onViewDiff={viewDiff}
                     showActions={true}
+                    hunks={changeHunks.get(change.id)}
+                    onExpandHunks={requestHunks}
+                    onAcceptHunk={acceptHunk}
+                    onRejectHunk={rejectHunk}
+                    onFinalizeHunks={finalizeHunkReview}
                   />
                 ))
               ) : (

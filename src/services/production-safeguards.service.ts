@@ -558,7 +558,7 @@ export class ProductionSafeguards implements vscode.Disposable {
       } catch (error: any) {
         this.logger.error("Resource monitoring error:", error);
       }
-    }, 10000); // Check every 10 seconds
+    }, 60_000); // Check every 60 seconds (was 10s — too aggressive)
   }
 
   /**

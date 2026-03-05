@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 import { LanguageUtils, AsyncUtils } from "../utils/common-utils";
+import { CodebuddyIgnoreService } from "./codebuddy-ignore.service";
 
 export interface FileMetadata {
   size: number;
@@ -272,6 +273,7 @@ export class FileService {
    */
   async getAllCodeFiles(excludePatterns: string[] = []): Promise<string[]> {
     const codePatterns = [LanguageUtils.getCodeFileGlobPattern()];
+    const ignoreGlobs = CodebuddyIgnoreService.getInstance().getExcludeGlobs();
     const defaultExcludes = [
       "**/node_modules/**",
       "**/dist/**",
@@ -283,6 +285,7 @@ export class FileService {
       "**/*.min.js",
       "**/*.bundle.js",
       "**/*.d.ts",
+      ...ignoreGlobs,
       ...excludePatterns,
     ];
 

@@ -55,6 +55,7 @@ import { CodeHealthTask } from "./services/tasks/code-health.task";
 import { DependencyCheckTask } from "./services/tasks/dependency-check.task";
 import { GitWatchdogTask } from "./services/tasks/git-watchdog.task";
 import { EndOfDaySummaryTask } from "./services/tasks/end-of-day-summary.task";
+import { CodebuddyIgnoreService } from "./services/codebuddy-ignore.service";
 
 const logger = Logger.initialize("extension-main", {
   minLevel: LogLevel.DEBUG,
@@ -199,6 +200,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const terminal = Terminal.getInstance();
     terminal.setExtensionPath(context.extensionPath);
 
+    // Initialize .codebuddyignore file exclusion service
+    const ignoreService = CodebuddyIgnoreService.getInstance();
+    await ignoreService.initialize();
+    context.subscriptions.push(ignoreService);
+
     // Initialize shared vector store (used by AstIndexingService + ContextRetriever)
     const vectorStore = SqliteVectorStore.getInstance();
     await vectorStore.initialize(context);
@@ -302,6 +308,31 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand("codebuddy.indexWorkspace", () =>
         indexWorkspaceCommand(NotificationService.getInstance()),
       ),
+    );
+
+    // Register .codebuddyignore scaffold command
+    context.subscriptions.push(
+      vscode.commands.registerCommand("codebuddy.initIgnoreFile", async () => {
+        const { DEFAULT_CODEBUDDYIGNORE } =
+          await import("./services/codebuddy-ignore.service");
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!root) {
+          vscode.window.showWarningMessage("No workspace folder open.");
+          return;
+        }
+        const filePath = path.join(root, ".codebuddyignore");
+        if (fs.existsSync(filePath)) {
+          const doc = await vscode.workspace.openTextDocument(filePath);
+          await vscode.window.showTextDocument(doc);
+          return;
+        }
+        fs.writeFileSync(filePath, DEFAULT_CODEBUDDYIGNORE, "utf-8");
+        const doc = await vscode.workspace.openTextDocument(filePath);
+        await vscode.window.showTextDocument(doc);
+        vscode.window.showInformationMessage(
+          "Created .codebuddyignore — customize which files to exclude from AI context.",
+        );
+      }),
     );
 
     // Register Automation Triggers

@@ -4,6 +4,22 @@ declare const vscodeApi: {
   postMessage: (message: any) => void;
 };
 
+export interface DiffLine {
+  type: "context" | "add" | "remove";
+  content: string;
+}
+
+export interface DiffHunk {
+  index: number;
+  header: string;
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  status: "pending" | "accepted" | "rejected";
+  lines: DiffLine[];
+}
+
 export interface FileChange {
   id: string;
   filePath: string;
@@ -16,6 +32,8 @@ export interface PendingChangesState {
   pendingChanges: FileChange[];
   recentChanges: FileChange[];
   isLoading: boolean;
+  /** Hunks for a specific change, keyed by change id */
+  changeHunks: Map<string, DiffHunk[]>;
 }
 
 export interface PendingChangesActions {
@@ -23,6 +41,14 @@ export interface PendingChangesActions {
   rejectChange: (id: string) => void;
   viewDiff: (id: string, filePath: string) => void;
   refreshChanges: () => void;
+  /** Request hunks for a specific change */
+  requestHunks: (id: string) => void;
+  /** Accept a single hunk */
+  acceptHunk: (changeId: string, hunkIndex: number) => void;
+  /** Reject a single hunk */
+  rejectHunk: (changeId: string, hunkIndex: number) => void;
+  /** Finalize hunk review (apply accepted, discard rejected) */
+  finalizeHunkReview: (changeId: string) => void;
 }
 
 export function usePendingChanges(): PendingChangesState &
@@ -30,6 +56,9 @@ export function usePendingChanges(): PendingChangesState &
   const [pendingChanges, setPendingChanges] = useState<FileChange[]>([]);
   const [recentChanges, setRecentChanges] = useState<FileChange[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [changeHunks, setChangeHunks] = useState<Map<string, DiffHunk[]>>(
+    new Map(),
+  );
 
   // Request pending and recent changes from extension
   const refreshChanges = useCallback(() => {
@@ -67,6 +96,78 @@ export function usePendingChanges(): PendingChangesState &
       vscodeApi.postMessage({ command: "view-change-diff", id, filePath });
     } catch (error) {
       console.error("Failed to view diff:", error);
+    }
+  }, []);
+
+  // Request hunks for a specific change
+  const requestHunks = useCallback((id: string) => {
+    try {
+      vscodeApi.postMessage({ command: "get-change-hunks", id });
+    } catch (error) {
+      console.error("Failed to request hunks:", error);
+    }
+  }, []);
+
+  // Accept a single hunk
+  const acceptHunk = useCallback((changeId: string, hunkIndex: number) => {
+    try {
+      vscodeApi.postMessage({
+        command: "accept-hunk",
+        id: changeId,
+        hunkIndex,
+      });
+      // Optimistic update
+      setChangeHunks((prev) => {
+        const next = new Map(prev);
+        const hunks = next.get(changeId);
+        if (hunks) {
+          next.set(
+            changeId,
+            hunks.map((h) =>
+              h.index === hunkIndex ? { ...h, status: "accepted" as const } : h,
+            ),
+          );
+        }
+        return next;
+      });
+    } catch (error) {
+      console.error("Failed to accept hunk:", error);
+    }
+  }, []);
+
+  // Reject a single hunk
+  const rejectHunk = useCallback((changeId: string, hunkIndex: number) => {
+    try {
+      vscodeApi.postMessage({
+        command: "reject-hunk",
+        id: changeId,
+        hunkIndex,
+      });
+      // Optimistic update
+      setChangeHunks((prev) => {
+        const next = new Map(prev);
+        const hunks = next.get(changeId);
+        if (hunks) {
+          next.set(
+            changeId,
+            hunks.map((h) =>
+              h.index === hunkIndex ? { ...h, status: "rejected" as const } : h,
+            ),
+          );
+        }
+        return next;
+      });
+    } catch (error) {
+      console.error("Failed to reject hunk:", error);
+    }
+  }, []);
+
+  // Finalize hunk review
+  const finalizeHunkReview = useCallback((changeId: string) => {
+    try {
+      vscodeApi.postMessage({ command: "finalize-hunk-review", id: changeId });
+    } catch (error) {
+      console.error("Failed to finalize hunk review:", error);
     }
   }, []);
 
@@ -131,6 +232,51 @@ export function usePendingChanges(): PendingChangesState &
           // Confirmation that a change was rejected
           setPendingChanges((prev) => prev.filter((c) => c.id !== message.id));
           break;
+
+        case "change-hunks":
+          // Received hunks for a specific change
+          if (message.hunks) {
+            setChangeHunks((prev) => {
+              const next = new Map(prev);
+              next.set(message.id, message.hunks);
+              return next;
+            });
+          }
+          break;
+
+        case "hunk-status-changed":
+          // Server confirmed hunk status update
+          if (message.status !== "error") {
+            setChangeHunks((prev) => {
+              const next = new Map(prev);
+              const hunks = next.get(message.id);
+              if (hunks) {
+                next.set(
+                  message.id,
+                  hunks.map((h) =>
+                    h.index === message.hunkIndex
+                      ? { ...h, status: message.status }
+                      : h,
+                  ),
+                );
+              }
+              return next;
+            });
+          }
+          break;
+
+        case "hunk-review-finalized":
+          if (message.success) {
+            setPendingChanges((prev) =>
+              prev.filter((c) => c.id !== message.id),
+            );
+            setChangeHunks((prev) => {
+              const next = new Map(prev);
+              next.delete(message.id);
+              return next;
+            });
+          }
+          break;
       }
     };
 
@@ -148,9 +294,14 @@ export function usePendingChanges(): PendingChangesState &
     pendingChanges,
     recentChanges,
     isLoading,
+    changeHunks,
     applyChange,
     rejectChange,
     viewDiff,
     refreshChanges,
+    requestHunks,
+    acceptHunk,
+    rejectHunk,
+    finalizeHunkReview,
   };
 }

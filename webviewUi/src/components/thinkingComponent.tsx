@@ -114,7 +114,7 @@ const ThinkingText = styled.div`
   opacity: 0.8;
   font-size: 12px;
   line-height: 1.6;
-  font-family: 'SF Mono', 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-family: var(--codebuddy-font-family);
   white-space: pre-wrap;
   
   code {
