@@ -5,6 +5,7 @@ import {
   NotificationService,
   NotificationSource,
 } from "../services/notification.service";
+import { CodebuddyIgnoreService } from "../services/codebuddy-ignore.service";
 
 const logger = Logger.initialize("IndexWorkspace", {
   minLevel: LogLevel.DEBUG,
@@ -19,9 +20,17 @@ export async function indexWorkspaceCommand(
   const ns = notificationService;
   const astIndexer = AstIndexingService.getInstance();
 
+  const ignoreExclude =
+    CodebuddyIgnoreService.getInstance().getExcludePattern();
+  const baseExclude =
+    "**/{node_modules,.git,dist,out,build,coverage,.codebuddy}/**";
+  const excludePattern = ignoreExclude
+    ? `{${baseExclude.slice(1, -1)},${ignoreExclude.slice(1, -1)}}`
+    : baseExclude;
+
   const files = await vscode.workspace.findFiles(
     "**/*.{ts,js,tsx,jsx,py,java,go,rs,cpp,h,c}",
-    "**/{node_modules,.git,dist,out,build,coverage,.codebuddy}/**",
+    excludePattern,
   );
 
   if (files.length === 0) {

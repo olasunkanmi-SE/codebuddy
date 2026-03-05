@@ -157,6 +157,11 @@
         "category": "CodeBuddy"
       },
       {
+        "command": "codebuddy.initIgnoreFile",
+        "title": "Init .codebuddyignore",
+        "category": "CodeBuddy"
+      },
+      {
         "command": "CodeBuddy.commentCode",
         "title": "%commands.commentCode%",
         "category": "CodeBuddy"
