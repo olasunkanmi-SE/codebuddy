@@ -797,6 +797,44 @@ export class SymbolSearchTool {
   }
 }
 
+import { TestRunnerService } from "../services/test-runner.service";
+
+export class TestRunnerTool {
+  public async execute(testPath?: string, testName?: string): Promise<string> {
+    const service = TestRunnerService.getInstance();
+    const result = await service.runTests(testPath, testName);
+    return service.formatForAgent(result);
+  }
+
+  config() {
+    return {
+      name: "run_tests",
+      description:
+        "Run the project's test suite and return structured results. " +
+        "Auto-detects the test framework (Jest, Vitest, Mocha, Pytest, Go, Cargo). " +
+        "Use after making code changes to verify correctness. " +
+        "If tests fail, read the failure details and fix the code, then re-run. " +
+        "Supports filtering by file path and test name.",
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          testPath: {
+            type: SchemaType.STRING,
+            description:
+              "Optional path or glob to run specific test files (e.g. 'src/test/suite/my.test.ts').",
+          },
+          testName: {
+            type: SchemaType.STRING,
+            description:
+              "Optional test name or pattern to filter which tests run (e.g. 'should create user').",
+          },
+        },
+        required: [],
+      },
+    };
+  }
+}
+
 export const TOOL_CONFIGS = {
   FileTool: { tool: FileTool, useContextRetriever: true },
   WebTool: { tool: WebTool, useContextRetriever: true },
@@ -811,4 +849,5 @@ export const TOOL_CONFIGS = {
   WebPreviewTool: { tool: WebPreviewTool, useContextRetriever: false },
   TodoTool: { tool: TodoTool, useContextRetriever: false },
   MemoryTool: { tool: MemoryTool, useContextRetriever: false },
+  TestRunnerTool: { tool: TestRunnerTool, useContextRetriever: false },
 };

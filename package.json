@@ -925,6 +925,18 @@
             "enum": ["debug", "info", "warn", "error"],
             "default": "info",
             "description": "Log level for vector database operations."
+          },
+          "codebuddy.testCommand": {
+            "type": "string",
+            "default": "",
+            "description": "Custom shell command to run tests. If empty, CodeBuddy auto-detects the framework (Jest, Vitest, Mocha, Pytest, Go, Cargo)."
+          },
+          "codebuddy.testTimeout": {
+            "type": "number",
+            "default": 120000,
+            "minimum": 5000,
+            "maximum": 600000,
+            "description": "Timeout in milliseconds for test execution (default: 120000 = 2 minutes)."
           }
         }
       }

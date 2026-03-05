@@ -18,6 +18,7 @@ import {
   DeepTerminalTool,
   TodoTool,
   MemoryTool,
+  TestRunnerTool,
 } from "../../../tools/tools";
 import { ContextRetriever } from "./../../../services/context-retriever";
 import { LangChainFileTool } from "./file";
@@ -36,6 +37,7 @@ import { LangChainWebPreviewTool } from "./web_preview";
 import { LangChainSearchTool } from "./search";
 import { LangChainTodoTool } from "./todo";
 import { LangChainMemoryTool } from "./memory";
+import { LangChainTestRunnerTool } from "./test-runner";
 import {
   DebugControlTool,
   DebugEvaluateTool,
@@ -147,6 +149,12 @@ class TodoToolFactory implements IToolFactory {
 class MemoryToolFactory implements IToolFactory {
   createTool(): StructuredTool<any> {
     return new LangChainMemoryTool(new MemoryTool());
+  }
+}
+
+class TestRunnerToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainTestRunnerTool(new TestRunnerTool());
   }
 }
 
@@ -318,6 +326,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "open_web_preview",
     "search_vector_db",
     "manage_terminal",
+    "run_tests",
   ],
   debugger: [
     "debug_get_state",
@@ -367,6 +376,7 @@ export class ToolProvider {
       new SearchToolFactory(this.contextRetriever),
       new TodoToolFactory(),
       new MemoryToolFactory(),
+      new TestRunnerToolFactory(),
       new DebugGetStateToolFactory(),
       new DebugGetStackTraceToolFactory(),
       new DebugGetVariablesToolFactory(),

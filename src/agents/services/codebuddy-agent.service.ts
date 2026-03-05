@@ -95,6 +95,11 @@ const TOOL_DESCRIPTIONS: Record<
     description: "Managing branches...",
     activityType: "working",
   },
+  run_tests: {
+    name: "Test Runner",
+    description: "Running tests...",
+    activityType: "executing",
+  },
   list_directory: {
     name: "Directory Listing",
     description: "Exploring directory structure...",
@@ -389,6 +394,7 @@ export class CodeBuddyAgentService {
       "git_diff",
       "git_status",
       "think",
+      "run_tests",
     ]);
     const maxDurationMs = 5 * 60 * 1000; // 5 minute timeout
     const startTime = Date.now();
