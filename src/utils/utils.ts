@@ -57,7 +57,11 @@ export const formatText = (text?: string): string => {
     let processedText = fixIncompleteMarkdown(text);
     processedText = fixUnmatchedBoldFormatting(processedText);
 
-    // Extract mermaid blocks before markdown-it processing to keep syntax intact
+    // Extract mermaid blocks before markdown-it processing.
+    // We replace them with unique placeholders, render markdown with
+    // html: false (safe default), then re-inject the mermaid HTML after.
+    const mermaidBlocks: Map<string, string> = new Map();
+    let mermaidIndex = 0;
     processedText = processedText.replace(
       /```mermaid\s*([\s\S]*?)```/g,
       (_, codeBlock: string) => {
@@ -69,17 +73,34 @@ export const formatText = (text?: string): string => {
         const encodedCode = Buffer.from(trimmedCode, "utf-8").toString(
           "base64",
         );
-        return `\n\n<div class="mermaid-container" data-mermaid="${encodedCode}"></div>\n\n`;
+        const placeholder = `MERMAID_PLACEHOLDER_${mermaidIndex++}`;
+        mermaidBlocks.set(
+          placeholder,
+          `<div class="mermaid-container" data-mermaid="${encodedCode}"></div>`,
+        );
+        return `\n\n${placeholder}\n\n`;
       },
     );
 
     const md = markdownit({
-      html: true,
+      html: false,
       linkify: true,
       breaks: true,
     });
 
-    return md.render(processedText);
+    let rendered = md.render(processedText);
+
+    // Re-inject mermaid HTML blocks after safe rendering
+    for (const [placeholder, html] of mermaidBlocks) {
+      rendered = rendered.replace(
+        new RegExp(`<p>${placeholder}</p>`, "g"),
+        html,
+      );
+      // Fallback in case markdown-it didn't wrap it in <p>
+      rendered = rendered.replace(placeholder, html);
+    }
+
+    return rendered;
   } catch (error: any) {
     // If markdown parsing fails, provide a more robust fallback
     console.warn(

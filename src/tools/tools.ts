@@ -421,12 +421,19 @@ export class DeepTerminalTool {
           return await service.startSession(sessionId);
         case "execute": {
           if (!command) return "Error: Command required for execute action.";
-          const result = await service.executeCommand(sessionId, command);
           if (waitMs && waitMs > 0) {
-            await new Promise((r) => setTimeout(r, waitMs));
-            return result + "\nOutput:\n" + service.readOutput(sessionId);
+            const result = await service.sendCommandAndWait(
+              sessionId,
+              command,
+              waitMs,
+            );
+            const status =
+              result.exitCode !== null
+                ? `\nExit Code: ${result.exitCode} (${result.success ? "success" : "failure"})`
+                : "";
+            return `Command sent to session ${sessionId}\nOutput:\n${result.output}${status}`;
           }
-          return result;
+          return await service.sendCommand(sessionId, command);
         }
         case "read":
           return service.readOutput(sessionId) || "(No new output)";
@@ -435,8 +442,9 @@ export class DeepTerminalTool {
         default:
           return "Invalid action. Use 'start', 'execute', 'read', or 'terminate'.";
       }
-    } catch (e: any) {
-      return `Error: ${e.message}`;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `Error: ${message}`;
     }
   }
 
