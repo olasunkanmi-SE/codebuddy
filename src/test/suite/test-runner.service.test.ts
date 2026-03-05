@@ -1,10 +1,10 @@
 import * as assert from "assert";
-import { TestRunnerService } from "../../services/test-runner.service";
+import { TestRunnerService, sanitizeArg, parseCommandLine } from "../../services/test-runner.service";
 
 // ---------------------------------------------------------------------------
-// We test parseCounts, parseFailures, and sanitizeArg via the public surface.
-// The singleton constructor is private, so we access parsing methods directly
-// by creating an instance via getInstance().
+// We test parseCounts, parseFailures, sanitizeArg, and parseCommandLine
+// via the public surface. The singleton constructor is private, so we
+// access parsing methods via getInstance().
 // ---------------------------------------------------------------------------
 
 suite("TestRunnerService", () => {
@@ -15,13 +15,136 @@ suite("TestRunnerService", () => {
   });
 
   // -----------------------------------------------------------------------
-  // sanitizeArg (tested indirectly via parseOutput — also unit-test the
-  // exported sanitizeArg behavior via runTests argument validation path)
+  // sanitizeArg — direct tests for malicious and edge-case inputs
   // -----------------------------------------------------------------------
-  suite("input sanitization", () => {
-    test("parseOutput does not throw for normal framework output", () => {
-      const result = service.parseOutput("1 passing (5ms)", "mocha", "npx mocha");
-      assert.strictEqual(result.passed, 1);
+  suite("sanitizeArg", () => {
+    test("accepts a simple file path", () => {
+      assert.strictEqual(sanitizeArg("src/test.ts", "testPath"), "src/test.ts");
+    });
+
+    test("accepts a glob pattern", () => {
+      assert.strictEqual(sanitizeArg("src/**/*.test.ts", "testPath"), "src/**/*.test.ts");
+    });
+
+    test("accepts an alphanumeric test name", () => {
+      assert.strictEqual(sanitizeArg("shouldCreateUser", "testName"), "shouldCreateUser");
+    });
+
+    test("trims leading/trailing whitespace", () => {
+      assert.strictEqual(sanitizeArg("  src/test.ts  ", "testPath"), "src/test.ts");
+    });
+
+    test("rejects empty string", () => {
+      assert.throws(() => sanitizeArg("", "testPath"), /must not be empty/);
+    });
+
+    test("rejects whitespace-only string", () => {
+      assert.throws(() => sanitizeArg("   ", "testPath"), /must not be empty/);
+    });
+
+    test("rejects string exceeding 500 chars", () => {
+      const long = "a".repeat(501);
+      assert.throws(() => sanitizeArg(long, "testPath"), /too long/);
+    });
+
+    test("accepts exactly 500 chars", () => {
+      const exact = "a".repeat(500);
+      assert.doesNotThrow(() => sanitizeArg(exact, "testPath"));
+    });
+
+    // Shell metacharacters — each one individually
+    const shellMetaChars: [string, string][] = [
+      [";", "semicolon"],
+      ["&", "ampersand"],
+      ["|", "pipe"],
+      ["`", "backtick"],
+      ["$", "dollar sign"],
+      ["(", "open paren"],
+      [")", "close paren"],
+      ["{", "open brace"],
+      ["}", "close brace"],
+      ["!", "exclamation"],
+      ["<", "less-than"],
+      [">", "greater-than"],
+      ["\\", "backslash"],
+      ["#", "hash"],
+      ["\n", "newline"],
+      ["\r", "carriage return"],
+    ];
+
+    for (const [char, description] of shellMetaChars) {
+      test(`rejects shell metacharacter: ${description}`, () => {
+        assert.throws(
+          () => sanitizeArg(`safe${char}path`, "testPath"),
+          /disallowed characters/,
+        );
+      });
+    }
+
+    test("rejects command substitution attempt: $(whoami)", () => {
+      assert.throws(() => sanitizeArg("$(whoami)", "testPath"), /disallowed characters/);
+    });
+
+    test("rejects command chaining: foo ; rm -rf /", () => {
+      assert.throws(() => sanitizeArg("foo ; rm -rf /", "testPath"), /disallowed characters/);
+    });
+
+    test("rejects pipe injection: foo | cat /etc/passwd", () => {
+      assert.throws(() => sanitizeArg("foo | cat /etc/passwd", "testPath"), /disallowed characters/);
+    });
+
+    test("rejects backtick injection: `id`", () => {
+      assert.throws(() => sanitizeArg("`id`", "testPath"), /disallowed characters/);
+    });
+
+    test("includes the label in the error message", () => {
+      assert.throws(() => sanitizeArg("", "myLabel"), /myLabel/);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // parseCommandLine — quoted argument parsing for custom commands
+  // -----------------------------------------------------------------------
+  suite("parseCommandLine", () => {
+    test("splits simple space-separated command", () => {
+      assert.deepStrictEqual(parseCommandLine("npx jest --verbose"), ["npx", "jest", "--verbose"]);
+    });
+
+    test("preserves double-quoted segments with spaces", () => {
+      assert.deepStrictEqual(
+        parseCommandLine('"/path/to/my runner" --config "my config.json"'),
+        ["/path/to/my runner", "--config", "my config.json"],
+      );
+    });
+
+    test("preserves single-quoted segments with spaces", () => {
+      assert.deepStrictEqual(
+        parseCommandLine("'/path/to/my runner' --config 'my config.json'"),
+        ["/path/to/my runner", "--config", "my config.json"],
+      );
+    });
+
+    test("handles mixed quoting styles", () => {
+      assert.deepStrictEqual(
+        parseCommandLine(`npx jest "test path" '--grep=my test'`),
+        ["npx", "jest", "test path", "--grep=my test"],
+      );
+    });
+
+    test("handles multiple spaces between arguments", () => {
+      assert.deepStrictEqual(parseCommandLine("npx   jest   --ci"), ["npx", "jest", "--ci"]);
+    });
+
+    test("returns empty array for empty string", () => {
+      assert.deepStrictEqual(parseCommandLine(""), []);
+    });
+
+    test("handles leading/trailing whitespace", () => {
+      assert.deepStrictEqual(parseCommandLine("  npx jest  "), ["npx", "jest"]);
+    });
+
+    test("handles adjacent quoted and unquoted text", () => {
+      assert.deepStrictEqual(parseCommandLine('--flag="value with spaces"'), ["--flag=value with spaces"]);
     });
   });
 
