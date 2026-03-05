@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import "./urlCardList.css";
 import { vscode } from "../utils/vscode";
 
 interface IParseURL {

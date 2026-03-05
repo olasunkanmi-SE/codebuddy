@@ -1,0 +1,38 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { create } from "zustand";
+
+interface ChatState {
+  commandAction: string;
+  isCommandExecuting: boolean;
+  selectedContext: string;
+  folders: any;
+  activeEditor: string;
+  fileChangesPanelCollapsed: boolean;
+
+  setCommandAction: (action: string) => void;
+  setIsCommandExecuting: (executing: boolean) => void;
+  setSelectedContext: (context: string) => void;
+  setFolders: (folders: any) => void;
+  setActiveEditor: (editor: string) => void;
+  toggleFileChangesPanel: () => void;
+  clearCommandState: () => void;
+}
+
+export const useChatStore = create<ChatState>()((set) => ({
+  commandAction: "",
+  isCommandExecuting: false,
+  selectedContext: "",
+  folders: "",
+  activeEditor: "",
+  fileChangesPanelCollapsed: true,
+
+  setCommandAction: (action) => set({ commandAction: action }),
+  setIsCommandExecuting: (executing) => set({ isCommandExecuting: executing }),
+  setSelectedContext: (context) => set({ selectedContext: context }),
+  setFolders: (folders) => set({ folders }),
+  setActiveEditor: (editor) => set({ activeEditor: editor }),
+  toggleFileChangesPanel: () =>
+    set((s) => ({ fileChangesPanelCollapsed: !s.fileChangesPanelCollapsed })),
+  clearCommandState: () =>
+    set({ isCommandExecuting: false, commandAction: "" }),
+}));

@@ -1,0 +1,134 @@
+/* URL Card List Styles */
+.url-container {
+  background: linear-gradient(to bottom, #2d2d2d, #3a3a3a);
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 12px;
+  max-width: 600px;
+  width: 100%;
+}
+
+.url-link {
+  color: #007bff;
+  font-size: 16px;
+  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  line-height: 1.5;
+  text-decoration: none;
+  word-wrap: break-word;
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.url-link:hover {
+  color: #0056b3;
+  transform: scale(1.02);
+}
+
+.app-container {
+  padding: 20px;
+  background-color: #1a1a1a;
+  min-height: 100vh;
+}
+
+.url-grid-container {
+  display: inline;
+  gap: 20px;
+  padding: 16px;
+  width: 100%;
+}
+
+.url-card {
+  border-radius: 12px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  display: block;
+  height: 100%;
+}
+
+.url-card:hover {
+  border-color: #0070f3;
+}
+
+.url-card-content {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.url-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 98px;
+  background-color: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 14px;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.favicon {
+  width: 16px;
+  height: 16px;
+}
+
+.url-details {
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.url-details:hover {
+  text-decoration: none;
+}
+
+.domain-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.domain-name a {
+  text-decoration: none;
+}
+
+.domain-name:hover {
+  text-decoration: none;
+}
+
+.full-url {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #6e6e6e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.visit-icon {
+  color: #0070f3;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+
+.url-card:hover .visit-icon {
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  .url-grid-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .url-grid-container {
+    grid-template-columns: 1fr;
+  }
+}

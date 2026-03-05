@@ -1,0 +1,191 @@
+/* Chat layout — panels, containers, toolbar, compact mode */
+
+.container {
+  width: 100%;
+  padding: 12px 0;
+  box-sizing: border-box;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  gap: 12px;
+  overflow-x: hidden;
+}
+
+.dropdown-container {
+  overflow-y: visible;
+  overflow-x: hidden;
+  padding: 8px 4px 0;
+  max-width: 100%;
+  width: 100%;
+  font-size: 13px;
+  margin-left: 0;
+  box-sizing: border-box;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+
+.dropdown-container > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.currenFile {
+  margin: 5px;
+}
+
+.horizontal-stack {
+  display: flex;
+  justify-content: left;
+  gap: 20px;
+}
+
+.horizontal-stack-setting {
+  display: flex;
+  justify-content: left;
+  gap: 20px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.attachment-icon {
+  padding: 2px;
+  cursor: pointer;
+  color: #787c99;
+  transition: color .3s ease;
+  border-radius: 6px;
+  border: 1px solid;
+  border-color: #363b54;
+  margin: 10px 2px 0px 2px;
+}
+
+.attachment-icon.active {
+  color: rgb(97, 101, 126)
+}
+
+.attachment-icon:hover {
+  color: rgb(97, 101, 126)
+}
+
+.textarea-container {
+  background: #16161e;
+}
+
+.chat-content {
+  overflow: visible;
+  padding-bottom: 20px;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+
+.chat-content * {
+  max-width: 100%;
+}
+
+.vscodePanels {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  width: 100%;
+}
+
+vscode-panel-view {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  max-width: 100%;
+  width: 100%;
+}
+
+vscode-panel-view[hidden] {
+  display: none !important;
+}
+
+.panel-body-scroll {
+  padding: 0 20px 40px 20px;
+  box-sizing: border-box;
+  max-width: 100%;
+  width: 100%;
+}
+
+.panel-body-scroll pre {
+  max-width: calc(100% - 40px) !important;
+  overflow-x: auto !important;
+}
+
+.text-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 2px solid var(--vscode-editor-background);
+  border-radius: 14px;
+  background-color: var(--vscode-input-background, #252526);
+  color: "inherit";
+}
+
+.button {
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  color: var(--vscode-dropdown-foreground);
+}
+
+.inline-error-banner {
+  position: sticky;
+  top: 0;
+  background: var(--vscode-inputValidation-errorBackground);
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Compact Mode Styles */
+.compact-mode .message-container {
+  margin-bottom: 8px;
+  padding: 10px;
+}
+
+.compact-mode .container {
+  gap: 8px;
+}
+
+.compact-mode .doc-content {
+  padding: 4px 0 12px;
+}
+
+.compact-mode .doc-content p {
+  margin: 6px 0;
+}
+
+.compact-mode .doc-content pre {
+  margin: 8px 0;
+  padding: 10px;
+}
+
+.compact-mode .code-block {
+  margin: 8px 0;
+}
+
+.compact-mode .code-header {
+  padding: 4px 12px;
+}
+
+.compact-mode .code-content {
+  padding: 10px;
+}
+
+.compact-mode .thinking-container {
+  margin: 8px 0;
+}
+
+.compact-mode .url-container {
+  padding: 10px;
+  grid-gap: 12px;
+}

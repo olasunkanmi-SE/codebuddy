@@ -1,4 +1,3 @@
-import "./App.css";
 import { WebviewUI } from "./components/webview";
 
 function App() {

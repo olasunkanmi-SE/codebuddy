@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import "./MessageRenderer.css";
 import { BotMessage } from "./botMessage";
 import SearchResultCard from "./SearchResultCard";
 import CodeAnalysisCard from "./CodeAnalysisCard";

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import "./FileMention.css";
 import { flattenFileTree, searchFiles, getDirectory } from "../utils/fuzzySearch";
 import styled from "styled-components";
 
