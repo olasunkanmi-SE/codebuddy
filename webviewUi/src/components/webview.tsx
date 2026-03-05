@@ -30,6 +30,7 @@ import { CostDisplay } from "./CostDisplay";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 import MessageRenderer from "./MessageRenderer";
 import { PendingChangesPanel } from "./PendingChangesPanel";
+import { CheckpointPanel } from "./CheckpointPanel";
 import { UserMessage } from "./personMessage";
 import { SettingsPanel, SettingsGearIcon } from "./settings/index";
 import { WelcomeScreen } from "./welcomeUI";
@@ -510,6 +511,11 @@ export const WebviewUI = () => {
             <PendingChangesPanel 
               collapsed={fileChangesPanelCollapsed}
               onToggle={() => useChatStore.getState().toggleFileChangesPanel()}
+            />
+            {/* Checkpoint Panel - revert workspace to previous state */}
+            <CheckpointPanel
+              collapsed={useChatStore.getState().checkpointPanelCollapsed}
+              onToggle={() => useChatStore.getState().toggleCheckpointPanel()}
             />
           </div>
         </VSCodePanelView>

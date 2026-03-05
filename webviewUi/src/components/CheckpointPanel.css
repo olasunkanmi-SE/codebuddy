@@ -1,0 +1,142 @@
+.checkpoint-panel {
+  border-top: 1px solid var(--vscode-panel-border, #333);
+  font-size: 12px;
+}
+
+.checkpoint-panel.collapsed .panel-content {
+  display: none;
+}
+
+.checkpoint-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--vscode-sideBar-background, #1e1e1e);
+}
+
+.checkpoint-panel .panel-header:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+.checkpoint-panel .panel-title {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.checkpoint-badge {
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
+  border-radius: 8px;
+  padding: 0 6px;
+  font-size: 10px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.checkpoint-panel .panel-content {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.checkpoint-list {
+  padding: 4px 0;
+}
+
+.checkpoint-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border, #2a2a2a);
+}
+
+.checkpoint-item:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+.checkpoint-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.checkpoint-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--vscode-foreground, #ccc);
+}
+
+.checkpoint-meta {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+}
+
+.checkpoint-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.checkpoint-btn {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--vscode-foreground, #ccc);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.checkpoint-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, #383838);
+}
+
+.checkpoint-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.revert-btn:hover {
+  color: var(--vscode-charts-blue, #4fc1ff);
+}
+
+.confirm-btn {
+  color: var(--vscode-charts-green, #89d185);
+}
+
+.cancel-btn {
+  color: var(--vscode-charts-red, #f48771);
+}
+
+.delete-btn:hover {
+  color: var(--vscode-charts-red, #f48771);
+}
+
+.revert-status {
+  padding: 6px 10px;
+  font-style: italic;
+  color: var(--vscode-descriptionForeground, #888);
+}
+
+.revert-result {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.revert-result.success {
+  color: var(--vscode-charts-green, #89d185);
+}
+
+.revert-result.has-errors {
+  color: var(--vscode-charts-orange, #cca700);
+}

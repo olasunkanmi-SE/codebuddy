@@ -15,3 +15,4 @@ export { DiffReviewHandler } from "./diff-review-handler";
 export { ObservabilityHandler } from "./observability-handler";
 export { RulesHandler } from "./rules-handler";
 export { PerformanceHandler } from "./performance-handler";
+export { CheckpointHandler } from "./checkpoint-handler";

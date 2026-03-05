@@ -8,6 +8,10 @@ export class DiffReviewHandler implements WebviewMessageHandler {
     "apply-change",
     "reject-change",
     "view-change-diff",
+    "get-change-hunks",
+    "accept-hunk",
+    "reject-hunk",
+    "finalize-hunk-review",
   ];
 
   async handle(message: any, ctx: HandlerContext): Promise<void> {
@@ -81,6 +85,68 @@ export class DiffReviewHandler implements WebviewMessageHandler {
           message.filePath,
         );
         break;
+
+      case "get-change-hunks": {
+        const hunks = diffService.getHunks(message.id);
+        await ctx.webview.webview.postMessage({
+          type: "change-hunks",
+          id: message.id,
+          hunks: hunks
+            ? hunks.map((h) => ({
+                index: h.index,
+                header: h.header,
+                oldStart: h.oldStart,
+                oldLines: h.oldLines,
+                newStart: h.newStart,
+                newLines: h.newLines,
+                status: h.status,
+                lines: h.lines,
+              }))
+            : null,
+        });
+        break;
+      }
+
+      case "accept-hunk": {
+        const accepted = diffService.acceptHunk(message.id, message.hunkIndex);
+        await ctx.webview.webview.postMessage({
+          type: "hunk-status-changed",
+          id: message.id,
+          hunkIndex: message.hunkIndex,
+          status: accepted ? "accepted" : "error",
+        });
+        break;
+      }
+
+      case "reject-hunk": {
+        const rejected = diffService.rejectHunk(message.id, message.hunkIndex);
+        await ctx.webview.webview.postMessage({
+          type: "hunk-status-changed",
+          id: message.id,
+          hunkIndex: message.hunkIndex,
+          status: rejected ? "rejected" : "error",
+        });
+        break;
+      }
+
+      case "finalize-hunk-review": {
+        try {
+          const finalized = await diffService.finalizeHunkReview(message.id);
+          await ctx.webview.webview.postMessage({
+            type: "hunk-review-finalized",
+            id: message.id,
+            success: finalized,
+          });
+        } catch (error: any) {
+          await ctx.webview.webview.postMessage({
+            type: "hunk-review-finalized",
+            id: message.id,
+            success: false,
+            error: error.message,
+          });
+        }
+        break;
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as fsp from "fs/promises";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
+import { DiffHunk, computeHunks, applySelectedHunks } from "./diff-hunk";
 
 export interface PendingChange {
   id: string;
@@ -10,6 +11,8 @@ export interface PendingChange {
   timestamp: number;
   status: "pending" | "applied" | "rejected";
   isNewFile: boolean;
+  /** Per-hunk breakdown (computed lazily on first access). */
+  hunks?: DiffHunk[];
 }
 
 export interface ChangeEvent {
@@ -181,6 +184,117 @@ export class DiffReviewService implements vscode.TextDocumentContentProvider {
     this.recentChanges.unshift(change);
     if (this.recentChanges.length > this.MAX_RECENT_CHANGES) {
       this.recentChanges.pop();
+    }
+  }
+
+  // ── Per-hunk operations ──────────────────────────────────
+
+  /**
+   * Get the diff hunks for a pending change.
+   * Hunks are computed lazily and cached on the PendingChange.
+   */
+  public getHunks(changeId: string): DiffHunk[] | undefined {
+    const change = this.pendingChanges.get(changeId);
+    if (!change) {
+      return undefined;
+    }
+    if (!change.hunks) {
+      change.hunks = computeHunks(change.originalContent, change.newContent);
+    }
+    return change.hunks;
+  }
+
+  /**
+   * Accept a single hunk within a pending change.
+   */
+  public acceptHunk(changeId: string, hunkIndex: number): boolean {
+    const hunks = this.getHunks(changeId);
+    if (!hunks) {
+      return false;
+    }
+    const hunk = hunks.find((h) => h.index === hunkIndex);
+    if (!hunk || hunk.status !== "pending") {
+      return false;
+    }
+    hunk.status = "accepted";
+    this.logger.info(`Accepted hunk ${hunkIndex} of change ${changeId}`);
+    return true;
+  }
+
+  /**
+   * Reject a single hunk within a pending change.
+   */
+  public rejectHunk(changeId: string, hunkIndex: number): boolean {
+    const hunks = this.getHunks(changeId);
+    if (!hunks) {
+      return false;
+    }
+    const hunk = hunks.find((h) => h.index === hunkIndex);
+    if (!hunk || hunk.status !== "pending") {
+      return false;
+    }
+    hunk.status = "rejected";
+    this.logger.info(`Rejected hunk ${hunkIndex} of change ${changeId}`);
+    return true;
+  }
+
+  /**
+   * Finalize a per-hunk review: write the result of applying only accepted
+   * hunks to disk and resolve the pending change.
+   * If all hunks are rejected, the change is discarded.
+   * If all are accepted, it's equivalent to applyChange.
+   */
+  public async finalizeHunkReview(changeId: string): Promise<boolean> {
+    const change = this.pendingChanges.get(changeId);
+    if (!change) {
+      this.logger.error(`Cannot finalize hunk review ${changeId}: not found`);
+      return false;
+    }
+
+    const hunks = this.getHunks(changeId);
+    if (!hunks || hunks.length === 0) {
+      return this.applyChange(changeId);
+    }
+
+    // Auto-reject any still-pending hunks
+    for (const h of hunks) {
+      if (h.status === "pending") {
+        h.status = "rejected";
+      }
+    }
+
+    const anyAccepted = hunks.some((h) => h.status === "accepted");
+    if (!anyAccepted) {
+      // All rejected — discard
+      this.removePendingChange(changeId);
+      return true;
+    }
+
+    try {
+      const resultContent = applySelectedHunks(change.originalContent, hunks);
+
+      const uri = vscode.Uri.file(change.filePath);
+      const data = new Uint8Array(Buffer.from(resultContent, "utf8"));
+      await vscode.workspace.fs.writeFile(uri, data);
+
+      change.newContent = resultContent;
+      change.status = "applied";
+      this.logger.info(
+        `Finalized hunk review for ${changeId} — ` +
+          `${hunks.filter((h) => h.status === "accepted").length} accepted, ` +
+          `${hunks.filter((h) => h.status === "rejected").length} rejected`,
+      );
+
+      this._onChangeEvent.fire({ type: "applied", change });
+      this.addToRecentChanges(change);
+      this.pendingChanges.delete(changeId);
+
+      return true;
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to finalize hunk review ${changeId}: ${error.message}`,
+      );
+      throw error;
     }
   }
 

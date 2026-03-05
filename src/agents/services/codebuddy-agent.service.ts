@@ -12,6 +12,7 @@ import { ResultSynthesizerService } from "./result-synthesizer.service";
 import { AgentRunningGuardService } from "../../services/agent-running-guard.service";
 import { InputValidator } from "../../services/input-validator";
 import { CostTrackingService } from "../../services/cost-tracking.service";
+import { CheckpointService } from "../../services/checkpoint.service";
 import { getGenerativeAiModel, getAPIKeyAndModel } from "../../utils/utils";
 
 // Tool descriptions for user-friendly feedback
@@ -126,6 +127,29 @@ export class CodeBuddyAgentService {
       enableTelemetry: true,
     });
     this.synthesizer = ResultSynthesizerService.getInstance();
+
+    // Track every file the agent edits so checkpoints cover them
+    this.initFileTracking();
+  }
+
+  /**
+   * Listen for file‐change events from DiffReviewService and register
+   * each touched path with CheckpointService for future snapshots.
+   */
+  private initFileTracking(): void {
+    try {
+      // Lazy import to avoid circular dependency at module level
+      import("../../services/diff-review.service").then(
+        ({ DiffReviewService }) => {
+          const diffService = DiffReviewService.getInstance();
+          diffService.onChangeEvent((evt) => {
+            CheckpointService.getInstance().trackFile(evt.change.filePath);
+          });
+        },
+      );
+    } catch {
+      this.logger.warn("Could not initialize file tracking for checkpoints");
+    }
   }
 
   static getInstance(): CodeBuddyAgentService {
@@ -418,6 +442,18 @@ export class CodeBuddyAgentService {
         content: "Analyzing your request...",
         metadata: { threadId: conversationId, timestamp: Date.now() },
       };
+
+      // Create a checkpoint before the agent starts modifying files
+      try {
+        const checkpointSvc = CheckpointService.getInstance();
+        await checkpointSvc.createCheckpoint(
+          conversationId,
+          `Before: ${sanitizedMessage.slice(0, 60)}${sanitizedMessage.length > 60 ? "…" : ""}`,
+        );
+      } catch (cpError: any) {
+        this.logger.warn(`Failed to create checkpoint: ${cpError.message}`);
+      }
+
       agentState = "running";
 
       const config = {

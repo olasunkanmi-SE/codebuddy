@@ -47,6 +47,7 @@ import {
   BrowserHandler,
   ConnectorHandler,
   DiffReviewHandler,
+  CheckpointHandler,
   DockerHandler,
   MCPHandler,
   NewsHandler,
@@ -219,6 +220,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.handlerRegistry.register(new DiffReviewHandler());
     this.handlerRegistry.register(new ObservabilityHandler());
     this.handlerRegistry.register(new RulesHandler());
+    this.handlerRegistry.register(new CheckpointHandler());
     this.handlerRegistry.register(
       new PerformanceHandler(
         () => this.performanceProfiler,
@@ -1073,6 +1075,12 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.logger.debug(
       `Disposing BaseWebViewProvider with ${this.disposables.length} disposables`,
     );
+
+    // Dispose monitoring services to stop their intervals
+    this.performanceProfiler?.dispose();
+    this.productionSafeguards?.dispose();
+    this.enhancedCacheManager?.dispose();
+    this.configManager?.dispose();
 
     this.disposables.forEach((d) => d.dispose());
     this.disposables.length = 0; // Clear the array
