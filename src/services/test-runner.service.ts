@@ -15,6 +15,8 @@ export interface TestResult {
   success: boolean;
   failures: TestFailure[];
   rawOutput: string;
+  /** True when no framework-specific regex matched — counts derived from exit code only */
+  parseWarning?: string;
 }
 
 export interface TestFailure {
@@ -27,7 +29,33 @@ export interface TestFailure {
 
 interface DetectedFramework {
   name: string;
-  command: string;
+  /** The executable (e.g. "npx") */
+  executable: string;
+  /** Base arguments (e.g. ["vitest", "run"]) */
+  baseArgs: string[];
+}
+
+// Characters that could be used for shell injection
+const SHELL_META = /[;&|`$(){}!<>\\#\n\r]/;
+
+/**
+ * Validate a user-supplied argument to prevent shell injection.
+ * Only allows filesystem paths, glob patterns, and alphanumeric test names.
+ */
+function sanitizeArg(value: string, label: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error(`${label} must not be empty.`);
+  }
+  if (trimmed.length > 500) {
+    throw new Error(`${label} is too long (max 500 chars).`);
+  }
+  if (SHELL_META.test(trimmed)) {
+    throw new Error(
+      `${label} contains disallowed characters. Only file paths, globs, and alphanumeric patterns are accepted.`,
+    );
+  }
+  return trimmed;
 }
 
 /**
@@ -70,21 +98,36 @@ export class TestRunnerService {
           testScript &&
           testScript !== 'echo "Error: no test specified" && exit 1'
         ) {
-          // Identify the framework from the script
           if (testScript.includes("vitest")) {
-            return { name: "vitest", command: "npx vitest run" };
+            return {
+              name: "vitest",
+              executable: "npx",
+              baseArgs: ["vitest", "run"],
+            };
           }
           if (testScript.includes("jest")) {
-            return { name: "jest", command: "npx jest" };
+            return { name: "jest", executable: "npx", baseArgs: ["jest"] };
           }
           if (testScript.includes("mocha")) {
-            return { name: "mocha", command: testScript };
+            return {
+              name: "mocha",
+              executable: "npm",
+              baseArgs: ["test", "--"],
+            };
           }
           if (testScript.includes("pytest")) {
-            return { name: "pytest", command: "python -m pytest" };
+            return {
+              name: "pytest",
+              executable: "python",
+              baseArgs: ["-m", "pytest"],
+            };
           }
-          // Generic — use the test script directly
-          return { name: "npm-test", command: "npm test" };
+          // Generic — use npm test
+          return {
+            name: "npm-test",
+            executable: "npm",
+            baseArgs: ["test", "--"],
+          };
         }
 
         // Check devDependencies for known frameworks
@@ -93,13 +136,17 @@ export class TestRunnerService {
           ...pkg.devDependencies,
         };
         if (deps["vitest"]) {
-          return { name: "vitest", command: "npx vitest run" };
+          return {
+            name: "vitest",
+            executable: "npx",
+            baseArgs: ["vitest", "run"],
+          };
         }
         if (deps["jest"]) {
-          return { name: "jest", command: "npx jest" };
+          return { name: "jest", executable: "npx", baseArgs: ["jest"] };
         }
         if (deps["mocha"]) {
-          return { name: "mocha", command: "npx mocha" };
+          return { name: "mocha", executable: "npx", baseArgs: ["mocha"] };
         }
       } catch {
         // Ignore parse errors
@@ -112,17 +159,21 @@ export class TestRunnerService {
       fs.existsSync(path.join(workspaceRoot, "pyproject.toml")) ||
       fs.existsSync(path.join(workspaceRoot, "setup.py"))
     ) {
-      return { name: "pytest", command: "python -m pytest" };
+      return {
+        name: "pytest",
+        executable: "python",
+        baseArgs: ["-m", "pytest"],
+      };
     }
 
     // Go projects
     if (fs.existsSync(path.join(workspaceRoot, "go.mod"))) {
-      return { name: "go-test", command: "go test ./..." };
+      return { name: "go-test", executable: "go", baseArgs: ["test", "./..."] };
     }
 
     // Rust projects
     if (fs.existsSync(path.join(workspaceRoot, "Cargo.toml"))) {
-      return { name: "cargo-test", command: "cargo test" };
+      return { name: "cargo-test", executable: "cargo", baseArgs: ["test"] };
     }
 
     return null;
@@ -145,11 +196,15 @@ export class TestRunnerService {
       .getConfiguration("codebuddy")
       .get<string>("testCommand");
 
-    let command: string;
+    let executable: string;
+    let args: string[];
     let frameworkName: string;
 
-    if (customCommand) {
-      command = customCommand;
+    if (customCommand && customCommand.trim().length > 0) {
+      // Split the custom command into executable + args (no shell interpretation)
+      const parts = customCommand.trim().split(/\s+/);
+      executable = parts[0];
+      args = parts.slice(1);
       frameworkName = "custom";
     } else {
       const detected = await this.detectFramework(workspaceRoot);
@@ -158,43 +213,48 @@ export class TestRunnerService {
           "Could not detect a test framework. Set `codebuddy.testCommand` in settings or add a test script to package.json.",
         );
       }
-      command = detected.command;
+      executable = detected.executable;
+      args = [...detected.baseArgs];
       frameworkName = detected.name;
     }
 
-    // Append path/name filters
+    // Sanitize and append path filter
     if (testPath) {
-      command += ` ${testPath}`;
-    }
-    if (testName) {
-      const filterFlags: Record<string, string> = {
-        jest: `--testNamePattern="${testName}"`,
-        vitest: `--reporter=verbose -t "${testName}"`,
-        mocha: `--grep "${testName}"`,
-        pytest: `-k "${testName}"`,
-        "go-test": `-run "${testName}"`,
-        "cargo-test": `-- "${testName}"`,
-        "npm-test": "",
-        custom: "",
-      };
-      const flag = filterFlags[frameworkName] ?? "";
-      if (flag) {
-        command += ` ${flag}`;
-      }
+      const safePath = sanitizeArg(testPath, "testPath");
+      args.push(safePath);
     }
 
-    this.logger.info(`Running tests: ${command}`);
+    // Sanitize and append test name filter as separate arguments (no shell quoting)
+    if (testName) {
+      const safeName = sanitizeArg(testName, "testName");
+      const filterArgs: Record<string, string[]> = {
+        jest: ["--testNamePattern", safeName],
+        vitest: ["--reporter=verbose", "-t", safeName],
+        mocha: ["--grep", safeName],
+        pytest: ["-k", safeName],
+        "go-test": ["-run", safeName],
+        "cargo-test": ["--", safeName],
+        "npm-test": [],
+        custom: [],
+      };
+      const extra = filterArgs[frameworkName] ?? [];
+      args.push(...extra);
+    }
+
+    const commandDisplay = `${executable} ${args.join(" ")}`;
+    this.logger.info(`Running tests: ${commandDisplay}`);
 
     const timeout = vscode.workspace
       .getConfiguration("codebuddy")
       .get<number>("testTimeout", this.DEFAULT_TIMEOUT_MS);
     const rawOutput = await this.executeCommand(
-      command,
+      executable,
+      args,
       workspaceRoot,
       timeout,
     );
 
-    const result = this.parseOutput(rawOutput, frameworkName, command);
+    const result = this.parseOutput(rawOutput, frameworkName, commandDisplay);
     this.logger.info(
       `Tests finished: ${result.passed}/${result.total} passed, ${result.failed} failed`,
     );
@@ -202,7 +262,8 @@ export class TestRunnerService {
   }
 
   private executeCommand(
-    command: string,
+    executable: string,
+    args: string[],
     cwd: string,
     timeoutMs: number,
   ): Promise<string> {
@@ -210,13 +271,13 @@ export class TestRunnerService {
       let output = "";
       let killed = false;
 
-      const proc = spawn(command, {
-        shell: true,
+      // No shell: true — arguments are passed as an array, preventing injection
+      const proc = spawn(executable, args, {
         cwd,
         env: {
           ...process.env,
-          FORCE_COLOR: "0", // Disable ANSI colors for cleaner parsing
-          CI: "true", // Many frameworks simplify output in CI mode
+          FORCE_COLOR: "0",
+          CI: "true",
         },
       });
 
@@ -245,16 +306,20 @@ export class TestRunnerService {
         }
       });
 
-      proc.on("close", () => {
+      proc.on("close", (exitCode) => {
         clearTimeout(timer);
         if (!killed) {
+          // Capture exit code in output so parsers can use it as a fallback
+          if (exitCode !== null && exitCode !== 0) {
+            output += `\n[exit code: ${exitCode}]`;
+          }
           resolve(output);
         }
       });
     });
   }
 
-  private parseOutput(
+  parseOutput(
     rawOutput: string,
     framework: string,
     command: string,
@@ -265,8 +330,22 @@ export class TestRunnerService {
         : rawOutput;
 
     const failures = this.parseFailures(truncated, framework);
-
     const counts = this.parseCounts(truncated, framework);
+
+    // Detect when parsing found nothing useful — signal to the agent
+    const exitCodeMatch = rawOutput.match(/\[exit code: (\d+)\]/);
+    const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1]) : 0;
+    let parseWarning: string | undefined;
+
+    if (counts.total === 0 && failures.length === 0) {
+      if (exitCode !== 0) {
+        parseWarning =
+          "Could not parse structured test results. The command exited with a non-zero status — check the raw output below for details.";
+      } else {
+        parseWarning =
+          "Could not parse structured test results. The command succeeded (exit 0) but no test counts were found — the framework output format may be unrecognized.";
+      }
+    }
 
     return {
       framework,
@@ -276,15 +355,16 @@ export class TestRunnerService {
       skipped: counts.skipped,
       total: counts.total,
       duration: counts.duration,
-      success: counts.failed === 0,
+      success: counts.failed === 0 && exitCode === 0,
       failures,
       rawOutput: truncated,
+      parseWarning,
     };
   }
 
-  private parseCounts(
+  parseCounts(
     output: string,
-    framework: string,
+    _framework: string,
   ): {
     passed: number;
     failed: number;
@@ -298,6 +378,9 @@ export class TestRunnerService {
       total = 0,
       duration = "unknown";
 
+    // Try all patterns regardless of framework — the output is the truth, not the label.
+    // This makes parsing resilient when the detected framework name is imprecise.
+
     // Jest / Vitest: "Tests: 3 passed, 1 failed, 4 total"
     const jestMatch = output.match(
       /Tests:\s*(?:(\d+)\s*failed,?\s*)?(?:(\d+)\s*skipped,?\s*)?(?:(\d+)\s*passed,?\s*)?(\d+)\s*total/i,
@@ -307,6 +390,7 @@ export class TestRunnerService {
       skipped = parseInt(jestMatch[2] || "0");
       passed = parseInt(jestMatch[3] || "0");
       total = parseInt(jestMatch[4] || "0");
+      return { passed, failed, skipped, total, duration };
     }
 
     // Mocha: "X passing", "Y failing"
@@ -318,29 +402,35 @@ export class TestRunnerService {
       failed = mochaFail ? parseInt(mochaFail[1]) : 0;
       skipped = mochaPend ? parseInt(mochaPend[1]) : 0;
       total = passed + failed + skipped;
+      // Mocha duration: "passing (Xms)"
+      const mochaDur = output.match(/passing\s*\((.+?)\)/i);
+      if (mochaDur) duration = mochaDur[1];
+      return { passed, failed, skipped, total, duration };
     }
 
-    // Pytest: "X passed, Y failed"
+    // Pytest: "X passed, Y failed" in "====== X passed in Ys ======"
     const pytestMatch = output.match(/=+\s*([\d\w, ]+)\s*in\s*([\d.]+s)/);
     if (pytestMatch) {
-      const counts = pytestMatch[1];
+      const countsStr = pytestMatch[1];
       duration = pytestMatch[2];
-      const passMatch = counts.match(/(\d+)\s+passed/);
-      const failMatch = counts.match(/(\d+)\s+failed/);
-      const skipMatch = counts.match(/(\d+)\s+skipped/);
+      const passMatch = countsStr.match(/(\d+)\s+passed/);
+      const failMatch = countsStr.match(/(\d+)\s+failed/);
+      const skipMatch = countsStr.match(/(\d+)\s+skipped/);
       passed = passMatch ? parseInt(passMatch[1]) : 0;
       failed = failMatch ? parseInt(failMatch[1]) : 0;
       skipped = skipMatch ? parseInt(skipMatch[1]) : 0;
       total = passed + failed + skipped;
+      return { passed, failed, skipped, total, duration };
     }
 
-    // Go test: "ok" or "FAIL"
+    // Go test: "ok" or "FAIL" lines
     const goPass = output.match(/^ok\s/gm);
     const goFail = output.match(/^FAIL\s/gm);
     if (goPass || goFail) {
       passed = goPass?.length ?? 0;
       failed = goFail?.length ?? 0;
       total = passed + failed;
+      return { passed, failed, skipped, total, duration };
     }
 
     // Cargo test: "test result: ok. X passed; Y failed"
@@ -352,27 +442,21 @@ export class TestRunnerService {
       failed = parseInt(cargoMatch[2]);
       skipped = parseInt(cargoMatch[3]);
       total = passed + failed + skipped;
+      return { passed, failed, skipped, total, duration };
     }
 
     // Duration fallback
-    if (duration === "unknown") {
-      const durMatch = output.match(
-        /(?:Time|Duration|Ran)[:.]?\s*([\d.]+\s*m?s)/i,
-      );
-      if (durMatch) {
-        duration = durMatch[1];
-      }
-    }
-
-    // Total fallback
-    if (total === 0 && (passed > 0 || failed > 0)) {
-      total = passed + failed + skipped;
+    const durMatch = output.match(
+      /(?:Time|Duration|Ran)[:.]?\s*([\d.]+\s*m?s)/i,
+    );
+    if (durMatch) {
+      duration = durMatch[1];
     }
 
     return { passed, failed, skipped, total, duration };
   }
 
-  private parseFailures(output: string, framework: string): TestFailure[] {
+  parseFailures(output: string, _framework: string): TestFailure[] {
     const failures: TestFailure[] = [];
 
     // Jest/Vitest failure blocks: "● Test Name"
@@ -447,6 +531,10 @@ export class TestRunnerService {
       `Command: ${result.command}`,
     ];
 
+    if (result.parseWarning) {
+      lines.push("", `⚠️ ${result.parseWarning}`);
+    }
+
     if (result.failures.length > 0) {
       lines.push("", "## Failures:");
       for (const f of result.failures.slice(0, 10)) {
@@ -461,8 +549,9 @@ export class TestRunnerService {
       }
     }
 
-    // Include a truncated snippet of raw output for context
-    if (!result.success) {
+    // Include a truncated snippet of raw output when parsing couldn't extract structure
+    // or when there are failures
+    if (!result.success || result.parseWarning) {
       const tail = result.rawOutput.slice(-2000);
       lines.push("", "## Raw Output (tail):", "```", tail, "```");
     }
