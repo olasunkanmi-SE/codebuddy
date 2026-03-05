@@ -281,13 +281,36 @@ class PytestStrategy implements TestFrameworkStrategy {
 
   parseFailures(output: string): TestFailure[] {
     const failures: TestFailure[] = [];
-    const regex = /FAILED\s+([\w./]+::\w+)/g;
+
+    // Match FAILED lines for test names
+    const failedRegex = /FAILED\s+([\w./]+::\w+)/g;
     let match: RegExpExecArray | null;
-    while ((match = regex.exec(output)) !== null) {
-      failures.push({
-        testName: match[1],
-        message: `Test failed: ${match[1]}`,
-      });
+    while ((match = failedRegex.exec(output)) !== null) {
+      const testName = match[1];
+      const failure: TestFailure = {
+        testName,
+        message: `Test failed: ${testName}`,
+      };
+
+      // Try to extract file and line from traceback above the FAILED marker
+      const beforeFailed = output.slice(0, match.index);
+      const fileMatch = beforeFailed.match(
+        /File\s+"(.+?)",\s*line\s*(\d+)[\s\S]*$/m,
+      );
+      if (fileMatch) failure.file = `${fileMatch[1]}:${fileMatch[2]}`;
+
+      // Try to extract assertion details from the failure block
+      const assertionBlock = beforeFailed.slice(-1500);
+      const assertLeft = assertionBlock.match(
+        /AssertionError:\s*(.+?)(?:\n|$)/,
+      );
+      const expectedVal = assertionBlock.match(/Expected\s+(.+?)(?:\n|$)/i);
+      const actualVal = assertionBlock.match(/Actual\s+(.+?)(?:\n|$)/i);
+      if (assertLeft) failure.message = assertLeft[1].trim();
+      if (expectedVal) failure.expected = expectedVal[1].trim();
+      if (actualVal) failure.actual = actualVal[1].trim();
+
+      failures.push(failure);
     }
     return failures;
   }
@@ -323,8 +346,26 @@ class GoTestStrategy implements TestFrameworkStrategy {
     };
   }
 
-  parseFailures(_output: string): TestFailure[] {
-    return [];
+  parseFailures(output: string): TestFailure[] {
+    const failures: TestFailure[] = [];
+    // Go test failures: "--- FAIL: TestName (0.00s)" followed by log lines
+    const regex =
+      /--- FAIL:\s+(\S+)\s+\(([\d.]+s)\)\n((?:.*\n)*?)(?=--- |FAIL\t|ok\s|$)/g;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(output)) !== null) {
+      const block = match[3].trim();
+      const failure: TestFailure = {
+        testName: match[1],
+        message:
+          block.split("\n").slice(0, 10).join("\n") ||
+          `Test failed in ${match[2]}`,
+      };
+      // Extract file:line from Go test output (e.g. "    foo_test.go:42: ...")
+      const fileMatch = block.match(/(\S+\.go:\d+):/m);
+      if (fileMatch) failure.file = fileMatch[1];
+      failures.push(failure);
+    }
+    return failures;
   }
 }
 
@@ -481,8 +522,10 @@ export class TestRunnerService {
     if (fs.existsSync(pkgPath)) {
       try {
         pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-      } catch {
-        // Ignore parse errors
+      } catch (err) {
+        this.logger.info(
+          `Failed to parse package.json at ${pkgPath}: ${(err as Error).message}`,
+        );
       }
     }
 
@@ -532,6 +575,8 @@ export class TestRunnerService {
     let args: string[];
     let frameworkName: string;
 
+    let customFilterWarning: string | undefined;
+
     if (customCommand && customCommand.trim().length > 0) {
       // Parse the custom command respecting quoted segments
       const parts = parseCommandLine(customCommand.trim());
@@ -541,6 +586,11 @@ export class TestRunnerService {
       executable = parts[0];
       args = parts.slice(1);
       frameworkName = "custom";
+
+      if (testPath || testName) {
+        customFilterWarning =
+          "A custom test command is in use. File path and test name filters are appended as-is and may not be supported by your command.";
+      }
     } else {
       const detected = await this.detectFramework(workspaceRoot);
       if (!detected) {
@@ -590,6 +640,14 @@ export class TestRunnerService {
     );
 
     const result = this.parseOutput(rawOutput, frameworkName, commandDisplay);
+
+    // Append custom-command filter warning if applicable
+    if (customFilterWarning) {
+      result.parseWarning = result.parseWarning
+        ? `${result.parseWarning} ${customFilterWarning}`
+        : customFilterWarning;
+    }
+
     this.logger.info(
       `Tests finished: ${result.passed}/${result.total} passed, ${result.failed} failed`,
     );
@@ -606,9 +664,10 @@ export class TestRunnerService {
       let output = "";
       let killed = false;
 
-      // No shell: true — arguments are passed as an array, preventing injection
+      // Arguments passed as an array; shell defaults to false, preventing injection
       const proc = spawn(executable, args, {
         cwd,
+        shell: false,
         env: {
           ...process.env,
           FORCE_COLOR: "0",

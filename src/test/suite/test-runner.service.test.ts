@@ -292,6 +292,31 @@ test user::tests::test_delete ... FAILED
       const failures = service.parseFailures(output, "mocha");
       assert.strictEqual(failures.length, 0);
     });
+
+    test("parses Go test failure with file and message", () => {
+      const output = `--- FAIL: TestAdd (0.00s)
+    math_test.go:12: expected 4 but got 5
+FAIL\tgithub.com/user/pkg\t0.005s
+`;
+      const failures = service.parseFailures(output, "go-test");
+      assert.strictEqual(failures.length, 1);
+      assert.strictEqual(failures[0].testName, "TestAdd");
+      assert.ok(failures[0].file?.includes("math_test.go:12"));
+      assert.ok(failures[0].message.includes("expected 4 but got 5"));
+    });
+
+    test("parses Pytest failure with file and assertion details", () => {
+      const output = `
+    File "tests/test_math.py", line 8
+    AssertionError: 3 != 4
+FAILED tests/test_math.py::test_add
+`;
+      const failures = service.parseFailures(output, "pytest");
+      assert.strictEqual(failures.length, 1);
+      assert.strictEqual(failures[0].testName, "tests/test_math.py::test_add");
+      assert.ok(failures[0].file?.includes("test_math.py:8"));
+      assert.ok(failures[0].message.includes("3 != 4"));
+    });
   });
 
   // -----------------------------------------------------------------------
