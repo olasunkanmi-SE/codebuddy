@@ -39,7 +39,7 @@ vscode-text-area {
   border: 2px solid var(--vscode-editor-background);
   border-radius: 6px;
   padding: 8px 12px;
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  font-family: var(--codebuddy-font-family);
   font-size: 14px;
   line-height: 1.6;
   min-height: 36px;

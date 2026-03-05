@@ -2,7 +2,8 @@
 .bot-message {
   max-width: 100%;
   width: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
   box-sizing: border-box;
   min-width: 0;
 }
@@ -47,7 +48,7 @@
   background-color: var(--vscode-textCodeBlock-background, #2d2d2d);
   padding: 2px 6px;
   border-radius: 4px;
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  font-family: var(--codebuddy-font-family);
   font-size: 0.9em;
   color: var(--vscode-editor-foreground, #bb9af7);
 }
@@ -58,7 +59,7 @@
   border-radius: 10px;
   margin: 12px 0;
   overflow-x: auto !important;
-  overflow-y: hidden;
+  overflow-y: auto;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   max-width: 100% !important;
   width: auto;
@@ -73,7 +74,7 @@
   color: var(--vscode-editor-foreground, #bb9af7);
   display: block;
   white-space: pre;
-  max-width: none;
+  max-width: none !important;
   width: max-content;
 }
 
@@ -162,7 +163,7 @@
 }
 
 code {
-  font-family: inherit;
+  font-family: var(--codebuddy-font-family);
   background-color: transparent;
 }
 
@@ -179,7 +180,7 @@ pre {
   border: 1px solid var(--vscode-panel-border);
   border-radius: 6px;
   margin: 16px 0;
-  font-family: "JetBrains Mono", SF Mono, "Geist Mono", "Fira Code", "Fira Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  font-family: var(--codebuddy-font-family);
 }
 
 .individual-code-header {

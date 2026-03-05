@@ -28,12 +28,10 @@ import AttachmentIcon from "./attachmentIcon";
 import ChatInput from "./ChatInput";
 import { CostDisplay } from "./CostDisplay";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
-import FileMention from "./FileMention";
 import MessageRenderer from "./MessageRenderer";
 import { PendingChangesPanel } from "./PendingChangesPanel";
 import { UserMessage } from "./personMessage";
 import { SettingsPanel, SettingsGearIcon } from "./settings/index";
-import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
 import { SessionsPanel } from "./sessions";
 import { NotificationPanel } from "./notifications";
@@ -182,16 +180,15 @@ export const WebviewUI = () => {
 
   // ── Handlers (thin wrappers using stores) ──
 
-  const handleContextChange = useCallback((value: string) => {
-    useChatStore.getState().setSelectedContext(value);
-  }, []);
-
   const handleSend = useCallback(
-    (message: string) => {
+    (message: string, mentionedFiles?: string[]) => {
       if (!message.trim()) return;
+      const contextFiles = mentionedFiles && mentionedFiles.length > 0
+        ? mentionedFiles
+        : selectedContext.split("@").filter(Boolean);
       sendMessage(message, {
         mode: selectedCodeBuddyMode || "Agent",
-        context: selectedContext.split("@"),
+        context: contextFiles,
         threadId,
       });
     },
@@ -228,11 +225,6 @@ export const WebviewUI = () => {
   }, []);
 
   // ── Derived values ──
-
-  const processedContext = useMemo(() => {
-    const contextArray = Array.from(new Set(selectedContext.split("@").join(", ").split(", ")));
-    return contextArray.filter((item) => item.length > 1);
-  }, [selectedContext]);
 
   const memoizedMessages = useMemo(() => {
     return streamedMessages.map((msg) =>
@@ -498,14 +490,17 @@ export const WebviewUI = () => {
                           commandAction={commandAction}
                         />
                       )}
-                      {/* Show skeleton only if no activities are being tracked */}
+                      {/* Show typing indicator for chat messages before streaming content appears */}
                       {isBotLoading &&
                         !isCommandExecuting &&
-                        !isStreaming &&
+                        (!isStreaming ||
+                          !streamedMessages.some((m) => m.type === "bot" && m.isStreaming && m.content)) &&
                         !timeline.thinking &&
                         !timeline.plan &&
                         timeline.actions.length === 0 &&
-                        !timeline.summarizing && <SkeletonLoader />}
+                        !timeline.summarizing && (
+                          <CommandFeedbackLoader commandAction="Thinking" />
+                        )}
                     </>
                   )}
                 </div>
@@ -539,31 +534,11 @@ export const WebviewUI = () => {
         }}
       >
         <div className="textarea-container">
-          <div className="horizontal-stack">
-            <span>
-              {selectedContext.length > 1 ? (
-                <>
-                  <small>Context: </small>
-                  <small>
-                    {processedContext.map((item) => (
-                      <span className="attachment-icon" key={item}>
-                        {item}
-                      </span>
-                    ))}
-                  </small>
-                </>
-              ) : (
-                <></>
-              )}
-            </span>
-          </div>
-          <div className="horizontal-stack">
-            <span className="currenFile">
-              <small>Active workspace: </small>
-              <small className="attachment-icon">{activeEditor}</small>
-            </span>
-          </div>
-          <FileMention activeEditor={activeEditor} onInputChange={handleContextChange} folders={folders} />
+          {activeEditor && (
+            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", padding: "0 2px 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              Active: <span style={{ color: "rgba(255,255,255,0.6)" }}>{activeEditor}</span>
+            </div>
+          )}
           {pendingApproval && (
             <div
               style={{
@@ -586,7 +561,7 @@ export const WebviewUI = () => {
             </div>
           )}
           <CostDisplay costData={conversationCost} isStreaming={isStreaming} />
-          <ChatInput onSendMessage={handleSend} disabled={isStreaming || isBotLoading} />
+          <ChatInput onSendMessage={handleSend} disabled={isStreaming || isBotLoading} folders={folders} activeEditor={activeEditor} />
         </div>
         <div className="horizontal-stack">
           <AttachmentIcon onClick={handleGetContext} disabled={true} />

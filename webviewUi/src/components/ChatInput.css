@@ -1,0 +1,112 @@
+.chat-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* ── Textarea ── */
+.chat-input-textarea {
+  width: 100%;
+  min-height: 36px;
+  max-height: 180px;
+  padding: 8px 10px;
+  font-family: var(--vscode-font-family, sans-serif);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--vscode-input-foreground, #ccc);
+  background: var(--vscode-input-background, #1e1e2e);
+  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
+  field-sizing: content;          /* auto-grow where supported */
+}
+
+.chat-input-textarea:focus {
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.chat-input-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Mention dropdown (positioned above textarea) ── */
+.mention-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--vscode-editorWidget-background, rgb(22, 22, 30));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.35);
+  z-index: 200;
+  margin-bottom: 4px;
+}
+
+.mention-list {
+  list-style: none;
+  padding: 4px;
+  margin: 0;
+}
+
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--vscode-foreground, #e0e0e0);
+}
+
+.mention-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mention-item--active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mention-ext {
+  font-size: 10px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  color: rgba(255, 255, 255, 0.35);
+  min-width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.mention-file-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mention-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mention-path {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mention-badge {
+  font-size: 10px;
+  color: #4fc3f7;
+  background: rgba(79, 195, 247, 0.1);
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+}

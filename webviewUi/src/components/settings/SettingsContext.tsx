@@ -149,16 +149,23 @@ const DEFAULT_KEYMAP_OPTIONS: SelectOption[] = [
 ];
 
 const DEFAULT_FONT_FAMILY_OPTIONS: SelectOption[] = [
-  { value: 'Montserrat', label: 'Montserrat' },
-  { value: 'SF Mono', label: 'SF Mono' },
-  { value: 'Space Mono', label: 'Space Mono' },
-  { value: 'Fira Code', label: 'Fira Code' },
-  { value: 'Source Code Pro', label: 'Source Code Pro' },
   { value: 'JetBrains Mono', label: 'JetBrains Mono' },
-  { value: 'Roboto Mono', label: 'Roboto Mono' },
-  { value: 'Ubuntu Mono', label: 'Ubuntu Mono' },
+  { value: 'Fira Code', label: 'Fira Code' },
+  { value: 'Geist Mono', label: 'Geist Mono' },
+  { value: 'Monaspace Neon', label: 'Monaspace Neon' },
+  { value: 'Monaspace Argon', label: 'Monaspace Argon' },
+  { value: 'Cascadia Code', label: 'Cascadia Code' },
+  { value: 'SF Mono', label: 'SF Mono' },
+  { value: 'Source Code Pro', label: 'Source Code Pro' },
   { value: 'IBM Plex Mono', label: 'IBM Plex Mono' },
+  { value: 'Roboto Mono', label: 'Roboto Mono' },
+  { value: 'Space Mono', label: 'Space Mono' },
+  { value: 'Ubuntu Mono', label: 'Ubuntu Mono' },
   { value: 'Inconsolata', label: 'Inconsolata' },
+  { value: 'Iosevka', label: 'Iosevka' },
+  { value: 'Victor Mono', label: 'Victor Mono' },
+  { value: 'Commit Mono', label: 'Commit Mono' },
+  { value: 'Maple Mono', label: 'Maple Mono' },
 ];
 
 const DEFAULT_FONT_SIZE_OPTIONS: SelectOption[] = [
