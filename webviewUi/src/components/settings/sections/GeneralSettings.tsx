@@ -108,24 +108,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({ searchQuery: _
           </SettingControl>
         </SettingsRow>
 
-        <SettingsRow>
-          <SettingInfo>
-            <SettingLabel>{t("settings.general.codeBuddyMode")}</SettingLabel>
-            <SettingDescription>Switch between Agent mode (autonomous) and Ask mode (conversational)</SettingDescription>
-          </SettingInfo>
-          <SettingControl>
-            <Select 
-              value={values.codeBuddyMode} 
-              onChange={(e) => handlers.onCodeBuddyModeChange(e.target.value)}
-            >
-              {options.codeBuddyModeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </SettingControl>
-        </SettingsRow>
       </SettingsSection>
 
       <SettingsSection>

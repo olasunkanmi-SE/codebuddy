@@ -50,6 +50,16 @@ export interface AgentTimelineState {
 
 export type AgentTimelineSnapshot = AgentTimelineState;
 
+export interface IConversationCostData {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUSD: number;
+  provider: string;
+  model: string;
+  requestCount: number;
+}
+
 export interface IWebviewMessage {
   id: string;
   type: "user" | "bot";
@@ -59,6 +69,7 @@ export interface IWebviewMessage {
   isStreaming?: boolean;
   timestamp?: number;
   timelineSnapshot?: AgentTimelineSnapshot;
+  costData?: IConversationCostData;
 }
 
 interface UseStreamingChatOptions {
@@ -112,6 +123,9 @@ export const useStreamingChat = (
     toolName?: string;
     description?: string;
   } | null>(null);
+  const [conversationCost, setConversationCost] =
+    useState<IConversationCostData | null>(null);
+  const conversationCostRef = useRef<IConversationCostData | null>(null);
 
   const currentRequestIdRef = useRef<string | null>(null);
   const threadIdRef = useRef<string>(
@@ -158,6 +172,7 @@ export const useStreamingChat = (
       setIsLegacyLoading(false);
       setTimeline({ actions: [] }); // Clear timeline for new stream
       setPendingApproval(null); // Reset pending approvals for new requests
+      setConversationCost(null); // Reset cost for new stream
       setStreamingMessage({
         id: tempId,
         type: "bot",
@@ -197,6 +212,7 @@ export const useStreamingChat = (
           id: `bot-${Date.now()}`,
           isStreaming: false,
           content: finalContent,
+          costData: conversationCostRef.current ?? undefined,
         };
         setCompletedMessages((prevCompleted) => [
           ...prevCompleted,
@@ -412,6 +428,14 @@ export const useStreamingChat = (
     if (!payload?.status) return;
 
     switch (payload.status) {
+      case "cost_update": {
+        if (payload.costData) {
+          const cost = payload.costData as IConversationCostData;
+          setConversationCost(cost);
+          conversationCostRef.current = cost;
+        }
+        break;
+      }
       case "interrupt_waiting": {
         const desc =
           payload.description ||
@@ -734,5 +758,6 @@ export const useStreamingChat = (
     pendingApproval,
     cancelCurrentRequest,
     threadId: threadIdRef.current,
+    conversationCost,
   };
 };

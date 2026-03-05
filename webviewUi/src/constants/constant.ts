@@ -1,15 +1,96 @@
 import { FAQItem } from "../components/accordion";
 
 export const modelOptions = [
-  { value: "Gemini", label: "Google Gemini" },
-  { value: "Anthropic", label: "Anthropic Claude" },
-  { value: "Groq", label: "Groq (Llama)" },
-  { value: "Deepseek", label: "Deepseek" },
-  { value: "OpenAI", label: "OpenAI" },
-  { value: "Qwen", label: "Alibaba Qwen" },
-  { value: "GLM", label: "Zhipu GLM" },
-  { value: "Local", label: "Local (OpenAI Compatible)" },
+  {
+    value: "Gemini",
+    label: "Google Gemini",
+    pricingHint: "from $0.08/1M tokens",
+  },
+  {
+    value: "Anthropic",
+    label: "Anthropic Claude",
+    pricingHint: "from $0.25/1M tokens",
+  },
+  { value: "Groq", label: "Groq (Llama)", pricingHint: "from $0.05/1M tokens" },
+  { value: "Deepseek", label: "Deepseek", pricingHint: "from $0.14/1M tokens" },
+  { value: "OpenAI", label: "OpenAI", pricingHint: "from $0.15/1M tokens" },
+  { value: "Qwen", label: "Alibaba Qwen", pricingHint: "from $0.30/1M tokens" },
+  { value: "GLM", label: "Zhipu GLM", pricingHint: "from $0.007/1M tokens" },
+  {
+    value: "Local",
+    label: "Local (OpenAI Compatible)",
+    pricingHint: "free (self-hosted)",
+  },
 ];
+
+/** Per-model pricing (USD per 1M tokens) — mirrors backend CostTrackingService. */
+interface ModelPricing {
+  inputPerMillion: number;
+  outputPerMillion: number;
+}
+
+export const MODEL_PRICING_TABLE: Record<string, ModelPricing> = {
+  // Anthropic
+  "claude-sonnet-4-6": { inputPerMillion: 3, outputPerMillion: 15 },
+  "claude-sonnet-4-20250514": { inputPerMillion: 3, outputPerMillion: 15 },
+  "claude-opus-4-20250514": { inputPerMillion: 15, outputPerMillion: 75 },
+  "claude-3-7-sonnet-20250219": { inputPerMillion: 3, outputPerMillion: 15 },
+  "claude-3-5-sonnet-20241022": { inputPerMillion: 3, outputPerMillion: 15 },
+  "claude-3-5-haiku-20241022": { inputPerMillion: 0.8, outputPerMillion: 4 },
+  "claude-3-haiku-20240307": { inputPerMillion: 0.25, outputPerMillion: 1.25 },
+  // OpenAI
+  "gpt-4o": { inputPerMillion: 2.5, outputPerMillion: 10 },
+  "gpt-4o-mini": { inputPerMillion: 0.15, outputPerMillion: 0.6 },
+  "o3-mini": { inputPerMillion: 1.1, outputPerMillion: 4.4 },
+  // Google Gemini
+  "gemini-2.5-pro": { inputPerMillion: 1.25, outputPerMillion: 10 },
+  "gemini-2.5-flash": { inputPerMillion: 0.15, outputPerMillion: 0.6 },
+  "gemini-2.0-flash": { inputPerMillion: 0.1, outputPerMillion: 0.4 },
+  "gemini-1.5-flash": { inputPerMillion: 0.075, outputPerMillion: 0.3 },
+  // Groq
+  "llama-3.3-70b-versatile": { inputPerMillion: 0.59, outputPerMillion: 0.79 },
+  "llama-3.1-8b-instant": { inputPerMillion: 0.05, outputPerMillion: 0.08 },
+  // DeepSeek
+  "deepseek-chat": { inputPerMillion: 0.27, outputPerMillion: 1.1 },
+  "deepseek-coder": { inputPerMillion: 0.14, outputPerMillion: 0.28 },
+  "deepseek-reasoner": { inputPerMillion: 0.55, outputPerMillion: 2.19 },
+  // Qwen
+  "qwen-plus": { inputPerMillion: 0.8, outputPerMillion: 2 },
+  "qwen-turbo": { inputPerMillion: 0.3, outputPerMillion: 0.6 },
+  "qwen-max": { inputPerMillion: 2.4, outputPerMillion: 9.6 },
+  // GLM
+  "glm-4-plus": { inputPerMillion: 0.7, outputPerMillion: 0.7 },
+  "glm-4-flash": { inputPerMillion: 0.007, outputPerMillion: 0.007 },
+};
+
+/** Computes what a token count would cost on a different model. */
+export function estimateCostForModel(
+  modelKey: string,
+  inputTokens: number,
+  outputTokens: number,
+): number | null {
+  const pricing = MODEL_PRICING_TABLE[modelKey];
+  if (!pricing) return null;
+  return (
+    (inputTokens * pricing.inputPerMillion +
+      outputTokens * pricing.outputPerMillion) /
+    1_000_000
+  );
+}
+
+/** Representative "cheap" alternative per provider for cost comparison. */
+export const BUDGET_ALTERNATIVES: Record<
+  string,
+  { model: string; label: string }
+> = {
+  Anthropic: { model: "claude-3-5-haiku-20241022", label: "Haiku 3.5" },
+  OpenAI: { model: "gpt-4o-mini", label: "GPT-4o Mini" },
+  Gemini: { model: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  Groq: { model: "llama-3.1-8b-instant", label: "Llama 3.1 8B" },
+  Deepseek: { model: "deepseek-coder", label: "DeepSeek Coder" },
+  Qwen: { model: "qwen-turbo", label: "Qwen Turbo" },
+  GLM: { model: "glm-4-flash", label: "GLM-4 Flash" },
+};
 
 export const codeBuddyMode = [
   { value: "Agent", label: "Agent" },

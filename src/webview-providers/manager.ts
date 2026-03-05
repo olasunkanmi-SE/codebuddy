@@ -501,15 +501,19 @@ export class WebViewProviderManager implements vscode.Disposable {
 
   private async handleStreamMetadata(event: IEventPayload) {
     if (this.webviewView?.webview) {
+      // Flatten nested metadata so fields like status, costData, toolName
+      // are directly accessible in the webview payload.
+      const nested = event.message?.metadata ?? {};
       await this.webviewView.webview.postMessage({
         type: StreamEventType.METADATA,
         payload: {
           requestId: event.message?.requestId,
           threadId: event.message?.threadId,
-          status: event.message?.status,
-          toolName: event.message?.toolName,
-          description: event.message?.description,
+          status: event.message?.status ?? nested.status,
+          toolName: event.message?.toolName ?? nested.toolName,
+          description: event.message?.description ?? nested.description,
           content: event.message?.content,
+          costData: nested.costData,
           timestamp: Date.now(),
         },
       });

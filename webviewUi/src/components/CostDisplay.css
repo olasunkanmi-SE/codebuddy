@@ -1,0 +1,79 @@
+.cost-display {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  border-radius: 6px;
+  user-select: none;
+  overflow: hidden;
+}
+
+.cost-display--active {
+  color: var(--vscode-foreground, #ccc);
+}
+
+.cost-display__main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cost-display__tokens {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.cost-display__tokens svg {
+  opacity: 0.6;
+}
+
+.cost-display__separator {
+  opacity: 0.4;
+}
+
+.cost-display__cost {
+  font-weight: 500;
+  color: var(--vscode-charts-green, #89d185);
+}
+
+.cost-display__model {
+  opacity: 0.7;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cost-display__expand-hint {
+  opacity: 0.4;
+  font-size: 9px;
+  margin-left: 2px;
+}
+
+.cost-display__comparison {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 0 15px;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+  white-space: nowrap;
+}
+
+.cost-display__alt {
+  opacity: 0.8;
+}
+
+.cost-display__alt strong {
+  color: var(--vscode-foreground, #ccc);
+  font-weight: 500;
+}
+
+.cost-display__savings {
+  color: var(--vscode-charts-green, #89d185);
+  font-weight: 500;
+}

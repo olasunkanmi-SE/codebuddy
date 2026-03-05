@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useSettings } from '../SettingsContext';
-import { PREDEFINED_LOCAL_MODELS } from '../../../constants/constant';
+import { PREDEFINED_LOCAL_MODELS, BUDGET_ALTERNATIVES, modelOptions as modelOptionsWithPricing } from '../../../constants/constant';
 import {
   SettingsSection,
   SectionTitle,
@@ -265,11 +265,14 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({ searchQuery: _se
           </SettingInfo>
           <SettingControl>
             <Select value={selectedModel} onChange={(e) => onModelChange(e.target.value)}>
-              {modelOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {modelOptions.map((option) => {
+                const hint = modelOptionsWithPricing.find((m) => m.value === option.value)?.pricingHint;
+                return (
+                  <option key={option.value} value={option.value}>
+                    {option.label}{hint ? ` — ${hint}` : ''}
+                  </option>
+                );
+              })}
             </Select>
           </SettingControl>
         </SettingsRow>
@@ -292,12 +295,16 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({ searchQuery: _se
           </ModelHeader>
           <ModelStats>
             <Stat>
-              <StatLabel>Context Window</StatLabel>
-              <StatValue>128K tokens</StatValue>
+              <StatLabel>Pricing (per 1M tokens)</StatLabel>
+              <StatValue>
+                {modelOptionsWithPricing.find((m) => m.value === selectedModel)?.pricingHint || 'N/A'}
+              </StatValue>
             </Stat>
             <Stat>
-              <StatLabel>Response Speed</StatLabel>
-              <StatValue>Fast</StatValue>
+              <StatLabel>Budget Alternative</StatLabel>
+              <StatValue>
+                {BUDGET_ALTERNATIVES[selectedModel]?.label || '—'}
+              </StatValue>
             </Stat>
             <Stat>
               <StatLabel>Capabilities</StatLabel>

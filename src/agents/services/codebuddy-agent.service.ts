@@ -11,6 +11,8 @@ import { StreamManager } from "./stream-manager.service";
 import { ResultSynthesizerService } from "./result-synthesizer.service";
 import { AgentRunningGuardService } from "../../services/agent-running-guard.service";
 import { InputValidator } from "../../services/input-validator";
+import { CostTrackingService } from "../../services/cost-tracking.service";
+import { getGenerativeAiModel, getAPIKeyAndModel } from "../../utils/utils";
 
 // Tool descriptions for user-friendly feedback
 const TOOL_DESCRIPTIONS: Record<
@@ -382,6 +384,17 @@ export class CodeBuddyAgentService {
     let hasErrored = false;
     let forceStopReason: "max_events" | "max_tools" | "timeout" | null = null;
 
+    // Cost tracking — resolve current provider/model for pricing lookup
+    const costTracker = CostTrackingService.getInstance();
+    const providerName = getGenerativeAiModel() ?? "unknown";
+    let currentModelName = "unknown";
+    try {
+      const cfg = getAPIKeyAndModel(providerName.toLowerCase());
+      currentModelName = cfg.model ?? providerName;
+    } catch {
+      // Non-critical — fallback pricing will be used
+    }
+
     // Simple state machine to track phases
     type AgentState =
       | "planning"
@@ -597,6 +610,31 @@ export class CodeBuddyAgentService {
           // Check for tool results in messages (indicates tool completion)
           if (update?.messages && Array.isArray(update.messages)) {
             for (const message of update.messages) {
+              // Extract token usage from AI messages (LangChain usage_metadata)
+              if (
+                message.usage_metadata &&
+                (message.usage_metadata.input_tokens ||
+                  message.usage_metadata.output_tokens)
+              ) {
+                const usage = message.usage_metadata;
+                const costData = costTracker.recordUsage(
+                  conversationId,
+                  providerName,
+                  currentModelName,
+                  usage.input_tokens ?? 0,
+                  usage.output_tokens ?? 0,
+                );
+                yield {
+                  type: StreamEventType.METADATA,
+                  content: "cost_update",
+                  metadata: {
+                    threadId: conversationId,
+                    status: "cost_update",
+                    costData,
+                  },
+                };
+              }
+
               if (message.type === "tool" || message.name) {
                 const toolName = message.name || "unknown";
                 const toolActivity = pendingToolCalls.get(toolName);
@@ -966,6 +1004,9 @@ export class CodeBuddyAgentService {
       }
 
       streamManger.endStream(accumulatedContent);
+
+      // Include final cost summary in the END event
+      const finalCost = costTracker.getConversationCost(conversationId);
       yield {
         type: StreamEventType.END,
         content: accumulatedContent,
@@ -973,6 +1014,7 @@ export class CodeBuddyAgentService {
           threadId: conversationId,
           forceStopReason,
           state: forceStopReason ? "completed_with_warning" : "completed",
+          costData: finalCost ?? undefined,
         },
       };
       agentState = forceStopReason ? "completed" : "completed";
