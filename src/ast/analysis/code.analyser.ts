@@ -7,7 +7,7 @@ import { IAnalysisOutput, ICodeElement } from "../query-types";
 import { LairExtractor } from "./../query-extractor";
 import { CodeSearch } from "./code.search";
 import { FileParser } from "./file.parser";
-import { RelevanceScorer } from "./relevance.scrorer";
+import { RelevanceScorer } from "./relevance.scorer";
 
 export class CodeAnalyzer {
   private readonly textDecoder = new TextDecoder();

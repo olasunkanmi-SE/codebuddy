@@ -3,7 +3,7 @@ import { OutputManager } from "../../services/output-manager";
 import { CodeAnalyzer } from "../analysis/code.analyser";
 import { CodeSearch } from "../analysis/code.search";
 import { FileParser } from "../analysis/file.parser";
-import { SummaryGenerator } from "../analysis/summry.generator";
+import { SummaryGenerator } from "../analysis/summary.generator";
 import { CacheManager } from "../cache/cache.manager";
 import { TreeSitterParser } from "../parser/tree-sitter.parser";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
