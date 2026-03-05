@@ -1,0 +1,42 @@
+/* User Message Component Styles */
+.message-container {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.015));
+  border-radius: 8px;
+  max-width: 100%;
+  margin-bottom: 16px;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.avatar-container {
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  background-color: var(--vscode-button-background, #0e639c);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-button-foreground, #ffffff);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.message-content {
+  text-align: left;
+  flex: 1;
+  font-size: var(--codebuddy-font-size);
+  line-height: 1.6;
+  color: var(--vscode-foreground);
+  margin-top: 2px;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}

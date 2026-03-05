@@ -5,7 +5,6 @@ import { ChatHistoryRepository } from "../infrastructure/repository/db-chat-hist
 import { IMessageInput, Message } from "../llms/message";
 import { Memory } from "../memory/base";
 import { BaseWebViewProvider, LLMMessage } from "./base";
-import { CodebuddyAgentService } from "../agents/agentService";
 import { MessageHandler } from "../agents/handlers/message-handler";
 
 export class GeminiWebViewProvider extends BaseWebViewProvider {

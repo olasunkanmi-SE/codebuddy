@@ -5,6 +5,7 @@ import { ErrorBoundary } from "./components/errorBoundry.tsx";
 import { VSCodeProvider } from "./context/vscodeProvider.tsx";
 import "./i18n/i18n";
 import "./index.css";
+import "./styles/vscode-overrides.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import "./thinkingComponent.css";
 import DOMPurify from "dompurify";
 import styled from "styled-components";
 import { marked } from "marked";

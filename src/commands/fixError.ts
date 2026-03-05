@@ -1,7 +1,8 @@
 import { formatText } from "../utils/utils";
 import * as vscode from "vscode";
 import { CodeCommandHandler } from "./handler";
-import { CodebuddyAgentService } from "../agents/agentService";
+import { CodeBuddyAgentService } from "../agents/services/codebuddy-agent.service";
+import { StreamEventType } from "../agents/interface/agent.interface";
 import { WebViewProviderManager } from "../webview-providers/manager";
 import { Logger, LogLevel } from "../infrastructure/logger/logger";
 
@@ -36,7 +37,7 @@ export class FixError extends CodeCommandHandler {
       },
       async (progress, token) => {
         try {
-          const agentService = CodebuddyAgentService.getInstance();
+          const agentService = CodeBuddyAgentService.getInstance();
 
           // Check for active debug session
           const activeSession = vscode.debug.activeDebugSession;
@@ -72,31 +73,26 @@ Instructions:
           let toolUsed = false;
           let agentResponse = "";
 
-          // Run the agent
-          for await (const event of agentService.runx(prompt)) {
+          // Run the agent via the production streaming service
+          for await (const event of agentService.streamResponse(prompt)) {
             if (token.isCancellationRequested) {
               logger.info("Auto-fix cancelled by user");
               return;
             }
 
             // Check for tool usage
-            // event.node === "tools" indicates tool execution
-            // event.update?.messages?.[0]?.tool_calls indicates tool *request* (in agent node)
             if (
-              event.node === "tools" ||
-              event.update?.messages?.[0]?.tool_calls?.length > 0
+              event.type === StreamEventType.TOOL_START ||
+              event.type === StreamEventType.TOOL_END
             ) {
               toolUsed = true;
               progress.report({ message: "Applying fix..." });
             }
 
-            // Check for reasoning/text
-            if (event.node === "agent") {
-              const content = event.update?.messages?.[0]?.content;
-              if (typeof content === "string") {
-                agentResponse += content;
-                progress.report({ message: "Analyzing..." });
-              }
+            // Capture streamed text content
+            if (event.type === StreamEventType.CHUNK) {
+              agentResponse += event.content;
+              progress.report({ message: "Analyzing..." });
             }
           }
 

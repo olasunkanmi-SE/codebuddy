@@ -2,15 +2,26 @@
 
 import { VSCodeButton, VSCodePanels, VSCodePanelTab, VSCodePanelView } from "@vscode/webview-ui-toolkit/react";
 import type hljs from "highlight.js";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
-import styled from "styled-components";
-import { codeBuddyMode, faqItems, modelOptions, themeOptions } from "../constants/constant";
-import { IWebviewMessage, useStreamingChat } from "../hooks/useStreamingChat";
+import { useCallback, useEffect, useMemo } from "react";
+import "./webview.css";
+import { faqItems } from "../constants/constant";
+import { useStreamingChat } from "../hooks/useStreamingChat";
+import { useMessageDispatcher } from "../hooks/useMessageDispatcher";
 import { vscode } from "../utils/vscode";
 import { getChatCss } from "../themes/chat_css";
 import { updateStyles } from "../utils/dynamicCss";
 import { highlightCodeBlocks } from "../utils/highlightCode";
+import {
+  useSettingsStore,
+  useSettingsValues,
+  useSettingsHandlers,
+  useSettingsOptions,
+  usePanelStore,
+  useSessionsStore,
+  useNotificationsStore,
+  useContentStore,
+  useChatStore,
+} from "../stores";
 import { FAQAccordion } from "./accordion";
 import { AgentTimeline } from "./AgentTimeline";
 import AttachmentIcon from "./attachmentIcon";
@@ -20,496 +31,92 @@ import FileMention from "./FileMention";
 import MessageRenderer from "./MessageRenderer";
 import { PendingChangesPanel } from "./PendingChangesPanel";
 import { UserMessage } from "./personMessage";
-import { SettingsPanel, SettingsGearIcon, SettingsValues, SettingsOptions, SettingsHandlers, DEFAULT_LANGUAGE_OPTIONS, DEFAULT_KEYMAP_OPTIONS, DEFAULT_SUBAGENTS, DEFAULT_FONT_FAMILY_OPTIONS, DEFAULT_FONT_SIZE_OPTIONS, CustomRule, SubagentConfig } from "./settings/index";
+import { SettingsPanel, SettingsGearIcon } from "./settings/index";
 import { SkeletonLoader } from "./skeletonLoader";
 import { WelcomeScreen } from "./welcomeUI";
-import { SessionsPanel, ChatSession } from "./sessions";
-import { NotificationPanel, INotificationItem } from "./notifications";
+import { SessionsPanel } from "./sessions";
+import { NotificationPanel } from "./notifications";
 import { UpdatesPanel } from "./updates/UpdatesPanel";
 import { ObservabilityPanel } from "./observability/ObservabilityPanel";
 import { CoWorkerPanel } from "./coworker/CoWorkerPanel";
-
-// Styled components for settings toggle
-const SettingsToggleButton = styled.button`
-  position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-// Styled component for sessions toggle button
-const SessionsToggleButton = styled.button`
-  position: fixed;
-  top: 44px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-// Sessions icon component
-const SessionsIcon = ({ size = 14 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
-
-// Styled component for notification toggle button
-const NotificationToggleButton = styled.button`
-  position: fixed;
-  top: 76px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-// Co-Worker toggle button
-const CoWorkerToggleButton = styled.button`
-  position: fixed;
-  top: 204px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-const FontSizeGroup = styled.div`
-  position: fixed;
-  top: 236px;
-  left: 12px;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const FontSizeButton = styled.button`
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 4px;
-  width: 26px;
-  height: 26px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 11px;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-const NotificationIcon = ({ size = 14 }: { size?: number }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-  </svg>
-);
-
-// Book icon component for Updates
-const BookIcon = ({ size = 14 }: { size?: number }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-  </svg>
-);
-
-// Browser icon component
-const BrowserIcon = ({ size = 14 }: { size?: number }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <line x1="2" y1="12" x2="22" y2="12" />
-    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-  </svg>
-);
-
-// Co-Worker icon component
-const CoWorkerIcon = ({ size = 14 }: { size?: number }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="3" y="11" width="18" height="10" rx="2" />
-    <circle cx="9" cy="16" r="1.5" fill="currentColor" stroke="none" />
-    <circle cx="15" cy="16" r="1.5" fill="currentColor" stroke="none" />
-    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-  </svg>
-);
-
-// Styled component for observability toggle button
-const ObservabilityToggleButton = styled.button`
-  position: fixed;
-  top: 140px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-// Observability icon component
-const ObservabilityIcon = ({ size = 14 }: { size?: number }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-  </svg>
-);
-
-// Styled component for browser toggle button
-const BrowserToggleButton = styled.button`
-  position: fixed;
-  top: 172px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-// Browsing history dropdown
-const BrowsingHistoryDropdown = styled.div`
-  position: fixed;
-  top: 172px;
-  left: 40px;
-  z-index: 200;
-  background: var(--vscode-menu-background, #1e1e2e);
-  border: 1px solid var(--vscode-menu-border, rgba(255, 255, 255, 0.15));
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  min-width: 280px;
-  max-height: 320px;
-  overflow-y: auto;
-  padding: 4px 0;
-`;
-
-const HistoryItem = styled.button`
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  padding: 8px 12px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--vscode-menu-foreground, rgba(255, 255, 255, 0.85));
-  text-align: left;
-  transition: background 0.1s ease;
-  gap: 2px;
-
-  &:hover {
-    background: var(--vscode-menu-selectionBackground, rgba(255, 255, 255, 0.1));
-  }
-`;
-
-const HistoryTitle = styled.span`
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const HistoryUrl = styled.span`
-  font-size: 10px;
-  opacity: 0.6;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const HistoryHeader = styled.div`
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.5;
-  color: var(--vscode-menu-foreground, rgba(255, 255, 255, 0.85));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-`;
-
-// Styled component for updates toggle button
-const UpdatesToggleButton = styled.button`
-  position: fixed;
-  top: 108px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
+import {
+  SettingsToggleButton,
+  SessionsToggleButton,
+  NotificationToggleButton,
+  UpdatesToggleButton,
+  ObservabilityToggleButton,
+  BrowserToggleButton,
+  CoWorkerToggleButton,
+  FontSizeGroup,
+  FontSizeButton,
+  BrowsingHistoryDropdown,
+  HistoryItem,
+  HistoryTitle,
+  HistoryUrl,
+  HistoryHeader,
+  SessionsIcon,
+  NotificationIcon,
+  BookIcon,
+  BrowserIcon,
+  CoWorkerIcon,
+  ObservabilityIcon,
+} from "./webview.styles";
 
 const hljsApi = window["hljs" as any] as unknown as typeof hljs;
 
 const vsCode = vscode;
 
-interface ConfigData {
-  username?: string;
-  theme?: string;
-  selectedModel?: string;
-  enableStreaming?: boolean;
-  fontFamily?: string;
-  fontSize?: number;
-  autoApprove?: boolean;
-  allowFileEdits?: boolean;
-  allowTerminal?: boolean;
-  verboseLogging?: boolean;
-  indexCodebase?: boolean;
-  contextWindow?: string;
-  includeHidden?: boolean;
-  maxFileSize?: string;
-  compactMode?: boolean;
-  dailyStandupEnabled?: boolean;
-  codeHealthEnabled?: boolean;
-  dependencyCheckEnabled?: boolean;
-  browserType?: 'reader' | 'simple' | 'system';
-  language?: string;
-}
-
 export const WebviewUI = () => {
-  const { i18n } = useTranslation();
-  // State variables
-  const [selectedTheme, setSelectedTheme] = useState("tokyo night");
-  const [selectedModel, setSelectedModel] = useState("Groq");
-  // Default to Ask mode for conversational interactions
-  const [selectedCodeBuddyMode, setSelectedCodeBuddyMode] = useState("Ask");
-  const [commandAction, setCommandAction] = useState<string>("");
-  const [isCommandExecuting, setIsCommandExecuting] = useState(false);
-  const [selectedContext, setSelectedContext] = useState("");
-  const [folders, setFolders] = useState<any>("");
-  const [activeEditor, setActiveEditor] = useState("");
-  const [username, setUsername] = useState("");
-  const [enableStreaming, setEnableStreaming] = useState(true);
-  const [fontFamily, setFontFamily] = useState("JetBrains Mono");
-  const [fontSize, setFontSize] = useState(13);
-  const [autoApprove, setAutoApprove] = useState(false);
-  const [allowFileEdits, setAllowFileEdits] = useState(true);
-  const [allowTerminal, setAllowTerminal] = useState(true);
-  const [verboseLogging, setVerboseLogging] = useState(false);
-  const [indexCodebase, setIndexCodebase] = useState(false);
-  const [contextWindow, setContextWindow] = useState("16k");
-  const [includeHidden, setIncludeHidden] = useState(false);
-  const [maxFileSize, setMaxFileSize] = useState("1");
-  const [compactMode, setCompactMode] = useState(false);
-  const [dailyStandupEnabled, setDailyStandupEnabled] = useState(true);
-  const [codeHealthEnabled, setCodeHealthEnabled] = useState(true);
-  const [dependencyCheckEnabled, setDependencyCheckEnabled] = useState(true);
-  const [gitWatchdogEnabled, setGitWatchdogEnabled] = useState(true);
-  const [endOfDaySummaryEnabled, setEndOfDaySummaryEnabled] = useState(true);
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
-  const [browserType, setBrowserType] = useState<'reader' | 'simple' | 'system'>('reader');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [fileChangesPanelCollapsed, setFileChangesPanelCollapsed] = useState(true);
-  const [newsItems, setNewsItems] = useState<any[]>([]);
-  
-  // Rules & Subagents state
-  const [customRules, setCustomRules] = useState<CustomRule[]>([]);
-  const [customSystemPrompt, setCustomSystemPrompt] = useState("");
-  const [subagents, setSubagents] = useState<SubagentConfig[]>(DEFAULT_SUBAGENTS);
+  // ── Store selectors ──
+  const enableStreaming = useSettingsStore((s) => s.enableStreaming);
+  const selectedTheme = useSettingsStore((s) => s.selectedTheme);
+  const compactMode = useSettingsStore((s) => s.compactMode);
+  const username = useSettingsStore((s) => s.username);
+  const fontFamily = useSettingsStore((s) => s.fontFamily);
+  const fontSize = useSettingsStore((s) => s.fontSize);
+  const selectedCodeBuddyMode = useSettingsStore((s) => s.selectedCodeBuddyMode);
+  const selectedContext = useChatStore((s) => s.selectedContext);
+  const activeEditor = useChatStore((s) => s.activeEditor);
+  const folders = useChatStore((s) => s.folders);
+  const commandAction = useChatStore((s) => s.commandAction);
+  const isCommandExecuting = useChatStore((s) => s.isCommandExecuting);
+  const fileChangesPanelCollapsed = useChatStore((s) => s.fileChangesPanelCollapsed);
+  const unreadNotificationCount = useNotificationsStore((s) => s.unreadNotificationCount);
 
-  // Sessions state
-  const [isSessionsOpen, setIsSessionsOpen] = useState(false);
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  // Panel store
+  const isSettingsOpen = usePanelStore((s) => s.isSettingsOpen);
+  const isSessionsOpen = usePanelStore((s) => s.isSessionsOpen);
+  const isNotificationPanelOpen = usePanelStore((s) => s.isNotificationPanelOpen);
+  const isUpdatesPanelOpen = usePanelStore((s) => s.isUpdatesPanelOpen);
+  const isObservabilityOpen = usePanelStore((s) => s.isObservabilityOpen);
+  const isCoWorkerOpen = usePanelStore((s) => s.isCoWorkerOpen);
+  const isHistoryOpen = usePanelStore((s) => s.isHistoryOpen);
 
-  // Notifications state
-  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
-  const [isUpdatesPanelOpen, setIsUpdatesPanelOpen] = useState(false);
-  const [isObservabilityOpen, setIsObservabilityOpen] = useState(false);
-  const [isCoWorkerOpen, setIsCoWorkerOpen] = useState(false);
-  const [notifications, setNotifications] = useState<INotificationItem[]>([]);
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  // Sessions store
+  const sessions = useSessionsStore((s) => s.sessions);
+  const currentSessionId = useSessionsStore((s) => s.currentSessionId);
 
-  const [logs, setLogs] = useState<any[]>([]);
-  const [metrics, setMetrics] = useState<any>(null);
-  const [traces, setTraces] = useState<any[]>([]);
+  // Content store
+  const newsItems = useContentStore((s) => s.newsItems);
+  const logs = useContentStore((s) => s.logs);
+  const metrics = useContentStore((s) => s.metrics);
+  const traces = useContentStore((s) => s.traces);
+  const browsingHistory = useContentStore((s) => s.browsingHistory);
+  const notifications = useNotificationsStore((s) => s.notifications);
 
-  // Browsing history state
-  const [browsingHistory, setBrowsingHistory] = useState<Array<{ url: string; title: string; timestamp: number }>>([]);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  // const [dependencyGraph, setDependencyGraph] = useState<string | null>(null);
+  // Settings-derived objects for SettingsPanel
+  const settingsValues = useSettingsValues();
+  const settingsOptions = useSettingsOptions();
+  const settingsHandlers = useSettingsHandlers();
 
-  // Ref for username input element
-  // const nameInputRef = useRef<HTMLInputElement>(null);
+  // CoWorker panel props from settings store
+  const dailyStandupEnabled = useSettingsStore((s) => s.dailyStandupEnabled);
+  const codeHealthEnabled = useSettingsStore((s) => s.codeHealthEnabled);
+  const dependencyCheckEnabled = useSettingsStore((s) => s.dependencyCheckEnabled);
+  const gitWatchdogEnabled = useSettingsStore((s) => s.gitWatchdogEnabled);
+  const endOfDaySummaryEnabled = useSettingsStore((s) => s.endOfDaySummaryEnabled);
 
-  // Initialize streaming chat hook
+  // ── Streaming chat hook ──
   const {
     messages: streamedMessages,
     timeline,
@@ -529,346 +136,13 @@ export const WebviewUI = () => {
     },
   });
 
-  useEffect(() => {
-    // Removed connectors effect
-  }, []);
+  // ── Message dispatcher (replaces giant legacyMessageHandler) ──
+  useMessageDispatcher({ setMessages, clearMessages, addMessage, sendMessage, threadId });
 
-  // Memoize the chat CSS to prevent unnecessary re-renders
+  // ── Memoized CSS ──
   const chatCss = useMemo(() => getChatCss(selectedTheme), [selectedTheme]);
 
-  // Legacy message handler for non-streaming events
-  const legacyMessageHandler = useCallback((event: any) => {
-    const message = event.data;
-    const messageType = message.command || message.type;
-
-    // Handle stream end to clear command execution state
-    // (the actual message handling is done by useStreamingChat hook)
-    if (messageType === 'onStreamEnd' || messageType === 'onStreamError') {
-      setIsCommandExecuting(false);
-      setCommandAction("");
-      return;
-    }
-
-    // Skip other streaming-related messages as they're handled by the hook
-    if (message.command?.includes('stream') || message.type?.includes('stream')) {
-      return;
-    }
-
-    switch (messageType) {
-      case "codebuddy-commands":
-        console.log("Command feedback received:", message.message);
-        setIsCommandExecuting(true);
-        if (typeof message.message === "object" && message.message.action && message.message.description) {
-          setCommandAction(message.message.action);
-        } else {
-          setCommandAction(message.message || "Processing request");
-        }
-        break;
-
-      case "bootstrap":
-        setFolders(message);
-        break;
-
-      case "news-update":
-        if (message.payload && message.payload.news) {
-          setNewsItems(message.payload.news);
-        }
-        break;
-
-      case "notifications-update":
-        if (message.notifications) {
-          setNotifications(message.notifications);
-        }
-        if (message.unreadCount !== undefined) {
-          setUnreadNotificationCount(message.unreadCount);
-        }
-        break;
-
-      case "chat-history":
-        try {
-          const parsedMessages = JSON.parse(message.message);
-          console.log("chat-history received", parsedMessages?.length);
-          const formattedMessages: IWebviewMessage[] = parsedMessages.map((msg: any) => ({
-            id: `history-${Date.now()}-${Math.random()}`,
-            type: msg.type,
-            content: msg.content,
-            language: msg.language,
-            timestamp: Date.now(),
-          }));
-          setMessages(formattedMessages);
-        } catch (error: any) {
-          console.error("Error parsing chat history:", error);
-        }
-        break;
-
-      case "error":
-        console.error("Extension error", message.payload);
-        setIsCommandExecuting(false);
-        setCommandAction("");
-        break;
-
-      case "bot-response":
-        // Clear command execution state when bot response is received
-        // The actual message handling is done by useStreamingChat hook
-        setIsCommandExecuting(false);
-        setCommandAction("");
-        break;
-
-      case "onActiveworkspaceUpdate":
-        setActiveEditor(message.message ?? "");
-        break;
-
-      case "observability-logs":
-        setLogs(message.logs);
-        break;
-      case "observability-metrics":
-        setMetrics(message.metrics);
-        break;
-      case "observability-traces":
-        setTraces(message.traces);
-        break;
-      case "log-entry":
-        setLogs((prev) => [...prev, message.event].slice(-1000));
-        break;
-      case "browsing-history":
-        if (message.history) {
-          setBrowsingHistory(message.history);
-          setIsHistoryOpen(true);
-        }
-        break;
-
-      /* case "dependency-graph":
-        setDependencyGraph(message.graph);
-        break; */
-
-      case "set-locale":
-        if (message.locale) {
-          i18n.changeLanguage(message.locale);
-        }
-        break;
-
-      case "onConfigurationChange": {
-        const data = JSON.parse(message.message);
-        if (data.enableStreaming !== undefined) {
-          setEnableStreaming(data.enableStreaming);
-        }
-        // Handle configuration changes for compact mode
-        if (data["codebuddy.compactMode"] !== undefined) {
-          setCompactMode(data["codebuddy.compactMode"]);
-        }
-        if (data["codebuddy.automations.dailyStandup.enabled"] !== undefined) {
-          setDailyStandupEnabled(data["codebuddy.automations.dailyStandup.enabled"]);
-        }
-        if (data["codebuddy.automations.codeHealth.enabled"] !== undefined) {
-          setCodeHealthEnabled(data["codebuddy.automations.codeHealth.enabled"]);
-        }
-        if (data["codebuddy.automations.dependencyCheck.enabled"] !== undefined) {
-          setDependencyCheckEnabled(data["codebuddy.automations.dependencyCheck.enabled"]);
-        }
-        if (data["codebuddy.automations.gitWatchdog.enabled"] !== undefined) {
-          setGitWatchdogEnabled(data["codebuddy.automations.gitWatchdog.enabled"]);
-        }
-        if (data["codebuddy.automations.endOfDaySummary.enabled"] !== undefined) {
-          setEndOfDaySummaryEnabled(data["codebuddy.automations.endOfDaySummary.enabled"]);
-        }
-        if (data["codebuddy.browserType"] !== undefined) {
-          setBrowserType(data["codebuddy.browserType"]);
-        }
-        break;
-      }
-
-      case "onGetUserPreferences": {
-        const data: ConfigData = JSON.parse(message.message);
-        if (data.username) {
-          setUsername(data.username);
-        }
-        if (data.theme) {
-          setSelectedTheme(data.theme);
-        }
-        if (data.selectedModel) {
-          setSelectedModel(data.selectedModel);
-        }
-        if (data.enableStreaming !== undefined) {
-          setEnableStreaming(data.enableStreaming);
-        }
-        if (data.fontFamily) {
-          setFontFamily(data.fontFamily);
-        }
-        if (data.fontSize !== undefined) {
-          setFontSize(data.fontSize);
-        }
-        if (data.autoApprove !== undefined) {
-          setAutoApprove(data.autoApprove);
-        }
-        if (data.allowFileEdits !== undefined) {
-          setAllowFileEdits(data.allowFileEdits);
-        }
-        if (data.allowTerminal !== undefined) {
-          setAllowTerminal(data.allowTerminal);
-        }
-        if (data.verboseLogging !== undefined) {
-          setVerboseLogging(data.verboseLogging);
-        }
-        if (data.indexCodebase !== undefined) {
-          setIndexCodebase(data.indexCodebase);
-        }
-        if (data.contextWindow) {
-          setContextWindow(data.contextWindow);
-        }
-        if (data.includeHidden !== undefined) {
-          setIncludeHidden(data.includeHidden);
-        }
-        if (data.maxFileSize) {
-          setMaxFileSize(data.maxFileSize);
-        }
-        if (data.compactMode !== undefined) {
-          setCompactMode(data.compactMode);
-        }
-        if (data.dailyStandupEnabled !== undefined) {
-          setDailyStandupEnabled(data.dailyStandupEnabled);
-        }
-        if (data.codeHealthEnabled !== undefined) {
-          setCodeHealthEnabled(data.codeHealthEnabled);
-        }
-        if (data.dependencyCheckEnabled !== undefined) {
-          setDependencyCheckEnabled(data.dependencyCheckEnabled);
-        }
-        if (data.browserType !== undefined) {
-          setBrowserType(data.browserType);
-        }
-        if (data.language) {
-          setSelectedLanguage(data.language);
-          i18n.changeLanguage(data.language);
-        }
-        break;
-      }
-
-      case "theme-settings":
-        if (message.theme) {
-          setSelectedTheme(message.theme);
-        }
-        break;
-
-      case "rules-data":
-        // Handle rules and subagents data from extension
-        if (message.data) {
-          if (message.data.rules) {
-            setCustomRules(message.data.rules);
-          }
-          if (message.data.systemPrompt !== undefined) {
-            setCustomSystemPrompt(message.data.systemPrompt);
-          }
-          if (message.data.subagents) {
-            setSubagents(message.data.subagents);
-          }
-        }
-        break;
-
-      case "rule-added":
-        // Handle single rule added
-        if (message.data?.rule) {
-          setCustomRules(prev => [...prev, message.data.rule]);
-        }
-        break;
-
-      case "history-cleared":
-        // Clear local messages when history is cleared on backend
-        clearMessages();
-        break;
-
-      // Session management handlers
-      case "sessions-list":
-        if (message.sessions) {
-          setSessions(message.sessions);
-        }
-        break;
-
-      case "session-created":
-        if (message.sessionId) {
-          setCurrentSessionId(message.sessionId);
-        }
-        if (message.sessions) {
-          setSessions(message.sessions);
-        }
-        clearMessages();
-        break;
-
-      case "session-switched": {
-        if (message.sessionId) {
-          setCurrentSessionId(message.sessionId);
-        }
-        if (message.history) {
-          // Convert and set the history for the new session
-          const formattedMessages: IWebviewMessage[] = message.history.map((msg: any) => ({
-            id: `session-${Date.now()}-${Math.random()}`,
-            type: msg.type,
-            content: msg.content,
-            language: msg.language,
-            timestamp: msg.timestamp || Date.now(),
-          }));
-          setMessages(formattedMessages);
-        } else {
-          // Clear messages for new session
-          clearMessages();
-        }
-        break;
-      }
-
-      case "session-deleted":
-        console.log("session-deleted received:", message);
-        if (message.sessions) {
-          console.log("Setting sessions:", message.sessions.length);
-          setSessions(message.sessions);
-        }
-        // If the deleted session was current, clear the view
-        if (message.sessionId === currentSessionId) {
-          setCurrentSessionId(null);
-          clearMessages();
-        }
-        break;
-
-      case "session-title-updated":
-        if (message.sessions) {
-          setSessions(message.sessions);
-        }
-        break;
-
-      case "current-session":
-        if (message.sessionId) {
-          setCurrentSessionId(message.sessionId);
-        }
-        break;
-
-      case "append-to-chat":
-        if (message.text) {
-          // Show the content visually in chat
-          addMessage({
-            type: "bot",
-            content: `📎 **Context added from Reader:**\n\n${message.text}\n\n*This content will be included as context in your next message to the AI.*`,
-          });
-          // Notify the backend so it can store the context for the AI
-          vsCode.postMessage({
-            command: "store-reader-context",
-            text: message.text,
-          });
-        }
-        break;
-
-      case "send-message":
-        if (message.text) {
-          sendMessage(message.text, {
-            mode: selectedCodeBuddyMode || "Agent",
-            context: [],
-            threadId,
-          });
-        }
-        break;
-
-      default:
-        // Ignore unknown message types
-        break;
-    }
-  }, [setMessages, clearMessages, currentSessionId, addMessage, sendMessage, selectedCodeBuddyMode, threadId]);
+  // ── Effects ──
 
   // Update CSS whenever theme changes
   useEffect(() => {
@@ -881,20 +155,12 @@ export const WebviewUI = () => {
     document.documentElement.style.setProperty('--codebuddy-font-size', `${fontSize}px`);
   }, [fontFamily, fontSize]);
 
-  // Initialize legacy event listener
-  useEffect(() => {
-    window.addEventListener("message", legacyMessageHandler);
-    return () => {
-      window.removeEventListener("message", legacyMessageHandler);
-    };
-  }, [legacyMessageHandler]);
-
   // Signal to extension that webview is ready to receive messages
   useEffect(() => {
     vsCode.postMessage({ command: "webview-ready" });
   }, []);
 
-  // Request chat history on mount (in case the initial push was missed)
+  // Request chat history on mount
   useEffect(() => {
     vsCode.postMessage({ command: "request-chat-history" });
     vsCode.postMessage({ command: "notifications-get" });
@@ -908,60 +174,20 @@ export const WebviewUI = () => {
   // Clear command execution state when streaming completes
   useEffect(() => {
     if (!isStreaming && !isBotLoading) {
-      setIsCommandExecuting(false);
-      setCommandAction("");
+      useChatStore.getState().clearCommandState();
     }
   }, [isStreaming, isBotLoading]);
 
-  const handleMarkAsRead = useCallback((id: number) => {
-    vsCode.postMessage({ command: "news-mark-read", ids: [id] });
-    setNewsItems(prev => prev.filter(item => item.id !== id));
-  }, []);
-
-  const handleRefreshNews = useCallback(() => {
-    vsCode.postMessage({ command: "news-refresh" });
-  }, []);
-
-  const handleOpenUrl = useCallback((url: string) => {
-    vsCode.postMessage({ command: "openExternal", text: url, browserType });
-  }, [browserType]);
-
-  const handleOpenInReader = useCallback((url: string) => {
-    vsCode.postMessage({ command: "openInReader", text: url });
-  }, []);
-
-  const handleOpenBrowser = useCallback(() => {
-    vsCode.postMessage({ command: "promptOpenBrowser", browserType });
-  }, [browserType]);
-
-  const handleShowBrowsingHistory = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    vsCode.postMessage({ command: "get-browsing-history" });
-  }, []);
-
-  const handleOpenFromHistory = useCallback((url: string) => {
-    vsCode.postMessage({ command: "openBrowser", text: url, browserType });
-    setIsHistoryOpen(false);
-  }, [browserType]);
-
-  const handleToggleSaved = useCallback((id: number) => {
-    vsCode.postMessage({ command: "news-toggle-saved", id });
-  }, []);
-
-  const handleDeleteNews = useCallback((id: number) => {
-    vsCode.postMessage({ command: "news-delete", id });
-  }, []);
+  // ── Handlers (thin wrappers using stores) ──
 
   const handleContextChange = useCallback((value: string) => {
-    setSelectedContext(value);
+    useChatStore.getState().setSelectedContext(value);
   }, []);
 
   const handleSend = useCallback(
     (message: string) => {
       if (!message.trim()) return;
-
       sendMessage(message, {
-        // Force Agent mode during testing to ensure langgraph/deepagent streaming path runs
         mode: selectedCodeBuddyMode || "Agent",
         context: selectedContext.split("@"),
         threadId,
@@ -971,10 +197,7 @@ export const WebviewUI = () => {
   );
 
   const handleGetContext = useCallback(() => {
-    vsCode.postMessage({
-      command: "upload-file",
-      message: "",
-    });
+    vsCode.postMessage({ command: "upload-file", message: "" });
   }, []);
 
   const handleApproveAction = useCallback(() => {
@@ -985,71 +208,24 @@ export const WebviewUI = () => {
     cancelCurrentRequest();
   }, [cancelCurrentRequest]);
 
-  // Session management handlers
-  const handleNewSession = useCallback(() => {
-    vsCode.postMessage({ command: "create-session", message: {} });
-    setIsSessionsOpen(false);
-  }, []);
-
-  const handleSwitchSession = useCallback((sessionId: string) => {
-    vsCode.postMessage({ command: "switch-session", message: { sessionId } });
-    setIsSessionsOpen(false);
-  }, []);
-
-  const handleDeleteSession = useCallback((sessionId: string) => {
-    console.log("handleDeleteSession called with sessionId:", sessionId);
-    vsCode.postMessage({ command: "delete-session", message: { sessionId } });
-  }, []);
-
-  const handleRenameSession = useCallback((sessionId: string, newTitle: string) => {
-    vsCode.postMessage({ command: "update-session-title", message: { sessionId, title: newTitle } });
-  }, []);
-
-  const handleOpenSessions = useCallback(() => {
-    // Request sessions list when opening
-    vsCode.postMessage({ command: "get-sessions" });
-    setIsSessionsOpen(true);
-  }, []);
-
-  // Notification handlers
-  const handleNotificationMarkAsRead = useCallback((id: number) => {
-    vsCode.postMessage({ command: "notifications-mark-read", id });
-  }, []);
-
-  const handleNotificationMarkAllAsRead = useCallback(() => {
-    vsCode.postMessage({ command: "notifications-mark-all-read" });
-  }, []);
-
-  const handleNotificationClearAll = useCallback(() => {
-    vsCode.postMessage({ command: "notifications-clear-all" });
-  }, []);
-
-  const handleNotificationDelete = useCallback((id: number) => {
-    vsCode.postMessage({ command: "notifications-delete", id });
-  }, []);
-
-  const handleIncreaseFontSize = useCallback(() => {
-    setFontSize(prev => {
-      const newSize = Math.min(prev + 1, 24);
-      vsCode.postMessage({ command: "font-size-change-event", message: newSize });
-      return newSize;
-    });
-  }, []);
-
-  const handleDecreaseFontSize = useCallback(() => {
-    setFontSize(prev => {
-      const newSize = Math.max(prev - 1, 8);
-      vsCode.postMessage({ command: "font-size-change-event", message: newSize });
-      return newSize;
-    });
-  }, []);
-
   const handleToggleNotifications = useCallback(() => {
     if (!isNotificationPanelOpen) {
       vsCode.postMessage({ command: "notifications-get" });
     }
-    setIsNotificationPanelOpen(!isNotificationPanelOpen);
+    usePanelStore.getState().toggleNotifications();
   }, [isNotificationPanelOpen]);
+
+  const handleOpenSessions = useCallback(() => {
+    vsCode.postMessage({ command: "get-sessions" });
+    usePanelStore.getState().openSessions();
+  }, []);
+
+  const handleShowBrowsingHistory = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    useContentStore.getState().handleShowBrowsingHistory();
+  }, []);
+
+  // ── Derived values ──
 
   const processedContext = useMemo(() => {
     const contextArray = Array.from(new Set(selectedContext.split("@").join(", ").split(", ")));
@@ -1074,191 +250,11 @@ export const WebviewUI = () => {
     );
   }, [streamedMessages]);
 
-  // Settings context values for the new settings panel
-  const settingsValues = useMemo<SettingsValues>(() => ({
-    theme: selectedTheme,
-    language: selectedLanguage,
-    keymap: 'default',
-    nickname: username,
-    codeBuddyMode: selectedCodeBuddyMode,
-    enableStreaming: enableStreaming,
-    fontFamily: fontFamily,
-    fontSize: fontSize,
-    autoApprove: autoApprove,
-    allowFileEdits: allowFileEdits,
-    allowTerminal: allowTerminal,
-    verboseLogging: verboseLogging,
-    indexCodebase: indexCodebase,
-    contextWindow: contextWindow,
-    includeHidden: includeHidden,
-    maxFileSize: maxFileSize,
-    compactMode: compactMode,
-    dailyStandupEnabled: dailyStandupEnabled,
-    codeHealthEnabled: codeHealthEnabled,
-    dependencyCheckEnabled: dependencyCheckEnabled,
-    gitWatchdogEnabled: gitWatchdogEnabled,
-    endOfDaySummaryEnabled: endOfDaySummaryEnabled,
-    browserType: browserType,
-    selectedModel: selectedModel,
-    username: username,
-    accountType: 'Free',
-    customRules: customRules,
-    customSystemPrompt: customSystemPrompt,
-    subagents: subagents,
-  }), [selectedTheme, selectedLanguage, username, selectedCodeBuddyMode, enableStreaming, fontFamily, fontSize, autoApprove, allowFileEdits, allowTerminal, verboseLogging, indexCodebase, contextWindow, includeHidden, maxFileSize, compactMode, selectedModel, customRules, customSystemPrompt, subagents, dailyStandupEnabled, codeHealthEnabled, dependencyCheckEnabled, gitWatchdogEnabled, endOfDaySummaryEnabled, browserType]);
-
-  const settingsOptions = useMemo<SettingsOptions>(() => ({
-    themeOptions: themeOptions,
-    modelOptions: modelOptions,
-    codeBuddyModeOptions: codeBuddyMode,
-    keymapOptions: DEFAULT_KEYMAP_OPTIONS,
-    languageOptions: DEFAULT_LANGUAGE_OPTIONS,
-    fontFamilyOptions: DEFAULT_FONT_FAMILY_OPTIONS,
-    fontSizeOptions: DEFAULT_FONT_SIZE_OPTIONS,
-    browserTypeOptions: [
-      { value: 'reader', label: 'Smart Reader (Recommended)' },
-      { value: 'simple', label: 'Simple Browser' },
-      { value: 'system', label: 'System Browser' },
-    ],
-  }), []);
-
-  const settingsHandlers = useMemo<SettingsHandlers>(() => ({
-    onThemeChange: (value: string) => {
-      setSelectedTheme(value);
-      vsCode.postMessage({ command: "theme-change-event", message: value });
-    },
-    onLanguageChange: (value: string) => {
-      setSelectedLanguage(value);
-      i18n.changeLanguage(value);
-      vsCode.postMessage({ command: "language-change-event", message: value });
-    },
-    onKeymapChange: (_value: string) => {
-      // Coming soon - keymap change
-    },
-    onNicknameChange: (value: string) => {
-      setUsername(value);
-      vsCode.postMessage({ command: "nickname-change-event", message: value });
-    },
-    onCodeBuddyModeChange: (value: string) => {
-      setSelectedCodeBuddyMode(value);
-      vsCode.postMessage({ command: "codebuddy-model-change-event", message: value });
-    },
-    onStreamingChange: (enabled: boolean) => {
-      setEnableStreaming(enabled);
-      vsCode.postMessage({ command: "streaming-change-event", message: enabled });
-    },
-    onFontFamilyChange: (value: string) => {
-      setFontFamily(value);
-      vsCode.postMessage({ command: "font-family-change-event", message: value });
-    },
-    onFontSizeChange: (value: number) => {
-      setFontSize(value);
-      vsCode.postMessage({ command: "font-size-change-event", message: value });
-    },
-    onAutoApproveChange: (enabled: boolean) => {
-      setAutoApprove(enabled);
-      vsCode.postMessage({ command: "auto-approve-change-event", message: enabled });
-    },
-    onAllowFileEditsChange: (enabled: boolean) => {
-      setAllowFileEdits(enabled);
-      vsCode.postMessage({ command: "allow-file-edits-change-event", message: enabled });
-    },
-    onAllowTerminalChange: (enabled: boolean) => {
-      setAllowTerminal(enabled);
-      vsCode.postMessage({ command: "allow-terminal-change-event", message: enabled });
-    },
-    onVerboseLoggingChange: (enabled: boolean) => {
-      setVerboseLogging(enabled);
-      vsCode.postMessage({ command: "verbose-logging-change-event", message: enabled });
-    },
-    onIndexCodebaseChange: (enabled: boolean) => {
-      setIndexCodebase(enabled);
-      vsCode.postMessage({ command: "index-codebase-change-event", message: enabled });
-    },
-    onContextWindowChange: (value: string) => {
-      setContextWindow(value);
-      vsCode.postMessage({ command: "context-window-change-event", message: value });
-    },
-    onIncludeHiddenChange: (enabled: boolean) => {
-      setIncludeHidden(enabled);
-      vsCode.postMessage({ command: "include-hidden-change-event", message: enabled });
-    },
-    onMaxFileSizeChange: (value: string) => {
-      setMaxFileSize(value);
-      vsCode.postMessage({ command: "max-file-size-change-event", message: value });
-    },
-    onCompactModeChange: (enabled: boolean) => {
-      setCompactMode(enabled);
-      vsCode.postMessage({ command: "compact-mode-change-event", message: enabled });
-    },
-    onReindexWorkspace: () => {
-      vsCode.postMessage({ command: "reindex-workspace-event" });
-    },
-    onModelChange: (value: string) => {
-      setSelectedModel(value);
-      vsCode.postMessage({ command: "update-model-event", message: value });
-    },
-    onDailyStandupChange: (enabled: boolean) => {
-      setDailyStandupEnabled(enabled);
-      vsCode.postMessage({ command: "daily-standup-change-event", message: enabled });
-    },
-    onCodeHealthChange: (enabled: boolean) => {
-      setCodeHealthEnabled(enabled);
-      vsCode.postMessage({ command: "code-health-change-event", message: enabled });
-    },
-    onDependencyCheckChange: (enabled: boolean) => {
-      setDependencyCheckEnabled(enabled);
-      vsCode.postMessage({ command: "dependency-check-change-event", message: enabled });
-    },
-    onGitWatchdogChange: (enabled: boolean) => {
-      setGitWatchdogEnabled(enabled);
-      vsCode.postMessage({ command: "git-watchdog-change-event", message: enabled });
-    },
-    onEndOfDaySummaryChange: (enabled: boolean) => {
-      setEndOfDaySummaryEnabled(enabled);
-      vsCode.postMessage({ command: "end-of-day-summary-change-event", message: enabled });
-    },
-    onBrowserTypeChange: (value: 'reader' | 'simple' | 'system') => {
-      setBrowserType(value);
-      vsCode.postMessage({ command: "updateConfiguration", key: "codebuddy.browserType", value: value });
-    },
-    onUsernameChange: (value: string) => {
-      setUsername(value);
-    },
-    postMessage: (message: { command: string; [key: string]: any }) => {
-      vsCode.postMessage(message);
-    },
-    // Rules & Subagents handlers
-    onAddRule: (rule) => {
-      const newRule: CustomRule = {
-        ...rule,
-        id: `rule-${Date.now()}`,
-        createdAt: Date.now(),
-      };
-      setCustomRules(prev => [...prev, newRule]);
-    },
-    onUpdateRule: (id, updates) => {
-      setCustomRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
-    },
-    onDeleteRule: (id) => {
-      setCustomRules(prev => prev.filter(r => r.id !== id));
-    },
-    onToggleRule: (id, enabled) => {
-      setCustomRules(prev => prev.map(r => r.id === id ? { ...r, enabled } : r));
-    },
-    onUpdateSystemPrompt: (prompt) => {
-      setCustomSystemPrompt(prompt);
-    },
-    onToggleSubagent: (id, enabled) => {
-      setSubagents(prev => prev.map(s => s.id === id ? { ...s, enabled } : s));
-    },
-  }), []);
-
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Settings Toggle Button */}
       <SettingsToggleButton
-        onClick={() => setIsSettingsOpen(true)}
+        onClick={() => usePanelStore.getState().openSettings()}
         aria-label="Open settings"
         title="Settings"
       >
@@ -1270,7 +266,7 @@ export const WebviewUI = () => {
       {/* Settings Panel */}
       <SettingsPanel
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={() => usePanelStore.getState().closeSettings()}
         username={username || 'CodeBuddy User'}
         accountType="Free"
         settingsValues={settingsValues}
@@ -1292,11 +288,11 @@ export const WebviewUI = () => {
         sessions={sessions}
         currentSessionId={currentSessionId}
         isOpen={isSessionsOpen}
-        onClose={() => setIsSessionsOpen(false)}
-        onNewSession={handleNewSession}
-        onSwitchSession={handleSwitchSession}
-        onDeleteSession={handleDeleteSession}
-        onRenameSession={handleRenameSession}
+        onClose={() => usePanelStore.getState().closeSessions()}
+        onNewSession={() => { useSessionsStore.getState().handleNewSession(); usePanelStore.getState().closeSessions(); }}
+        onSwitchSession={(id: string) => { useSessionsStore.getState().handleSwitchSession(id); usePanelStore.getState().closeSessions(); }}
+        onDeleteSession={useSessionsStore.getState().handleDeleteSession}
+        onRenameSession={useSessionsStore.getState().handleRenameSession}
       />
 
       {/* Notifications Toggle Button */}
@@ -1331,10 +327,10 @@ export const WebviewUI = () => {
       </NotificationToggleButton>
 
       <FontSizeGroup>
-        <FontSizeButton onClick={handleIncreaseFontSize} title="Increase Font Size">
+        <FontSizeButton onClick={() => useSettingsStore.getState().handleIncreaseFontSize()} title="Increase Font Size">
           A+
         </FontSizeButton>
-        <FontSizeButton onClick={handleDecreaseFontSize} title="Decrease Font Size">
+        <FontSizeButton onClick={() => useSettingsStore.getState().handleDecreaseFontSize()} title="Decrease Font Size">
           A-
         </FontSizeButton>
       </FontSizeGroup>
@@ -1342,17 +338,17 @@ export const WebviewUI = () => {
       {/* Notifications Panel */}
       <NotificationPanel
         isOpen={isNotificationPanelOpen}
-        onClose={() => setIsNotificationPanelOpen(false)}
+        onClose={() => usePanelStore.getState().closeNotifications()}
         notifications={notifications}
-        onMarkAsRead={handleNotificationMarkAsRead}
-        onMarkAllAsRead={handleNotificationMarkAllAsRead}
-        onClearAll={handleNotificationClearAll}
-        onDelete={handleNotificationDelete}
+        onMarkAsRead={useNotificationsStore.getState().handleMarkAsRead}
+        onMarkAllAsRead={useNotificationsStore.getState().handleMarkAllAsRead}
+        onClearAll={useNotificationsStore.getState().handleClearAll}
+        onDelete={useNotificationsStore.getState().handleDelete}
       />
 
       {/* Updates Toggle Button */}
       <UpdatesToggleButton
-        onClick={() => setIsUpdatesPanelOpen(true)}
+        onClick={() => usePanelStore.getState().openUpdates()}
         aria-label="Open updates"
         title="Updates"
       >
@@ -1362,20 +358,20 @@ export const WebviewUI = () => {
       {/* Updates Panel */}
       <UpdatesPanel
         isOpen={isUpdatesPanelOpen}
-        onClose={() => setIsUpdatesPanelOpen(false)}
+        onClose={() => usePanelStore.getState().closeUpdates()}
         newsItems={newsItems}
-        onMarkAsRead={handleMarkAsRead}
-        onRefresh={handleRefreshNews}
-        onOpenUrl={handleOpenUrl}
-        onOpenInReader={handleOpenInReader}
-        onToggleSaved={handleToggleSaved}
-        onDelete={handleDeleteNews}
+        onMarkAsRead={useContentStore.getState().handleMarkNewsAsRead}
+        onRefresh={useContentStore.getState().handleRefreshNews}
+        onOpenUrl={useContentStore.getState().handleOpenUrl}
+        onOpenInReader={useContentStore.getState().handleOpenInReader}
+        onToggleSaved={useContentStore.getState().handleToggleSaved}
+        onDelete={useContentStore.getState().handleDeleteNews}
         userName={username || "Developer"}
       />
 
       {/* Observability Toggle Button */}
       <ObservabilityToggleButton
-        onClick={() => setIsObservabilityOpen(true)}
+        onClick={() => usePanelStore.getState().openObservability()}
         aria-label="Open observability"
         title="Observability"
       >
@@ -1384,7 +380,7 @@ export const WebviewUI = () => {
 
       {/* Browser Toggle Button */}
       <BrowserToggleButton
-        onClick={handleOpenBrowser}
+        onClick={() => useContentStore.getState().handleOpenBrowser()}
         onContextMenu={handleShowBrowsingHistory}
         aria-label="Open browser"
         title="Open Browser (right-click for history)"
@@ -1394,7 +390,7 @@ export const WebviewUI = () => {
 
       {/* Co-Worker Toggle Button */}
       <CoWorkerToggleButton
-        onClick={() => setIsCoWorkerOpen(true)}
+        onClick={() => usePanelStore.getState().openCoWorker()}
         aria-label="Open co-worker"
         title="Co-Worker"
       >
@@ -1406,7 +402,7 @@ export const WebviewUI = () => {
         <>
           <div
             style={{ position: "fixed", inset: 0, zIndex: 199 }}
-            onClick={() => setIsHistoryOpen(false)}
+            onClick={() => usePanelStore.getState().closeHistory()}
           />
           <BrowsingHistoryDropdown>
             <HistoryHeader>Recent Pages</HistoryHeader>
@@ -1416,7 +412,7 @@ export const WebviewUI = () => {
               </HistoryItem>
             ) : (
               browsingHistory.map((item, i) => (
-                <HistoryItem key={`${item.url}-${i}`} onClick={() => handleOpenFromHistory(item.url)}>
+                <HistoryItem key={`${item.url}-${i}`} onClick={() => { useContentStore.getState().handleOpenFromHistory(item.url); usePanelStore.getState().closeHistory(); }}>
                   <HistoryTitle>{item.title}</HistoryTitle>
                   <HistoryUrl>{item.url}</HistoryUrl>
                 </HistoryItem>
@@ -1433,13 +429,13 @@ export const WebviewUI = () => {
         metrics={metrics}
         traces={traces}
         isOpen={isObservabilityOpen}
-        onClose={() => setIsObservabilityOpen(false)}
+        onClose={() => usePanelStore.getState().closeObservability()}
       />
 
       {/* Co-Worker Panel */}
       <CoWorkerPanel
         isOpen={isCoWorkerOpen}
-        onClose={() => setIsCoWorkerOpen(false)}
+        onClose={() => usePanelStore.getState().closeCoWorker()}
         dailyStandupEnabled={dailyStandupEnabled}
         codeHealthEnabled={codeHealthEnabled}
         dependencyCheckEnabled={dependencyCheckEnabled}
@@ -1516,7 +512,7 @@ export const WebviewUI = () => {
             {/* File Changes Panel - shows pending and recent file modifications */}
             <PendingChangesPanel 
               collapsed={fileChangesPanelCollapsed}
-              onToggle={() => setFileChangesPanelCollapsed(!fileChangesPanelCollapsed)}
+              onToggle={() => useChatStore.getState().toggleFileChangesPanel()}
             />
           </div>
         </VSCodePanelView>

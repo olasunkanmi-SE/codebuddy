@@ -20,7 +20,8 @@
     "react-dom": "^18.3.1",
     "react-i18next": "^16.5.4",
     "styled-components": "^6.1.19",
-    "uninstall": "^0.0.0"
+    "uninstall": "^0.0.0",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import "./toggleButton.css";
 
 interface ToggleButtonProps {
   initialState?: boolean;

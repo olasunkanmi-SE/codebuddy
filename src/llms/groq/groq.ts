@@ -35,7 +35,9 @@ export class GroqLLM
   }
 
   async generateEmbeddings(text: string): Promise<number[]> {
-    return [1, 2];
+    // Groq does not have an embeddings API.
+    this.logger.warn("Groq does not support embeddings.");
+    return [];
   }
 
   // TODO Implement function call, especially think for this model.

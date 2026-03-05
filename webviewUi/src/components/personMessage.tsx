@@ -1,4 +1,5 @@
 import React from "react";
+import "./personMessage.css";
 
 interface MessageProps {
   message: string;
