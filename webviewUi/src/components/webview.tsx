@@ -26,6 +26,7 @@ import { FAQAccordion } from "./accordion";
 import { AgentTimeline } from "./AgentTimeline";
 import AttachmentIcon from "./attachmentIcon";
 import ChatInput from "./ChatInput";
+import { CostDisplay } from "./CostDisplay";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 import FileMention from "./FileMention";
 import MessageRenderer from "./MessageRenderer";
@@ -129,6 +130,7 @@ export const WebviewUI = () => {
     pendingApproval,
     cancelCurrentRequest,
     threadId,
+    conversationCost,
   } = useStreamingChat(vsCode, {
     enableStreaming,
     onLegacyMessage: (messages) => {
@@ -583,6 +585,7 @@ export const WebviewUI = () => {
               </VSCodeButton>
             </div>
           )}
+          <CostDisplay costData={conversationCost} isStreaming={isStreaming} />
           <ChatInput onSendMessage={handleSend} disabled={isStreaming || isBotLoading} />
         </div>
         <div className="horizontal-stack">
