@@ -2,11 +2,11 @@
  * Human-in-the-Loop (HITL) Flow Tests
  *
  * Tests the consent/approval mechanism in CodeBuddyAgentService:
- * - Consent waiter queue (FIFO)
- * - setUserConsent() resolves the next pending waiter
- * - Denied consent is a no-op
- * - Multiple concurrent approval requests are queued independently
- * - waitForActionConsent() blocks until resolved
+ * - Thread-keyed consent waiter map
+ * - setUserConsent() resolves waiters with a boolean (granted/denied)
+ * - waitForActionConsent() blocks until resolved, returns boolean
+ * - Multiple concurrent threads are isolated
+ * - Fallback: calling setUserConsent without threadId resolves all waiters
  */
 
 import * as assert from "assert";
@@ -16,27 +16,52 @@ suite("HITL — Consent Waiter Queue", () => {
   /**
    * Replicate the consent mechanism from CodeBuddyAgentService.
    * The actual implementation uses:
-   *   private consentWaiters: Array<() => void> = [];
-   *   setUserConsent(granted: boolean) { ... }
-   *   private async waitForActionConsent(): Promise<void> { ... }
+   *   private consentWaiters: Map<string, Array<(granted: boolean) => void>>
+   *   setUserConsent(granted: boolean, threadId?: string) { ... }
+   *   private async waitForActionConsent(threadId: string): Promise<boolean> { ... }
    */
   class ConsentQueue {
-    private consentWaiters: Array<() => void> = [];
+    private consentWaiters = new Map<string, Array<(granted: boolean) => void>>();
 
-    setUserConsent(granted: boolean): void {
-      if (!granted) return;
-      const resolver = this.consentWaiters.shift();
-      resolver?.();
+    setUserConsent(granted: boolean, threadId?: string): void {
+      if (threadId) {
+        const waiters = this.consentWaiters.get(threadId);
+        if (waiters?.length) {
+          const resolver = waiters.shift()!;
+          resolver(granted);
+          if (waiters.length === 0) {
+            this.consentWaiters.delete(threadId);
+          }
+        }
+      } else {
+        // Fallback: resolve all waiters across all threads
+        for (const [tid, waiters] of this.consentWaiters) {
+          for (const resolver of waiters) {
+            resolver(granted);
+          }
+        }
+        this.consentWaiters.clear();
+      }
     }
 
-    async waitForActionConsent(): Promise<void> {
-      await new Promise<void>((resolve) =>
-        this.consentWaiters.push(resolve),
-      );
+    async waitForActionConsent(threadId: string): Promise<boolean> {
+      return new Promise<boolean>((resolve) => {
+        if (!this.consentWaiters.has(threadId)) {
+          this.consentWaiters.set(threadId, []);
+        }
+        this.consentWaiters.get(threadId)!.push(resolve);
+      });
     }
 
-    get pendingCount(): number {
-      return this.consentWaiters.length;
+    pendingCount(threadId?: string): number {
+      if (threadId) {
+        return this.consentWaiters.get(threadId)?.length ?? 0;
+      }
+      let total = 0;
+      for (const waiters of this.consentWaiters.values()) {
+        total += waiters.length;
+      }
+      return total;
     }
   }
 
@@ -47,101 +72,111 @@ suite("HITL — Consent Waiter Queue", () => {
   });
 
   test("Queue starts empty", () => {
-    assert.strictEqual(queue.pendingCount, 0);
+    assert.strictEqual(queue.pendingCount(), 0);
   });
 
-  test("waitForActionConsent adds a resolver to the queue", () => {
-    // Don't await — it would block forever without consent
-    const promise = queue.waitForActionConsent();
-    assert.strictEqual(queue.pendingCount, 1);
+  test("waitForActionConsent adds a resolver to the queue for the given thread", () => {
+    const promise = queue.waitForActionConsent("thread-1");
+    assert.strictEqual(queue.pendingCount("thread-1"), 1);
+    assert.strictEqual(queue.pendingCount(), 1);
 
-    // Resolve it so the promise settles
-    queue.setUserConsent(true);
+    // Resolve so the promise settles
+    queue.setUserConsent(true, "thread-1");
     return promise;
   });
 
-  test("setUserConsent(true) resolves the FIRST pending waiter (FIFO)", async () => {
+  test("setUserConsent(true) resolves the FIRST pending waiter for a thread (FIFO)", async () => {
     const order: number[] = [];
 
-    const p1 = queue.waitForActionConsent().then(() => order.push(1));
-    const p2 = queue.waitForActionConsent().then(() => order.push(2));
+    const p1 = queue.waitForActionConsent("t1").then((g) => { order.push(1); return g; });
+    const p2 = queue.waitForActionConsent("t1").then((g) => { order.push(2); return g; });
 
-    assert.strictEqual(queue.pendingCount, 2);
+    assert.strictEqual(queue.pendingCount("t1"), 2);
 
-    // Approve first
-    queue.setUserConsent(true);
-    await p1;
+    queue.setUserConsent(true, "t1");
+    const r1 = await p1;
+    assert.strictEqual(r1, true);
     assert.deepStrictEqual(order, [1]);
-    assert.strictEqual(queue.pendingCount, 1);
+    assert.strictEqual(queue.pendingCount("t1"), 1);
 
-    // Approve second
-    queue.setUserConsent(true);
-    await p2;
+    queue.setUserConsent(true, "t1");
+    const r2 = await p2;
+    assert.strictEqual(r2, true);
     assert.deepStrictEqual(order, [1, 2]);
-    assert.strictEqual(queue.pendingCount, 0);
+    assert.strictEqual(queue.pendingCount("t1"), 0);
   });
 
-  test("setUserConsent(false) is a no-op — does not resolve any waiter", () => {
-    const promise = queue.waitForActionConsent();
-    assert.strictEqual(queue.pendingCount, 1);
+  test("setUserConsent(false) resolves the waiter with false (denial)", async () => {
+    const promise = queue.waitForActionConsent("t1");
+    assert.strictEqual(queue.pendingCount("t1"), 1);
 
-    queue.setUserConsent(false);
-    assert.strictEqual(queue.pendingCount, 1, "Denied consent should not resolve any waiter");
-
-    // Multiple denials still no-op
-    queue.setUserConsent(false);
-    queue.setUserConsent(false);
-    assert.strictEqual(queue.pendingCount, 1);
-
-    // Clean up — actually approve so test doesn't hang
-    queue.setUserConsent(true);
-    return promise;
+    queue.setUserConsent(false, "t1");
+    const result = await promise;
+    assert.strictEqual(result, false, "Denied consent should resolve with false");
+    assert.strictEqual(queue.pendingCount("t1"), 0);
   });
 
   test("setUserConsent(true) with empty queue is harmless", () => {
-    assert.strictEqual(queue.pendingCount, 0);
+    assert.strictEqual(queue.pendingCount(), 0);
 
     // Should not throw
-    queue.setUserConsent(true);
+    queue.setUserConsent(true, "empty-thread");
     queue.setUserConsent(true);
 
-    assert.strictEqual(queue.pendingCount, 0);
+    assert.strictEqual(queue.pendingCount(), 0);
   });
 
-  test("Multiple approvals in sequence resolve in FIFO order", async () => {
+  test("Multiple threads are isolated", async () => {
     const results: string[] = [];
 
-    const p1 = queue.waitForActionConsent().then(() => results.push("first"));
-    const p2 = queue.waitForActionConsent().then(() => results.push("second"));
-    const p3 = queue.waitForActionConsent().then(() => results.push("third"));
+    const p1 = queue.waitForActionConsent("thread-A").then((g) => { results.push(`A:${g}`); });
+    const p2 = queue.waitForActionConsent("thread-B").then((g) => { results.push(`B:${g}`); });
 
-    assert.strictEqual(queue.pendingCount, 3);
+    assert.strictEqual(queue.pendingCount("thread-A"), 1);
+    assert.strictEqual(queue.pendingCount("thread-B"), 1);
+    assert.strictEqual(queue.pendingCount(), 2);
 
-    queue.setUserConsent(true);
-    await p1;
-    assert.deepStrictEqual(results, ["first"]);
-
-    queue.setUserConsent(true);
+    // Approve thread-B first, deny thread-A
+    queue.setUserConsent(true, "thread-B");
     await p2;
-    assert.deepStrictEqual(results, ["first", "second"]);
+    assert.deepStrictEqual(results, ["B:true"]);
+    assert.strictEqual(queue.pendingCount("thread-A"), 1);
+    assert.strictEqual(queue.pendingCount("thread-B"), 0);
 
+    queue.setUserConsent(false, "thread-A");
+    await p1;
+    assert.deepStrictEqual(results, ["B:true", "A:false"]);
+    assert.strictEqual(queue.pendingCount(), 0);
+  });
+
+  test("Fallback: setUserConsent without threadId resolves all threads", async () => {
+    const results: boolean[] = [];
+
+    const p1 = queue.waitForActionConsent("t1").then((g) => { results.push(g); });
+    const p2 = queue.waitForActionConsent("t2").then((g) => { results.push(g); });
+
+    assert.strictEqual(queue.pendingCount(), 2);
+
+    // No threadId — resolves all
     queue.setUserConsent(true);
-    await p3;
-    assert.deepStrictEqual(results, ["first", "second", "third"]);
+    await Promise.all([p1, p2]);
+    assert.deepStrictEqual(results.sort(), [true, true]);
+    assert.strictEqual(queue.pendingCount(), 0);
   });
 
   test("Rapid approve-wait interleaving works correctly", async () => {
-    // Pre-approve (no pending waiter)
-    queue.setUserConsent(true);
-    assert.strictEqual(queue.pendingCount, 0);
+    // Pre-approve with no pending waiter
+    queue.setUserConsent(true, "t1");
+    assert.strictEqual(queue.pendingCount(), 0);
 
-    // Now wait (should NOT be auto-resolved — pre-approval doesn't queue)
-    const p = queue.waitForActionConsent();
-    assert.strictEqual(queue.pendingCount, 1);
+    // Now wait — should NOT be auto-resolved
+    const p = queue.waitForActionConsent("t1");
+    assert.strictEqual(queue.pendingCount("t1"), 1);
 
-    queue.setUserConsent(true);
-    await p;
-    assert.strictEqual(queue.pendingCount, 0);
+    queue.setUserConsent(true, "t1");
+    const result = await p;
+    assert.strictEqual(result, true);
+    assert.strictEqual(queue.pendingCount(), 0);
   });
 });
 

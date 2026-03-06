@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { Orchestrator } from "../../orchestrator";
 import { ResearchNotesExtractor } from "../../services/research-notes-extractor";
@@ -30,7 +31,7 @@ export class MessageHandler {
   }
 
   async handleUserMessage(message: string, metaData?: any): Promise<string> {
-    const requestId = `request-${Date.now()}`;
+    const requestId = `request-${randomUUID()}`;
     const threadId = metaData?.threadId;
     this.activeRequests.set(requestId, { threadId });
     let fullResponse = "";

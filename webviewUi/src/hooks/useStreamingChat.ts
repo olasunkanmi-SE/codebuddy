@@ -122,6 +122,7 @@ export const useStreamingChat = (
   const [pendingApproval, setPendingApproval] = useState<{
     toolName?: string;
     description?: string;
+    threadId?: string;
   } | null>(null);
   const [conversationCost, setConversationCost] =
     useState<IConversationCostData | null>(null);
@@ -445,6 +446,7 @@ export const useStreamingChat = (
         setPendingApproval({
           toolName: payload.toolName,
           description: desc,
+          threadId: payload.threadId,
         });
         break;
       }

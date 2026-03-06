@@ -1108,6 +1108,13 @@ export function deactivate(context: vscode.ExtensionContext) {
     providerManager.dispose();
   });
 
+  // Dispose agent service (clears caches, ends streams, unsubscribes events)
+  import("./agents/services/codebuddy-agent.service").then(
+    ({ CodeBuddyAgentService }) => {
+      CodeBuddyAgentService.getInstance().dispose();
+    },
+  );
+
   context.subscriptions.forEach((subscription) => subscription.dispose());
 
   logger.info("CodeBuddy extension deactivated successfully");

@@ -5,7 +5,7 @@ import { AgentTimelineState } from "../hooks/useStreamingChat";
 interface AgentTimelineProps {
   timeline: AgentTimelineState;
   isActive: boolean;
-  pendingApproval?: { toolName?: string; description?: string } | null;
+  pendingApproval?: { toolName?: string; description?: string; threadId?: string } | null;
   onApprove?: () => void;
   onDeny?: () => void;
   isLive?: boolean;

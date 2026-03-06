@@ -12,12 +12,7 @@ files
 webviewUi/dist/**
 samples
 patterns
-# CodeBuddy
 scripts
 lancedb
 dist
-.codebuddy/*
-!.codebuddy/skills/
-!.codebuddy/rules/
-!.codebuddy/prompts/
-!.codebuddy/config.json
+.codebuddy

@@ -91,7 +91,15 @@ export class StreamManager {
     // added to the new empty buffer while the old one is being flushed.
     const chunksToFlush = this.buffer;
     this.buffer = [];
-    this.orchestrator.publish("onStreamFlush", chunksToFlush);
+    try {
+      this.orchestrator.publish("onStreamFlush", chunksToFlush);
+    } catch (error) {
+      this.logger.warn("Failed to publish flushed chunks", {
+        error,
+        chunkCount: chunksToFlush.length,
+        streamId: this.streamId,
+      });
+    }
   }
 
   /**

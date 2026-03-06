@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "%description%",
-  "version": "4.1.7",
+  "version": "4.1.9",
   "engines": {
     "vscode": "^1.78.0"
   },
