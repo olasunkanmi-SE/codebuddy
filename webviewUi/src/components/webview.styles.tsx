@@ -82,68 +82,6 @@ export const FontSizeButton = styled.button`
   }
 `;
 
-// ── Browsing History ──
-
-export const BrowsingHistoryDropdown = styled.div`
-  position: fixed;
-  top: 12px;
-  left: 40px;
-  z-index: 200;
-  background: var(--vscode-menu-background, #1e1e2e);
-  border: 1px solid var(--vscode-menu-border, rgba(255, 255, 255, 0.15));
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  min-width: 280px;
-  max-height: 320px;
-  overflow-y: auto;
-  padding: 4px 0;
-`;
-
-export const HistoryItem = styled.button`
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  padding: 8px 12px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--vscode-menu-foreground, rgba(255, 255, 255, 0.85));
-  text-align: left;
-  transition: background 0.1s ease;
-  gap: 2px;
-
-  &:hover {
-    background: var(--vscode-menu-selectionBackground, rgba(255, 255, 255, 0.1));
-  }
-`;
-
-export const HistoryTitle = styled.span`
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-export const HistoryUrl = styled.span`
-  font-size: 10px;
-  opacity: 0.6;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-export const HistoryHeader = styled.div`
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.5;
-  color: var(--vscode-menu-foreground, rgba(255, 255, 255, 0.85));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-`;
-
 // ── Sidebar Icons ──
 
 export const SessionsIcon = ({ size = 14 }: { size?: number }) => (

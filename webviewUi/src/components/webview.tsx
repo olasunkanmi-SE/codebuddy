@@ -41,6 +41,7 @@ import { UpdatesPanel } from "./updates/UpdatesPanel";
 import { ObservabilityPanel } from "./observability/ObservabilityPanel";
 import { CoWorkerPanel } from "./coworker/CoWorkerPanel";
 import { BrowserPanel } from "./browser/BrowserPanel";
+import { PanelErrorBoundary } from "./PanelErrorBoundary";
 import {
   SidebarNav,
   SettingsToggleButton,
@@ -336,6 +337,7 @@ export const WebviewUI = () => {
       </SidebarNav>
 
       {/* Settings Panel */}
+      <PanelErrorBoundary fallbackLabel="Settings">
       <SettingsPanel
         isOpen={isSettingsOpen}
         onClose={() => usePanelStore.getState().closeSettings()}
@@ -345,8 +347,10 @@ export const WebviewUI = () => {
         settingsOptions={settingsOptions}
         settingsHandlers={settingsHandlers}
       />
+      </PanelErrorBoundary>
 
       {/* Sessions Panel */}
+      <PanelErrorBoundary fallbackLabel="Sessions">
       <SessionsPanel
         sessions={sessions}
         currentSessionId={currentSessionId}
@@ -357,8 +361,10 @@ export const WebviewUI = () => {
         onDeleteSession={useSessionsStore.getState().handleDeleteSession}
         onRenameSession={useSessionsStore.getState().handleRenameSession}
       />
+      </PanelErrorBoundary>
 
       {/* Notifications Panel */}
+      <PanelErrorBoundary fallbackLabel="Notifications">
       <NotificationPanel
         isOpen={isNotificationPanelOpen}
         onClose={() => usePanelStore.getState().closeNotifications()}
@@ -368,8 +374,10 @@ export const WebviewUI = () => {
         onClearAll={useNotificationsStore.getState().handleClearAll}
         onDelete={useNotificationsStore.getState().handleDelete}
       />
+      </PanelErrorBoundary>
 
       {/* Updates Panel */}
+      <PanelErrorBoundary fallbackLabel="Updates">
       <UpdatesPanel
         isOpen={isUpdatesPanelOpen}
         onClose={() => usePanelStore.getState().closeUpdates()}
@@ -382,14 +390,18 @@ export const WebviewUI = () => {
         onDelete={useContentStore.getState().handleDeleteNews}
         userName={username || "Developer"}
       />
+      </PanelErrorBoundary>
 
       {/* Browser Panel (Chrome-style with History + Bookmarks) */}
+      <PanelErrorBoundary fallbackLabel="Browser">
       <BrowserPanel
         isOpen={isBrowserPanelOpen}
         onClose={() => usePanelStore.getState().closeBrowserPanel()}
       />
+      </PanelErrorBoundary>
 
       {/* Observability Panel */}
+      <PanelErrorBoundary fallbackLabel="Observability">
       <ObservabilityPanel
         vsCode={vsCode}
         logs={logs}
@@ -398,8 +410,10 @@ export const WebviewUI = () => {
         isOpen={isObservabilityOpen}
         onClose={() => usePanelStore.getState().closeObservability()}
       />
+      </PanelErrorBoundary>
 
       {/* Co-Worker Panel */}
+      <PanelErrorBoundary fallbackLabel="Co-Worker">
       <CoWorkerPanel
         isOpen={isCoWorkerOpen}
         onClose={() => usePanelStore.getState().closeCoWorker()}
@@ -414,6 +428,7 @@ export const WebviewUI = () => {
         onGitWatchdogChange={settingsHandlers.onGitWatchdogChange}
         onEndOfDaySummaryChange={settingsHandlers.onEndOfDaySummaryChange}
       />
+      </PanelErrorBoundary>
 
       <VSCodePanels className="vscodePanels" activeid="tab-1">
         <VSCodePanelTab id="tab-1">CHAT</VSCodePanelTab>
