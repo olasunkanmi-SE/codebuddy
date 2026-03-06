@@ -524,6 +524,100 @@ export async function activate(context: vscode.ExtensionContext) {
       ),
     );
 
+    // Register Composer Session commands
+    const { ComposerService } = await import("./services/composer.service");
+    const composerService = ComposerService.getInstance();
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "codebuddy.reviewComposerSession",
+        async (sessionId: string) => {
+          const session = composerService.getSession(sessionId);
+          if (!session) {
+            vscode.window.showErrorMessage(
+              l10n.t("Composer session not found or expired."),
+            );
+            return;
+          }
+
+          const changes = composerService.getSessionChanges(sessionId);
+          const pendingChanges = changes.filter((c) => c.status === "pending");
+
+          if (pendingChanges.length === 0) {
+            vscode.window.showInformationMessage(
+              l10n.t("No pending changes in this session."),
+            );
+            return;
+          }
+
+          const action = await vscode.window.showInformationMessage(
+            l10n.t(
+              'Composer: "{0}" — {1} file(s) changed',
+              session.label,
+              pendingChanges.length,
+            ),
+            { modal: false },
+            l10n.t("Apply All"),
+            l10n.t("Reject All"),
+            l10n.t("Review Files"),
+          );
+
+          if (action === l10n.t("Apply All")) {
+            const result = await composerService.applySession(sessionId);
+            vscode.window.showInformationMessage(
+              l10n.t(
+                "Applied {0} file(s), {1} failed.",
+                result.applied,
+                result.failed,
+              ),
+            );
+          } else if (action === l10n.t("Reject All")) {
+            composerService.rejectSession(sessionId);
+            vscode.window.showInformationMessage(
+              l10n.t("All changes in session rejected."),
+            );
+          } else if (action === l10n.t("Review Files")) {
+            // Open diff for each pending file so user can review individually
+            for (const change of pendingChanges) {
+              const left = vscode.Uri.file(change.filePath);
+              const right = vscode.Uri.parse(
+                `${DiffReviewService.SCHEME}:${change.id}`,
+              );
+              const title = `Review: ${path.basename(change.filePath)}`;
+              await vscode.commands.executeCommand(
+                "vscode.diff",
+                left,
+                right,
+                title,
+              );
+            }
+          }
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.applyComposerSession",
+        async (sessionId: string) => {
+          const result = await composerService.applySession(sessionId);
+          vscode.window.showInformationMessage(
+            l10n.t(
+              "Applied {0} file(s), {1} failed.",
+              result.applied,
+              result.failed,
+            ),
+          );
+        },
+      ),
+      vscode.commands.registerCommand(
+        "codebuddy.rejectComposerSession",
+        async (sessionId: string) => {
+          composerService.rejectSession(sessionId);
+          vscode.window.showInformationMessage(
+            l10n.t("All changes in session rejected."),
+          );
+        },
+      ),
+    );
+
     // Initialize Inline Completion Service
     logger.info("Initializing Inline Completion Service...");
     const outputChannel = OutputManager.getInstance().getChannel();

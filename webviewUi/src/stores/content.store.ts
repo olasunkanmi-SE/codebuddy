@@ -3,12 +3,19 @@ import { create } from "zustand";
 import { vscode } from "../utils/vscode";
 import { useSettingsStore } from "./settings.store";
 
+interface Bookmark {
+  url: string;
+  title: string;
+  created_at: string;
+}
+
 interface ContentState {
   newsItems: any[];
   logs: any[];
   metrics: any;
   traces: any[];
   browsingHistory: Array<{ url: string; title: string; timestamp: number }>;
+  bookmarks: Bookmark[];
 
   setNewsItems: (items: any[]) => void;
   setLogs: (logs: any[]) => void;
@@ -18,6 +25,7 @@ interface ContentState {
   setBrowsingHistory: (
     history: Array<{ url: string; title: string; timestamp: number }>,
   ) => void;
+  setBookmarks: (bookmarks: Bookmark[]) => void;
 
   handleMarkNewsAsRead: (id: number) => void;
   handleRefreshNews: () => void;
@@ -28,6 +36,10 @@ interface ContentState {
   handleOpenBrowser: () => void;
   handleOpenFromHistory: (url: string) => void;
   handleShowBrowsingHistory: () => void;
+  handleAddHistoryToChat: (url: string, title: string) => void;
+  handleAddBookmark: (url: string, title: string) => void;
+  handleRemoveBookmark: (url: string) => void;
+  handleGetBookmarks: () => void;
 }
 
 export const useContentStore = create<ContentState>()((set) => ({
@@ -36,6 +48,7 @@ export const useContentStore = create<ContentState>()((set) => ({
   metrics: null,
   traces: [],
   browsingHistory: [],
+  bookmarks: [],
 
   setNewsItems: (items) => set({ newsItems: items }),
   setLogs: (logs) => set({ logs }),
@@ -43,6 +56,7 @@ export const useContentStore = create<ContentState>()((set) => ({
   setMetrics: (metrics) => set({ metrics }),
   setTraces: (traces) => set({ traces }),
   setBrowsingHistory: (history) => set({ browsingHistory: history }),
+  setBookmarks: (bookmarks) => set({ bookmarks }),
 
   handleMarkNewsAsRead: (id) => {
     vscode.postMessage({ command: "news-mark-read", ids: [id] });
@@ -74,5 +88,17 @@ export const useContentStore = create<ContentState>()((set) => ({
   },
   handleShowBrowsingHistory: () => {
     vscode.postMessage({ command: "get-browsing-history" });
+  },
+  handleAddHistoryToChat: (url, title) => {
+    vscode.postMessage({ command: "add-history-to-chat", text: url, title });
+  },
+  handleAddBookmark: (url, title) => {
+    vscode.postMessage({ command: "add-bookmark", url, title });
+  },
+  handleRemoveBookmark: (url) => {
+    vscode.postMessage({ command: "remove-bookmark", url });
+  },
+  handleGetBookmarks: () => {
+    vscode.postMessage({ command: "get-bookmarks" });
   },
 }));

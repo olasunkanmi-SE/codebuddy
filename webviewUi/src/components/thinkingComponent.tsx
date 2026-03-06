@@ -65,7 +65,7 @@ const ThinkingHeaderRight = styled.div`
 const ThinkingChevron = styled.span<{ $isExpanded: boolean }>`
   font-size: 10px;
   color: var(--vscode-foreground);
-  opacity: 0.5;
+  opacity: 0.7;
   transition: transform 0.2s ease;
   transform: ${props => props.$isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'};
 `;

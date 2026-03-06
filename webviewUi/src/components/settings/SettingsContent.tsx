@@ -32,7 +32,7 @@ const CategoryTitle = styled.h2`
 const CategoryDescription = styled.p`
   margin: 6px 0 0;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
 `;
 
 const ContentBody = styled.div`

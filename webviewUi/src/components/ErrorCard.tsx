@@ -140,7 +140,7 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ message, suggestion, reason }) =>
   const suggestions = getSuggestions();
 
   return (
-    <CardContainer>
+    <CardContainer role="alert">
       <Header>
         <ErrorIcon />
         <Title>Request could not be completed</Title>

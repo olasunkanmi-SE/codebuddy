@@ -45,6 +45,7 @@ import { ChatHistoryPruningService } from "../services/chat-history-pruning.serv
 import { ContextEnhancementService } from "../services/context-enhancement.service";
 import {
   BrowserHandler,
+  ComposerHandler,
   ConnectorHandler,
   DiffReviewHandler,
   CheckpointHandler,
@@ -221,6 +222,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     this.handlerRegistry.register(new ObservabilityHandler());
     this.handlerRegistry.register(new RulesHandler());
     this.handlerRegistry.register(new CheckpointHandler());
+    this.handlerRegistry.register(new ComposerHandler());
     this.handlerRegistry.register(
       new PerformanceHandler(
         () => this.performanceProfiler,

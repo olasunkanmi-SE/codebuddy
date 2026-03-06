@@ -39,7 +39,7 @@ const Section = styled.div`
 const SectionTitle = styled.h3`
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   margin: 0 0 20px 0;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -80,7 +80,7 @@ const SettingLabel = styled.label`
 
 const SettingDescription = styled.p`
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   margin: 0;
   line-height: 1.5;
   text-align: left;
@@ -141,7 +141,7 @@ const ToggleSlider = styled.span`
     width: 16px;
     left: 3px;
     bottom: 2px;
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.85);
     transition: 0.2s;
     border-radius: 50%;
   }
@@ -170,7 +170,7 @@ const TextInput = styled.input`
   }
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.5);
   }
 `;
 

@@ -49,7 +49,7 @@ const ModelName = styled.h4`
 const ModelDescription = styled.p`
   margin: 0;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
 `;
 
 const ModelStats = styled.div`
@@ -66,7 +66,7 @@ const Stat = styled.div`
 const StatLabel = styled.span`
   display: block;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.6);
   margin-bottom: 2px;
 `;
 

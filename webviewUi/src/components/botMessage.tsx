@@ -63,7 +63,7 @@ export const BotMessage: React.FC<BotMessageProps> = ({
     } catch (error) {
       console.error("Failed to copy markdown to clipboard:", error);
 
-      // Fallback method
+      // Fallback method — re-clean content and retry Clipboard API
       try {
         let markdownContent = content;
 
@@ -87,23 +87,7 @@ export const BotMessage: React.FC<BotMessageProps> = ({
           contentToCopy = markdownContent.trim();
         }
 
-        // Create a temporary textarea for fallback copy
-        const textarea = document.createElement("textarea");
-        textarea.value = contentToCopy;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-
-        // Use the modern approach with fallback
-        try {
-          document.execCommand("copy");
-        } catch (execError) {
-          console.error("execCommand failed:", execError);
-        }
-
-        document.body.removeChild(textarea);
-
+        await navigator.clipboard.writeText(contentToCopy);
         console.log("Markdown content copied to clipboard using fallback method");
       } catch (fallbackError) {
         console.error("Both clipboard methods failed:", fallbackError);

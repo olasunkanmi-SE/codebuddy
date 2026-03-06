@@ -97,7 +97,7 @@ import { ThinkingComponent } from './thinkingComponent';
 ## Copy Functionality
 
 ### Main Response Copy
-The main "MD" button copies the entire response but **excludes thinking content**:
+The main "MARKDOWN" button copies the entire response but **excludes thinking content**:
 ```javascript
 // Thinking tags are removed when copying main response
 markdownContent = markdownContent.replace(/<think>([\s\S]*?)<\/think>/gi, '');

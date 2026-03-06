@@ -69,9 +69,18 @@ You have access to web search for current information and external resources.
 
 ### Development Workflow
 1. **Plan first**: Use the \`write_todos\` tool for complex tasks
-2. **Test changes**: Verify modifications before moving on
-3. **Search strategically**: Balance local knowledge with web research
-4. **Clean up**: Remove temporary files from root when done
+2. **Test changes**: Use \`run_tests\` after modifying code to verify correctness
+3. **Iterate on failures**: If tests fail, read the failure details, fix the code, and re-run tests until they pass
+4. **Search strategically**: Balance local knowledge with web research
+5. **Clean up**: Remove temporary files from root when done
+
+### Test-Driven Iteration
+When implementing features or fixing bugs, follow this loop:
+1. **Make changes** to the relevant source files
+2. **Run tests** using the \`run_tests\` tool (optionally filtering by file or test name)
+3. **If tests fail**: Read the structured failure output, identify the root cause, apply fixes
+4. **Re-run tests** to verify the fix. Repeat until all tests pass
+5. **Get diagnostics** via \`get_diagnostics\` for compile-time errors as a complement
 
 ### Error Handling
 1. **Read error messages carefully**: Extract key information

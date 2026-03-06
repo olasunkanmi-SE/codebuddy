@@ -107,7 +107,7 @@ const ServerName = styled.h4`
 const ServerDescription = styled.p`
   margin: 0;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
 `;
 
 const ServerMeta = styled.div`
@@ -118,11 +118,11 @@ const ServerMeta = styled.div`
 
 const ToolCount = styled.span`
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
 `;
 
 const ExpandIcon = styled.div<{ $isExpanded: boolean }>`
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   transition: transform 0.2s ease;
   transform: rotate(${props => props.$isExpanded ? '180deg' : '0deg'});
 `;
@@ -179,7 +179,7 @@ const LoadingSpinner = styled.div`
   align-items: center;
   justify-content: center;
   padding: 40px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
 `;
 
 const RefreshButton = styled(Button)`
@@ -273,13 +273,13 @@ const PresetName = styled.h4`
 const PresetDescription = styled.p`
   margin: 0 0 4px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.4;
 `;
 
 const PresetPackage = styled.code`
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.6);
 `;
 
 const PresetActions = styled.div`

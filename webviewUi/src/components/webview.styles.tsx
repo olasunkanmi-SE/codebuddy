@@ -1,22 +1,31 @@
 import styled from "styled-components";
 
-// ── Sidebar Toggle Buttons ──
+// ── Sidebar Navigation Container ──
 
-export const SettingsToggleButton = styled.button`
+export const SidebarNav = styled.nav`
   position: fixed;
   top: 12px;
   left: 12px;
   z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+// ── Shared Sidebar Toggle Button ──
+
+export const SidebarButton = styled.button`
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   padding: 5px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.15s ease;
+  position: relative;
 
   &:hover {
     background: rgba(255, 255, 255, 0.1);
@@ -29,175 +38,18 @@ export const SettingsToggleButton = styled.button`
   }
 `;
 
-export const SessionsToggleButton = styled.button`
-  position: fixed;
-  top: 44px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-export const NotificationToggleButton = styled.button`
-  position: fixed;
-  top: 76px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-export const UpdatesToggleButton = styled.button`
-  position: fixed;
-  top: 108px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-export const ObservabilityToggleButton = styled.button`
-  position: fixed;
-  top: 140px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-export const BrowserToggleButton = styled.button`
-  position: fixed;
-  top: 172px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-export const CoWorkerToggleButton = styled.button`
-  position: fixed;
-  top: 204px;
-  left: 12px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 5px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
+// Aliases for backward compatibility
+export const SettingsToggleButton = SidebarButton;
+export const SessionsToggleButton = SidebarButton;
+export const NotificationToggleButton = SidebarButton;
+export const UpdatesToggleButton = SidebarButton;
+export const ObservabilityToggleButton = SidebarButton;
+export const BrowserToggleButton = SidebarButton;
+export const CoWorkerToggleButton = SidebarButton;
 
 // ── Font Size Controls ──
 
 export const FontSizeGroup = styled.div`
-  position: fixed;
-  top: 236px;
-  left: 12px;
-  z-index: 100;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -211,7 +63,7 @@ export const FontSizeButton = styled.button`
   width: 26px;
   height: 26px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -228,68 +80,6 @@ export const FontSizeButton = styled.button`
   &:active {
     transform: scale(0.95);
   }
-`;
-
-// ── Browsing History ──
-
-export const BrowsingHistoryDropdown = styled.div`
-  position: fixed;
-  top: 172px;
-  left: 40px;
-  z-index: 200;
-  background: var(--vscode-menu-background, #1e1e2e);
-  border: 1px solid var(--vscode-menu-border, rgba(255, 255, 255, 0.15));
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  min-width: 280px;
-  max-height: 320px;
-  overflow-y: auto;
-  padding: 4px 0;
-`;
-
-export const HistoryItem = styled.button`
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  padding: 8px 12px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--vscode-menu-foreground, rgba(255, 255, 255, 0.85));
-  text-align: left;
-  transition: background 0.1s ease;
-  gap: 2px;
-
-  &:hover {
-    background: var(--vscode-menu-selectionBackground, rgba(255, 255, 255, 0.1));
-  }
-`;
-
-export const HistoryTitle = styled.span`
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-export const HistoryUrl = styled.span`
-  font-size: 10px;
-  opacity: 0.6;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-export const HistoryHeader = styled.div`
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.5;
-  color: var(--vscode-menu-foreground, rgba(255, 255, 255, 0.85));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 `;
 
 // ── Sidebar Icons ──

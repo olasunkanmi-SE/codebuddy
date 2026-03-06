@@ -37,57 +37,42 @@ export class FileStorage implements IStorage {
   }
 
   /**
-   * Ensures .gitignore is configured to allow skills/rules but ignore logs/data
+   * Ensures .codebuddy is in .gitignore
    */
   async ensureCorrectGitIgnore(workspaceRoot: string): Promise<void> {
     const gitIgnorePath = path.join(workspaceRoot, ".gitignore");
-    const rules = [
-      "# CodeBuddy",
-      ".codebuddy/*",
-      "!.codebuddy/skills/",
-      "!.codebuddy/rules/",
-      "!.codebuddy/prompts/",
-      "!.codebuddy/config.json",
-    ];
+    const rule = ".codebuddy";
 
     let currentContent = "";
     if (fs.existsSync(gitIgnorePath)) {
       currentContent = fs.readFileSync(gitIgnorePath, "utf8");
     }
 
-    // Check if we need to update
-    // If we find the old ".codebuddy" (exact line), we might want to replace it
-    // Or if we don't find our new rules.
-
-    let newContent = currentContent;
-    let modified = false;
-
-    // 1. Remove strict ".codebuddy" ignore if present (as it blocks exceptions)
-    const lines = newContent.split(/\r?\n/);
-    const cleanLines = lines.filter(
-      (line) => line.trim() !== ".codebuddy" && line.trim() !== "/.codebuddy",
-    );
-
-    if (cleanLines.length !== lines.length) {
-      newContent = cleanLines.join("\n");
-      modified = true;
+    // Already has the rule
+    const lines = currentContent.split(/\r?\n/);
+    if (lines.some((line) => line.trim() === rule)) {
+      return;
     }
 
-    // 2. Append new rules if not present
-    const missingRules = rules.filter((rule) => !newContent.includes(rule));
+    // Remove old granular rules if present
+    const oldRules = [
+      ".codebuddy/*",
+      "!.codebuddy/skills/",
+      "!.codebuddy/rules/",
+      "!.codebuddy/prompts/",
+      "!.codebuddy/config.json",
+      "# CodeBuddy",
+    ];
+    const cleanLines = lines.filter((line) => !oldRules.includes(line.trim()));
 
-    if (missingRules.length > 0) {
-      if (!newContent.endsWith("\n") && newContent.length > 0) {
-        newContent += "\n";
-      }
-      newContent += missingRules.join("\n") + "\n";
-      modified = true;
+    let newContent = cleanLines.join("\n");
+    if (!newContent.endsWith("\n") && newContent.length > 0) {
+      newContent += "\n";
     }
+    newContent += rule + "\n";
 
-    if (modified) {
-      fs.writeFileSync(gitIgnorePath, newContent, "utf8");
-      this.logger.info("Updated .gitignore to support committed skills/rules");
-    }
+    fs.writeFileSync(gitIgnorePath, newContent, "utf8");
+    this.logger.info("Updated .gitignore with .codebuddy");
   }
 
   /**

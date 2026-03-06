@@ -7,7 +7,7 @@ interface PanelState {
   isUpdatesPanelOpen: boolean;
   isObservabilityOpen: boolean;
   isCoWorkerOpen: boolean;
-  isHistoryOpen: boolean;
+  isBrowserPanelOpen: boolean;
 
   openSettings: () => void;
   closeSettings: () => void;
@@ -21,8 +21,8 @@ interface PanelState {
   closeObservability: () => void;
   openCoWorker: () => void;
   closeCoWorker: () => void;
-  openHistory: () => void;
-  closeHistory: () => void;
+  openBrowserPanel: () => void;
+  closeBrowserPanel: () => void;
 }
 
 export const usePanelStore = create<PanelState>()((set) => ({
@@ -32,7 +32,7 @@ export const usePanelStore = create<PanelState>()((set) => ({
   isUpdatesPanelOpen: false,
   isObservabilityOpen: false,
   isCoWorkerOpen: false,
-  isHistoryOpen: false,
+  isBrowserPanelOpen: false,
 
   openSettings: () => set({ isSettingsOpen: true }),
   closeSettings: () => set({ isSettingsOpen: false }),
@@ -47,6 +47,6 @@ export const usePanelStore = create<PanelState>()((set) => ({
   closeObservability: () => set({ isObservabilityOpen: false }),
   openCoWorker: () => set({ isCoWorkerOpen: true }),
   closeCoWorker: () => set({ isCoWorkerOpen: false }),
-  openHistory: () => set({ isHistoryOpen: true }),
-  closeHistory: () => set({ isHistoryOpen: false }),
+  openBrowserPanel: () => set({ isBrowserPanelOpen: true }),
+  closeBrowserPanel: () => set({ isBrowserPanelOpen: false }),
 }));

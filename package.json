@@ -287,6 +287,21 @@
         "icon": "$(close)"
       },
       {
+        "command": "codebuddy.reviewComposerSession",
+        "title": "%commands.reviewComposerSession%",
+        "category": "CodeBuddy"
+      },
+      {
+        "command": "codebuddy.applyComposerSession",
+        "title": "%commands.applyComposerSession%",
+        "category": "CodeBuddy"
+      },
+      {
+        "command": "codebuddy.rejectComposerSession",
+        "title": "%commands.rejectComposerSession%",
+        "category": "CodeBuddy"
+      },
+      {
         "command": "CodeBuddy.openInReader",
         "title": "%commands.openInReader%",
         "category": "CodeBuddy"
@@ -925,6 +940,18 @@
             "enum": ["debug", "info", "warn", "error"],
             "default": "info",
             "description": "Log level for vector database operations."
+          },
+          "codebuddy.testCommand": {
+            "type": "string",
+            "default": "",
+            "description": "Custom shell command to run tests. If empty, CodeBuddy auto-detects the framework (Jest, Vitest, Mocha, Pytest, Go, Cargo)."
+          },
+          "codebuddy.testTimeout": {
+            "type": "number",
+            "default": 120000,
+            "minimum": 5000,
+            "maximum": 600000,
+            "description": "Timeout in milliseconds for test execution (default: 120000 = 2 minutes)."
           }
         }
       }
@@ -943,6 +970,7 @@
     "lint": "eslint src --ext ts",
     "fix": "eslint src --ext ts --fix",
     "test": "vscode-test",
+    "test:coverage": "vscode-test --coverage --coverage-reporter text-summary --coverage-reporter lcov --coverage-reporter json-summary",
     "format": "prettier --write \"**/*.ts\"",
     "fix-chromadb": "npm uninstall chromadb && npm install chromadb@1.8.1",
     "setup-chromadb-server": "echo 'Install ChromaDB server: pip install chromadb' && echo 'Start server: chroma run --host localhost --port 8000'"

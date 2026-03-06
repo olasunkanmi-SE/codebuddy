@@ -1,7 +1,7 @@
 /* User Message Component Styles */
 .message-container {
   display: flex;
-  gap: 16px;
+  gap: 5px;
   padding: 16px;
   background-color: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.015));
   border-radius: 8px;

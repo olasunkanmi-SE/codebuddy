@@ -8,7 +8,7 @@ export function InlineErrorBanner({ error, onDismiss }: ErrorBannerProps) {
   if (!error) return null;
 
   return (
-    <div className="inline-error-banner">
+    <div className="inline-error-banner" role="alert">
       <span>⚠️ {error.message}</span>
       <button onClick={onDismiss}>Dismiss</button>
     </div>

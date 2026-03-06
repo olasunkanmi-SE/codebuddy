@@ -330,6 +330,24 @@ export class SqliteDatabaseService {
     } catch (error: any) {
       this.logger.warn("Failed to initialize notifications schema:", error);
     }
+
+    try {
+      // Bookmarks / Read Later Table
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS bookmarks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          url TEXT NOT NULL UNIQUE,
+          title TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_bookmarks_created_at ON bookmarks(created_at)
+      `);
+    } catch (error: any) {
+      this.logger.warn("Failed to initialize bookmarks schema:", error);
+    }
   }
 
   /**

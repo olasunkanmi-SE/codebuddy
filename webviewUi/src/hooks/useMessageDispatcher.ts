@@ -152,7 +152,13 @@ export function useMessageDispatcher(streamingChat: StreamingChatAPI) {
         case "browsing-history":
           if (message.history) {
             content.setBrowsingHistory(message.history);
-            panels.openHistory();
+            panels.openBrowserPanel();
+          }
+          break;
+
+        case "bookmarks-list":
+          if (message.bookmarks) {
+            content.setBookmarks(message.bookmarks);
           }
           break;
 
@@ -319,6 +325,14 @@ export function useMessageDispatcher(streamingChat: StreamingChatAPI) {
 
         case "append-to-chat":
           if (message.text) {
+            // Extract title from the markdown if present
+            const titleMatch = message.text.match(
+              /\*\*\[From Reader: (.+?)\]\*\*/,
+            );
+            const title = titleMatch ? titleMatch[1] : "Web Content";
+            useChatStore
+              .getState()
+              .setReaderContext({ title, text: message.text });
             addMessage({
               type: "bot",
               content: `📎 **Context added from Reader:**\n\n${message.text}\n\n*This content will be included as context in your next message to the AI.*`,

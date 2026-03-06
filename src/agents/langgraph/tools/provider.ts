@@ -18,6 +18,8 @@ import {
   DeepTerminalTool,
   TodoTool,
   MemoryTool,
+  TestRunnerTool,
+  ComposerTool,
 } from "../../../tools/tools";
 import { ContextRetriever } from "./../../../services/context-retriever";
 import { LangChainFileTool } from "./file";
@@ -36,6 +38,8 @@ import { LangChainWebPreviewTool } from "./web_preview";
 import { LangChainSearchTool } from "./search";
 import { LangChainTodoTool } from "./todo";
 import { LangChainMemoryTool } from "./memory";
+import { LangChainTestRunnerTool } from "./test-runner";
+import { LangChainComposerTool } from "./composer";
 import {
   DebugControlTool,
   DebugEvaluateTool,
@@ -150,6 +154,18 @@ class MemoryToolFactory implements IToolFactory {
   }
 }
 
+class TestRunnerToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainTestRunnerTool(new TestRunnerTool());
+  }
+}
+
+class ComposerToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainComposerTool(new ComposerTool());
+  }
+}
+
 class SearchToolFactory implements IToolFactory {
   constructor(private contextRetriever: ContextRetriever) {}
   createTool(): StructuredTool<any> {
@@ -227,6 +243,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "search_vector_db",
     "manage_tasks",
     "manage_core_memory",
+    "compose_files",
   ],
   "doc-writer": [
     "search",
@@ -242,6 +259,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "search_symbols",
     "list_files",
     "edit_file",
+    "compose_files",
     "search_vector_db",
   ],
   "file-organizer": [
@@ -263,6 +281,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "git",
     "list_files",
     "edit_file",
+    "compose_files",
     "manage_terminal",
   ],
   architect: [
@@ -318,6 +337,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "open_web_preview",
     "search_vector_db",
     "manage_terminal",
+    "run_tests",
   ],
   debugger: [
     "debug_get_state",
@@ -367,6 +387,8 @@ export class ToolProvider {
       new SearchToolFactory(this.contextRetriever),
       new TodoToolFactory(),
       new MemoryToolFactory(),
+      new TestRunnerToolFactory(),
+      new ComposerToolFactory(),
       new DebugGetStateToolFactory(),
       new DebugGetStackTraceToolFactory(),
       new DebugGetVariablesToolFactory(),

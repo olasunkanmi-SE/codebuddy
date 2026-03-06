@@ -28,7 +28,7 @@ export const DownloadIcon: React.FC<DownloadIconProps> = ({ onClick, className =
   const getButtonText = () => {
     if (showSuccess) return "Copied!";
     if (isProcessing) return "...";
-    return "MD";
+    return "MARKDOWN";
   };
 
   return (
