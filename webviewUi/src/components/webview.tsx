@@ -40,7 +40,9 @@ import { NotificationPanel } from "./notifications";
 import { UpdatesPanel } from "./updates/UpdatesPanel";
 import { ObservabilityPanel } from "./observability/ObservabilityPanel";
 import { CoWorkerPanel } from "./coworker/CoWorkerPanel";
+import { BrowserPanel } from "./browser/BrowserPanel";
 import {
+  SidebarNav,
   SettingsToggleButton,
   SessionsToggleButton,
   NotificationToggleButton,
@@ -50,11 +52,6 @@ import {
   CoWorkerToggleButton,
   FontSizeGroup,
   FontSizeButton,
-  BrowsingHistoryDropdown,
-  HistoryItem,
-  HistoryTitle,
-  HistoryUrl,
-  HistoryHeader,
   SessionsIcon,
   NotificationIcon,
   BookIcon,
@@ -91,7 +88,7 @@ export const WebviewUI = () => {
   const isUpdatesPanelOpen = usePanelStore((s) => s.isUpdatesPanelOpen);
   const isObservabilityOpen = usePanelStore((s) => s.isObservabilityOpen);
   const isCoWorkerOpen = usePanelStore((s) => s.isCoWorkerOpen);
-  const isHistoryOpen = usePanelStore((s) => s.isHistoryOpen);
+  const isBrowserPanelOpen = usePanelStore((s) => s.isBrowserPanelOpen);
 
   // Sessions store
   const sessions = useSessionsStore((s) => s.sessions);
@@ -102,7 +99,6 @@ export const WebviewUI = () => {
   const logs = useContentStore((s) => s.logs);
   const metrics = useContentStore((s) => s.metrics);
   const traces = useContentStore((s) => s.traces);
-  const browsingHistory = useContentStore((s) => s.browsingHistory);
   const notifications = useNotificationsStore((s) => s.notifications);
 
   // Settings-derived objects for SettingsPanel
@@ -221,9 +217,10 @@ export const WebviewUI = () => {
     usePanelStore.getState().openSessions();
   }, []);
 
-  const handleShowBrowsingHistory = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleOpenBrowserPanel = useCallback(() => {
     useContentStore.getState().handleShowBrowsingHistory();
+    useContentStore.getState().handleGetBookmarks();
+    usePanelStore.getState().openBrowserPanel();
   }, []);
 
   // ── Derived values ──
@@ -248,16 +245,95 @@ export const WebviewUI = () => {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      {/* Settings Toggle Button */}
-      <SettingsToggleButton
-        onClick={() => usePanelStore.getState().openSettings()}
-        aria-label="Open settings"
-        title="Settings"
-      >
-        <SettingsGearIcon size={14} />
-      </SettingsToggleButton>
+      {/* Sidebar Navigation — flexbox container replaces hardcoded pixel positions */}
+      <SidebarNav aria-label="Sidebar actions">
+        <SettingsToggleButton
+          onClick={() => usePanelStore.getState().openSettings()}
+          aria-label="Open settings"
+          title="Settings"
+        >
+          <SettingsGearIcon size={14} />
+        </SettingsToggleButton>
 
+        <SessionsToggleButton
+          onClick={handleOpenSessions}
+          aria-label="Open sessions"
+          title="Sessions"
+        >
+          <SessionsIcon size={14} />
+        </SessionsToggleButton>
 
+        <NotificationToggleButton
+          onClick={handleToggleNotifications}
+          aria-label="Open notifications"
+          title="Notifications"
+        >
+          <NotificationIcon size={14} />
+          {unreadNotificationCount > 0 && (
+            <span
+              style={{
+                position: "absolute",
+                top: "-4px",
+                right: "-4px",
+                background: "var(--vscode-activityBarBadge-background)",
+                color: "var(--vscode-activityBarBadge-foreground)",
+                fontSize: "9px",
+                fontWeight: "bold",
+                borderRadius: "50%",
+                minWidth: "14px",
+                height: "14px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "1px solid var(--vscode-editor-background)",
+              }}
+            >
+              {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+            </span>
+          )}
+        </NotificationToggleButton>
+
+        <UpdatesToggleButton
+          onClick={() => usePanelStore.getState().openUpdates()}
+          aria-label="Open updates"
+          title="Updates"
+        >
+          <BookIcon size={14} />
+        </UpdatesToggleButton>
+
+        <ObservabilityToggleButton
+          onClick={() => usePanelStore.getState().openObservability()}
+          aria-label="Open observability"
+          title="Observability"
+        >
+          <ObservabilityIcon size={14} />
+        </ObservabilityToggleButton>
+
+        <BrowserToggleButton
+          onClick={handleOpenBrowserPanel}
+          aria-label="Open browser"
+          title="Browser"
+        >
+          <BrowserIcon size={14} />
+        </BrowserToggleButton>
+
+        <CoWorkerToggleButton
+          onClick={() => usePanelStore.getState().openCoWorker()}
+          aria-label="Open co-worker"
+          title="Co-Worker"
+        >
+          <CoWorkerIcon size={14} />
+        </CoWorkerToggleButton>
+
+        <FontSizeGroup>
+          <FontSizeButton onClick={() => useSettingsStore.getState().handleIncreaseFontSize()} title="Increase Font Size">
+            A+
+          </FontSizeButton>
+          <FontSizeButton onClick={() => useSettingsStore.getState().handleDecreaseFontSize()} title="Decrease Font Size">
+            A-
+          </FontSizeButton>
+        </FontSizeGroup>
+      </SidebarNav>
 
       {/* Settings Panel */}
       <SettingsPanel
@@ -269,15 +345,6 @@ export const WebviewUI = () => {
         settingsOptions={settingsOptions}
         settingsHandlers={settingsHandlers}
       />
-
-      {/* Sessions Toggle Button */}
-      <SessionsToggleButton
-        onClick={handleOpenSessions}
-        aria-label="Open sessions"
-        title="Sessions"
-      >
-        <SessionsIcon size={14} />
-      </SessionsToggleButton>
 
       {/* Sessions Panel */}
       <SessionsPanel
@@ -291,46 +358,6 @@ export const WebviewUI = () => {
         onRenameSession={useSessionsStore.getState().handleRenameSession}
       />
 
-      {/* Notifications Toggle Button */}
-      <NotificationToggleButton
-        onClick={handleToggleNotifications}
-        aria-label="Open notifications"
-        title="Notifications"
-      >
-        <NotificationIcon size={14} />
-        {unreadNotificationCount > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: "-4px",
-              right: "-4px",
-              background: "var(--vscode-activityBarBadge-background)",
-              color: "var(--vscode-activityBarBadge-foreground)",
-              fontSize: "9px",
-              fontWeight: "bold",
-              borderRadius: "50%",
-              minWidth: "14px",
-              height: "14px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "1px solid var(--vscode-editor-background)",
-            }}
-          >
-            {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
-          </span>
-        )}
-      </NotificationToggleButton>
-
-      <FontSizeGroup>
-        <FontSizeButton onClick={() => useSettingsStore.getState().handleIncreaseFontSize()} title="Increase Font Size">
-          A+
-        </FontSizeButton>
-        <FontSizeButton onClick={() => useSettingsStore.getState().handleDecreaseFontSize()} title="Decrease Font Size">
-          A-
-        </FontSizeButton>
-      </FontSizeGroup>
-
       {/* Notifications Panel */}
       <NotificationPanel
         isOpen={isNotificationPanelOpen}
@@ -341,15 +368,6 @@ export const WebviewUI = () => {
         onClearAll={useNotificationsStore.getState().handleClearAll}
         onDelete={useNotificationsStore.getState().handleDelete}
       />
-
-      {/* Updates Toggle Button */}
-      <UpdatesToggleButton
-        onClick={() => usePanelStore.getState().openUpdates()}
-        aria-label="Open updates"
-        title="Updates"
-      >
-        <BookIcon size={14} />
-      </UpdatesToggleButton>
 
       {/* Updates Panel */}
       <UpdatesPanel
@@ -365,58 +383,11 @@ export const WebviewUI = () => {
         userName={username || "Developer"}
       />
 
-      {/* Observability Toggle Button */}
-      <ObservabilityToggleButton
-        onClick={() => usePanelStore.getState().openObservability()}
-        aria-label="Open observability"
-        title="Observability"
-      >
-        <ObservabilityIcon size={14} />
-      </ObservabilityToggleButton>
-
-      {/* Browser Toggle Button */}
-      <BrowserToggleButton
-        onClick={() => useContentStore.getState().handleOpenBrowser()}
-        onContextMenu={handleShowBrowsingHistory}
-        aria-label="Open browser"
-        title="Open Browser (right-click for history)"
-      >
-        <BrowserIcon size={14} />
-      </BrowserToggleButton>
-
-      {/* Co-Worker Toggle Button */}
-      <CoWorkerToggleButton
-        onClick={() => usePanelStore.getState().openCoWorker()}
-        aria-label="Open co-worker"
-        title="Co-Worker"
-      >
-        <CoWorkerIcon size={14} />
-      </CoWorkerToggleButton>
-
-      {/* Browsing History Dropdown */}
-      {isHistoryOpen && (
-        <>
-          <div
-            style={{ position: "fixed", inset: 0, zIndex: 199 }}
-            onClick={() => usePanelStore.getState().closeHistory()}
-          />
-          <BrowsingHistoryDropdown>
-            <HistoryHeader>Recent Pages</HistoryHeader>
-            {browsingHistory.length === 0 ? (
-              <HistoryItem as="div" style={{ cursor: "default", opacity: 0.5 }}>
-                <HistoryTitle>No browsing history yet</HistoryTitle>
-              </HistoryItem>
-            ) : (
-              browsingHistory.map((item, i) => (
-                <HistoryItem key={`${item.url}-${i}`} onClick={() => { useContentStore.getState().handleOpenFromHistory(item.url); usePanelStore.getState().closeHistory(); }}>
-                  <HistoryTitle>{item.title}</HistoryTitle>
-                  <HistoryUrl>{item.url}</HistoryUrl>
-                </HistoryItem>
-              ))
-            )}
-          </BrowsingHistoryDropdown>
-        </>
-      )}
+      {/* Browser Panel (Chrome-style with History + Bookmarks) */}
+      <BrowserPanel
+        isOpen={isBrowserPanelOpen}
+        onClose={() => usePanelStore.getState().closeBrowserPanel()}
+      />
 
       {/* Observability Panel */}
       <ObservabilityPanel

@@ -6,9 +6,13 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -18,7 +22,7 @@ jobs:
       - name: Upload diff artifact
         uses: actions/upload-artifact@v4
         with:
-          name: git-diff
+          name: git-diff-${{ matrix.os }}
           path: diff.txt
 
       - name: Setup Node.js
@@ -51,9 +55,35 @@ jobs:
       - name: Compile Tests
         run: npm run compile:test
 
-      - name: Run Tests
-        run: xvfb-run -a npm test
+      - name: Run Tests with Coverage (Linux)
+        run: xvfb-run -a npm run test:coverage
         if: runner.os == 'Linux'
+
+      - name: Run Tests (macOS)
+        run: npm test
+        if: runner.os == 'macOS'
+
+      - name: Run Tests (Windows)
+        run: npm test
+        if: runner.os == 'Windows'
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        if: ${{ runner.os == 'Linux' && !cancelled() }}
+        with:
+          name: coverage-report
+          path: coverage/
+
+      - name: Check Coverage Threshold
+        if: runner.os == 'Linux'
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            LINES=$(node -e "const c=require('./coverage/coverage-summary.json');console.log(c.total.lines.pct)")
+            echo "Line coverage: ${LINES}%"
+            node -e "const c=require('./coverage/coverage-summary.json');if(c.total.lines.pct<30){console.error('Coverage '+c.total.lines.pct+'% is below 30% threshold');process.exit(1)}else{console.log('Coverage gate passed: '+c.total.lines.pct+'%')}"
+          else
+            echo "::warning::No coverage summary found, skipping threshold check"
+          fi
 
       - name: Package
         run: npm run package

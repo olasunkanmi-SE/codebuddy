@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flattenFileTree, searchFiles, getDirectory } from "../utils/fuzzySearch";
 import type { FileItem } from "../utils/fuzzySearch";
+import { useChatStore } from "../stores/chat.store";
 import "./ChatInput.css";
 
 interface ChatInputProps {
@@ -33,6 +34,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionAnchor, setMentionAnchor] = useState(-1); // cursor position of the '@'
+
+  const readerContext = useChatStore((s) => s.readerContext);
+  const clearReaderContext = useChatStore((s) => s.setReaderContext);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -160,7 +164,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
     onSendRef.current(userInput, mentioned);
     setUserInput("");
     setMentionOpen(false);
-  }, [userInput, disabled]);
+    clearReaderContext(null);
+  }, [userInput, disabled, clearReaderContext]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -178,6 +183,24 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className="chat-input-wrapper">
+      {/* Reader context chip */}
+      {readerContext && (
+        <div className="reader-context-chip" role="status">
+          <span className="reader-context-icon">🌐</span>
+          <span className="reader-context-label" title={readerContext.text.slice(0, 200)}>
+            {readerContext.title}
+          </span>
+          <button
+            className="reader-context-dismiss"
+            onClick={() => clearReaderContext(null)}
+            aria-label="Remove web context"
+            title="Remove"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Mention autocomplete dropdown (rendered above textarea) */}
       {mentionOpen && totalItems > 0 && (
         <div className="mention-dropdown" ref={dropdownRef}>

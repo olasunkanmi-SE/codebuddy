@@ -126,6 +126,7 @@ export const CheckpointPanel: React.FC<CheckpointPanelProps> = ({
           {lastRevertResult && !isReverting && (
             <div
               className={`revert-result ${lastRevertResult.errors.length > 0 ? "has-errors" : "success"}`}
+              role="alert"
             >
               {lastRevertResult.errors.length > 0 ? (
                 <span>

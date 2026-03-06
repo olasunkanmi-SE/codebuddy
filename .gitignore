@@ -1,6 +1,7 @@
 out
 node_modules
 .vscode-test/
+coverage/
 *.vsix
 
 # Sentry Config File

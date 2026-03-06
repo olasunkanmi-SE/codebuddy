@@ -652,7 +652,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, fullHeigh
         {isLoading && <LoadingState>Rendering diagram...</LoadingState>}
         
         {error && (
-          <ErrorState>
+          <ErrorState role="alert">
             <ErrorMessage>
               <span>⚠️</span>
               <span>Diagram Syntax Error</span>

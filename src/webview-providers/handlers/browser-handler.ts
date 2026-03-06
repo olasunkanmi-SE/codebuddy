@@ -10,6 +10,10 @@ export class BrowserHandler implements WebviewMessageHandler {
     "openBrowser",
     "store-reader-context",
     "get-browsing-history",
+    "add-history-to-chat",
+    "add-bookmark",
+    "remove-bookmark",
+    "get-bookmarks",
   ];
 
   constructor(
@@ -148,6 +152,103 @@ export class BrowserHandler implements WebviewMessageHandler {
           type: "browsing-history",
           history,
         });
+        break;
+      }
+
+      case "add-history-to-chat": {
+        if (message.text) {
+          const { NewsReaderService: AddToReader } =
+            await import("../../services/news-reader.service");
+          const reader = AddToReader.getInstance();
+          try {
+            await reader.analyzeContent(message.text);
+            const article = reader.currentArticle;
+            const title = article?.title || message.title || message.text;
+            const content = article?.content
+              ? article.content.substring(0, 5000)
+              : "Page content could not be extracted.";
+            const snippet = `**[From Web: ${title}]**\n\n${content}`;
+            await vscode.commands.executeCommand(
+              "codebuddy.appendToChat",
+              snippet,
+            );
+          } catch {
+            // Fallback: add URL as context reference
+            const snippet = `**[From Web: ${message.title || message.text}]**\n\nURL: ${message.text}`;
+            await vscode.commands.executeCommand(
+              "codebuddy.appendToChat",
+              snippet,
+            );
+          }
+        }
+        break;
+      }
+
+      case "add-bookmark": {
+        if (message.url) {
+          try {
+            const { SqliteDatabaseService } =
+              await import("../../services/sqlite-database.service");
+            const db = SqliteDatabaseService.getInstance();
+            await db.ensureInitialized();
+            db.executeSqlCommand(
+              `INSERT OR IGNORE INTO bookmarks (url, title) VALUES (?, ?)`,
+              [message.url, message.title || message.url],
+            );
+            const bookmarks = db.executeSql(
+              `SELECT url, title, created_at FROM bookmarks ORDER BY created_at DESC`,
+            );
+            await ctx.webview.webview.postMessage({
+              type: "bookmarks-list",
+              bookmarks,
+            });
+          } catch (err) {
+            ctx.logger.warn("Failed to add bookmark", err);
+          }
+        }
+        break;
+      }
+
+      case "remove-bookmark": {
+        if (message.url) {
+          try {
+            const { SqliteDatabaseService } =
+              await import("../../services/sqlite-database.service");
+            const db = SqliteDatabaseService.getInstance();
+            await db.ensureInitialized();
+            db.executeSqlCommand(`DELETE FROM bookmarks WHERE url = ?`, [
+              message.url,
+            ]);
+            const bookmarks = db.executeSql(
+              `SELECT url, title, created_at FROM bookmarks ORDER BY created_at DESC`,
+            );
+            await ctx.webview.webview.postMessage({
+              type: "bookmarks-list",
+              bookmarks,
+            });
+          } catch (err) {
+            ctx.logger.warn("Failed to remove bookmark", err);
+          }
+        }
+        break;
+      }
+
+      case "get-bookmarks": {
+        try {
+          const { SqliteDatabaseService } =
+            await import("../../services/sqlite-database.service");
+          const db = SqliteDatabaseService.getInstance();
+          await db.ensureInitialized();
+          const bookmarks = db.executeSql(
+            `SELECT url, title, created_at FROM bookmarks ORDER BY created_at DESC`,
+          );
+          await ctx.webview.webview.postMessage({
+            type: "bookmarks-list",
+            bookmarks,
+          });
+        } catch (err) {
+          ctx.logger.warn("Failed to get bookmarks", err);
+        }
         break;
       }
     }

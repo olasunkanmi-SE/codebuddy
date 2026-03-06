@@ -10,6 +10,7 @@ interface ChatState {
   fileChangesPanelCollapsed: boolean;
   checkpointPanelCollapsed: boolean;
   composerPanelCollapsed: boolean;
+  readerContext: { title: string; text: string } | null;
 
   setCommandAction: (action: string) => void;
   setIsCommandExecuting: (executing: boolean) => void;
@@ -20,6 +21,7 @@ interface ChatState {
   toggleCheckpointPanel: () => void;
   toggleComposerPanel: () => void;
   clearCommandState: () => void;
+  setReaderContext: (ctx: { title: string; text: string } | null) => void;
 }
 
 export const useChatStore = create<ChatState>()((set) => ({
@@ -31,6 +33,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   fileChangesPanelCollapsed: true,
   checkpointPanelCollapsed: true,
   composerPanelCollapsed: true,
+  readerContext: null,
 
   setCommandAction: (action) => set({ commandAction: action }),
   setIsCommandExecuting: (executing) => set({ isCommandExecuting: executing }),
@@ -45,4 +48,5 @@ export const useChatStore = create<ChatState>()((set) => ({
     set((s) => ({ composerPanelCollapsed: !s.composerPanelCollapsed })),
   clearCommandState: () =>
     set({ isCommandExecuting: false, commandAction: "" }),
+  setReaderContext: (ctx) => set({ readerContext: ctx }),
 }));
