@@ -679,7 +679,69 @@ export class CodeBuddyAgentService {
         );
 
         if (safetyResult.shouldStop) {
+          const limitLabel = this.safetyGuard.buildStopMessage(
+            safetyResult.reason!,
+            ctx.eventCount,
+            ctx.totalToolInvocations,
+            elapsed,
+          );
+
+          // Ask the user whether to continue or stop
+          yield {
+            type: StreamEventType.METADATA,
+            content: "interrupt_waiting",
+            metadata: {
+              threadId: conversationId,
+              status: "interrupt_waiting",
+              toolName: "Safety limit reached",
+              description: `${limitLabel} Would you like me to continue?`,
+            },
+          };
+          yield {
+            type: StreamEventType.CHUNK,
+            content: `${limitLabel} Would you like me to continue?`,
+            metadata: { threadId: conversationId, timestamp: Date.now() },
+          };
+
+          const continueGranted =
+            await this.waitForActionConsent(conversationId);
+
+          if (continueGranted) {
+            // User chose to continue — extend the limits and keep going
+            yield {
+              type: StreamEventType.METADATA,
+              content: "interrupt_approved",
+              metadata: {
+                threadId: conversationId,
+                status: "interrupt_approved",
+                toolName: "Safety limit reached",
+              },
+            };
+            yield {
+              type: StreamEventType.CHUNK,
+              content: "Continuing...",
+              metadata: { threadId: conversationId, timestamp: Date.now() },
+            };
+
+            this.safetyGuard.extendLimits(ctx);
+            this.logger.debug(
+              `[STREAM] User approved limit extension for thread ${conversationId}`,
+            );
+            continue;
+          }
+
+          // User denied — stop gracefully
           ctx.forceStopReason = safetyResult.reason;
+
+          yield {
+            type: StreamEventType.METADATA,
+            content: "interrupt_denied",
+            metadata: {
+              threadId: conversationId,
+              status: "interrupt_denied",
+              toolName: "Safety limit reached",
+            },
+          };
 
           // Mark pending tools as completed
           for (const [toolName, activity] of ctx.pendingToolCalls) {
@@ -696,20 +758,13 @@ export class CodeBuddyAgentService {
           }
           ctx.pendingToolCalls.clear();
 
-          const warning = this.safetyGuard.buildStopMessage(
-            ctx.forceStopReason!,
-            ctx.eventCount,
-            ctx.totalToolInvocations,
-            elapsed,
-          );
-
           yield {
             type: StreamEventType.CHUNK,
-            content: warning,
+            content: limitLabel,
             metadata: { threadId: conversationId, reason: ctx.forceStopReason },
             accumulated: ctx.accumulatedContent
-              ? `${ctx.accumulatedContent}\n\n${warning}`
-              : warning,
+              ? `${ctx.accumulatedContent}\n\n${limitLabel}`
+              : limitLabel,
           };
 
           break;

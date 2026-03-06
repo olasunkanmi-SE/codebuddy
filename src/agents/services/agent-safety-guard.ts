@@ -150,6 +150,25 @@ export class AgentSafetyGuard {
   }
 
   /**
+   * Extend limits by resetting the stream context counters, giving the
+   * agent another full quota of events, tool calls, and wall-clock time.
+   * Called when the user approves continuation after a safety limit is hit.
+   */
+  extendLimits(ctx: {
+    eventCount: number;
+    totalToolInvocations: number;
+    startTime: number;
+  }): void {
+    this.logger.log(
+      LogLevel.INFO,
+      `Extending limits: resetting counters (was events=${ctx.eventCount}, tools=${ctx.totalToolInvocations})`,
+    );
+    ctx.eventCount = 0;
+    ctx.totalToolInvocations = 0;
+    ctx.startTime = Date.now();
+  }
+
+  /**
    * Build a user-facing error message for a looping tool.
    */
   buildToolLoopErrorMessage(toolName: string, callCount: number): string {
