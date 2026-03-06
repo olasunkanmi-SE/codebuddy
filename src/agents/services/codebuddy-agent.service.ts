@@ -125,11 +125,17 @@ const TOOL_DESCRIPTIONS: Record<string, IToolDescription> = {
 };
 
 export class CodeBuddyAgentService {
+  /**
+   * Agents are keyed by `provider:model` but intentionally share a single
+   * `store` and `checkpointer` so conversation history persists across
+   * model switches within the same workspace session.
+   */
   private agentCache = new Map<string, IStreamableAgent>();
   private store = new InMemoryStore();
-  private checkpointer: MemorySaver | SqliteSaver | undefined;
+  private checkpointerPromise: Promise<MemorySaver | SqliteSaver> | null = null;
   private readonly logger: Logger;
-  private static instance: CodeBuddyAgentService;
+  private static instance: CodeBuddyAgentService | null = null;
+  private disposed = false;
   private activeStreams = new Map<string, StreamManager>();
   private readonly synthesizer: ResultSynthesizerService;
   private readonly safetyGuard: AgentSafetyGuard;
@@ -170,25 +176,27 @@ export class CodeBuddyAgentService {
    * Lazily initializes a persistent SQLite-backed checkpointer.
    * Falls back to an ephemeral MemorySaver if the workspace path
    * is unavailable or SQLite initialization fails.
+   *
+   * Uses promise memoization to prevent a check-then-act race when
+   * multiple concurrent calls arrive before initialization completes.
    */
-  private async getCheckpointer(): Promise<MemorySaver | SqliteSaver> {
-    if (this.checkpointer) return this.checkpointer;
+  private getCheckpointer(): Promise<MemorySaver | SqliteSaver> {
+    return (this.checkpointerPromise ??= this.initCheckpointer());
+  }
 
+  private async initCheckpointer(): Promise<MemorySaver | SqliteSaver> {
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (workspacePath) {
       try {
         const codeBuddyDir = path.join(workspacePath, ".codebuddy");
-        if (!fs.existsSync(codeBuddyDir)) {
-          fs.mkdirSync(codeBuddyDir, { recursive: true });
-        }
+        await fs.promises.mkdir(codeBuddyDir, { recursive: true });
         const dbPath = path.join(codeBuddyDir, "checkpoints.db");
         const saver = SqliteSaver.fromConnString(dbPath);
-        this.checkpointer = saver;
         this.logger.log(
           LogLevel.INFO,
           `Persistent checkpointer initialized at ${dbPath}`,
         );
-        return this.checkpointer;
+        return saver;
       } catch (error) {
         this.logger.warn(
           "Failed to initialize SQLite checkpointer, falling back to in-memory",
@@ -197,8 +205,7 @@ export class CodeBuddyAgentService {
       }
     }
 
-    this.checkpointer = new MemorySaver();
-    return this.checkpointer;
+    return new MemorySaver();
   }
 
   /**
@@ -598,13 +605,17 @@ export class CodeBuddyAgentService {
         );
 
         if (interruptEntry) {
-          const newIter = yield* this.handleInterrupt(
+          const iteratorHolder: { value: AsyncIterator<unknown> | null } = {
+            value: null,
+          };
+          yield* this.handleInterrupt(
             interruptEntry as [string, IInterruptValue | IInterruptValue[]],
             ctx,
             agent,
             config,
+            iteratorHolder,
           );
-          if (newIter) streamIterator = newIter;
+          if (iteratorHolder.value) streamIterator = iteratorHolder.value;
           continue;
         }
 
@@ -631,10 +642,7 @@ export class CodeBuddyAgentService {
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       ctx.agentState = "failed";
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: err.message,
-      });
+      ctx.hasErrored = true;
       span.recordException(err);
 
       // Mark pending tools as failed
@@ -661,6 +669,15 @@ export class CodeBuddyAgentService {
 
       throw err;
     } finally {
+      // Centralize span finalization so it always fires exactly once
+      if (ctx.hasErrored) {
+        span.setStatus({ code: SpanStatusCode.ERROR });
+      } else {
+        span.setStatus({ code: SpanStatusCode.OK });
+      }
+      span.setAttribute("agent.final_state", ctx.agentState);
+      span.setAttribute("agent.event_count", ctx.eventCount);
+      span.setAttribute("agent.tool_count", ctx.totalToolInvocations);
       span.end();
       this.activeStreams.delete(conversationId);
       this.consentManager.clearThread(conversationId);
@@ -676,13 +693,12 @@ export class CodeBuddyAgentService {
     ctx: IStreamContext,
     agent: IStreamableAgent,
     config: Record<string, unknown>,
-  ): AsyncGenerator<IStreamEvent, AsyncIterator<unknown> | null> {
+    iteratorOut: { value: AsyncIterator<unknown> | null },
+  ): AsyncGenerator<IStreamEvent> {
     const [, interruptUpdates] = interruptEntry;
     const interrupts = Array.isArray(interruptUpdates)
       ? interruptUpdates
       : [interruptUpdates];
-
-    let newIterator: AsyncIterator<unknown> | null = null;
 
     for (const interrupt of interrupts) {
       const interruptId = interrupt?.value?.id ?? `interrupt-${Date.now()}`;
@@ -738,7 +754,7 @@ export class CodeBuddyAgentService {
 
         const resumeCommand = new Command({ resume: "approve" });
         try {
-          newIterator = (await agent.stream(resumeCommand, config))[
+          iteratorOut.value = (await agent.stream(resumeCommand, config))[
             Symbol.asyncIterator
           ]();
           this.logger.debug(
@@ -749,7 +765,7 @@ export class CodeBuddyAgentService {
             `[STREAM] Failed to resume: ${resumeError instanceof Error ? resumeError.message : resumeError}`,
           );
           const fallbackResume = { resume: { [interruptId]: "approve" } };
-          newIterator = (await agent.stream(fallbackResume, config))[
+          iteratorOut.value = (await agent.stream(fallbackResume, config))[
             Symbol.asyncIterator
           ]();
           this.logger.debug(`[STREAM] Used fallback resume format`);
@@ -776,22 +792,35 @@ export class CodeBuddyAgentService {
 
         const denyCommand = new Command({ resume: "deny" });
         try {
-          newIterator = (await agent.stream(denyCommand, config))[
+          iteratorOut.value = (await agent.stream(denyCommand, config))[
             Symbol.asyncIterator
           ]();
         } catch (denyError) {
           this.logger.error(
             `[STREAM] Failed to resume with deny: ${denyError instanceof Error ? denyError.message : denyError}`,
           );
-          const fallbackDeny = { resume: { [interruptId]: "deny" } };
-          newIterator = (await agent.stream(fallbackDeny, config))[
-            Symbol.asyncIterator
-          ]();
+          try {
+            const fallbackDeny = { resume: { [interruptId]: "deny" } };
+            iteratorOut.value = (await agent.stream(fallbackDeny, config))[
+              Symbol.asyncIterator
+            ]();
+          } catch (fallbackError) {
+            this.logger.error(
+              `[STREAM] Denial fallback also failed: ${fallbackError instanceof Error ? fallbackError.message : fallbackError}`,
+            );
+            ctx.hasErrored = true;
+            yield {
+              type: StreamEventType.ERROR,
+              content: `Failed to process denial for ${friendlyName}. The agent may be in an inconsistent state.`,
+              metadata: {
+                threadId: ctx.conversationId,
+                toolName: friendlyName,
+              },
+            };
+          }
         }
       }
     }
-
-    return newIterator;
   }
 
   private *processNodeEntries(
@@ -1201,15 +1230,6 @@ export class CodeBuddyAgentService {
       },
     };
     ctx.agentState = "completed";
-
-    if (ctx.hasErrored) {
-      span.setStatus({ code: SpanStatusCode.ERROR });
-    } else {
-      span.setStatus({ code: SpanStatusCode.OK });
-    }
-    span.setAttribute("agent.final_state", ctx.agentState);
-    span.setAttribute("agent.event_count", ctx.eventCount);
-    span.setAttribute("agent.tool_count", ctx.totalToolInvocations);
   }
 
   private summarizeToolResult(content: unknown, toolName: string): string {
@@ -1346,6 +1366,9 @@ export class CodeBuddyAgentService {
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+
     // End all active streams and clear consent waiters
     for (const [threadId, streamManager] of this.activeStreams) {
       if (streamManager.isActive()) {
@@ -1362,8 +1385,7 @@ export class CodeBuddyAgentService {
     this.modelChangeDisposable.dispose();
 
     // Reset singleton so a fresh instance is created if needed
-    CodeBuddyAgentService.instance =
-      undefined as unknown as CodeBuddyAgentService;
+    CodeBuddyAgentService.instance = null;
 
     this.logger.log(LogLevel.INFO, "CodeBuddyAgentService disposed");
   }

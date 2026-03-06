@@ -5,8 +5,8 @@
  * collaborators that previously had zero test coverage:
  *
  * 1. ContentNormalizer — direct import (no vscode dependency)
- * 2. ConsentManager — logic re-implemented inline (depends on Logger → vscode)
- * 3. AgentSafetyGuard — expanded coverage (checkLimits, detectToolLoop,
+ * 2. ConsentManager — real import with injected no-op logger
+ * 3. AgentSafetyGuard — real import with injected no-op logger;
  *    detectFileLoop, buildStopMessage, buildToolLoopErrorMessage)
  * 4. collectToolCalls — validation of additional_kwargs entries
  * 5. summarizeToolResult — size guard, per-tool summaries
@@ -16,6 +16,18 @@
 
 import * as assert from "assert";
 import { ContentNormalizer } from "../../agents/services/content-normalizer";
+import { ConsentManager } from "../../agents/services/consent-manager";
+import { AgentSafetyGuard } from "../../agents/services/agent-safety-guard";
+
+// ═══════════════════════════════════════════════════════════════
+// No-op logger for testing real classes without vscode dependency
+// ═══════════════════════════════════════════════════════════════
+
+const noopLogger = {
+  log: () => {},
+  warn: () => {},
+  debug: () => {},
+};
 
 // ═══════════════════════════════════════════════════════════════
 // 1. ContentNormalizer (real import — zero external deps)
@@ -172,93 +184,14 @@ suite("ContentNormalizer — filterToolUseFromString()", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// 2. ConsentManager — re-implemented inline
+// 2. ConsentManager — real import with no-op logger
 // ═══════════════════════════════════════════════════════════════
 
 suite("ConsentManager — consent lifecycle", () => {
-  // Inline re-implementation (real class imports Logger → vscode)
-  class TestConsentManager {
-    private static readonly CONSENT_TIMEOUT_MS = 200; // short for tests
-    private waiters = new Map<
-      string,
-      Array<{
-        resolve: (granted: boolean) => void;
-        timeout: ReturnType<typeof setTimeout>;
-      }>
-    >();
-
-    waitForConsent(threadId: string): Promise<boolean> {
-      return new Promise<boolean>((resolve) => {
-        const timeout = setTimeout(() => {
-          this.removeWaiter(threadId, entry);
-          resolve(false);
-        }, TestConsentManager.CONSENT_TIMEOUT_MS);
-        const entry = { resolve, timeout };
-        let queue = this.waiters.get(threadId);
-        if (!queue) {
-          queue = [];
-          this.waiters.set(threadId, queue);
-        }
-        queue.push(entry);
-      });
-    }
-
-    respond(granted: boolean, threadId?: string): void {
-      if (threadId) {
-        this.resolveOldest(threadId, granted);
-      } else {
-        for (const [tid] of this.waiters) {
-          if (this.resolveOldest(tid, granted)) return;
-        }
-      }
-    }
-
-    pendingCount(threadId?: string): number {
-      if (threadId) return this.waiters.get(threadId)?.length ?? 0;
-      let total = 0;
-      for (const queue of this.waiters.values()) total += queue.length;
-      return total;
-    }
-
-    clearThread(threadId: string): void {
-      const queue = this.waiters.get(threadId);
-      if (!queue) return;
-      for (const entry of queue) {
-        clearTimeout(entry.timeout);
-        entry.resolve(false);
-      }
-      this.waiters.delete(threadId);
-    }
-
-    private resolveOldest(threadId: string, granted: boolean): boolean {
-      const queue = this.waiters.get(threadId);
-      const entry = queue?.shift();
-      if (!entry) return false;
-      clearTimeout(entry.timeout);
-      if (queue?.length === 0) this.waiters.delete(threadId);
-      entry.resolve(granted);
-      return true;
-    }
-
-    private removeWaiter(
-      threadId: string,
-      entry: {
-        resolve: (granted: boolean) => void;
-        timeout: ReturnType<typeof setTimeout>;
-      },
-    ): void {
-      const queue = this.waiters.get(threadId);
-      if (!queue) return;
-      const idx = queue.indexOf(entry);
-      if (idx !== -1) queue.splice(idx, 1);
-      if (queue.length === 0) this.waiters.delete(threadId);
-    }
-  }
-
-  let mgr: TestConsentManager;
+  let mgr: ConsentManager;
 
   setup(() => {
-    mgr = new TestConsentManager();
+    mgr = new ConsentManager(noopLogger, 200); // 200ms timeout for tests
   });
 
   test("waitForConsent + respond(true) resolves with true", async () => {
@@ -342,270 +275,203 @@ suite("ConsentManager — consent lifecycle", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// 3. AgentSafetyGuard — expanded coverage
+// 3. AgentSafetyGuard — real import with no-op logger
 // ═══════════════════════════════════════════════════════════════
 
 suite("AgentSafetyGuard — checkLimits", () => {
-  // Re-implement inline (real class imports Logger → vscode)
-  const AGENT_SAFETY_LIMITS = {
-    maxEventCount: 1000,
-    maxToolInvocations: 200,
-    maxToolCallsPerType: 20,
-    maxDurationMs: 5 * 60 * 1000,
-    fileEditLoopThreshold: 4,
-    criticalToolLimits: {
-      edit_file: 8, write_file: 8, delete_file: 3,
-      run_command: 10, run_terminal_command: 100, web_search: 8,
-    } as Record<string, number>,
-    readOnlyTools: new Set([
-      "read_file", "list_directory", "search_codebase", "grep", "glob",
-      "analyze_files_for_question", "git_log", "git_diff", "git_status", "think", "run_tests",
-    ]),
-  };
+  let guard: AgentSafetyGuard;
 
-  type ForceStopReason = "max_events" | "max_tools" | "timeout";
-
-  function checkLimits(
-    eventCount: number,
-    totalToolInvocations: number,
-    elapsedMs: number,
-  ): { shouldStop: boolean; reason: ForceStopReason | null } {
-    if (eventCount >= AGENT_SAFETY_LIMITS.maxEventCount) {
-      return { shouldStop: true, reason: "max_events" };
-    }
-    if (totalToolInvocations >= AGENT_SAFETY_LIMITS.maxToolInvocations) {
-      return { shouldStop: true, reason: "max_tools" };
-    }
-    if (elapsedMs >= AGENT_SAFETY_LIMITS.maxDurationMs) {
-      return { shouldStop: true, reason: "timeout" };
-    }
-    return { shouldStop: false, reason: null };
-  }
+  setup(() => {
+    guard = new AgentSafetyGuard(noopLogger);
+  });
 
   test("under all limits → shouldStop false", () => {
-    const r = checkLimits(500, 100, 60_000);
+    const r = guard.checkLimits(500, 100, 60_000);
     assert.strictEqual(r.shouldStop, false);
     assert.strictEqual(r.reason, null);
   });
 
   test("at exact maxEventCount → stops", () => {
-    const r = checkLimits(1000, 0, 0);
+    const r = guard.checkLimits(1000, 0, 0);
     assert.strictEqual(r.shouldStop, true);
     assert.strictEqual(r.reason, "max_events");
   });
 
   test("over maxEventCount → stops", () => {
-    const r = checkLimits(1500, 0, 0);
+    const r = guard.checkLimits(1500, 0, 0);
     assert.strictEqual(r.shouldStop, true);
     assert.strictEqual(r.reason, "max_events");
   });
 
   test("at exact maxToolInvocations → stops", () => {
-    const r = checkLimits(0, 200, 0);
+    const r = guard.checkLimits(0, 200, 0);
     assert.strictEqual(r.shouldStop, true);
     assert.strictEqual(r.reason, "max_tools");
   });
 
   test("at exact maxDurationMs → stops", () => {
-    const r = checkLimits(0, 0, 300_000);
+    const r = guard.checkLimits(0, 0, 300_000);
     assert.strictEqual(r.shouldStop, true);
     assert.strictEqual(r.reason, "timeout");
   });
 
   test("events checked before tools (priority)", () => {
     // Both exceeded but events should be returned first
-    const r = checkLimits(1000, 200, 300_000);
+    const r = guard.checkLimits(1000, 200, 300_000);
     assert.strictEqual(r.reason, "max_events");
   });
 
   test("just under all limits → safe", () => {
-    const r = checkLimits(999, 199, 299_999);
+    const r = guard.checkLimits(999, 199, 299_999);
     assert.strictEqual(r.shouldStop, false);
   });
 });
 
 suite("AgentSafetyGuard — detectToolLoop", () => {
-  const AGENT_SAFETY_LIMITS = {
-    maxToolCallsPerType: 20,
-    criticalToolLimits: {
-      edit_file: 8, write_file: 8, delete_file: 3,
-      run_command: 10, run_terminal_command: 100, web_search: 8,
-    } as Record<string, number>,
-    readOnlyTools: new Set([
-      "read_file", "list_directory", "search_codebase", "grep", "glob",
-      "analyze_files_for_question", "git_log", "git_diff", "git_status", "think", "run_tests",
-    ]),
-  };
+  let guard: AgentSafetyGuard;
 
-  function detectToolLoop(toolName: string, currentCount: number) {
-    const isReadOnly = AGENT_SAFETY_LIMITS.readOnlyTools.has(toolName);
-    const limit =
-      AGENT_SAFETY_LIMITS.criticalToolLimits[toolName] ??
-      AGENT_SAFETY_LIMITS.maxToolCallsPerType;
-    const isLooping = currentCount >= limit;
-    return { isLooping, isReadOnly, limit, currentCount };
-  }
+  setup(() => {
+    guard = new AgentSafetyGuard(noopLogger);
+  });
 
   test("edit_file has critical limit of 8", () => {
-    const r = detectToolLoop("edit_file", 8);
+    const r = guard.detectToolLoop("edit_file", 8);
     assert.strictEqual(r.isLooping, true);
     assert.strictEqual(r.limit, 8);
     assert.strictEqual(r.isReadOnly, false);
   });
 
   test("edit_file under limit is not looping", () => {
-    assert.strictEqual(detectToolLoop("edit_file", 7).isLooping, false);
+    assert.strictEqual(guard.detectToolLoop("edit_file", 7).isLooping, false);
   });
 
   test("delete_file has critical limit of 3", () => {
-    assert.strictEqual(detectToolLoop("delete_file", 3).isLooping, true);
-    assert.strictEqual(detectToolLoop("delete_file", 2).isLooping, false);
+    assert.strictEqual(guard.detectToolLoop("delete_file", 3).isLooping, true);
+    assert.strictEqual(guard.detectToolLoop("delete_file", 2).isLooping, false);
   });
 
   test("read_file is read-only", () => {
-    const r = detectToolLoop("read_file", 0);
+    const r = guard.detectToolLoop("read_file", 0);
     assert.strictEqual(r.isReadOnly, true);
   });
 
   test("edit_file is not read-only", () => {
-    assert.strictEqual(detectToolLoop("edit_file", 0).isReadOnly, false);
+    assert.strictEqual(guard.detectToolLoop("edit_file", 0).isReadOnly, false);
   });
 
   test("unknown tool uses default maxToolCallsPerType (20)", () => {
-    const r = detectToolLoop("custom_tool", 19);
+    const r = guard.detectToolLoop("custom_tool", 19);
     assert.strictEqual(r.isLooping, false);
     assert.strictEqual(r.limit, 20);
 
-    const r2 = detectToolLoop("custom_tool", 20);
+    const r2 = guard.detectToolLoop("custom_tool", 20);
     assert.strictEqual(r2.isLooping, true);
   });
 
   test("run_terminal_command has high limit of 100", () => {
-    assert.strictEqual(detectToolLoop("run_terminal_command", 99).isLooping, false);
-    assert.strictEqual(detectToolLoop("run_terminal_command", 100).isLooping, true);
+    assert.strictEqual(guard.detectToolLoop("run_terminal_command", 99).isLooping, false);
+    assert.strictEqual(guard.detectToolLoop("run_terminal_command", 100).isLooping, true);
   });
 
   test("think is read-only", () => {
-    assert.strictEqual(detectToolLoop("think", 0).isReadOnly, true);
+    assert.strictEqual(guard.detectToolLoop("think", 0).isReadOnly, true);
   });
 
   test("run_tests is read-only", () => {
-    assert.strictEqual(detectToolLoop("run_tests", 0).isReadOnly, true);
+    assert.strictEqual(guard.detectToolLoop("run_tests", 0).isReadOnly, true);
   });
 });
 
 suite("AgentSafetyGuard — detectFileLoop (pure query, no mutation)", () => {
-  const FILE_EDIT_LOOP_THRESHOLD = 4;
+  let guard: AgentSafetyGuard;
 
-  function detectFileLoop(
-    filePath: string,
-    fileEditCounts: Map<string, number>,
-  ) {
-    const editCount = (fileEditCounts.get(filePath) || 0) + 1;
-    return {
-      isLooping: editCount >= FILE_EDIT_LOOP_THRESHOLD,
-      filePath,
-      editCount,
-    };
-  }
+  setup(() => {
+    guard = new AgentSafetyGuard(noopLogger);
+  });
 
   test("first edit returns editCount 1, not looping", () => {
     const counts = new Map<string, number>();
-    const r = detectFileLoop("/src/a.ts", counts);
+    const r = guard.detectFileLoop("/src/a.ts", counts);
     assert.strictEqual(r.editCount, 1);
     assert.strictEqual(r.isLooping, false);
   });
 
   test("does NOT mutate the caller's map", () => {
     const counts = new Map<string, number>();
-    detectFileLoop("/src/a.ts", counts);
+    guard.detectFileLoop("/src/a.ts", counts);
     assert.strictEqual(counts.has("/src/a.ts"), false);
   });
 
   test("at threshold (4) → looping", () => {
     const counts = new Map<string, number>([[ "/src/a.ts", 3 ]]);
-    const r = detectFileLoop("/src/a.ts", counts);
+    const r = guard.detectFileLoop("/src/a.ts", counts);
     assert.strictEqual(r.editCount, 4);
     assert.strictEqual(r.isLooping, true);
   });
 
   test("above threshold → looping", () => {
     const counts = new Map<string, number>([[ "/src/a.ts", 10 ]]);
-    assert.strictEqual(detectFileLoop("/src/a.ts", counts).isLooping, true);
+    assert.strictEqual(guard.detectFileLoop("/src/a.ts", counts).isLooping, true);
   });
 
   test("different files tracked independently", () => {
     const counts = new Map<string, number>([[ "/src/a.ts", 3 ]]);
-    assert.strictEqual(detectFileLoop("/src/b.ts", counts).editCount, 1);
-    assert.strictEqual(detectFileLoop("/src/a.ts", counts).editCount, 4);
+    assert.strictEqual(guard.detectFileLoop("/src/b.ts", counts).editCount, 1);
+    assert.strictEqual(guard.detectFileLoop("/src/a.ts", counts).editCount, 4);
   });
 });
 
 suite("AgentSafetyGuard — buildStopMessage", () => {
-  type ForceStopReason = "max_events" | "max_tools" | "timeout";
+  let guard: AgentSafetyGuard;
 
-  function buildStopMessage(
-    reason: ForceStopReason,
-    eventCount: number,
-    totalToolInvocations: number,
-    elapsedMs: number,
-  ): string {
-    const reasonMessages: Record<ForceStopReason, string> = {
-      max_events: `Processed ${eventCount} events`,
-      max_tools: `Made ${totalToolInvocations} tool calls`,
-      timeout: `Ran for ${Math.round(elapsedMs / 1000)} seconds`,
-    };
-    return `⚠️ Stopping early (${reasonMessages[reason]}). Here's what I found so far:`;
-  }
+  setup(() => {
+    guard = new AgentSafetyGuard(noopLogger);
+  });
 
   test("max_events includes event count", () => {
-    const msg = buildStopMessage("max_events", 1000, 50, 60_000);
+    const msg = guard.buildStopMessage("max_events", 1000, 50, 60_000);
     assert.ok(msg.includes("Processed 1000 events"));
     assert.ok(msg.includes("⚠️"));
   });
 
   test("max_tools includes tool count", () => {
-    const msg = buildStopMessage("max_tools", 500, 200, 120_000);
+    const msg = guard.buildStopMessage("max_tools", 500, 200, 120_000);
     assert.ok(msg.includes("Made 200 tool calls"));
   });
 
   test("timeout includes elapsed seconds", () => {
-    const msg = buildStopMessage("timeout", 100, 50, 300_000);
+    const msg = guard.buildStopMessage("timeout", 100, 50, 300_000);
     assert.ok(msg.includes("Ran for 300 seconds"));
   });
 });
 
 suite("AgentSafetyGuard — buildToolLoopErrorMessage", () => {
-  function buildToolLoopErrorMessage(toolName: string, callCount: number): string {
-    if (toolName === "edit_file" || toolName === "write_file") {
-      return `I've attempted to edit this file ${callCount} times but the edit isn't completing successfully. This usually happens when the edit operation is interrupted or the file content doesn't match exactly. I'll stop here to avoid an infinite loop. You may need to make the change manually.`;
-    }
-    if (toolName === "web_search") {
-      return `I've searched for this information multiple times but couldn't find definitive results. For GitHub issues, try using the GitHub MCP tools directly or visit the repository issues page manually.`;
-    }
-    return `I've called ${toolName} ${callCount} times which indicates a loop. I'll stop here to prevent infinite processing.`;
-  }
+  let guard: AgentSafetyGuard;
+
+  setup(() => {
+    guard = new AgentSafetyGuard(noopLogger);
+  });
 
   test("edit_file message mentions 'edit this file' + count", () => {
-    const msg = buildToolLoopErrorMessage("edit_file", 8);
+    const msg = guard.buildToolLoopErrorMessage("edit_file", 8);
     assert.ok(msg.includes("8 times"));
     assert.ok(msg.includes("infinite loop"));
   });
 
   test("write_file uses same path as edit_file", () => {
-    const msg = buildToolLoopErrorMessage("write_file", 5);
+    const msg = guard.buildToolLoopErrorMessage("write_file", 5);
     assert.ok(msg.includes("5 times"));
     assert.ok(msg.includes("edit"));
   });
 
   test("web_search has specific message", () => {
-    const msg = buildToolLoopErrorMessage("web_search", 8);
+    const msg = guard.buildToolLoopErrorMessage("web_search", 8);
     assert.ok(msg.includes("searched for this information"));
     assert.ok(msg.includes("GitHub MCP tools"));
   });
 
   test("generic tool message includes tool name and count", () => {
-    const msg = buildToolLoopErrorMessage("custom_tool", 20);
+    const msg = guard.buildToolLoopErrorMessage("custom_tool", 20);
     assert.ok(msg.includes("custom_tool"));
     assert.ok(msg.includes("20 times"));
   });

@@ -9,8 +9,9 @@ import { Logger, LogLevel } from "../../infrastructure/logger/logger";
  * requests to prevent memory leaks.
  */
 export class ConsentManager {
-  private static readonly CONSENT_TIMEOUT_MS = 5 * 60 * 1000;
-  private readonly logger: Logger;
+  private static readonly DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+  private readonly timeoutMs: number;
+  private readonly logger: Pick<Logger, "log" | "warn" | "debug">;
 
   /**
    * threadId → queue of { resolve, timeoutHandle } in FIFO order.
@@ -23,13 +24,19 @@ export class ConsentManager {
     }>
   >();
 
-  constructor() {
-    this.logger = Logger.initialize("ConsentManager", {
-      minLevel: LogLevel.DEBUG,
-      enableConsole: true,
-      enableFile: true,
-      enableTelemetry: true,
-    });
+  constructor(
+    logger?: Pick<Logger, "log" | "warn" | "debug">,
+    timeoutMs?: number,
+  ) {
+    this.logger =
+      logger ??
+      Logger.initialize("ConsentManager", {
+        minLevel: LogLevel.DEBUG,
+        enableConsole: true,
+        enableFile: true,
+        enableTelemetry: true,
+      });
+    this.timeoutMs = timeoutMs ?? ConsentManager.DEFAULT_TIMEOUT_MS;
   }
 
   /**
@@ -38,15 +45,21 @@ export class ConsentManager {
    */
   waitForConsent(threadId: string): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
-      const timeout = setTimeout(() => {
+      const entry: {
+        resolve: (granted: boolean) => void;
+        timeout: ReturnType<typeof setTimeout>;
+      } = {
+        resolve,
+        timeout: 0 as unknown as ReturnType<typeof setTimeout>,
+      };
+
+      entry.timeout = setTimeout(() => {
         this.removeWaiter(threadId, entry);
         this.logger.warn(
-          `Consent request for thread ${threadId} timed out after ${ConsentManager.CONSENT_TIMEOUT_MS / 1000}s`,
+          `Consent request for thread ${threadId} timed out after ${this.timeoutMs / 1000}s`,
         );
         resolve(false);
-      }, ConsentManager.CONSENT_TIMEOUT_MS);
-
-      const entry = { resolve, timeout };
+      }, this.timeoutMs);
 
       let queue = this.waiters.get(threadId);
       if (!queue) {

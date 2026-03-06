@@ -71,7 +71,7 @@ export class ContentNormalizer {
   filterToolUseFromString(text: string): string {
     if (!text) return "";
 
-    let result = "";
+    const parts: string[] = [];
     let i = 0;
     while (i < text.length) {
       if (text[i] === "{") {
@@ -88,11 +88,14 @@ export class ContentNormalizer {
           }
         }
       }
-      result += text[i];
+      parts.push(text[i]);
       i++;
     }
 
-    return result.replace(/\n{3,}/g, "\n\n").trim();
+    return parts
+      .join("")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
   }
 
   private extractBalancedJson(text: string, start: number): string | null {

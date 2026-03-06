@@ -262,16 +262,17 @@ export class ResearchNotesExtractor {
       return;
     }
 
+    // Claim the slot before any early-exit checks that follow
+    this.extractionInProgress = true;
+    this.lastExtractionTime = now;
+
     if (!this.shouldExtract(userQuery, aiResponse)) {
       this.logger.debug(
         "Response too short or code-only — skipping extraction",
       );
+      this.extractionInProgress = false;
       return;
     }
-
-    // Claim the slot before any async work
-    this.extractionInProgress = true;
-    this.lastExtractionTime = now;
 
     try {
       const notes = await this.extractNotes(userQuery, aiResponse);

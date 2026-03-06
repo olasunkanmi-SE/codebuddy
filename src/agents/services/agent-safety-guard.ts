@@ -56,15 +56,17 @@ export interface FileLoopResult {
  * Stateless — operates on the caller-provided counters and maps.
  */
 export class AgentSafetyGuard {
-  private readonly logger: Logger;
+  private readonly logger: Pick<Logger, "log" | "warn" | "debug">;
 
-  constructor() {
-    this.logger = Logger.initialize("AgentSafetyGuard", {
-      minLevel: LogLevel.DEBUG,
-      enableConsole: true,
-      enableFile: true,
-      enableTelemetry: true,
-    });
+  constructor(logger?: Pick<Logger, "log" | "warn" | "debug">) {
+    this.logger =
+      logger ??
+      Logger.initialize("AgentSafetyGuard", {
+        minLevel: LogLevel.DEBUG,
+        enableConsole: true,
+        enableFile: true,
+        enableTelemetry: true,
+      });
   }
 
   /**
