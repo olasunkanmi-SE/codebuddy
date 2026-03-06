@@ -124,6 +124,112 @@ const TOOL_DESCRIPTIONS: Record<string, IToolDescription> = {
   },
 };
 
+/**
+ * Extract and deduplicate tool calls from a LangGraph node update.
+ * Exported as a module-level pure function for direct testability.
+ */
+export function collectToolCallsFromUpdate(
+  update: IAgentNodeUpdate,
+): IAgentToolCall[] {
+  const calls: IAgentToolCall[] = [];
+  const seenIds = new Set<string>();
+
+  const push = (tc: IAgentToolCall) => {
+    if (tc.id) {
+      if (seenIds.has(tc.id)) return;
+      seenIds.add(tc.id);
+    }
+    calls.push(tc);
+  };
+
+  if (update?.toolCalls && Array.isArray(update.toolCalls)) {
+    for (const tc of update.toolCalls) push(tc);
+  }
+
+  if (update?.messages && Array.isArray(update.messages)) {
+    for (const msg of update.messages) {
+      if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
+        for (const tc of msg.tool_calls) push(tc);
+      }
+      if (
+        msg.additional_kwargs?.tool_calls &&
+        Array.isArray(msg.additional_kwargs.tool_calls)
+      ) {
+        for (const tc of msg.additional_kwargs.tool_calls) {
+          if (
+            tc &&
+            typeof tc === "object" &&
+            typeof (tc as Record<string, unknown>).name === "string"
+          ) {
+            const raw = tc as Record<string, unknown>;
+            push({
+              name: raw.name as string,
+              args:
+                raw.args && typeof raw.args === "object"
+                  ? (raw.args as Record<string, unknown>)
+                  : {},
+              id: typeof raw.id === "string" ? raw.id : undefined,
+            });
+          }
+        }
+      }
+      if (Array.isArray(msg.content)) {
+        for (const block of msg.content) {
+          if (block.type === "tool_use") {
+            push({
+              name: block.name ?? "unknown",
+              args: block.input ?? {},
+              id: block.id,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return calls;
+}
+
+/**
+ * Summarize tool output for user-facing display.
+ * Exported as a module-level pure function for direct testability.
+ */
+export function summarizeToolResultContent(
+  content: unknown,
+  toolName: string,
+): string {
+  if (!content) return "Completed";
+
+  const MAX_CONTENT_LENGTH = 512_000; // 512 KB cap
+  let contentStr: string;
+  if (typeof content === "string") {
+    contentStr =
+      content.length > MAX_CONTENT_LENGTH
+        ? content.slice(0, MAX_CONTENT_LENGTH)
+        : content;
+  } else {
+    const raw = JSON.stringify(content);
+    contentStr =
+      raw.length > MAX_CONTENT_LENGTH ? raw.slice(0, MAX_CONTENT_LENGTH) : raw;
+  }
+
+  if (toolName === "read_file") {
+    const lines = contentStr.split("\n").length;
+    return `Read ${lines} lines`;
+  }
+
+  if (toolName === "search_codebase") {
+    const matchCount = (contentStr.match(/match/gi) || []).length;
+    return matchCount > 0 ? `Found ${matchCount} matches` : "Search complete";
+  }
+
+  if (contentStr.length > 100) {
+    return `Processed ${Math.ceil(contentStr.length / 1000)}KB of data`;
+  }
+
+  return "Completed successfully";
+}
+
 export class CodeBuddyAgentService {
   /**
    * Agents are keyed by `provider:model` but intentionally share a single
@@ -133,6 +239,7 @@ export class CodeBuddyAgentService {
   private agentCache = new Map<string, IStreamableAgent>();
   private store = new InMemoryStore();
   private checkpointerPromise: Promise<MemorySaver | SqliteSaver> | null = null;
+  private checkpointer: MemorySaver | SqliteSaver | null = null;
   private readonly logger: Logger;
   private static instance: CodeBuddyAgentService | null = null;
   private disposed = false;
@@ -142,6 +249,7 @@ export class CodeBuddyAgentService {
   private readonly consentManager: ConsentManager;
   private readonly contentNormalizer: ContentNormalizer;
   private readonly modelChangeDisposable: { dispose(): void };
+  private static readonly MAX_WARNED_TOOLS = 100;
   private readonly warnedUnknownTools = new Set<string>();
 
   constructor() {
@@ -192,6 +300,7 @@ export class CodeBuddyAgentService {
         await fs.promises.mkdir(codeBuddyDir, { recursive: true });
         const dbPath = path.join(codeBuddyDir, "checkpoints.db");
         const saver = SqliteSaver.fromConnString(dbPath);
+        this.checkpointer = saver;
         this.logger.log(
           LogLevel.INFO,
           `Persistent checkpointer initialized at ${dbPath}`,
@@ -205,7 +314,9 @@ export class CodeBuddyAgentService {
       }
     }
 
-    return new MemorySaver();
+    const memorySaver = new MemorySaver();
+    this.checkpointer = memorySaver;
+    return memorySaver;
   }
 
   /**
@@ -260,7 +371,10 @@ export class CodeBuddyAgentService {
   private getToolInfo(toolName: string): IToolDescription {
     const info = TOOL_DESCRIPTIONS[toolName];
     if (info) return info;
-    if (!this.warnedUnknownTools.has(toolName)) {
+    if (
+      !this.warnedUnknownTools.has(toolName) &&
+      this.warnedUnknownTools.size < CodeBuddyAgentService.MAX_WARNED_TOOLS
+    ) {
       this.warnedUnknownTools.add(toolName);
       this.logger.warn(
         `Unknown tool "${toolName}" not in TOOL_DESCRIPTIONS — using default`,
@@ -408,8 +522,11 @@ export class CodeBuddyAgentService {
     try {
       const cfg = getAPIKeyAndModel(provider.toLowerCase());
       model = cfg.model ?? provider;
-    } catch {
-      // Use provider name as fallback
+    } catch (e) {
+      this.logger.debug(
+        `getAPIKeyAndModel failed for "${provider}", using provider name as model key`,
+        e,
+      );
     }
     return `agent:${provider}:${model}`;
   }
@@ -605,17 +722,20 @@ export class CodeBuddyAgentService {
         );
 
         if (interruptEntry) {
-          const iteratorHolder: { value: AsyncIterator<unknown> | null } = {
-            value: null,
-          };
-          yield* this.handleInterrupt(
+          const interruptGen = this.handleInterrupt(
             interruptEntry as [string, IInterruptValue | IInterruptValue[]],
             ctx,
             agent,
             config,
-            iteratorHolder,
           );
-          if (iteratorHolder.value) streamIterator = iteratorHolder.value;
+          let interruptNext = await interruptGen.next();
+          while (!interruptNext.done) {
+            yield interruptNext.value;
+            interruptNext = await interruptGen.next();
+          }
+          // The generator's return value carries the new iterator (if any)
+          const newIter = interruptNext.value;
+          if (newIter) streamIterator = newIter;
           continue;
         }
 
@@ -693,12 +813,13 @@ export class CodeBuddyAgentService {
     ctx: IStreamContext,
     agent: IStreamableAgent,
     config: Record<string, unknown>,
-    iteratorOut: { value: AsyncIterator<unknown> | null },
-  ): AsyncGenerator<IStreamEvent> {
+  ): AsyncGenerator<IStreamEvent, AsyncIterator<unknown> | null> {
     const [, interruptUpdates] = interruptEntry;
     const interrupts = Array.isArray(interruptUpdates)
       ? interruptUpdates
       : [interruptUpdates];
+
+    let newIterator: AsyncIterator<unknown> | null = null;
 
     for (const interrupt of interrupts) {
       const interruptId = interrupt?.value?.id ?? `interrupt-${Date.now()}`;
@@ -754,7 +875,7 @@ export class CodeBuddyAgentService {
 
         const resumeCommand = new Command({ resume: "approve" });
         try {
-          iteratorOut.value = (await agent.stream(resumeCommand, config))[
+          newIterator = (await agent.stream(resumeCommand, config))[
             Symbol.asyncIterator
           ]();
           this.logger.debug(
@@ -765,7 +886,7 @@ export class CodeBuddyAgentService {
             `[STREAM] Failed to resume: ${resumeError instanceof Error ? resumeError.message : resumeError}`,
           );
           const fallbackResume = { resume: { [interruptId]: "approve" } };
-          iteratorOut.value = (await agent.stream(fallbackResume, config))[
+          newIterator = (await agent.stream(fallbackResume, config))[
             Symbol.asyncIterator
           ]();
           this.logger.debug(`[STREAM] Used fallback resume format`);
@@ -792,7 +913,7 @@ export class CodeBuddyAgentService {
 
         const denyCommand = new Command({ resume: "deny" });
         try {
-          iteratorOut.value = (await agent.stream(denyCommand, config))[
+          newIterator = (await agent.stream(denyCommand, config))[
             Symbol.asyncIterator
           ]();
         } catch (denyError) {
@@ -801,7 +922,7 @@ export class CodeBuddyAgentService {
           );
           try {
             const fallbackDeny = { resume: { [interruptId]: "deny" } };
-            iteratorOut.value = (await agent.stream(fallbackDeny, config))[
+            newIterator = (await agent.stream(fallbackDeny, config))[
               Symbol.asyncIterator
             ]();
           } catch (fallbackError) {
@@ -821,9 +942,11 @@ export class CodeBuddyAgentService {
         }
       }
     }
+
+    return newIterator;
   }
 
-  private *processNodeEntries(
+  private async *processNodeEntries(
     entries: [string, IAgentNodeUpdate][],
     ctx: IStreamContext,
     span: Span,
@@ -946,54 +1069,7 @@ export class CodeBuddyAgentService {
   }
 
   private collectToolCalls(update: IAgentNodeUpdate): IAgentToolCall[] {
-    const calls: IAgentToolCall[] = [];
-
-    if (update?.toolCalls && Array.isArray(update.toolCalls)) {
-      calls.push(...update.toolCalls);
-    }
-
-    if (update?.messages && Array.isArray(update.messages)) {
-      for (const msg of update.messages) {
-        if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
-          calls.push(...msg.tool_calls);
-        }
-        if (
-          msg.additional_kwargs?.tool_calls &&
-          Array.isArray(msg.additional_kwargs.tool_calls)
-        ) {
-          for (const tc of msg.additional_kwargs.tool_calls) {
-            if (
-              tc &&
-              typeof tc === "object" &&
-              typeof (tc as Record<string, unknown>).name === "string"
-            ) {
-              const raw = tc as Record<string, unknown>;
-              calls.push({
-                name: raw.name as string,
-                args:
-                  raw.args && typeof raw.args === "object"
-                    ? (raw.args as Record<string, unknown>)
-                    : {},
-                id: typeof raw.id === "string" ? raw.id : undefined,
-              });
-            }
-          }
-        }
-        if (Array.isArray(msg.content)) {
-          for (const block of msg.content) {
-            if (block.type === "tool_use") {
-              calls.push({
-                name: block.name ?? "unknown",
-                args: block.input ?? {},
-                id: block.id,
-              });
-            }
-          }
-        }
-      }
-    }
-
-    return calls;
+    return collectToolCallsFromUpdate(update);
   }
 
   private *processToolCalls(
@@ -1343,10 +1419,12 @@ export class CodeBuddyAgentService {
       )) {
         if (chunk.type === StreamEventType.ERROR) {
           onError(new Error(chunk.content));
+          if (threadId) this.cancelStream(threadId);
           return;
         }
         if (chunk.type === StreamEventType.END) {
           finalContent = chunk.content;
+          break;
         }
       }
       onComplete(finalContent);
@@ -1383,6 +1461,21 @@ export class CodeBuddyAgentService {
 
     // Unsubscribe from model-change events
     this.modelChangeDisposable.dispose();
+
+    // Close the SQLite handle if it was opened
+    if (
+      this.checkpointer &&
+      typeof (this.checkpointer as unknown as Record<string, unknown>).close ===
+        "function"
+    ) {
+      try {
+        (this.checkpointer as unknown as { close(): void }).close();
+      } catch (e) {
+        this.logger.warn("Failed to close checkpointer", e);
+      }
+    }
+    this.checkpointer = null;
+    this.checkpointerPromise = null;
 
     // Reset singleton so a fresh instance is created if needed
     CodeBuddyAgentService.instance = null;

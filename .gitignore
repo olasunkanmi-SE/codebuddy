@@ -15,4 +15,5 @@ patterns
 scripts
 lancedb
 dist
+.codebuddy/checkpoints.db
 .codebuddy

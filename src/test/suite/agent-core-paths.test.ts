@@ -8,8 +8,8 @@
  * 2. ConsentManager — real import with injected no-op logger
  * 3. AgentSafetyGuard — real import with injected no-op logger;
  *    detectFileLoop, buildStopMessage, buildToolLoopErrorMessage)
- * 4. collectToolCalls — validation of additional_kwargs entries
- * 5. summarizeToolResult — size guard, per-tool summaries
+ * 4. collectToolCalls — imported pure function with dedup + additional_kwargs
+ * 5. summarizeToolResult — imported pure function, size guard, per-tool summaries
  * 6. cancelStream / dispose lifecycle
  * 7. StreamManager buffer & flush behavior
  */
@@ -18,15 +18,20 @@ import * as assert from "assert";
 import { ContentNormalizer } from "../../agents/services/content-normalizer";
 import { ConsentManager } from "../../agents/services/consent-manager";
 import { AgentSafetyGuard } from "../../agents/services/agent-safety-guard";
+import {
+  collectToolCallsFromUpdate,
+  summarizeToolResultContent,
+} from "../../agents/services/codebuddy-agent.service";
+import { LogLevel } from "../../infrastructure/logger/logger";
 
 // ═══════════════════════════════════════════════════════════════
-// No-op logger for testing real classes without vscode dependency
+// No-op logger matching Pick<Logger, 'log' | 'warn' | 'debug'>
 // ═══════════════════════════════════════════════════════════════
 
 const noopLogger = {
-  log: () => {},
-  warn: () => {},
-  debug: () => {},
+  log: (_level: LogLevel, _message: string, _data?: unknown) => {},
+  warn: (_message: string, _data?: unknown) => {},
+  debug: (_message: string, _data?: unknown) => {},
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -382,6 +387,9 @@ suite("AgentSafetyGuard — detectToolLoop", () => {
   });
 });
 
+// NOTE: detectFileLoop is a pure query — it returns the *would-be* edit count
+// without touching the caller's map. The real caller (processToolCalls) is
+// responsible for mutating ctx.fileEditCounts after inspecting the result.
 suite("AgentSafetyGuard — detectFileLoop (pure query, no mutation)", () => {
   let guard: AgentSafetyGuard;
 
@@ -396,7 +404,7 @@ suite("AgentSafetyGuard — detectFileLoop (pure query, no mutation)", () => {
     assert.strictEqual(r.isLooping, false);
   });
 
-  test("does NOT mutate the caller's map", () => {
+  test("does NOT mutate the caller's map — caller must persist count itself", () => {
     const counts = new Map<string, number>();
     guard.detectFileLoop("/src/a.ts", counts);
     assert.strictEqual(counts.has("/src/a.ts"), false);
@@ -478,74 +486,12 @@ suite("AgentSafetyGuard — buildToolLoopErrorMessage", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// 4. collectToolCalls — validation of additional_kwargs entries
+// 4. collectToolCalls — real import (deduplication + kwargs)
 // ═══════════════════════════════════════════════════════════════
 
 suite("collectToolCalls — additional_kwargs validation", () => {
-  interface IAgentToolCall {
-    name: string;
-    args: Record<string, unknown>;
-    id?: string;
-  }
-
-  // Re-implementation mirrors the real validated collectToolCalls
-  function collectToolCalls(update: {
-    toolCalls?: IAgentToolCall[];
-    messages?: Array<{
-      tool_calls?: IAgentToolCall[];
-      additional_kwargs?: Record<string, unknown>;
-      content?: Array<{ type: string; name?: string; input?: Record<string, unknown>; id?: string }>;
-    }>;
-  }): IAgentToolCall[] {
-    const calls: IAgentToolCall[] = [];
-
-    if (update?.toolCalls && Array.isArray(update.toolCalls)) {
-      calls.push(...update.toolCalls);
-    }
-
-    if (update?.messages && Array.isArray(update.messages)) {
-      for (const msg of update.messages) {
-        if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
-          calls.push(...msg.tool_calls);
-        }
-        if (
-          msg.additional_kwargs?.tool_calls &&
-          Array.isArray(msg.additional_kwargs.tool_calls)
-        ) {
-          for (const tc of msg.additional_kwargs.tool_calls as unknown[]) {
-            if (
-              tc &&
-              typeof tc === "object" &&
-              typeof (tc as Record<string, unknown>).name === "string"
-            ) {
-              const raw = tc as Record<string, unknown>;
-              calls.push({
-                name: raw.name as string,
-                args:
-                  raw.args && typeof raw.args === "object"
-                    ? (raw.args as Record<string, unknown>)
-                    : {},
-                id: typeof raw.id === "string" ? raw.id : undefined,
-              });
-            }
-          }
-        }
-        if (Array.isArray(msg.content)) {
-          for (const block of msg.content) {
-            if (block.type === "tool_use") {
-              calls.push({
-                name: block.name ?? "unknown",
-                args: block.input ?? {},
-                id: block.id,
-              });
-            }
-          }
-        }
-      }
-    }
-
-    return calls;
-  }
+  // Use the real exported function instead of an inline copy
+  const collectToolCalls = collectToolCallsFromUpdate as (update: Record<string, unknown>) => Array<{ name: string; args: Record<string, unknown>; id?: string }>;
 
   test("valid additional_kwargs entries are collected", () => {
     const calls = collectToolCalls({
@@ -678,45 +624,14 @@ suite("collectToolCalls — additional_kwargs validation", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// 5. summarizeToolResult — size guard & per-tool summaries
+// 5. summarizeToolResult — real import, size guard & per-tool summaries
 // ═══════════════════════════════════════════════════════════════
 
 suite("summarizeToolResult — size guard & summaries", () => {
   const MAX_CONTENT_LENGTH = 512_000;
 
-  function summarizeToolResult(content: unknown, toolName: string): string {
-    if (!content) return "Completed";
-
-    let contentStr: string;
-    if (typeof content === "string") {
-      contentStr =
-        content.length > MAX_CONTENT_LENGTH
-          ? content.slice(0, MAX_CONTENT_LENGTH)
-          : content;
-    } else {
-      const raw = JSON.stringify(content);
-      contentStr =
-        raw.length > MAX_CONTENT_LENGTH
-          ? raw.slice(0, MAX_CONTENT_LENGTH)
-          : raw;
-    }
-
-    if (toolName === "read_file") {
-      const lines = contentStr.split("\n").length;
-      return `Read ${lines} lines`;
-    }
-
-    if (toolName === "search_codebase") {
-      const matchCount = (contentStr.match(/match/gi) || []).length;
-      return matchCount > 0 ? `Found ${matchCount} matches` : "Search complete";
-    }
-
-    if (contentStr.length > 100) {
-      return `Processed ${Math.ceil(contentStr.length / 1000)}KB of data`;
-    }
-
-    return "Completed successfully";
-  }
+  // Use the real exported function
+  const summarizeToolResult = summarizeToolResultContent;
 
   test("null/undefined content returns 'Completed'", () => {
     assert.strictEqual(summarizeToolResult(null, "read_file"), "Completed");

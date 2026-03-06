@@ -74,21 +74,21 @@ export class ConsentManager {
    * Respond to a pending consent request.
    * @param granted Whether the user approved the action.
    * @param threadId Optional — when provided, resolves the oldest waiter
-   *   for that thread. When omitted, resolves the first waiter across all
-   *   threads (backward-compatible fallback).
+   *   for that thread. When omitted, resolves the single oldest waiter
+   *   across all threads (backward-compatible fallback for callers that
+   *   haven't been updated to pass threadId yet).
    */
   respond(granted: boolean, threadId?: string): void {
     if (threadId) {
       this.resolveOldest(threadId, granted);
-    } else {
-      // Fallback: resolve the first waiter across all threads.
-      // This path should not be reached now that the webview passes threadId.
-      this.logger.warn(
-        "respond() called without threadId — falling back to oldest waiter across all threads",
-      );
-      for (const [tid] of this.waiters) {
-        if (this.resolveOldest(tid, granted)) return;
-      }
+      return;
+    }
+    // Backward-compatible fallback: resolve the single oldest waiter
+    this.logger.warn(
+      "respond() called without threadId — resolving oldest pending waiter",
+    );
+    for (const [tid] of this.waiters) {
+      if (this.resolveOldest(tid, granted)) return;
     }
   }
 
