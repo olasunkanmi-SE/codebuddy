@@ -270,7 +270,7 @@ const EmptyState = styled.div`
   justify-content: center;
   padding: 40px 20px;
   gap: 12px;
-  opacity: 0.5;
+  opacity: 0.7;
   color: var(--vscode-descriptionForeground);
   font-size: 12px;
   text-align: center;

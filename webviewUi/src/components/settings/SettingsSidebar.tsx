@@ -69,7 +69,7 @@ const Username = styled.span`
 
 const AccountBadge = styled.span`
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
 `;
 
 const SearchSection = styled.div`
@@ -85,7 +85,7 @@ const SearchInput = styled.div`
 const SearchIcon = styled.div`
   position: absolute;
   left: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -108,7 +108,7 @@ const Input = styled.input`
   transition: all 0.15s ease;
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.6);
   }
 
   &:focus {
@@ -121,7 +121,7 @@ const KeyHint = styled.span`
   position: absolute;
   right: 10px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.5);
   background: rgba(255, 255, 255, 0.06);
   padding: 2px 6px;
   border-radius: 4px;
@@ -149,7 +149,7 @@ const NavSection = styled.nav`
 const NoResults = styled.div`
   padding: 16px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 13px;
 `;
 
@@ -184,7 +184,7 @@ const NavIcon = styled.span<{ $active: boolean }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  color: ${props => props.$active ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.5)'};
+  color: ${props => props.$active ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.7)'};
   transition: color 0.15s ease;
 
   svg {
@@ -196,7 +196,7 @@ const NavIcon = styled.span<{ $active: boolean }>`
 const NavLabel = styled.span<{ $active: boolean }>`
   font-size: 13px;
   font-weight: ${props => props.$active ? 500 : 400};
-  color: ${props => props.$active ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.7)'};
+  color: ${props => props.$active ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.8)'};
   transition: all 0.15s ease;
 `;
 

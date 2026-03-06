@@ -30,7 +30,7 @@ const Title = styled.h2`
 
 const Subtitle = styled.p`
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.75);
   margin: 0;
   text-align: left;
   line-height: 1.5;
@@ -50,7 +50,7 @@ const FilterButton = styled.button<{ $active: boolean }>`
   padding: 8px 14px;
   font-size: 12px;
   font-weight: 500;
-  color: ${props => props.$active ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.6)'};
+  color: ${props => props.$active ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.8)'};
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -128,7 +128,7 @@ const StatusBadge = styled.span<{ $status: string }>`
     switch (props.$status) {
       case 'beta': return 'rgba(96, 165, 250, 0.9)';
       case 'experimental': return 'rgba(192, 132, 252, 0.9)';
-      default: return 'rgba(255, 255, 255, 0.6)';
+      default: return 'rgba(255, 255, 255, 0.8)';
     }
   }};
   border: 1px solid ${props => {
@@ -150,7 +150,7 @@ const CardTitle = styled.h3`
 
 const CardDescription = styled.p`
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.8);
   margin: 0;
   line-height: 1.6;
   text-align: left;
@@ -162,7 +162,7 @@ const CategoryTag = styled.span`
   border-radius: 4px;
   font-size: 10px;
   background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   margin-top: 12px;
   border: 1px solid rgba(255, 255, 255, 0.06);
 `;
@@ -175,7 +175,7 @@ const VoteButton = styled.button`
   padding: 10px;
   font-size: 12px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
   transition: all 0.2s ease;
   margin-top: 16px;

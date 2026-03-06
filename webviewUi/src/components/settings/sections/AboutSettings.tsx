@@ -60,7 +60,7 @@ const AppName = styled.h2`
 const AppVersion = styled.p`
   margin: 0 0 8px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
 `;
 
 const AppTagline = styled.p`
@@ -95,7 +95,7 @@ const LinkItem = styled.a`
   }
 
   svg {
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.7);
   }
 `;
 

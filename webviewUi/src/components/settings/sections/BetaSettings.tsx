@@ -65,7 +65,7 @@ const FeatureName = styled.h4`
 const FeatureDescription = styled.p`
   margin: 0;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.5;
 `;
 

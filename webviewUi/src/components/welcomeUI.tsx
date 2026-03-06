@@ -41,7 +41,7 @@ const WelcomeTitle = styled.h1`
 
 const WelcomeSubtitle = styled.p`
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.75);
   margin: 0 0 48px 0;
   animation: ${fadeIn} 0.6s ease-out 0.2s both;
   text-align: center;
@@ -63,7 +63,7 @@ const TipsContainer = styled.div`
 const TipsTitle = styled.div`
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
   margin-bottom: 16px;
   text-transform: uppercase;
   letter-spacing: 0.5px;

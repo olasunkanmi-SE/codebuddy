@@ -13,7 +13,7 @@ export const SettingsSection = styled.div`
 export const SectionTitle = styled.h3`
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   margin: 0 0 16px 0;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -21,7 +21,7 @@ export const SectionTitle = styled.h3`
 
 export const SectionDescription = styled.p`
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.8);
   margin: 0 0 16px 0;
   line-height: 1.5;
 `;
@@ -59,7 +59,7 @@ export const SettingLabel = styled.label`
 
 export const SettingDescription = styled.p`
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   margin: 0;
   line-height: 1.5;
 `;
@@ -119,7 +119,7 @@ const ToggleSlider = styled.span`
     width: 16px;
     left: 3px;
     bottom: 2px;
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.85);
     transition: 0.2s;
     border-radius: 50%;
   }
@@ -197,7 +197,7 @@ export const Input = styled.input`
   }
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.5);
   }
 `;
 
@@ -286,7 +286,7 @@ export const CardTitle = styled.h4`
 export const CardDescription = styled.p`
   margin: 0;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.5;
 `;
 
@@ -333,7 +333,7 @@ export const IconButton = styled.button`
   border: none;
   padding: 8px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -360,12 +360,12 @@ export const IconButton = styled.button`
 export const EmptyState = styled.div`
   text-align: center;
   padding: 40px 20px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
 `;
 
 export const EmptyStateIcon = styled.div`
   margin-bottom: 16px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.5);
 
   svg {
     width: 48px;

@@ -47,7 +47,7 @@ const Title = styled.h2`
 
 const Subtitle = styled.p`
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.75);
   margin: 0;
   text-align: left;
   line-height: 1.5;
@@ -92,7 +92,7 @@ const SectionHeader = styled.div`
 const SectionTitle = styled.h3`
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -181,7 +181,7 @@ const CardTitle = styled.h4`
 
 const CardDescription = styled.p`
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   margin: 0;
   line-height: 1.4;
 `;
@@ -252,7 +252,7 @@ const EmptyState = styled.div`
 const EmptyIcon = styled.div`
   font-size: 48px;
   margin-bottom: 16px;
-  opacity: 0.3;
+  opacity: 0.5;
 `;
 
 const EmptyTitle = styled.h3`
@@ -264,7 +264,7 @@ const EmptyTitle = styled.h3`
 
 const EmptyDescription = styled.p`
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   margin: 0 0 20px 0;
   line-height: 1.5;
 `;

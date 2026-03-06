@@ -20,7 +20,7 @@ export const SidebarButton = styled.button`
   border-radius: 6px;
   padding: 5px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -63,7 +63,7 @@ export const FontSizeButton = styled.button`
   width: 26px;
   height: 26px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;

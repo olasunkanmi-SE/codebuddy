@@ -54,7 +54,7 @@ const ProfileName = styled.h3`
 const ProfileEmail = styled.p`
   margin: 0 0 8px;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
 `;
 
 const ProfileBadge = styled.div`

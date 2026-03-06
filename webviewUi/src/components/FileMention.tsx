@@ -73,14 +73,14 @@ const FileIcon = styled.span`
 
 const FilePath = styled.span`
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   margin-left: 20px;
 `;
 
 const NoResults = styled.div`
   padding: 12px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 12px;
 `;
 

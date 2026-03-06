@@ -93,7 +93,7 @@ const ToggleButton = styled.button<{ $expanded: boolean }>`
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -102,7 +102,7 @@ const ToggleButton = styled.button<{ $expanded: boolean }>`
 
   &:hover {
     background: rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.95);
   }
 
   svg {
@@ -147,7 +147,7 @@ const DetailDot = styled.div<{ $active: boolean }>`
 `;
 
 const DetailText = styled.span`
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -155,7 +155,7 @@ const DetailText = styled.span`
 `;
 
 const DetailTime = styled.span`
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.6);
   font-size: 10px;
 `;
 

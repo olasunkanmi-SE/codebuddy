@@ -146,7 +146,7 @@ const SessionTitle = styled.div`
 
 const SessionMeta = styled.div`
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.6);
   margin-top: 2px;
 `;
 
@@ -155,7 +155,7 @@ const DeleteButton = styled.button`
   border: none;
   padding: 4px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -179,7 +179,7 @@ const EmptyState = styled.div`
   align-items: center;
   justify-content: center;
   padding: 32px 16px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.6);
   text-align: center;
   font-size: 12px;
 `;

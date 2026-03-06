@@ -45,7 +45,7 @@ const AccordionButton = styled.button`
   border: none;
   cursor: pointer;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.9);
   transition: color 0.2s ease;
 
   &:hover {
@@ -58,11 +58,11 @@ const IconWrapper = styled.span`
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.6);
   transition: color 0.2s ease;
 
   ${AccordionButton}:hover & {
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.8);
   }
 
   svg {
@@ -82,7 +82,7 @@ const AnswerWrapper = styled.div<{ $isOpen: boolean }>`
 const AnswerContent = styled.div`
   font-size: 12px;
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.8);
   text-align: left;
   
   p {
@@ -97,7 +97,7 @@ const AnswerContent = styled.div`
   h3 {
     font-size: 13px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.85);
     margin: 16px 0 10px 0;
   }
 
@@ -108,16 +108,16 @@ const AnswerContent = styled.div`
 
   li {
     margin: 6px 0;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.75);
   }
 
   strong {
-    color: rgba(255, 255, 255, 0.75);
+    color: rgba(255, 255, 255, 0.9);
     font-weight: 500;
   }
 
   a {
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     transition: all 0.2s ease;
