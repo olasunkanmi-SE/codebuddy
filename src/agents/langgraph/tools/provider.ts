@@ -19,6 +19,7 @@ import {
   TodoTool,
   MemoryTool,
   TestRunnerTool,
+  ComposerTool,
 } from "../../../tools/tools";
 import { ContextRetriever } from "./../../../services/context-retriever";
 import { LangChainFileTool } from "./file";
@@ -38,6 +39,7 @@ import { LangChainSearchTool } from "./search";
 import { LangChainTodoTool } from "./todo";
 import { LangChainMemoryTool } from "./memory";
 import { LangChainTestRunnerTool } from "./test-runner";
+import { LangChainComposerTool } from "./composer";
 import {
   DebugControlTool,
   DebugEvaluateTool,
@@ -158,6 +160,12 @@ class TestRunnerToolFactory implements IToolFactory {
   }
 }
 
+class ComposerToolFactory implements IToolFactory {
+  createTool(): StructuredTool<any> {
+    return new LangChainComposerTool(new ComposerTool());
+  }
+}
+
 class SearchToolFactory implements IToolFactory {
   constructor(private contextRetriever: ContextRetriever) {}
   createTool(): StructuredTool<any> {
@@ -235,6 +243,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "search_vector_db",
     "manage_tasks",
     "manage_core_memory",
+    "compose_files",
   ],
   "doc-writer": [
     "search",
@@ -250,6 +259,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "search_symbols",
     "list_files",
     "edit_file",
+    "compose_files",
     "search_vector_db",
   ],
   "file-organizer": [
@@ -271,6 +281,7 @@ const TOOL_ROLE_MAPPING: Record<string, string[]> = {
     "git",
     "list_files",
     "edit_file",
+    "compose_files",
     "manage_terminal",
   ],
   architect: [
@@ -377,6 +388,7 @@ export class ToolProvider {
       new TodoToolFactory(),
       new MemoryToolFactory(),
       new TestRunnerToolFactory(),
+      new ComposerToolFactory(),
       new DebugGetStateToolFactory(),
       new DebugGetStackTraceToolFactory(),
       new DebugGetVariablesToolFactory(),

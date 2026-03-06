@@ -1,0 +1,226 @@
+.composer-panel {
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 4px;
+  margin: 4px 0;
+  overflow: hidden;
+}
+
+.composer-panel .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  cursor: pointer;
+  background: var(--vscode-sideBar-background, #1e1e1e);
+}
+
+.composer-panel .panel-title {
+  font-weight: 600;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.composer-panel .active-badge {
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
+  border-radius: 8px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.composer-panel .panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.composer-panel .refresh-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--vscode-foreground);
+  opacity: 0.7;
+  font-size: 14px;
+  padding: 2px 4px;
+}
+
+.composer-panel .refresh-btn:hover {
+  opacity: 1;
+}
+
+.composer-panel .collapse-icon {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.composer-panel .panel-content {
+  padding: 4px 8px 8px;
+}
+
+.composer-panel .loading,
+.composer-panel .empty-state {
+  padding: 8px;
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+/* Session item */
+.composer-session-item {
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 4px;
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+
+.session-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  cursor: pointer;
+  gap: 8px;
+}
+
+.session-header:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+.session-status {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.session-status-active {
+  color: var(--vscode-charts-yellow, #cca700);
+}
+
+.session-status-applied {
+  color: var(--vscode-charts-green, #89d185);
+}
+
+.session-status-rejected {
+  color: var(--vscode-charts-red, #f48771);
+}
+
+.session-status-partial {
+  color: var(--vscode-charts-orange, #d18616);
+}
+
+.session-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.session-label {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-meta {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.session-actions .action-btn {
+  background: none;
+  border: 1px solid var(--vscode-button-border, transparent);
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.apply-all-btn:hover {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+}
+
+.reject-all-btn:hover {
+  background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+}
+
+.expand-icon {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* Changes within a session */
+.session-changes {
+  border-top: 1px solid var(--vscode-panel-border, #333);
+  padding: 4px 8px;
+}
+
+.session-change-item {
+  display: flex;
+  align-items: center;
+  padding: 3px 4px;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.session-change-item:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+  border-radius: 3px;
+}
+
+.change-status-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.change-status-pending {
+  color: var(--vscode-charts-yellow, #cca700);
+}
+
+.change-status-applied {
+  color: var(--vscode-charts-green, #89d185);
+}
+
+.change-status-rejected {
+  color: var(--vscode-charts-red, #f48771);
+}
+
+.change-filename {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-change-item .new-badge {
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-size: 9px;
+  margin-right: 4px;
+}
+
+.session-change-item .view-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 1px 4px;
+  opacity: 0.7;
+}
+
+.session-change-item .view-btn:hover {
+  opacity: 1;
+}

@@ -5,6 +5,7 @@ import { Terminal } from "../utils/terminal";
 import { z } from "zod";
 import * as vscode from "vscode";
 import { DiffReviewService } from "../services/diff-review.service";
+import { ComposerService, FileEdit } from "../services/composer.service";
 import * as path from "path";
 import { TodoTool } from "./todo";
 import { MemoryTool } from "./memory";
@@ -835,6 +836,99 @@ export class TestRunnerTool {
   }
 }
 
+export class ComposerTool {
+  public async execute(label: string, edits: FileEdit[]): Promise<string> {
+    try {
+      const composerService = ComposerService.getInstance();
+      const { session, errors } = await composerService.createSession(
+        label,
+        edits,
+      );
+
+      const parts: string[] = [];
+      parts.push(`## Multi-file Compose: ${label}`);
+      parts.push(`**Session:** \`${session.id}\``);
+      parts.push(`**Files changed:** ${session.changeIds.length}`);
+
+      if (errors.length > 0) {
+        parts.push(`\n**Errors (${errors.length}):**`);
+        for (const err of errors) {
+          parts.push(`- ⚠️ ${err}`);
+        }
+      }
+
+      if (session.changeIds.length > 0) {
+        parts.push(`\nAll changes are pending review.`);
+        const args = encodeURIComponent(JSON.stringify(session.id));
+        parts.push(
+          `[Review & Apply All](command:codebuddy.reviewComposerSession?${args})`,
+        );
+      }
+
+      return parts.join("\n");
+    } catch (e: any) {
+      return `Error in multi-file compose: ${e.message}`;
+    }
+  }
+
+  config() {
+    return {
+      name: "compose_files",
+      description:
+        "Edit multiple files in a single atomic operation (Composer-style). " +
+        "Use this when a task requires coordinated changes across several files. " +
+        "Each edit can overwrite a file or do a search-and-replace. " +
+        "All changes are staged for grouped review — the user can apply or reject them together.",
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          label: {
+            type: SchemaType.STRING,
+            description:
+              "A short label describing this batch of changes (e.g. 'Add user authentication').",
+          },
+          edits: {
+            type: SchemaType.ARRAY,
+            description: "Array of file edits to apply as a group.",
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                filePath: {
+                  type: SchemaType.STRING,
+                  description: "Absolute path to the file.",
+                },
+                mode: {
+                  type: SchemaType.STRING,
+                  enum: ["overwrite", "replace"],
+                  description:
+                    "'overwrite' replaces the whole file. 'replace' substitutes a string.",
+                },
+                content: {
+                  type: SchemaType.STRING,
+                  description:
+                    "The new content (required for 'overwrite' mode).",
+                },
+                search: {
+                  type: SchemaType.STRING,
+                  description:
+                    "Exact text to find (required for 'replace' mode).",
+                },
+                replace: {
+                  type: SchemaType.STRING,
+                  description:
+                    "Text to replace search with (required for 'replace' mode).",
+                },
+              },
+              required: ["filePath", "mode"],
+            },
+          },
+        },
+        required: ["label", "edits"],
+      },
+    };
+  }
+}
+
 export const TOOL_CONFIGS = {
   FileTool: { tool: FileTool, useContextRetriever: true },
   WebTool: { tool: WebTool, useContextRetriever: true },
@@ -850,4 +944,5 @@ export const TOOL_CONFIGS = {
   TodoTool: { tool: TodoTool, useContextRetriever: false },
   MemoryTool: { tool: MemoryTool, useContextRetriever: false },
   TestRunnerTool: { tool: TestRunnerTool, useContextRetriever: false },
+  ComposerTool: { tool: ComposerTool, useContextRetriever: false },
 };

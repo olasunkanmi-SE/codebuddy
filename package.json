@@ -287,6 +287,21 @@
         "icon": "$(close)"
       },
       {
+        "command": "codebuddy.reviewComposerSession",
+        "title": "%commands.reviewComposerSession%",
+        "category": "CodeBuddy"
+      },
+      {
+        "command": "codebuddy.applyComposerSession",
+        "title": "%commands.applyComposerSession%",
+        "category": "CodeBuddy"
+      },
+      {
+        "command": "codebuddy.rejectComposerSession",
+        "title": "%commands.rejectComposerSession%",
+        "category": "CodeBuddy"
+      },
+      {
         "command": "CodeBuddy.openInReader",
         "title": "%commands.openInReader%",
         "category": "CodeBuddy"

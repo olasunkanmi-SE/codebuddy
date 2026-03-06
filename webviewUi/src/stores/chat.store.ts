@@ -9,6 +9,7 @@ interface ChatState {
   activeEditor: string;
   fileChangesPanelCollapsed: boolean;
   checkpointPanelCollapsed: boolean;
+  composerPanelCollapsed: boolean;
 
   setCommandAction: (action: string) => void;
   setIsCommandExecuting: (executing: boolean) => void;
@@ -17,6 +18,7 @@ interface ChatState {
   setActiveEditor: (editor: string) => void;
   toggleFileChangesPanel: () => void;
   toggleCheckpointPanel: () => void;
+  toggleComposerPanel: () => void;
   clearCommandState: () => void;
 }
 
@@ -28,6 +30,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   activeEditor: "",
   fileChangesPanelCollapsed: true,
   checkpointPanelCollapsed: true,
+  composerPanelCollapsed: true,
 
   setCommandAction: (action) => set({ commandAction: action }),
   setIsCommandExecuting: (executing) => set({ isCommandExecuting: executing }),
@@ -38,6 +41,8 @@ export const useChatStore = create<ChatState>()((set) => ({
     set((s) => ({ fileChangesPanelCollapsed: !s.fileChangesPanelCollapsed })),
   toggleCheckpointPanel: () =>
     set((s) => ({ checkpointPanelCollapsed: !s.checkpointPanelCollapsed })),
+  toggleComposerPanel: () =>
+    set((s) => ({ composerPanelCollapsed: !s.composerPanelCollapsed })),
   clearCommandState: () =>
     set({ isCommandExecuting: false, commandAction: "" }),
 }));

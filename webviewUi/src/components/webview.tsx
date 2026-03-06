@@ -30,6 +30,7 @@ import { CostDisplay } from "./CostDisplay";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 import MessageRenderer from "./MessageRenderer";
 import { PendingChangesPanel } from "./PendingChangesPanel";
+import { ComposerPanel } from "./ComposerPanel";
 import { CheckpointPanel } from "./CheckpointPanel";
 import { UserMessage } from "./personMessage";
 import { SettingsPanel, SettingsGearIcon } from "./settings/index";
@@ -511,6 +512,11 @@ export const WebviewUI = () => {
             <PendingChangesPanel 
               collapsed={fileChangesPanelCollapsed}
               onToggle={() => useChatStore.getState().toggleFileChangesPanel()}
+            />
+            {/* Composer Panel - multi-file compose sessions */}
+            <ComposerPanel
+              collapsed={useChatStore.getState().composerPanelCollapsed}
+              onToggle={() => useChatStore.getState().toggleComposerPanel()}
             />
             {/* Checkpoint Panel - revert workspace to previous state */}
             <CheckpointPanel

@@ -16,3 +16,4 @@ export { ObservabilityHandler } from "./observability-handler";
 export { RulesHandler } from "./rules-handler";
 export { PerformanceHandler } from "./performance-handler";
 export { CheckpointHandler } from "./checkpoint-handler";
+export { ComposerHandler } from "./composer-handler";
