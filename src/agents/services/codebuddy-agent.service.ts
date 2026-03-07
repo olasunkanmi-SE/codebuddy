@@ -1,8 +1,12 @@
 import { randomUUID } from "crypto";
 import * as path from "path";
 import * as fs from "fs";
-import { Command, InMemoryStore, MemorySaver } from "@langchain/langgraph";
-import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
+import {
+  Command,
+  InMemoryStore,
+  MemorySaver,
+  BaseCheckpointSaver,
+} from "@langchain/langgraph";
 import { trace, Span, SpanStatusCode } from "@opentelemetry/api";
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
@@ -243,8 +247,8 @@ export class CodeBuddyAgentService {
    */
   private agentCache = new Map<string, IStreamableAgent>();
   private store = new InMemoryStore();
-  private checkpointerPromise: Promise<MemorySaver | SqliteSaver> | null = null;
-  private checkpointer: MemorySaver | SqliteSaver | null = null;
+  private checkpointerPromise: Promise<BaseCheckpointSaver> | null = null;
+  private checkpointer: BaseCheckpointSaver | null = null;
   private readonly logger: Logger;
   private static instance: CodeBuddyAgentService | null = null;
   private disposed = false;
@@ -294,14 +298,17 @@ export class CodeBuddyAgentService {
    * Uses promise memoization to prevent a check-then-act race when
    * multiple concurrent calls arrive before initialization completes.
    */
-  private getCheckpointer(): Promise<MemorySaver | SqliteSaver> {
+  private getCheckpointer(): Promise<BaseCheckpointSaver> {
     return (this.checkpointerPromise ??= this.initCheckpointer());
   }
 
-  private async initCheckpointer(): Promise<MemorySaver | SqliteSaver> {
+  private async initCheckpointer(): Promise<BaseCheckpointSaver> {
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (workspacePath) {
       try {
+        // Dynamic import to avoid native module loading issues when bundled
+        const { SqliteSaver } =
+          await import("@langchain/langgraph-checkpoint-sqlite");
         const codeBuddyDir = path.join(workspacePath, ".codebuddy");
         await fs.promises.mkdir(codeBuddyDir, { recursive: true });
         const dbPath = path.join(codeBuddyDir, "checkpoints.db");
@@ -530,12 +537,12 @@ export class CodeBuddyAgentService {
     if (!this.agentCache.has(cacheKey)) {
       this.evictAgentCacheIfNeeded();
       const checkpointer = await this.getCheckpointer();
-      const agent = await createAdvancedDeveloperAgent({
+      const agent: unknown = await createAdvancedDeveloperAgent({
         checkPointer: checkpointer,
         store: this.store,
         enableHITL: true,
       });
-      this.agentCache.set(cacheKey, agent as unknown as IStreamableAgent);
+      this.agentCache.set(cacheKey, agent as IStreamableAgent);
       this.logger.log(LogLevel.INFO, `Agent initialized (key: ${cacheKey})`);
     }
     return this.agentCache.get(cacheKey)!;
