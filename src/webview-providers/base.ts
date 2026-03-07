@@ -615,6 +615,7 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
             case "user-consent": {
               CodeBuddyAgentService.getInstance().setUserConsent(
                 message.message === "granted",
+                message.threadId,
               );
               break;
             }

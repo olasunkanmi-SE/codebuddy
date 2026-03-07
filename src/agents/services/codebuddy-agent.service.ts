@@ -1,10 +1,21 @@
+import { randomUUID } from "crypto";
+import * as path from "path";
+import * as fs from "fs";
 import { Command, InMemoryStore, MemorySaver } from "@langchain/langgraph";
-import { trace, SpanStatusCode } from "@opentelemetry/api";
+import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
+import { trace, Span, SpanStatusCode } from "@opentelemetry/api";
+import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { createAdvancedDeveloperAgent } from "../developer/agent";
 import {
-  ICodeBuddyAgentConfig,
   IToolActivity,
+  IStreamContext,
+  IAgentToolCall,
+  IAgentNodeUpdate,
+  IToolDescription,
+  IStreamEvent,
+  IStreamableAgent,
+  IInterruptValue,
   StreamEventType,
 } from "../interface/agent.interface";
 import { StreamManager } from "./stream-manager.service";
@@ -14,12 +25,23 @@ import { InputValidator } from "../../services/input-validator";
 import { CostTrackingService } from "../../services/cost-tracking.service";
 import { CheckpointService } from "../../services/checkpoint.service";
 import { getGenerativeAiModel, getAPIKeyAndModel } from "../../utils/utils";
+import { Orchestrator } from "../../orchestrator";
+import { AgentSafetyGuard } from "./agent-safety-guard";
+import { ConsentManager } from "./consent-manager";
+import { ContentNormalizer } from "./content-normalizer";
+
+/** Typed alias for the async iterator from a LangGraph agent stream. */
+type AgentStreamIterator = AsyncIterator<unknown>;
+
+// Guaranteed fallback — extracted as a named constant for compile-time safety
+const DEFAULT_TOOL_DESCRIPTION: IToolDescription = Object.freeze({
+  name: "Tool",
+  description: "Executing tool...",
+  activityType: "working",
+});
 
 // Tool descriptions for user-friendly feedback
-const TOOL_DESCRIPTIONS: Record<
-  string,
-  { name: string; description: string; activityType: string }
-> = {
+const TOOL_DESCRIPTIONS: Record<string, IToolDescription> = {
   run_command: {
     name: "Terminal",
     description: "Running command...",
@@ -105,24 +127,136 @@ const TOOL_DESCRIPTIONS: Record<
     description: "Exploring directory structure...",
     activityType: "reading",
   },
-  default: {
-    name: "Tool",
-    description: "Executing tool...",
-    activityType: "working",
-  },
 };
 
+/**
+ * Extract and deduplicate tool calls from a LangGraph node update.
+ * Exported as a module-level pure function for direct testability.
+ */
+export function collectToolCallsFromUpdate(
+  update: IAgentNodeUpdate,
+): IAgentToolCall[] {
+  const calls: IAgentToolCall[] = [];
+  const seenIds = new Set<string>();
+
+  const push = (tc: IAgentToolCall) => {
+    if (tc.id) {
+      if (seenIds.has(tc.id)) return;
+      seenIds.add(tc.id);
+    }
+    calls.push(tc);
+  };
+
+  if (update?.toolCalls && Array.isArray(update.toolCalls)) {
+    for (const tc of update.toolCalls) push(tc);
+  }
+
+  if (update?.messages && Array.isArray(update.messages)) {
+    for (const msg of update.messages) {
+      if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
+        for (const tc of msg.tool_calls) push(tc);
+      }
+      if (
+        msg.additional_kwargs?.tool_calls &&
+        Array.isArray(msg.additional_kwargs.tool_calls)
+      ) {
+        for (const tc of msg.additional_kwargs.tool_calls) {
+          if (
+            tc &&
+            typeof tc === "object" &&
+            typeof (tc as Record<string, unknown>).name === "string"
+          ) {
+            const raw = tc as Record<string, unknown>;
+            push({
+              name: raw.name as string,
+              args:
+                raw.args && typeof raw.args === "object"
+                  ? (raw.args as Record<string, unknown>)
+                  : {},
+              id: typeof raw.id === "string" ? raw.id : undefined,
+            });
+          }
+        }
+      }
+      if (Array.isArray(msg.content)) {
+        for (const block of msg.content) {
+          if (block.type === "tool_use") {
+            push({
+              name: block.name ?? "unknown",
+              args: block.input ?? {},
+              id: block.id,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return calls;
+}
+
+/**
+ * Summarize tool output for user-facing display.
+ * Exported as a module-level pure function for direct testability.
+ */
+export function summarizeToolResultContent(
+  content: unknown,
+  toolName: string,
+): string {
+  if (!content) return "Completed";
+
+  const MAX_CONTENT_LENGTH = 512_000; // 512 KB cap
+  let contentStr: string;
+  if (typeof content === "string") {
+    contentStr =
+      content.length > MAX_CONTENT_LENGTH
+        ? content.slice(0, MAX_CONTENT_LENGTH)
+        : content;
+  } else {
+    const raw = JSON.stringify(content);
+    contentStr =
+      raw.length > MAX_CONTENT_LENGTH ? raw.slice(0, MAX_CONTENT_LENGTH) : raw;
+  }
+
+  if (toolName === "read_file") {
+    const lines = contentStr.split("\n").length;
+    return `Read ${lines} lines`;
+  }
+
+  if (toolName === "search_codebase") {
+    const matchCount = (contentStr.match(/match/gi) || []).length;
+    return matchCount > 0 ? `Found ${matchCount} matches` : "Search complete";
+  }
+
+  if (contentStr.length > 100) {
+    return `Processed ${Math.ceil(contentStr.length / 1000)}KB of data`;
+  }
+
+  return "Completed successfully";
+}
+
 export class CodeBuddyAgentService {
-  private agent: any = null;
+  /**
+   * Agents are keyed by `provider:model` but intentionally share a single
+   * `store` and `checkpointer` so conversation history persists across
+   * model switches within the same workspace session.
+   */
+  private agentCache = new Map<string, IStreamableAgent>();
   private store = new InMemoryStore();
-  private checkpointer = new MemorySaver();
+  private checkpointerPromise: Promise<MemorySaver | SqliteSaver> | null = null;
+  private checkpointer: MemorySaver | SqliteSaver | null = null;
   private readonly logger: Logger;
-  private static instance: CodeBuddyAgentService;
+  private static instance: CodeBuddyAgentService | null = null;
+  private disposed = false;
   private activeStreams = new Map<string, StreamManager>();
-  private activeTools = new Map<string, IToolActivity>();
   private readonly synthesizer: ResultSynthesizerService;
-  // Queue of pending approvals; each resolver represents one requested action approval
-  private consentWaiters: Array<() => void> = [];
+  private readonly safetyGuard: AgentSafetyGuard;
+  private readonly consentManager: ConsentManager;
+  private readonly contentNormalizer: ContentNormalizer;
+  private readonly modelChangeDisposable: { dispose(): void };
+  private static readonly MAX_WARNED_TOOLS = 100;
+  private static readonly MAX_CACHED_AGENTS = 3;
+  private readonly warnedUnknownTools = new Set<string>();
 
   constructor() {
     this.logger = Logger.initialize("CodeBuddyAgentService", {
@@ -132,67 +266,140 @@ export class CodeBuddyAgentService {
       enableTelemetry: true,
     });
     this.synthesizer = ResultSynthesizerService.getInstance();
+    this.safetyGuard = new AgentSafetyGuard();
+    this.consentManager = new ConsentManager();
+    this.contentNormalizer = new ContentNormalizer();
+
+    // Invalidate cached agents when the user switches model/provider
+    this.modelChangeDisposable =
+      Orchestrator.getInstance().onModelChangeSuccess(() => {
+        if (this.agentCache.size > 0) {
+          this.agentCache.clear();
+          this.logger.log(
+            LogLevel.INFO,
+            "Agent cache cleared after model change",
+          );
+        }
+      });
 
     // Track every file the agent edits so checkpoints cover them
     this.initFileTracking();
   }
 
   /**
-   * Listen for file‐change events from DiffReviewService and register
-   * each touched path with CheckpointService for future snapshots.
+   * Lazily initializes a persistent SQLite-backed checkpointer.
+   * Falls back to an ephemeral MemorySaver if the workspace path
+   * is unavailable or SQLite initialization fails.
+   *
+   * Uses promise memoization to prevent a check-then-act race when
+   * multiple concurrent calls arrive before initialization completes.
    */
-  private initFileTracking(): void {
-    try {
-      // Lazy import to avoid circular dependency at module level
-      import("../../services/diff-review.service").then(
-        ({ DiffReviewService }) => {
-          const diffService = DiffReviewService.getInstance();
-          diffService.onChangeEvent((evt) => {
-            CheckpointService.getInstance().trackFile(evt.change.filePath);
-          });
-        },
-      );
-    } catch {
-      this.logger.warn("Could not initialize file tracking for checkpoints");
-    }
+  private getCheckpointer(): Promise<MemorySaver | SqliteSaver> {
+    return (this.checkpointerPromise ??= this.initCheckpointer());
   }
 
-  static getInstance(): CodeBuddyAgentService {
-    return (CodeBuddyAgentService.instance ??= new CodeBuddyAgentService());
+  private async initCheckpointer(): Promise<MemorySaver | SqliteSaver> {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspacePath) {
+      try {
+        const codeBuddyDir = path.join(workspacePath, ".codebuddy");
+        await fs.promises.mkdir(codeBuddyDir, { recursive: true });
+        const dbPath = path.join(codeBuddyDir, "checkpoints.db");
+        const saver = SqliteSaver.fromConnString(dbPath);
+        this.checkpointer = saver;
+        this.logger.log(
+          LogLevel.INFO,
+          `Persistent checkpointer initialized at ${dbPath}`,
+        );
+        return saver;
+      } catch (error) {
+        this.logger.warn(
+          "Failed to initialize SQLite checkpointer, falling back to in-memory",
+          error,
+        );
+        // Fall through to MemorySaver below
+      }
+    }
+
+    // Fallback: use in-memory checkpointer (conversation state won't persist)
+    const memorySaver = new MemorySaver();
+    this.checkpointer = memorySaver;
+    this.logger.log(LogLevel.INFO, "Using in-memory checkpointer");
+    return memorySaver;
   }
 
   /**
-   * Checks if any agent is currently running/streaming
-   * Used for close confirmation dialogs
+   * Listen for file‐change events from DiffReviewService and register
+   * each touched path with CheckpointService for future snapshots.
+   * Returns void synchronously — the async import is fire-and-forget
+   * with an explicit .catch() for observability.
+   */
+  private initFileTracking(): void {
+    Promise.resolve()
+      .then(() => import("../../services/diff-review.service"))
+      .then(({ DiffReviewService }) => {
+        const diffService = DiffReviewService.getInstance();
+        diffService.onChangeEvent((evt) => {
+          try {
+            CheckpointService.getInstance().trackFile(evt.change.filePath);
+          } catch (trackError) {
+            this.logger.warn("Failed to track file change", trackError);
+          }
+        });
+        this.logger.log(LogLevel.DEBUG, "File tracking initialized");
+      })
+      .catch((importError) => {
+        this.logger.warn(
+          "Could not initialize file tracking for checkpoints",
+          importError,
+        );
+      });
+  }
+
+  static getInstance(): CodeBuddyAgentService {
+    if (
+      !CodeBuddyAgentService.instance ||
+      CodeBuddyAgentService.instance.disposed
+    ) {
+      CodeBuddyAgentService.instance = new CodeBuddyAgentService();
+    }
+    return CodeBuddyAgentService.instance;
+  }
+
+  /**
+   * Checks if any agent is currently running/streaming.
    */
   isAnyAgentRunning(): boolean {
-    for (const [_, streamManager] of this.activeStreams) {
-      if (streamManager.isActive()) {
-        return true;
-      }
+    for (const sm of this.activeStreams.values()) {
+      if (sm.isActive()) return true;
     }
     return false;
   }
 
   /**
-   * Gets count of active agent streams
+   * Gets count of active agent streams.
    */
   getActiveStreamCount(): number {
     let count = 0;
-    for (const [_, streamManager] of this.activeStreams) {
-      if (streamManager.isActive()) {
-        count++;
-      }
+    for (const sm of this.activeStreams.values()) {
+      if (sm.isActive()) count++;
     }
     return count;
   }
 
-  private getToolInfo(toolName: string): {
-    name: string;
-    description: string;
-    activityType: string;
-  } {
-    return TOOL_DESCRIPTIONS[toolName] || TOOL_DESCRIPTIONS.default;
+  private getToolInfo(toolName: string): IToolDescription {
+    const info = TOOL_DESCRIPTIONS[toolName];
+    if (info) return info;
+    if (
+      !this.warnedUnknownTools.has(toolName) &&
+      this.warnedUnknownTools.size < CodeBuddyAgentService.MAX_WARNED_TOOLS
+    ) {
+      this.warnedUnknownTools.add(toolName);
+      this.logger.warn(
+        `Unknown tool "${toolName}" not in TOOL_DESCRIPTIONS — using default`,
+      );
+    }
+    return DEFAULT_TOOL_DESCRIPTION;
   }
 
   /**
@@ -219,18 +426,25 @@ export class CodeBuddyAgentService {
     }
   }
 
-  private createToolActivity(toolName: string, args?: any): IToolActivity {
+  private createToolActivity(
+    toolName: string,
+    args?: Record<string, unknown>,
+  ): IToolActivity {
     const toolInfo = this.getToolInfo(toolName);
     let description = toolInfo.description;
 
     // Customize description based on tool args
-    if (toolName === "web_search" && args?.query) {
-      description = `Searching the web for: "${args.query.substring(0, 50)}${args.query.length > 50 ? "..." : ""}"`;
-    } else if (toolName === "think" && args?.thought) {
+    if (toolName === "web_search" && typeof args?.query === "string") {
+      const q = args.query;
+      description = `Searching the web for: "${q.substring(0, 50)}${q.length > 50 ? "..." : ""}"`;
+    } else if (toolName === "think" && typeof args?.thought === "string") {
       description = args.thought;
-    } else if (toolName === "read_file" && args?.path) {
+    } else if (toolName === "read_file" && typeof args?.path === "string") {
       description = `Reading file: ${args.path.split("/").pop()}`;
-    } else if (toolName === "analyze_files_for_question" && args?.files) {
+    } else if (
+      toolName === "analyze_files_for_question" &&
+      Array.isArray(args?.files)
+    ) {
       description = `Analyzing ${args.files.length} file(s)...`;
     } else if (
       (toolName === "run_command" || toolName === "command") &&
@@ -248,7 +462,7 @@ export class CodeBuddyAgentService {
     }
 
     return {
-      id: `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `tool-${randomUUID()}`,
       toolName,
       status: "starting",
       description,
@@ -256,38 +470,40 @@ export class CodeBuddyAgentService {
     };
   }
 
-  private summarizeArgs(args: any): string | null {
+  private summarizeArgs(
+    args: Record<string, unknown> | null | undefined,
+    style: "keys" | "pairs" = "keys",
+  ): string | null {
     if (!args || typeof args !== "object") return null;
     const keys = Object.keys(args);
     if (keys.length === 0) return null;
+
+    if (style === "pairs") {
+      const entries = Object.entries(args).slice(0, 2);
+      const parts = entries.map(([key, value]) => {
+        const raw = typeof value === "string" ? value : JSON.stringify(value);
+        const trimmed = raw.length > 60 ? `${raw.slice(0, 57)}...` : raw;
+        return `${key}=${trimmed}`;
+      });
+      const suffix = keys.length > 2 ? ", …" : "";
+      return `inputs: ${parts.join(", ")}${suffix}`;
+    }
+
     const shown = keys.slice(0, 3).join(", ");
     const suffix = keys.length > 3 ? "…" : "";
     return `inputs: ${shown}${suffix}`;
   }
 
-  private summarizeArgPairs(args: any): string | null {
-    if (!args || typeof args !== "object") return null;
-    const entries = Object.entries(args).slice(0, 2);
-    if (entries.length === 0) return null;
-    const parts = entries.map(([key, value]) => {
-      const raw = typeof value === "string" ? value : JSON.stringify(value);
-      const trimmed = raw.length > 60 ? `${raw.slice(0, 57)}...` : raw;
-      return `${key}=${trimmed}`;
-    });
-    const suffix = Object.keys(args).length > 2 ? ", …" : "";
-    return `inputs: ${parts.join(", ")}${suffix}`;
-  }
-
   private describeToolInvocation(
     toolNameRaw: string,
-    args: any,
+    args: Record<string, unknown> | undefined,
     fallbackDescription?: string,
   ): { friendlyName: string; summary: string } {
     const toolInfo = this.getToolInfo(toolNameRaw);
     const friendlyName = toolInfo.name || toolNameRaw;
 
     const argSummary = this.summarizeArgs(args);
-    const argPairs = this.summarizeArgPairs(args);
+    const argPairs = this.summarizeArgs(args, "pairs");
     let descriptionBase =
       fallbackDescription || toolInfo.description || "Approval required.";
 
@@ -304,36 +520,81 @@ export class CodeBuddyAgentService {
     return { friendlyName, summary };
   }
 
-  private async getAgent(config?: ICodeBuddyAgentConfig) {
-    if (!this.agent) {
-      this.agent = await createAdvancedDeveloperAgent({
-        checkPointer: config?.checkPointer ?? this.checkpointer,
-        store: config?.store ?? this.store,
-        enableHITL: config?.enableHITL ?? true,
-        interruptOn: config?.interruptOn,
-      });
-      this.logger.log(LogLevel.INFO, "Agent initialized");
+  private async getAgent(): Promise<IStreamableAgent> {
+    const cacheKey = this.buildAgentCacheKey();
+    if (!cacheKey) {
+      throw new Error(
+        "Agent configuration is invalid. Please check your API key and model settings.",
+      );
     }
-    return this.agent;
+    if (!this.agentCache.has(cacheKey)) {
+      this.evictAgentCacheIfNeeded();
+      const checkpointer = await this.getCheckpointer();
+      const agent = await createAdvancedDeveloperAgent({
+        checkPointer: checkpointer,
+        store: this.store,
+        enableHITL: true,
+      });
+      this.agentCache.set(cacheKey, agent as unknown as IStreamableAgent);
+      this.logger.log(LogLevel.INFO, `Agent initialized (key: ${cacheKey})`);
+    }
+    return this.agentCache.get(cacheKey)!;
   }
 
-  setUserConsent(granted: boolean) {
-    // Treat consent as approving the next pending action only
-    if (!granted) return;
-    const resolver = this.consentWaiters.shift();
-    resolver?.();
+  /**
+   * Evict the oldest agent from cache if at capacity.
+   * Map preserves insertion order, so the first key is the oldest.
+   */
+  private evictAgentCacheIfNeeded(): void {
+    if (this.agentCache.size < CodeBuddyAgentService.MAX_CACHED_AGENTS) return;
+    const oldestKey = this.agentCache.keys().next().value;
+    if (oldestKey) {
+      this.agentCache.delete(oldestKey);
+      this.logger.log(
+        LogLevel.DEBUG,
+        `Evicted agent cache entry: ${oldestKey} (cache at max ${CodeBuddyAgentService.MAX_CACHED_AGENTS})`,
+      );
+    }
   }
 
-  private async waitForActionConsent(): Promise<void> {
-    await new Promise<void>((resolve) => this.consentWaiters.push(resolve));
+  /**
+   * Build a cache key for the current provider/model configuration.
+   * Returns `null` if configuration is invalid (missing API key, etc.),
+   * causing getAgent() to fail fast with a user-readable error.
+   */
+  private buildAgentCacheKey(): string | null {
+    const provider = getGenerativeAiModel() ?? "unknown";
+    try {
+      const cfg = getAPIKeyAndModel(provider.toLowerCase());
+      const model = cfg.model ?? provider;
+      return `agent:${provider}:${model}`;
+    } catch (e) {
+      this.logger.warn(
+        `getAPIKeyAndModel failed for "${provider}" — agent cannot be created until config is valid`,
+        e,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Respond to a pending consent request.
+   * Delegates to ConsentManager.
+   */
+  setUserConsent(granted: boolean, threadId?: string) {
+    this.consentManager.respond(granted, threadId);
+  }
+
+  private waitForActionConsent(threadId: string): Promise<boolean> {
+    return this.consentManager.waitForConsent(threadId);
   }
 
   async *streamResponse(
     userMessage: string,
     threadId?: string,
-    onChunk?: (chunk: any) => void,
+    onChunk?: (chunk: IStreamEvent) => void,
     requestId?: string,
-  ) {
+  ): AsyncGenerator<IStreamEvent> {
     // Validate input for prompt injection and other security issues
     const validation = InputValidator.getInstance().validateInput(userMessage);
 
@@ -356,48 +617,32 @@ export class CodeBuddyAgentService {
     }
 
     const conversationId = threadId ?? `thread-${Date.now()}`;
-    const streamManger = new StreamManager({
+    const streamManager = new StreamManager({
       maxBufferSize: 10,
       flushInterval: 50,
       enableBackPressure: true,
     });
-    this.activeStreams.set(conversationId, streamManger);
-    this.activeTools.clear();
+    this.activeStreams.set(conversationId, streamManager);
 
     // Notify guard service that agent is starting (enables close confirmation)
     const guardService = AgentRunningGuardService.getInstance();
     await guardService.notifyAgentStarted();
 
-    // Safety limits - increased from 50 to handle complex multi-step tasks
-    // Event count is higher because agent emits many events per "turn"
-    const maxEventCount = 1000; // Total events from the stream
-    const maxToolInvocations = 200; // Maximum agent-initiated tool calls (excludes middleware)
-    const maxToolCallsPerType = 20; // Limit repeated calls to same tool (agent-initiated only)
-    // Critical/mutating tools have stricter limits to prevent infinite loops
-    const criticalToolLimits: Record<string, number> = {
-      edit_file: 8, // Editing files - stricter limit
-      write_file: 8,
-      delete_file: 3,
-      run_command: 10,
-      run_terminal_command: 100,
-      web_search: 8,
+    // Stream-scoped mutable state — never shared across concurrent streams
+    const ctx: IStreamContext = {
+      conversationId,
+      pendingToolCalls: new Map(),
+      toolCallCounts: new Map(),
+      fileEditCounts: new Map(),
+      accumulatedContent: "",
+      eventCount: 0,
+      totalToolInvocations: 0,
+      startTime: Date.now(),
+      hasErrored: false,
+      forceStopReason: null,
+      agentState: "planning",
     };
-    // Read-only tools are allowed many more calls - gathering context is normal
-    const readOnlyTools = new Set([
-      "read_file",
-      "list_directory",
-      "search_codebase",
-      "grep",
-      "glob",
-      "analyze_files_for_question",
-      "git_log",
-      "git_diff",
-      "git_status",
-      "think",
-      "run_tests",
-    ]);
-    const maxDurationMs = 5 * 60 * 1000; // 5 minute timeout
-    const startTime = Date.now();
+
     const tracer = trace.getTracer("codebuddy-agent-service");
     const span = tracer.startSpan("streamAgent", {
       attributes: {
@@ -405,14 +650,6 @@ export class CodeBuddyAgentService {
         user_message: sanitizedMessage.substring(0, 500),
       },
     });
-
-    let eventCount = 0;
-    let totalToolInvocations = 0;
-    const pendingToolCalls = new Map<string, IToolActivity>();
-    const toolCallCounts = new Map<string, number>(); // Track agent-initiated tool call frequency only
-    const fileEditCounts = new Map<string, number>(); // Track edits per file to detect file-specific loops
-    let hasErrored = false;
-    let forceStopReason: "max_events" | "max_tools" | "timeout" | null = null;
 
     // Cost tracking — resolve current provider/model for pricing lookup
     const costTracker = CostTrackingService.getInstance();
@@ -425,18 +662,9 @@ export class CodeBuddyAgentService {
       // Non-critical — fallback pricing will be used
     }
 
-    // Simple state machine to track phases
-    type AgentState =
-      | "planning"
-      | "running"
-      | "summarizing"
-      | "completed"
-      | "failed";
-    let agentState: AgentState = "planning";
-
     try {
       const agent = await this.getAgent();
-      const streamId = await streamManger.startStream(requestId);
+      const streamId = await streamManager.startStream(requestId);
       this.logger.log(
         LogLevel.INFO,
         `Starting stream ${streamId} for thread ${conversationId}`,
@@ -456,67 +684,114 @@ export class CodeBuddyAgentService {
           conversationId,
           `Before: ${sanitizedMessage.slice(0, 60)}${sanitizedMessage.length > 60 ? "…" : ""}`,
         );
-      } catch (cpError: any) {
-        this.logger.warn(`Failed to create checkpoint: ${cpError.message}`);
+      } catch (cpError) {
+        this.logger.warn(
+          `Failed to create checkpoint: ${cpError instanceof Error ? cpError.message : cpError}`,
+        );
       }
 
-      agentState = "running";
+      ctx.agentState = "running";
 
       const config = {
         configurable: { thread_id: conversationId },
         recursionLimit: 100,
       };
-      let streamIterator = (
+      let streamIterator: AgentStreamIterator = (
         await agent.stream(
           { messages: [{ role: "user", content: sanitizedMessage }] },
           config,
         )
       )[Symbol.asyncIterator]();
-      let accumulatedContent = "";
 
       while (true) {
         const { value: event, done } = await streamIterator.next();
         if (done) break;
         // Stop immediately if we've already errored
-        if (hasErrored) break;
+        if (ctx.hasErrored) break;
 
         // DEBUG: Log raw events from agent (reduce verbosity in production)
         this.logger.debug(
-          `[STREAM] Event #${eventCount + 1}: ${JSON.stringify(Object.keys(event || {}))}`,
+          `[STREAM] Event #${ctx.eventCount + 1}: ${JSON.stringify(Object.keys(event || {}))}`,
         );
 
-        eventCount++;
+        ctx.eventCount++;
 
         // Check safety limits
-        const elapsed = Date.now() - startTime;
-        let shouldStop = false;
+        const elapsed = Date.now() - ctx.startTime;
+        const safetyResult = this.safetyGuard.checkLimits(
+          ctx.eventCount,
+          ctx.totalToolInvocations,
+          elapsed,
+        );
 
-        if (eventCount >= maxEventCount) {
-          forceStopReason = "max_events";
-          this.logger.log(
-            LogLevel.WARN,
-            `Force stopping: exceeded ${maxEventCount} events (${totalToolInvocations} tool calls in ${Math.round(elapsed / 1000)}s)`,
+        if (safetyResult.shouldStop) {
+          const limitLabel = this.safetyGuard.buildStopMessage(
+            safetyResult.reason!,
+            ctx.eventCount,
+            ctx.totalToolInvocations,
+            elapsed,
           );
-          shouldStop = true;
-        } else if (totalToolInvocations >= maxToolInvocations) {
-          forceStopReason = "max_tools";
-          this.logger.log(
-            LogLevel.WARN,
-            `Force stopping: exceeded ${maxToolInvocations} tool invocations`,
-          );
-          shouldStop = true;
-        } else if (elapsed >= maxDurationMs) {
-          forceStopReason = "timeout";
-          this.logger.log(
-            LogLevel.WARN,
-            `Force stopping: exceeded ${maxDurationMs / 1000}s timeout`,
-          );
-          shouldStop = true;
-        }
 
-        if (shouldStop) {
-          // Mark pending tools as completed with no result to avoid losing context
-          for (const [toolName, activity] of pendingToolCalls) {
+          // Ask the user whether to continue or stop
+          yield {
+            type: StreamEventType.METADATA,
+            content: "interrupt_waiting",
+            metadata: {
+              threadId: conversationId,
+              status: "interrupt_waiting",
+              toolName: "Safety limit reached",
+              description: `${limitLabel} Would you like me to continue?`,
+            },
+          };
+          yield {
+            type: StreamEventType.CHUNK,
+            content: `${limitLabel} Would you like me to continue?`,
+            metadata: { threadId: conversationId, timestamp: Date.now() },
+          };
+
+          const continueGranted =
+            await this.waitForActionConsent(conversationId);
+
+          if (continueGranted) {
+            // User chose to continue — extend the limits and keep going
+            yield {
+              type: StreamEventType.METADATA,
+              content: "interrupt_approved",
+              metadata: {
+                threadId: conversationId,
+                status: "interrupt_approved",
+                toolName: "Safety limit reached",
+              },
+            };
+            yield {
+              type: StreamEventType.CHUNK,
+              content: "Continuing...",
+              metadata: { threadId: conversationId, timestamp: Date.now() },
+            };
+
+            this.safetyGuard.extendLimits(ctx);
+            Object.assign(ctx, this.safetyGuard.buildLimitReset());
+            this.logger.debug(
+              `[STREAM] Limits extended for thread ${conversationId}: counters reset`,
+            );
+            continue;
+          }
+
+          // User denied — stop gracefully
+          ctx.forceStopReason = safetyResult.reason;
+
+          yield {
+            type: StreamEventType.METADATA,
+            content: "interrupt_denied",
+            metadata: {
+              threadId: conversationId,
+              status: "interrupt_denied",
+              toolName: "Safety limit reached",
+            },
+          };
+
+          // Mark pending tools as completed
+          for (const [toolName, activity] of ctx.pendingToolCalls) {
             activity.status = "completed";
             activity.endTime = Date.now();
             yield {
@@ -528,560 +803,72 @@ export class CodeBuddyAgentService {
               },
             };
           }
-          pendingToolCalls.clear();
-
-          // Emit a warning chunk so UI can surface the partial state
-          const reasonMessages: Record<string, string> = {
-            max_events: `Processed ${eventCount} events`,
-            max_tools: `Made ${totalToolInvocations} tool calls`,
-            timeout: `Ran for ${Math.round(elapsed / 1000)} seconds`,
-          };
-          const reasonText = forceStopReason
-            ? reasonMessages[forceStopReason]
-            : "Safety limit reached";
-          const warning = `⚠️ Stopping early (${reasonText}). Here's what I found so far:`;
+          ctx.pendingToolCalls.clear();
 
           yield {
             type: StreamEventType.CHUNK,
-            content: warning,
-            metadata: { threadId: conversationId, reason: forceStopReason },
-            accumulated: accumulatedContent
-              ? `${accumulatedContent}\n\n${warning}`
-              : warning,
+            content: limitLabel,
+            metadata: { threadId: conversationId, reason: ctx.forceStopReason },
+            accumulated: ctx.accumulatedContent
+              ? `${ctx.accumulatedContent}\n\n${limitLabel}`
+              : limitLabel,
           };
 
-          // Break the loop but allow graceful END below
           break;
         }
 
-        const entries = Object.entries(event as Record<string, any>);
+        const entries = Object.entries(event as Record<string, unknown>);
 
         const interruptEntry = entries.find(
           ([nodeName]) => nodeName === "__interrupt__",
         );
 
         if (interruptEntry) {
-          const [, interruptUpdates] = interruptEntry;
-          const interrupts = Array.isArray(interruptUpdates)
-            ? interruptUpdates
-            : [interruptUpdates];
-
-          for (const interrupt of interrupts) {
-            const interruptId =
-              interrupt?.value?.id ?? `interrupt-${Date.now()}`;
-            const toolNameRaw =
-              interrupt?.value?.name || interrupt?.value?.tool || "tool";
-            const toolArgs =
-              interrupt?.value?.input ||
-              interrupt?.value?.args ||
-              interrupt?.value?.parameters;
-            const { friendlyName, summary } = this.describeToolInvocation(
-              toolNameRaw,
-              toolArgs,
-              interrupt?.value?.description,
-            );
-
-            yield {
-              type: StreamEventType.METADATA,
-              content: "interrupt_waiting",
-              metadata: {
-                threadId: conversationId,
-                status: "interrupt_waiting",
-                toolName: friendlyName,
-                description: summary,
-              },
-            };
-            yield {
-              type: StreamEventType.CHUNK,
-              content: `Approval needed for ${friendlyName}: ${summary} Waiting for your approval...`,
-              metadata: { threadId: conversationId, timestamp: Date.now() },
-            };
-
-            await this.waitForActionConsent();
-
-            yield {
-              type: StreamEventType.METADATA,
-              content: "interrupt_approved",
-              metadata: {
-                threadId: conversationId,
-                status: "interrupt_approved",
-                toolName: friendlyName,
-              },
-            };
-            yield {
-              type: StreamEventType.CHUNK,
-              content: `Approval received. Continuing with ${friendlyName}...`,
-              metadata: { threadId: conversationId, timestamp: Date.now() },
-            };
-
-            // Resume the agent after approval using LangGraph Command
-            // The resume value should match the interrupt's expected response format
-            this.logger.debug(
-              `[STREAM] Resuming from interrupt ${interruptId} with approval`,
-            );
-
-            // Create a proper Command object to resume the agent
-            const resumeCommand = new Command({
-              resume: "approve", // Simple approval - the agent will continue with the pending tool
-            });
-
-            try {
-              streamIterator = (await agent.stream(resumeCommand, config))[
-                Symbol.asyncIterator
-              ]();
-              this.logger.debug(
-                `[STREAM] Successfully created new stream iterator after resume`,
-              );
-            } catch (resumeError: any) {
-              this.logger.error(
-                `[STREAM] Failed to resume: ${resumeError.message}`,
-              );
-              // Try alternative resume format as fallback
-              const fallbackResume = { resume: { [interruptId]: "approve" } };
-              streamIterator = (
-                await agent.stream(fallbackResume as any, config)
-              )[Symbol.asyncIterator]();
-              this.logger.debug(`[STREAM] Used fallback resume format`);
-            }
+          const interruptGen = this.handleInterrupt(
+            interruptEntry as [string, IInterruptValue | IInterruptValue[]],
+            ctx,
+            agent,
+            config,
+          );
+          let interruptNext = await interruptGen.next();
+          while (!interruptNext.done) {
+            yield interruptNext.value;
+            interruptNext = await interruptGen.next();
           }
-
-          continue; // Skip normal processing for interrupt events
+          // The generator's return value carries the new iterator (if any)
+          const newIter = interruptNext.value;
+          if (newIter) streamIterator = newIter;
+          continue;
         }
 
-        for (const [nodeName, update] of entries) {
-          // Check for tool results in messages (indicates tool completion)
-          if (update?.messages && Array.isArray(update.messages)) {
-            for (const message of update.messages) {
-              // Extract token usage from AI messages (LangChain usage_metadata)
-              if (
-                message.usage_metadata &&
-                (message.usage_metadata.input_tokens ||
-                  message.usage_metadata.output_tokens)
-              ) {
-                const usage = message.usage_metadata;
-                const costData = costTracker.recordUsage(
-                  conversationId,
-                  providerName,
-                  currentModelName,
-                  usage.input_tokens ?? 0,
-                  usage.output_tokens ?? 0,
-                );
-                yield {
-                  type: StreamEventType.METADATA,
-                  content: "cost_update",
-                  metadata: {
-                    threadId: conversationId,
-                    status: "cost_update",
-                    costData,
-                  },
-                };
-              }
-
-              if (message.type === "tool" || message.name) {
-                const toolName = message.name || "unknown";
-                const toolActivity = pendingToolCalls.get(toolName);
-
-                if (toolActivity) {
-                  toolActivity.status = "completed";
-                  toolActivity.endTime = Date.now();
-                  toolActivity.result = {
-                    summary: this.summarizeToolResult(
-                      message.content,
-                      toolName,
-                    ),
-                    itemCount: this.countResultItems(message.content),
-                  };
-
-                  // Add OpenTelemetry event for tool completion
-                  span.addEvent("tool_end", {
-                    "tool.name": toolName,
-                    "tool.result_summary": toolActivity.result.summary,
-                    "node.name": nodeName,
-                    duration_ms: toolActivity.endTime - toolActivity.startTime,
-                  });
-
-                  yield {
-                    type: StreamEventType.TOOL_END,
-                    content: JSON.stringify(toolActivity),
-                    metadata: {
-                      toolName,
-                      node: nodeName,
-                      duration: toolActivity.endTime - toolActivity.startTime,
-                    },
-                  };
-
-                  // Emit a working event to show the agent is processing results
-                  yield {
-                    type: StreamEventType.WORKING,
-                    content: `Finished ${this.getToolInfo(toolName).name} and processing results...`,
-                    metadata: {
-                      toolName,
-                      node: nodeName,
-                      result: toolActivity.result?.summary,
-                      timestamp: Date.now(),
-                    },
-                  };
-
-                  pendingToolCalls.delete(toolName);
-                }
-              }
-            }
-
-            const lastMessage = update.messages[update.messages.length - 1];
-            if (lastMessage?.content && lastMessage.type !== "tool") {
-              const newContent = this.normalizeMessageContent(
-                lastMessage.content,
-              );
-              const delta = newContent.slice(accumulatedContent.length);
-              if (delta) {
-                accumulatedContent = newContent;
-                streamManger.addChunk(delta, {
-                  node: nodeName,
-                  messageType: lastMessage.type,
-                });
-
-                yield {
-                  type: StreamEventType.CHUNK,
-                  content: delta,
-                  metadata: { node: nodeName, messageType: lastMessage.type },
-                  accumulated: accumulatedContent,
-                };
-                onChunk?.({
-                  type: StreamEventType.CHUNK,
-                  content: delta,
-                  metadata: { node: nodeName, messageType: lastMessage.type },
-                  accumulated: accumulatedContent,
-                });
-              }
-            }
-          }
-
-          // Handle tool calls - check messages for tool_calls property (LangChain format)
-          // Tool calls can be in update.toolCalls OR in message.tool_calls
-          const toolCallsToProcess: any[] = [];
-
-          // Check update-level toolCalls (some frameworks put them here)
-          if (update?.toolCalls && Array.isArray(update.toolCalls)) {
-            toolCallsToProcess.push(...update.toolCalls);
-          }
-
-          // Check message-level tool_calls (LangChain/LangGraph standard format)
-          if (update?.messages && Array.isArray(update.messages)) {
-            for (const msg of update.messages) {
-              // AI messages may have tool_calls array
-              if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
-                toolCallsToProcess.push(...msg.tool_calls);
-              }
-              // Also check additional_kwargs for tool_calls (older format)
-              if (
-                msg.additional_kwargs?.tool_calls &&
-                Array.isArray(msg.additional_kwargs.tool_calls)
-              ) {
-                toolCallsToProcess.push(...msg.additional_kwargs.tool_calls);
-              }
-              // Check content array for tool_use blocks (Anthropic format)
-              if (Array.isArray(msg.content)) {
-                for (const block of msg.content) {
-                  if (block.type === "tool_use") {
-                    toolCallsToProcess.push({
-                      name: block.name,
-                      args: block.input,
-                      id: block.id,
-                    });
-                  }
-                }
-              }
-            }
-          }
-
-          if (toolCallsToProcess.length > 0) {
-            this.logger.debug(
-              `[STREAM] Tool calls detected: ${toolCallsToProcess.length} tools - ${toolCallsToProcess.map((tc: any) => tc.name).join(", ")}`,
-            );
-            // Emit a decision event when agent decides to use tools
-            // Deduplicate tool names and show counts for repeated tools
-            const toolNameCounts = new Map<string, number>();
-            for (const tc of toolCallsToProcess) {
-              const name = this.getToolInfo(tc.name).name;
-              toolNameCounts.set(name, (toolNameCounts.get(name) || 0) + 1);
-            }
-            const toolNamesFormatted = Array.from(toolNameCounts.entries())
-              .map(([name, count]) =>
-                count > 1 ? `${name} (x${count})` : name,
-              )
-              .join(", ");
-            yield {
-              type: StreamEventType.DECISION,
-              content: `Using: ${toolNamesFormatted}`,
-              metadata: {
-                toolCount: toolCallsToProcess.length,
-                tools: toolCallsToProcess.map((tc: any) => tc.name),
-                node: nodeName,
-                timestamp: Date.now(),
-              },
-            };
-
-            for (const toolCall of toolCallsToProcess) {
-              // Only count tool invocations from actual agent nodes, not middleware
-              // Middleware nodes like "SummarizationMiddleware.before_model" are internal operations
-              const isMiddlewareNode =
-                nodeName.includes("Middleware") ||
-                nodeName.includes("before_model");
-
-              // Only track and limit agent-initiated tool calls
-              let currentCount = 0;
-              if (!isMiddlewareNode) {
-                totalToolInvocations++;
-                currentCount = toolCallCounts.get(toolCall.name) || 0;
-                toolCallCounts.set(toolCall.name, currentCount + 1);
-              }
-
-              this.logger.debug(
-                `[STREAM] Tool call: ${toolCall.name} from ${nodeName}${isMiddlewareNode ? " (middleware - not counted)" : ` (#${totalToolInvocations}, ${currentCount + 1}x for this tool)`}`,
-              );
-
-              // Check if this tool is being called too many times (looping)
-              // Only apply loop detection for agent-initiated calls, not middleware
-              if (!isMiddlewareNode) {
-                // Read-only tools don't trigger loop stopping - they just gather context
-                const isReadOnlyTool = readOnlyTools.has(toolCall.name);
-
-                // Use stricter limits for critical/mutating tools only
-                const toolLimit =
-                  criticalToolLimits[toolCall.name] ?? maxToolCallsPerType;
-                const isLooping = currentCount >= toolLimit;
-
-                // Also track per-file edits to detect same-file loops
-                if (
-                  (toolCall.name === "edit_file" ||
-                    toolCall.name === "write_file") &&
-                  toolCall.args?.file_path
-                ) {
-                  const filePath = toolCall.args.file_path;
-                  const fileCount = (fileEditCounts.get(filePath) || 0) + 1;
-                  fileEditCounts.set(filePath, fileCount);
-
-                  if (fileCount >= 4) {
-                    this.logger.log(
-                      LogLevel.WARN,
-                      `Same file ${filePath} edited ${fileCount} times - stopping to prevent infinite loop`,
-                    );
-
-                    hasErrored = true;
-                    span.setStatus({
-                      code: SpanStatusCode.ERROR,
-                      message: `Infinite loop detected editing file: ${filePath}`,
-                    });
-                    span.setAttribute("error.reason", "file_edit_loop");
-                    span.setAttribute("error.file_path", filePath);
-
-                    yield {
-                      type: StreamEventType.ERROR,
-                      content: `I've tried to edit the same file (${filePath.split("/").pop()}) ${fileCount} times. The edit may not be matching correctly or there's an issue with the file content. I'll stop here - please try the edit manually or check if the file content matches what I expect.`,
-                      metadata: {
-                        threadId: conversationId,
-                        reason: "same_file_loop",
-                        toolName: toolCall.name,
-                        filePath,
-                        fileEditCount: fileCount,
-                      },
-                    };
-                    break;
-                  }
-                }
-
-                // Only stop for loops on mutating tools, not read-only ones
-                if (isLooping && !isReadOnlyTool) {
-                  this.logger.log(
-                    LogLevel.WARN,
-                    `Tool ${toolCall.name} called ${currentCount + 1} times (limit: ${toolLimit}) - loop detected, stopping`,
-                  );
-
-                  hasErrored = true;
-                  span.setStatus({
-                    code: SpanStatusCode.ERROR,
-                    message: `Tool loop detected for ${toolCall.name}`,
-                  });
-                  span.setAttribute("error.reason", "tool_loop_detected");
-                  span.setAttribute("error.tool", toolCall.name);
-
-                  // Provide specific error messages based on tool type
-                  let errorMessage: string;
-                  if (
-                    toolCall.name === "edit_file" ||
-                    toolCall.name === "write_file"
-                  ) {
-                    errorMessage = `I've attempted to edit this file ${currentCount + 1} times but the edit isn't completing successfully. This usually happens when the edit operation is interrupted or the file content doesn't match exactly. I'll stop here to avoid an infinite loop. You may need to make the change manually.`;
-                  } else if (toolCall.name === "web_search") {
-                    errorMessage = `I've searched for this information multiple times but couldn't find definitive results. For GitHub issues, try using the GitHub MCP tools directly or visit the repository issues page manually.`;
-                  } else {
-                    errorMessage = `I've called ${toolCall.name} ${currentCount + 1} times which indicates a loop. I'll stop here to prevent infinite processing.`;
-                  }
-
-                  yield {
-                    type: StreamEventType.ERROR,
-                    content: errorMessage,
-                    metadata: {
-                      threadId: conversationId,
-                      reason: "tool_loop_detected",
-                      toolName: toolCall.name,
-                      callCount: currentCount + 1,
-                      limit: toolLimit,
-                    },
-                  };
-                  break;
-                } else if (isLooping && isReadOnlyTool) {
-                  // Just log a warning for read-only tools, don't stop
-                  this.logger.debug(
-                    `[STREAM] Read-only tool ${toolCall.name} called ${currentCount + 1} times - allowing to continue`,
-                  );
-                }
-              }
-
-              const toolActivity = this.createToolActivity(
-                toolCall.name,
-                toolCall.args,
-              );
-              toolActivity.status = "running";
-              pendingToolCalls.set(toolCall.name, toolActivity);
-
-              // Add OpenTelemetry span attribute for tool usage
-              span.addEvent("tool_start", {
-                "tool.name": toolCall.name,
-                "tool.args": JSON.stringify(toolCall.args),
-                "node.name": nodeName,
-                is_middleware: isMiddlewareNode,
-              });
-
-              streamManger.addToolEvent(toolCall.name, true, toolCall);
-
-              // Emit the generic TOOL_START event
-              yield {
-                type: StreamEventType.TOOL_START,
-                content: JSON.stringify({
-                  ...toolActivity,
-                  args: toolCall.args,
-                }),
-                metadata: {
-                  toolName: toolCall.name,
-                  node: nodeName,
-                  toolId: toolActivity.id,
-                },
-              };
-
-              // Also emit an activity-specific event for detailed streaming
-              if (toolCall.name === "think") {
-                yield {
-                  type: StreamEventType.THINKING_START,
-                  content: toolActivity.description,
-                  metadata: {
-                    toolName: toolCall.name,
-                    node: nodeName,
-                    toolId: toolActivity.id,
-                    activityType: this.getToolInfo(toolCall.name).activityType,
-                    timestamp: Date.now(),
-                  },
-                };
-              } else {
-                const activityEventType = this.getActivityEventType(
-                  toolCall.name,
-                );
-                yield {
-                  type: activityEventType,
-                  content: toolActivity.description,
-                  metadata: {
-                    toolName: toolCall.name,
-                    node: nodeName,
-                    toolId: toolActivity.id,
-                    activityType: this.getToolInfo(toolCall.name).activityType,
-                    timestamp: Date.now(),
-                  },
-                };
-              }
-            }
-          }
-        }
+        yield* this.processNodeEntries(
+          entries as [string, IAgentNodeUpdate][],
+          ctx,
+          span,
+          streamManager,
+          costTracker,
+          conversationId,
+          providerName,
+          currentModelName,
+          onChunk,
+        );
       }
 
-      // Don't emit END if we errored
-      if (hasErrored) {
-        streamManger.endStream();
-        return;
-      }
-
-      // Mark any remaining pending tools as completed
-      for (const [toolName, activity] of pendingToolCalls) {
-        activity.status = "completed";
-        activity.endTime = Date.now();
-        yield {
-          type: StreamEventType.TOOL_END,
-          content: JSON.stringify(activity),
-          metadata: {
-            toolName,
-            duration: activity.endTime - activity.startTime,
-          },
-        };
-        if (toolName === "think") {
-          yield {
-            type: StreamEventType.THINKING_END,
-            content: activity.description,
-            metadata: {
-              toolName,
-              timestamp: Date.now(),
-            },
-          };
-        }
-      }
-
-      // Emit summarizing event before final response
-      if (accumulatedContent) {
-        yield {
-          type: StreamEventType.SUMMARIZING,
-          content: forceStopReason
-            ? "Preparing partial response (stopped early for safety)..."
-            : "Preparing response...",
-          metadata: { threadId: conversationId, timestamp: Date.now() },
-        };
-        agentState = "summarizing";
-      }
-
-      streamManger.endStream(accumulatedContent);
-
-      // Include final cost summary in the END event
-      const finalCost = costTracker.getConversationCost(conversationId);
-      yield {
-        type: StreamEventType.END,
-        content: accumulatedContent,
-        metadata: {
-          threadId: conversationId,
-          forceStopReason,
-          state: forceStopReason ? "completed_with_warning" : "completed",
-          costData: finalCost ?? undefined,
-        },
-      };
-      agentState = forceStopReason ? "completed" : "completed";
-
-      // Final status check and end span
-      if (hasErrored) {
-        span.setStatus({ code: SpanStatusCode.ERROR });
-      } else {
-        span.setStatus({ code: SpanStatusCode.OK });
-      }
-      span.setAttribute("agent.final_state", agentState);
-      span.setAttribute("agent.event_count", eventCount);
-      span.setAttribute("agent.tool_count", totalToolInvocations);
-      span.end();
-    } catch (error: any) {
-      agentState = "failed";
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: error.message,
-      });
-      span.recordException(error);
-      span.end();
+      yield* this.emitCompletion(
+        ctx,
+        span,
+        streamManager,
+        costTracker,
+        conversationId,
+      );
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      ctx.agentState = "failed";
+      ctx.hasErrored = true;
+      span.recordException(err);
 
       // Mark pending tools as failed
-      for (const [toolName, activity] of pendingToolCalls) {
+      for (const [toolName, activity] of ctx.pendingToolCalls) {
         activity.status = "failed";
         activity.endTime = Date.now();
         yield {
@@ -1099,29 +886,577 @@ export class CodeBuddyAgentService {
       this.logger.log(
         LogLevel.ERROR,
         `Stream failed for thread ${conversationId}`,
-        error,
+        err,
       );
 
-      throw error;
+      throw err;
     } finally {
+      // Centralize span finalization so it always fires exactly once
+      if (ctx.hasErrored) {
+        span.setStatus({ code: SpanStatusCode.ERROR });
+      } else {
+        span.setStatus({ code: SpanStatusCode.OK });
+      }
+      span.setAttribute("agent.final_state", ctx.agentState);
+      span.setAttribute("agent.event_count", ctx.eventCount);
+      span.setAttribute("agent.tool_count", ctx.totalToolInvocations);
+      span.end();
       this.activeStreams.delete(conversationId);
-      this.activeTools.clear();
-      // Notify guard service that agent has stopped
+      this.consentManager.clearThread(conversationId);
       const guardService = AgentRunningGuardService.getInstance();
       guardService.notifyAgentStopped();
     }
   }
 
-  private summarizeToolResult(content: any, toolName: string): string {
+  // ── Stream sub-generators ────────────────────────────────
+
+  /**
+   * Create a new stream iterator from the agent, trying `primary` input first,
+   * then `fallback` if the primary throws. Returns null if both fail.
+   */
+  private async createStreamIterator(
+    agent: IStreamableAgent,
+    primary: unknown,
+    config: Record<string, unknown>,
+    fallback?: unknown,
+  ): Promise<AgentStreamIterator | null> {
+    try {
+      const iter = (await agent.stream(primary, config))[
+        Symbol.asyncIterator
+      ]() as AgentStreamIterator;
+      this.logger.debug("[STREAM] Created new stream iterator");
+      return iter;
+    } catch (primaryError) {
+      this.logger.error(
+        `[STREAM] Primary resume failed: ${primaryError instanceof Error ? primaryError.message : primaryError}`,
+      );
+      if (fallback !== undefined) {
+        try {
+          const iter = (await agent.stream(fallback, config))[
+            Symbol.asyncIterator
+          ]() as AgentStreamIterator;
+          this.logger.debug("[STREAM] Used fallback resume format");
+          return iter;
+        } catch (fallbackError) {
+          this.logger.error(
+            `[STREAM] Fallback also failed: ${fallbackError instanceof Error ? fallbackError.message : fallbackError}`,
+          );
+        }
+      }
+      return null;
+    }
+  }
+
+  private async *handleInterrupt(
+    interruptEntry: [string, IInterruptValue | IInterruptValue[]],
+    ctx: IStreamContext,
+    agent: IStreamableAgent,
+    config: Record<string, unknown>,
+  ): AsyncGenerator<IStreamEvent, AgentStreamIterator | null> {
+    const [, interruptUpdates] = interruptEntry;
+    const interrupts = Array.isArray(interruptUpdates)
+      ? interruptUpdates
+      : [interruptUpdates];
+
+    // Process only the first interrupt — subsequent ones will be emitted
+    // in the resumed stream. Handling multiple at once would require
+    // sequential stream creation which leaks intermediate iterators.
+    const [interrupt] = interrupts;
+    if (interrupts.length > 1) {
+      this.logger.warn(
+        `[STREAM] Received ${interrupts.length} interrupts in one event — processing only first`,
+      );
+    }
+
+    const interruptId = interrupt?.value?.id ?? `interrupt-${randomUUID()}`;
+    const toolNameRaw =
+      interrupt?.value?.name || interrupt?.value?.tool || "tool";
+    const toolArgs =
+      interrupt?.value?.input ||
+      interrupt?.value?.args ||
+      interrupt?.value?.parameters;
+    const { friendlyName, summary } = this.describeToolInvocation(
+      toolNameRaw,
+      toolArgs,
+      interrupt?.value?.description,
+    );
+
+    yield {
+      type: StreamEventType.METADATA,
+      content: "interrupt_waiting",
+      metadata: {
+        threadId: ctx.conversationId,
+        status: "interrupt_waiting",
+        toolName: friendlyName,
+        description: summary,
+      },
+    };
+    yield {
+      type: StreamEventType.CHUNK,
+      content: `Approval needed for ${friendlyName}: ${summary} Waiting for your approval...`,
+      metadata: { threadId: ctx.conversationId, timestamp: Date.now() },
+    };
+
+    const granted = await this.waitForActionConsent(ctx.conversationId);
+
+    let newIterator: AgentStreamIterator | null = null;
+
+    if (granted) {
+      yield {
+        type: StreamEventType.METADATA,
+        content: "interrupt_approved",
+        metadata: {
+          threadId: ctx.conversationId,
+          status: "interrupt_approved",
+          toolName: friendlyName,
+        },
+      };
+      yield {
+        type: StreamEventType.CHUNK,
+        content: `Approval received. Continuing with ${friendlyName}...`,
+        metadata: { threadId: ctx.conversationId, timestamp: Date.now() },
+      };
+
+      this.logger.debug(
+        `[STREAM] Resuming from interrupt ${interruptId} with approval`,
+      );
+
+      const resumeCommand = new Command({ resume: "approve" });
+      const fallbackResume = { resume: { [interruptId]: "approve" } };
+      newIterator = await this.createStreamIterator(
+        agent,
+        resumeCommand,
+        config,
+        fallbackResume,
+      );
+      if (!newIterator) {
+        ctx.hasErrored = true;
+        yield {
+          type: StreamEventType.ERROR,
+          content: `Failed to resume after approval for ${friendlyName}.`,
+          metadata: {
+            threadId: ctx.conversationId,
+            toolName: friendlyName,
+          },
+        };
+      }
+    } else {
+      yield {
+        type: StreamEventType.METADATA,
+        content: "interrupt_denied",
+        metadata: {
+          threadId: ctx.conversationId,
+          status: "interrupt_denied",
+          toolName: friendlyName,
+        },
+      };
+      yield {
+        type: StreamEventType.CHUNK,
+        content: `Action denied. Skipping ${friendlyName}.`,
+        metadata: { threadId: ctx.conversationId, timestamp: Date.now() },
+      };
+
+      this.logger.debug(
+        `[STREAM] User denied interrupt ${interruptId}, resuming with deny`,
+      );
+
+      const denyCommand = new Command({ resume: "deny" });
+      const fallbackDeny = { resume: { [interruptId]: "deny" } };
+      newIterator = await this.createStreamIterator(
+        agent,
+        denyCommand,
+        config,
+        fallbackDeny,
+      );
+      if (!newIterator) {
+        ctx.hasErrored = true;
+        yield {
+          type: StreamEventType.ERROR,
+          content: `Failed to process denial for ${friendlyName}. The agent may be in an inconsistent state.`,
+          metadata: {
+            threadId: ctx.conversationId,
+            toolName: friendlyName,
+          },
+        };
+      }
+    }
+
+    return newIterator;
+  }
+
+  private async *processNodeEntries(
+    entries: [string, IAgentNodeUpdate][],
+    ctx: IStreamContext,
+    span: Span,
+    streamManager: StreamManager,
+    costTracker: CostTrackingService,
+    conversationId: string,
+    providerName: string,
+    currentModelName: string,
+    onChunk?: (chunk: IStreamEvent) => void,
+  ): AsyncGenerator<IStreamEvent> {
+    for (const [nodeName, update] of entries) {
+      if (update?.messages && Array.isArray(update.messages)) {
+        for (const message of update.messages) {
+          if (
+            message.usage_metadata &&
+            (message.usage_metadata.input_tokens ||
+              message.usage_metadata.output_tokens)
+          ) {
+            const usage = message.usage_metadata;
+            const costData = costTracker.recordUsage(
+              conversationId,
+              providerName,
+              currentModelName,
+              usage.input_tokens ?? 0,
+              usage.output_tokens ?? 0,
+            );
+            yield {
+              type: StreamEventType.METADATA,
+              content: "cost_update",
+              metadata: {
+                threadId: conversationId,
+                status: "cost_update",
+                costData,
+              },
+            };
+          }
+
+          if (message.type === "tool" || message.name) {
+            const toolName = message.name || "unknown";
+            const toolActivity = ctx.pendingToolCalls.get(toolName);
+
+            if (toolActivity) {
+              toolActivity.status = "completed";
+              toolActivity.endTime = Date.now();
+              toolActivity.result = {
+                summary: this.summarizeToolResult(message.content, toolName),
+                itemCount: this.countResultItems(message.content),
+              };
+
+              span.addEvent("tool_end", {
+                "tool.name": toolName,
+                "tool.result_summary": toolActivity.result.summary,
+                "node.name": nodeName,
+                duration_ms: toolActivity.endTime - toolActivity.startTime,
+              });
+
+              yield {
+                type: StreamEventType.TOOL_END,
+                content: JSON.stringify(toolActivity),
+                metadata: {
+                  toolName,
+                  node: nodeName,
+                  duration: toolActivity.endTime - toolActivity.startTime,
+                },
+              };
+
+              yield {
+                type: StreamEventType.WORKING,
+                content: `Finished ${this.getToolInfo(toolName).name} and processing results...`,
+                metadata: {
+                  toolName,
+                  node: nodeName,
+                  result: toolActivity.result?.summary,
+                  timestamp: Date.now(),
+                },
+              };
+
+              ctx.pendingToolCalls.delete(toolName);
+            }
+          }
+        }
+
+        const lastMessage = update.messages[update.messages.length - 1];
+        if (lastMessage?.content && lastMessage.type !== "tool") {
+          const newContent = this.contentNormalizer.normalize(
+            lastMessage.content,
+          );
+          const delta = newContent.slice(ctx.accumulatedContent.length);
+          if (delta) {
+            ctx.accumulatedContent = newContent;
+            const chunkMeta: Record<string, unknown> = { node: nodeName };
+            if (lastMessage.type) {
+              chunkMeta.messageType = lastMessage.type;
+            }
+            streamManager.addChunk(delta, chunkMeta);
+
+            const chunkEvent = {
+              type: StreamEventType.CHUNK,
+              content: delta,
+              metadata: chunkMeta,
+              accumulated: ctx.accumulatedContent,
+            };
+            yield chunkEvent;
+            onChunk?.(chunkEvent);
+          }
+        }
+      }
+
+      const toolCalls = this.collectToolCalls(update);
+      if (toolCalls.length > 0) {
+        yield* this.processToolCalls(
+          toolCalls,
+          nodeName,
+          ctx,
+          span,
+          streamManager,
+        );
+        if (ctx.hasErrored) return;
+      }
+    }
+  }
+
+  private collectToolCalls(update: IAgentNodeUpdate): IAgentToolCall[] {
+    return collectToolCallsFromUpdate(update);
+  }
+
+  private async *processToolCalls(
+    toolCalls: IAgentToolCall[],
+    nodeName: string,
+    ctx: IStreamContext,
+    span: Span,
+    streamManager: StreamManager,
+  ): AsyncGenerator<IStreamEvent> {
+    this.logger.debug(
+      `[STREAM] Tool calls detected: ${toolCalls.length} tools - ${toolCalls.map((tc) => tc.name).join(", ")}`,
+    );
+
+    const toolNameCounts = new Map<string, number>();
+    for (const tc of toolCalls) {
+      const name = this.getToolInfo(tc.name).name;
+      toolNameCounts.set(name, (toolNameCounts.get(name) || 0) + 1);
+    }
+    const toolNamesFormatted = Array.from(toolNameCounts.entries())
+      .map(([name, count]) => (count > 1 ? `${name} (x${count})` : name))
+      .join(", ");
+    yield {
+      type: StreamEventType.DECISION,
+      content: `Using: ${toolNamesFormatted}`,
+      metadata: {
+        toolCount: toolCalls.length,
+        tools: toolCalls.map((tc) => tc.name),
+        node: nodeName,
+        timestamp: Date.now(),
+      },
+    };
+
+    for (const toolCall of toolCalls) {
+      if (ctx.hasErrored) return;
+
+      const isMiddlewareNode =
+        nodeName.includes("Middleware") || nodeName.includes("before_model");
+
+      let currentCount = 0;
+      if (!isMiddlewareNode) {
+        ctx.totalToolInvocations++;
+        currentCount = ctx.toolCallCounts.get(toolCall.name) || 0;
+        ctx.toolCallCounts.set(toolCall.name, currentCount + 1);
+      }
+
+      this.logger.debug(
+        `[STREAM] Tool call: ${toolCall.name} from ${nodeName}${isMiddlewareNode ? " (middleware - not counted)" : ` (#${ctx.totalToolInvocations}, ${currentCount + 1}x for this tool)`}`,
+      );
+
+      if (!isMiddlewareNode) {
+        if (
+          (toolCall.name === "edit_file" || toolCall.name === "write_file") &&
+          toolCall.args?.file_path
+        ) {
+          const filePath = toolCall.args.file_path as string;
+          const fileLoop = this.safetyGuard.detectFileLoop(
+            filePath,
+            ctx.fileEditCounts,
+          );
+          ctx.fileEditCounts.set(filePath, fileLoop.editCount);
+          if (fileLoop.isLooping) {
+            this.logger.log(
+              LogLevel.WARN,
+              `Same file ${filePath} edited ${fileLoop.editCount} times - stopping`,
+            );
+            ctx.hasErrored = true;
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: `Infinite loop detected editing file: ${filePath}`,
+            });
+            span.setAttribute("error.reason", "file_edit_loop");
+            span.setAttribute("error.file_path", filePath);
+
+            yield {
+              type: StreamEventType.ERROR,
+              content: `I've tried to edit the same file (${filePath.split("/").pop()}) ${fileLoop.editCount} times. The edit may not be matching correctly or there's an issue with the file content. I'll stop here - please try the edit manually or check if the file content matches what I expect.`,
+              metadata: {
+                threadId: ctx.conversationId,
+                reason: "same_file_loop",
+                toolName: toolCall.name,
+                filePath,
+                fileEditCount: fileLoop.editCount,
+              },
+            };
+            return;
+          }
+        }
+
+        const loopResult = this.safetyGuard.detectToolLoop(
+          toolCall.name,
+          currentCount,
+        );
+        if (loopResult.isLooping && !loopResult.isReadOnly) {
+          this.logger.log(
+            LogLevel.WARN,
+            `Tool ${toolCall.name} called ${currentCount + 1} times (limit: ${loopResult.limit}) - loop detected`,
+          );
+          ctx.hasErrored = true;
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: `Tool loop detected for ${toolCall.name}`,
+          });
+          span.setAttribute("error.reason", "tool_loop_detected");
+          span.setAttribute("error.tool", toolCall.name);
+
+          yield {
+            type: StreamEventType.ERROR,
+            content: this.safetyGuard.buildToolLoopErrorMessage(
+              toolCall.name,
+              currentCount + 1,
+            ),
+            metadata: {
+              threadId: ctx.conversationId,
+              reason: "tool_loop_detected",
+              toolName: toolCall.name,
+              callCount: currentCount + 1,
+              limit: loopResult.limit,
+            },
+          };
+          return;
+        } else if (loopResult.isLooping && loopResult.isReadOnly) {
+          this.logger.debug(
+            `[STREAM] Read-only tool ${toolCall.name} called ${currentCount + 1} times - allowing`,
+          );
+        }
+      }
+
+      const toolActivity = this.createToolActivity(
+        toolCall.name,
+        toolCall.args,
+      );
+      toolActivity.status = "running";
+      ctx.pendingToolCalls.set(toolCall.name, toolActivity);
+
+      span.addEvent("tool_start", {
+        "tool.name": toolCall.name,
+        "tool.args": JSON.stringify(toolCall.args),
+        "node.name": nodeName,
+        is_middleware: isMiddlewareNode,
+      });
+
+      streamManager.addToolEvent(toolCall.name, true, toolCall);
+
+      yield {
+        type: StreamEventType.TOOL_START,
+        content: JSON.stringify({ ...toolActivity, args: toolCall.args }),
+        metadata: {
+          toolName: toolCall.name,
+          node: nodeName,
+          toolId: toolActivity.id,
+        },
+      };
+
+      if (toolCall.name === "think") {
+        yield {
+          type: StreamEventType.THINKING_START,
+          content: toolActivity.description,
+          metadata: {
+            toolName: toolCall.name,
+            node: nodeName,
+            toolId: toolActivity.id,
+            activityType: this.getToolInfo(toolCall.name).activityType,
+            timestamp: Date.now(),
+          },
+        };
+      } else {
+        yield {
+          type: this.getActivityEventType(toolCall.name),
+          content: toolActivity.description,
+          metadata: {
+            toolName: toolCall.name,
+            node: nodeName,
+            toolId: toolActivity.id,
+            activityType: this.getToolInfo(toolCall.name).activityType,
+            timestamp: Date.now(),
+          },
+        };
+      }
+    }
+  }
+
+  private async *emitCompletion(
+    ctx: IStreamContext,
+    span: Span,
+    streamManager: StreamManager,
+    costTracker: CostTrackingService,
+    conversationId: string,
+  ): AsyncGenerator<IStreamEvent> {
+    if (ctx.hasErrored) {
+      streamManager.endStream();
+      return;
+    }
+
+    for (const [toolName, activity] of ctx.pendingToolCalls) {
+      activity.status = "completed";
+      activity.endTime = Date.now();
+      yield {
+        type: StreamEventType.TOOL_END,
+        content: JSON.stringify(activity),
+        metadata: {
+          toolName,
+          duration: activity.endTime - activity.startTime,
+        },
+      };
+      if (toolName === "think") {
+        yield {
+          type: StreamEventType.THINKING_END,
+          content: activity.description,
+          metadata: { toolName, timestamp: Date.now() },
+        };
+      }
+    }
+
+    if (ctx.accumulatedContent) {
+      yield {
+        type: StreamEventType.SUMMARIZING,
+        content: ctx.forceStopReason
+          ? "Preparing partial response (stopped early for safety)..."
+          : "Preparing response...",
+        metadata: { threadId: conversationId, timestamp: Date.now() },
+      };
+      ctx.agentState = "summarizing";
+    }
+
+    streamManager.endStream(ctx.accumulatedContent);
+
+    const finalCost = costTracker.getConversationCost(conversationId);
+    yield {
+      type: StreamEventType.END,
+      content: ctx.accumulatedContent,
+      metadata: {
+        threadId: conversationId,
+        forceStopReason: ctx.forceStopReason,
+        state: ctx.forceStopReason ? "completed_with_warning" : "completed",
+        costData: finalCost ?? undefined,
+      },
+    };
+    ctx.agentState = "completed";
+  }
+
+  private summarizeToolResult(content: unknown, toolName: string): string {
     if (!content) return "Completed";
 
-    const contentStr =
-      typeof content === "string" ? content : JSON.stringify(content);
-
-    // Use synthesizer for web search results
+    // Handle web_search via synthesizer (requires `this`)
     if (toolName === "web_search") {
+      const contentStr =
+        typeof content === "string" ? content : JSON.stringify(content);
       try {
-        // Try to parse as search response
         const parsed =
           typeof content === "string" ? JSON.parse(content) : content;
         if (parsed?.results) {
@@ -1131,7 +1466,6 @@ export class CodeBuddyAgentService {
             : result.summary;
         }
       } catch {
-        // Fall back to regex extraction
         const resultMatch = contentStr.match(/Found (\d+) results/);
         if (resultMatch) {
           return `Found ${resultMatch[1]} search results`;
@@ -1140,13 +1474,10 @@ export class CodeBuddyAgentService {
       return "Search completed";
     }
 
-    if (toolName === "read_file") {
-      const lines = contentStr.split("\n").length;
-      return `Read ${lines} lines`;
-    }
-
+    // Handle analyze_files_for_question (extracts first sentence insight)
     if (toolName === "analyze_files_for_question") {
-      // Extract key insight from analysis
+      const contentStr =
+        typeof content === "string" ? content : JSON.stringify(content);
       const firstSentence = contentStr.match(/^[^.!?]+[.!?]/)?.[0];
       if (
         firstSentence &&
@@ -1158,19 +1489,11 @@ export class CodeBuddyAgentService {
       return "Code analysis complete";
     }
 
-    if (toolName === "search_codebase") {
-      const matchCount = (contentStr.match(/match/gi) || []).length;
-      return matchCount > 0 ? `Found ${matchCount} matches` : "Search complete";
-    }
-
-    if (contentStr.length > 100) {
-      return `Processed ${Math.ceil(contentStr.length / 1000)}KB of data`;
-    }
-
-    return "Completed successfully";
+    // Delegate all other tools to the exported pure function
+    return summarizeToolResultContent(content, toolName);
   }
 
-  private countResultItems(content: any): number | undefined {
+  private countResultItems(content: unknown): number | undefined {
     if (!content) return undefined;
 
     const contentStr =
@@ -1195,125 +1518,37 @@ export class CodeBuddyAgentService {
     return undefined;
   }
 
-  // Convert various message content shapes into plain text.
-  // Handles: string, array of content blocks, single object with `text` or `content`.
-  // Filters out tool_use blocks that shouldn't be displayed to users.
-  private normalizeMessageContent(content: any): string {
-    if (content == null) return "";
-    if (typeof content === "string") {
-      // Filter out JSON tool_use blocks that may appear in string content
-      return this.filterToolUseFromString(content);
-    }
-
-    // Array of blocks (e.g., [{type:'text', text: '...'}, ...])
-    if (Array.isArray(content)) {
-      return content
-        .map((item) => {
-          if (item == null) return "";
-          if (typeof item === "string")
-            return this.filterToolUseFromString(item);
-          if (typeof item === "object") {
-            // Skip tool_use blocks entirely - these are internal
-            if (item.type === "tool_use") return "";
-            if (item.type === "tool_result") return "";
-            if (typeof item.text === "string") return item.text;
-            if (typeof item.content === "string") return item.content;
-            // Skip unknown tool-related objects
-            if (item.name && item.input) return "";
-            return "";
-          }
-          return String(item);
-        })
-        .filter(Boolean)
-        .join("");
-    }
-
-    if (typeof content === "object") {
-      // Skip tool_use objects
-      if (content.type === "tool_use") return "";
-      if (content.type === "tool_result") return "";
-      if (typeof content.text === "string") return content.text;
-      if (typeof content.content === "string") return content.content;
-      return "";
-    }
-
-    return String(content);
-  }
-
-  // Remove embedded JSON tool_use blocks from string content
-  private filterToolUseFromString(text: string): string {
-    if (!text) return "";
-
-    let cleaned = text;
-
-    // Remove JSON objects that look like tool_use blocks
-    // Pattern matches {"type":"tool_use",...} objects
-    const toolUsePattern =
-      /\{"type"\s*:\s*"tool_use"[^}]*"input"\s*:\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\}\s*\}/g;
-    cleaned = cleaned.replace(toolUsePattern, "");
-
-    // Remove tool_call objects: {"name":"...", "args":{...}, "type":"tool_call"...}
-    const toolCallPattern =
-      /\{"name"\s*:\s*"[^"]+"\s*,\s*"args"\s*:\s*\{[^}]*\}[^}]*\}/g;
-    cleaned = cleaned.replace(toolCallPattern, "");
-
-    // Remove command objects: {"command":"user-input",...}
-    const commandPattern =
-      /\{"command"\s*:\s*"[^"]+"\s*,\s*"message"\s*:\s*"[^"]*"[^}]*\}/g;
-    cleaned = cleaned.replace(commandPattern, "");
-
-    // Remove any remaining partial JSON that starts with tool_use or tool_call patterns
-    cleaned = cleaned.replace(/\{"type"\s*:\s*"tool_use"[\s\S]*$/g, "");
-    cleaned = cleaned.replace(/\{"type"\s*:\s*"tool_call"[\s\S]*$/g, "");
-    cleaned = cleaned.replace(
-      /\{"name"\s*:\s*"[^"]+"\s*,\s*"args"[\s\S]*$/g,
-      "",
-    );
-    cleaned = cleaned.replace(/\{"command"\s*:\s*"user-input"[\s\S]*$/g, "");
-
-    // Aggressive cleanup: remove consecutive JSON objects that start with {" and end with }
-    // This catches concatenated tool call JSON that wasn't matched by specific patterns
-    cleaned = cleaned.replace(/(\{"[^"]+"\s*:[^}]+\})+(?=\{"|$)/g, (match) => {
-      // Only remove if it looks like tool/command metadata, not actual content
-      if (
-        match.includes('"type":"tool') ||
-        match.includes('"name":"') ||
-        match.includes('"command":"') ||
-        match.includes('"args":') ||
-        match.includes('"id":"toolu_')
-      ) {
-        return "";
-      }
-      return match;
-    });
-
-    // Clean up multiple newlines left behind
-    cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
-
-    return cleaned.trim();
-  }
-
   async processUserQuery(
     userInput: string,
-    onChunk: (chunk: any) => void,
+    onChunk: (chunk: IStreamEvent) => void,
     onComplete: (finalContent: string) => void,
     onError: (error: Error) => void,
     threadId?: string,
   ) {
+    let finalContent = "";
+
     try {
-      let finalContent = "";
       for await (const chunk of this.streamResponse(
         userInput,
         threadId,
         onChunk,
       )) {
+        if (chunk.type === StreamEventType.ERROR) {
+          onError(new Error(chunk.content));
+          if (threadId) this.cancelStream(threadId);
+          break;
+        }
         if (chunk.type === StreamEventType.END) {
           finalContent = chunk.content;
+          break;
         }
       }
+    } catch (error) {
+      onError(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      // Always call onComplete so callers can reset loading states, etc.
+      // Callers can check if content is empty to distinguish error from success.
       onComplete(finalContent);
-    } catch (error: any) {
-      onError(error);
     }
   }
 
@@ -1322,7 +1557,58 @@ export class CodeBuddyAgentService {
     if (streamManager && streamManager.isActive()) {
       streamManager.endStream();
       this.activeStreams.delete(threadId);
+      this.consentManager.clearThread(threadId);
       this.logger.log(LogLevel.INFO, `Stream cancelled for thread ${threadId}`);
     }
+  }
+
+  async dispose(): Promise<void> {
+    if (this.disposed) return;
+    this.disposed = true;
+
+    // End all active streams and clear consent waiters
+    for (const [threadId, streamManager] of this.activeStreams) {
+      if (streamManager.isActive()) {
+        streamManager.endStream();
+      }
+      this.consentManager.clearThread(threadId);
+    }
+    this.activeStreams.clear();
+
+    // Clear cached agents
+    this.agentCache.clear();
+    this.warnedUnknownTools.clear();
+
+    // Unsubscribe from model-change events
+    this.modelChangeDisposable.dispose();
+
+    // Wait for pending initialization before closing, to avoid race condition
+    // where dispose() is called while initCheckpointer() is still running
+    const checkpointerToClose =
+      this.checkpointer ??
+      (this.checkpointerPromise
+        ? await this.checkpointerPromise.catch(() => null)
+        : null);
+
+    this.checkpointerPromise = null;
+
+    // Close the SQLite handle if it was opened
+    if (
+      checkpointerToClose &&
+      typeof (checkpointerToClose as unknown as Record<string, unknown>)
+        .close === "function"
+    ) {
+      try {
+        (checkpointerToClose as unknown as { close(): void }).close();
+      } catch (e) {
+        this.logger.warn("Failed to close checkpointer", e);
+      }
+    }
+    this.checkpointer = null;
+
+    // Do NOT null the singleton — let the next getInstance() check `.disposed`
+    // This avoids a race where concurrent getInstance() calls could create duplicates
+
+    this.logger.log(LogLevel.INFO, "CodeBuddyAgentService disposed");
   }
 }

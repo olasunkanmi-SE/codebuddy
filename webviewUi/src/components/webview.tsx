@@ -199,8 +199,8 @@ export const WebviewUI = () => {
   }, []);
 
   const handleApproveAction = useCallback(() => {
-    vsCode.postMessage({ command: "user-consent", message: "granted" });
-  }, []);
+    vsCode.postMessage({ command: "user-consent", message: "granted", threadId: pendingApproval?.threadId });
+  }, [pendingApproval]);
 
   const handleStop = useCallback(() => {
     cancelCurrentRequest();
@@ -458,7 +458,7 @@ export const WebviewUI = () => {
                           isActive={isStreaming || isBotLoading}
                           pendingApproval={pendingApproval}
                           onApprove={handleApproveAction}
-                          onDeny={() => vsCode.postMessage({ command: "user-consent", message: "denied" })}
+                          onDeny={() => vsCode.postMessage({ command: "user-consent", message: "denied", threadId: pendingApproval?.threadId })}
                           isLive
                         />
                       )}

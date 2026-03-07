@@ -131,6 +131,7 @@ interface IStreamMetadata {
   toolName?: string;
   timestamp?: number;
   tokens?: number;
+  [key: string]: unknown;
 }
 
 export interface IStreamChunk {
@@ -159,4 +160,88 @@ export interface IStreamOptions {
   maxBufferSize: number;
   flushInterval: number;
   enableBackPressure: boolean;
+}
+
+// ─── Domain Types for Agent Stream Processing ───────────────
+
+/** A tool call extracted from agent stream events (LangChain, Anthropic, or legacy). */
+export interface IAgentToolCall {
+  name: string;
+  args: Record<string, unknown>;
+  id?: string;
+}
+
+/** Structured content block from an LLM message. */
+export interface IContentBlock {
+  type: string;
+  text?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  id?: string;
+}
+
+/** Token / cost usage metadata attached to AI messages. */
+export interface IUsageMetadata {
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+}
+
+/** An agent message extracted from a stream event update. */
+export interface IAgentMessage {
+  type?: "human" | "ai" | "tool" | string;
+  content: string | IContentBlock[];
+  tool_calls?: IAgentToolCall[];
+  usage_metadata?: IUsageMetadata;
+  name?: string;
+  additional_kwargs?: Record<string, unknown>;
+}
+
+/** A single node update from the agent stream (entry of the event object). */
+export interface IAgentNodeUpdate {
+  messages?: IAgentMessage[];
+  toolCalls?: IAgentToolCall[];
+}
+
+/** Mutable state scoped to a single stream invocation. */
+export interface IStreamContext {
+  conversationId: string;
+  pendingToolCalls: Map<string, IToolActivity>;
+  toolCallCounts: Map<string, number>;
+  fileEditCounts: Map<string, number>;
+  accumulatedContent: string;
+  eventCount: number;
+  totalToolInvocations: number;
+  startTime: number;
+  hasErrored: boolean;
+  forceStopReason: "max_events" | "max_tools" | "timeout" | null;
+  agentState: "planning" | "running" | "summarizing" | "completed" | "failed";
+}
+
+/** Tool description registry entry. */
+export interface IToolDescription {
+  name: string;
+  description: string;
+  activityType: string;
+}
+
+/** An interrupt payload from a LangGraph agent stream. */
+export interface IInterruptValue {
+  value?: {
+    id?: string;
+    name?: string;
+    tool?: string;
+    input?: Record<string, unknown>;
+    args?: Record<string, unknown>;
+    parameters?: Record<string, unknown>;
+    description?: string;
+  };
+}
+
+/** Minimal contract for a compiled LangGraph agent that supports streaming. */
+export interface IStreamableAgent {
+  stream(
+    input: unknown,
+    config: Record<string, unknown>,
+  ): Promise<AsyncIterable<unknown>>;
 }

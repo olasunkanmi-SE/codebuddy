@@ -15,14 +15,10 @@ import {
 } from "deepagents";
 import { StructuredTool } from "langchain";
 import * as vscode from "vscode";
-import { IEventPayload } from "../../emitter/interface";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
-import { Memory } from "../../memory/base";
-import { Orchestrator } from "../../orchestrator";
 import { ProjectRulesService } from "../../services/project-rules.service";
 import { MemoryTool } from "../../tools/memory";
 import { SkillManager } from "../../services/skill-manager";
-import { getAPIKeyAndModel } from "../../utils/utils";
 import { createVscodeFsBackendFactory } from "../backends/filesystem";
 import {
   ICodeBuddyAgentConfig,
@@ -31,6 +27,7 @@ import {
 import { ToolProvider } from "../langgraph/tools/provider";
 import { DEVELOPER_SYSTEM_PROMPT } from "./prompts";
 import { createDeveloperSubagents } from "./subagents";
+import { getAPIKeyAndModel, getGenerativeAiModel } from "../../utils/utils";
 
 const execFileAsync = promisify(execFile);
 
@@ -44,11 +41,7 @@ export class DeveloperAgent {
     | undefined;
   private tools: StructuredTool[];
   private readonly logger: Logger;
-  private readonly disposables: vscode.Disposable[] = [];
-  protected readonly orchestrator: Orchestrator;
-
   constructor(config: ICodeBuddyAgentConfig = {}) {
-    this.orchestrator = Orchestrator.getInstance();
     this.config = config;
     ToolProvider.initialize();
     // Tools will be loaded asynchronously in create()
@@ -60,83 +53,6 @@ export class DeveloperAgent {
       enableFile: true,
       enableTelemetry: true,
     });
-    this.disposables.push(
-      this.orchestrator.onModelChangeSuccess(this.handleModelChange.bind(this)),
-    );
-  }
-
-  private handleModelChange(event: IEventPayload) {
-    try {
-      if (!event.message) {
-        return;
-      }
-      const msg = JSON.parse(event.message);
-      const model = msg.modelName;
-      this.getAIConfigFromWebProvider(model);
-    } catch (error) {
-      // Ignore model change errors
-    }
-  }
-
-  private getAIConfigFromWebProvider(model: string) {
-    const apiKeyAndModel = getAPIKeyAndModel(model.toLowerCase());
-    let currentModel:
-      | ChatAnthropic
-      | ChatGroq
-      | ChatOpenAI
-      | ChatGoogleGenerativeAI
-      | undefined;
-    switch (model.toLowerCase()) {
-      case "anthropic":
-        currentModel = new ChatAnthropic({
-          apiKey: apiKeyAndModel.apiKey,
-          model: apiKeyAndModel.model!,
-        });
-        break;
-      case "groq":
-        currentModel = new ChatGroq({
-          apiKey: apiKeyAndModel.apiKey,
-          model: apiKeyAndModel.model!,
-        });
-        break;
-      case "gemini":
-        currentModel = new ChatGoogleGenerativeAI({
-          apiKey: apiKeyAndModel.apiKey,
-          model: apiKeyAndModel.model!,
-        });
-        break;
-      case "local":
-        // Use ChatOpenAI with Ollama's OpenAI-compatible endpoint
-        currentModel = new ChatOpenAI({
-          apiKey: apiKeyAndModel.apiKey || "not-needed",
-          model: apiKeyAndModel.model || "qwen2.5-coder",
-          configuration: {
-            baseURL: apiKeyAndModel.baseUrl || "http://localhost:11434/v1",
-          },
-        });
-        break;
-      case "openai":
-        currentModel = new ChatOpenAI({
-          apiKey: apiKeyAndModel.apiKey,
-          model: apiKeyAndModel.model!,
-        });
-        break;
-      case "qwen":
-      case "glm":
-      case "deepseek":
-        currentModel = new ChatOpenAI({
-          apiKey: apiKeyAndModel.apiKey,
-          model: apiKeyAndModel.model!,
-          configuration: {
-            baseURL: apiKeyAndModel.baseUrl,
-          },
-        });
-        break;
-      default:
-        break;
-    }
-    this.model = currentModel;
-    Memory.set("agentModel", currentModel);
   }
 
   /**
@@ -239,6 +155,91 @@ export class DeveloperAgent {
   }
 
   /**
+   * Creates the appropriate LangChain chat model based on current settings.
+   * @returns The LangChain model instance or undefined if configuration is invalid.
+   */
+  private createChatModel():
+    | ChatAnthropic
+    | ChatGroq
+    | ChatOpenAI
+    | ChatGoogleGenerativeAI
+    | undefined {
+    const provider = getGenerativeAiModel()?.toLowerCase();
+    if (!provider) {
+      this.logger.warn("No generative AI provider selected in settings");
+      return undefined;
+    }
+
+    try {
+      const { apiKey, model: modelName, baseUrl } = getAPIKeyAndModel(provider);
+      if (!apiKey) {
+        this.logger.warn(`No API key found for provider: ${provider}`);
+        return undefined;
+      }
+
+      switch (provider) {
+        case "anthropic":
+          return new ChatAnthropic({
+            anthropicApiKey: apiKey,
+            modelName: modelName || "claude-sonnet-4-20250514",
+          });
+        case "openai":
+          return new ChatOpenAI({
+            openAIApiKey: apiKey,
+            modelName: modelName || "gpt-4o",
+            configuration: baseUrl ? { baseURL: baseUrl } : undefined,
+          });
+        case "groq":
+          return new ChatGroq({
+            apiKey,
+            model: modelName || "llama-3.3-70b-versatile",
+          });
+        case "gemini":
+          return new ChatGoogleGenerativeAI({
+            apiKey,
+            model: modelName || "gemini-2.0-flash",
+          });
+        case "deepseek":
+          return new ChatOpenAI({
+            openAIApiKey: apiKey,
+            modelName: modelName || "deepseek-chat",
+            configuration: { baseURL: baseUrl || "https://api.deepseek.com" },
+          });
+        case "qwen":
+          return new ChatOpenAI({
+            openAIApiKey: apiKey,
+            modelName: modelName || "qwen-plus",
+            configuration: {
+              baseURL:
+                baseUrl ||
+                "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+            },
+          });
+        case "glm":
+          return new ChatOpenAI({
+            openAIApiKey: apiKey,
+            modelName: modelName || "glm-4-plus",
+            configuration: {
+              baseURL: baseUrl || "https://open.bigmodel.cn/api/paas/v4",
+            },
+          });
+        case "local":
+          return new ChatOpenAI({
+            openAIApiKey: apiKey || "not-needed",
+            modelName: modelName || "local-model",
+            configuration: { baseURL: baseUrl || "http://localhost:11434/v1" },
+          });
+        default:
+          this.logger.warn(`Unsupported provider: ${provider}`);
+          return undefined;
+      }
+    } catch (error) {
+      this.logger.error(`Failed to create chat model for ${provider}`, error);
+      return undefined;
+    }
+  }
+
+  /**
    * Configures Human-in-the-loop interrupts
    * Only delete operations require user approval - writes and edits proceed automatically
    */
@@ -258,20 +259,18 @@ export class DeveloperAgent {
    * Main entry point to build and return the agent runnable
    */
   public async create() {
-    const cachedModel = Memory.get("agentModel");
-    if (!this.model && !cachedModel) {
+    // Create the model from current settings if not already set
+    if (!this.model) {
+      this.model = this.createChatModel();
+    }
+
+    if (!this.model) {
       this.logger.error("Error creating DeveloperAgent: No model found");
       vscode.window.showWarningMessage(
         "Please make sure that you have selected a valid model with correct API key in the settings.",
       );
       throw new Error("Error creating DeveloperAgent: No model found");
     }
-
-    this.model = cachedModel as
-      | ChatAnthropic
-      | ChatGroq
-      | ChatOpenAI
-      | ChatGoogleGenerativeAI;
     const { store, enableSubAgents = true, checkPointer } = this.config;
 
     // Ensure MCP tools are loaded before creating the agent

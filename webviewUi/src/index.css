@@ -26,9 +26,7 @@ body {
 
 body {
   margin: 0;
-  background: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.08), transparent 35%),
-    radial-gradient(circle at 80% 0%, rgba(16, 185, 129, 0.08), transparent 30%),
-    var(--vscode-editor-background);
+  background: var(--vscode-editor-background);
 }
 
 #root {

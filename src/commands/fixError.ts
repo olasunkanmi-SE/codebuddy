@@ -38,6 +38,7 @@ export class FixError extends CodeCommandHandler {
       async (progress, token) => {
         try {
           const agentService = CodeBuddyAgentService.getInstance();
+          const threadId = `fix-error-${Date.now()}`;
 
           // Check for active debug session
           const activeSession = vscode.debug.activeDebugSession;
@@ -74,8 +75,12 @@ Instructions:
           let agentResponse = "";
 
           // Run the agent via the production streaming service
-          for await (const event of agentService.streamResponse(prompt)) {
+          for await (const event of agentService.streamResponse(
+            prompt,
+            threadId,
+          )) {
             if (token.isCancellationRequested) {
+              agentService.cancelStream(threadId);
               logger.info("Auto-fix cancelled by user");
               return;
             }

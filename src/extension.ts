@@ -48,6 +48,8 @@ import {
 import { AstIndexingService } from "./services/ast-indexing.service";
 import { DiffReviewService } from "./services/diff-review.service";
 import { SecretStorageService } from "./services/secret-storage";
+import { WebViewProviderManager } from "./webview-providers/manager";
+import { CodeBuddyAgentService } from "./agents/services/codebuddy-agent.service";
 import { NotificationService } from "./services/notification.service";
 import { SqliteVectorStore } from "./services/sqlite-vector-store";
 import { StandupService } from "./services/standup.service";
@@ -1103,10 +1105,10 @@ export function deactivate(context: vscode.ExtensionContext) {
   agentGuard.dispose();
 
   // Dispose provider manager
-  import("./webview-providers/manager").then(({ WebViewProviderManager }) => {
-    const providerManager = WebViewProviderManager.getInstance(context);
-    providerManager.dispose();
-  });
+  WebViewProviderManager.getInstance(context).dispose();
+
+  // Dispose agent service (clears caches, ends streams, unsubscribes events)
+  CodeBuddyAgentService.getInstance().dispose();
 
   context.subscriptions.forEach((subscription) => subscription.dispose());
 
