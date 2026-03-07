@@ -266,15 +266,14 @@ export class ResearchNotesExtractor {
     this.extractionInProgress = true;
     this.lastExtractionTime = now;
 
-    if (!this.shouldExtract(userQuery, aiResponse)) {
-      this.logger.debug(
-        "Response too short or code-only — skipping extraction",
-      );
-      this.extractionInProgress = false;
-      return;
-    }
-
     try {
+      if (!this.shouldExtract(userQuery, aiResponse)) {
+        this.logger.debug(
+          "Response too short or code-only — skipping extraction",
+        );
+        return;
+      }
+
       const notes = await this.extractNotes(userQuery, aiResponse);
       if (notes.length === 0) {
         this.logger.debug("No extractable research notes found");
@@ -324,6 +323,7 @@ export class ResearchNotesExtractor {
       // Never let extraction failures affect the user experience
       this.logger.warn("Research notes extraction failed", error);
     } finally {
+      // Guarantee mutex release on all exit paths (early returns, success, or error)
       this.extractionInProgress = false;
     }
   }

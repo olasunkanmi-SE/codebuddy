@@ -117,12 +117,22 @@ export class ContentNormalizer {
       .trim();
   }
 
+  /** Maximum characters to scan when looking for balanced JSON brackets. */
+  private static readonly MAX_JSON_SCAN_CHARS = 10_000;
+
   private extractBalancedJson(text: string, start: number): string | null {
     if (text[start] !== "{") return null;
+
+    // Cap the scan window to prevent slow scans on large LLM outputs
+    const scanEnd = Math.min(
+      text.length,
+      start + ContentNormalizer.MAX_JSON_SCAN_CHARS,
+    );
     let depth = 0;
     let inString = false;
     let escape = false;
-    for (let i = start; i < text.length; i++) {
+
+    for (let i = start; i < scanEnd; i++) {
       const ch = text[i];
       if (escape) {
         escape = false;
@@ -143,6 +153,7 @@ export class ContentNormalizer {
         if (depth === 0) return text.slice(start, i + 1);
       }
     }
+    // Truncated or unbalanced — treat as not found
     return null;
   }
 

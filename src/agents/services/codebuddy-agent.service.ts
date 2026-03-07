@@ -255,6 +255,7 @@ export class CodeBuddyAgentService {
   private readonly contentNormalizer: ContentNormalizer;
   private readonly modelChangeDisposable: { dispose(): void };
   private static readonly MAX_WARNED_TOOLS = 100;
+  private static readonly MAX_CACHED_AGENTS = 3;
   private readonly warnedUnknownTools = new Set<string>();
 
   constructor() {
@@ -527,6 +528,7 @@ export class CodeBuddyAgentService {
       );
     }
     if (!this.agentCache.has(cacheKey)) {
+      this.evictAgentCacheIfNeeded();
       const checkpointer = await this.getCheckpointer();
       const agent = await createAdvancedDeveloperAgent({
         checkPointer: checkpointer,
@@ -537,6 +539,22 @@ export class CodeBuddyAgentService {
       this.logger.log(LogLevel.INFO, `Agent initialized (key: ${cacheKey})`);
     }
     return this.agentCache.get(cacheKey)!;
+  }
+
+  /**
+   * Evict the oldest agent from cache if at capacity.
+   * Map preserves insertion order, so the first key is the oldest.
+   */
+  private evictAgentCacheIfNeeded(): void {
+    if (this.agentCache.size < CodeBuddyAgentService.MAX_CACHED_AGENTS) return;
+    const oldestKey = this.agentCache.keys().next().value;
+    if (oldestKey) {
+      this.agentCache.delete(oldestKey);
+      this.logger.log(
+        LogLevel.DEBUG,
+        `Evicted agent cache entry: ${oldestKey} (cache at max ${CodeBuddyAgentService.MAX_CACHED_AGENTS})`,
+      );
+    }
   }
 
   /**
@@ -752,8 +770,9 @@ export class CodeBuddyAgentService {
             };
 
             this.safetyGuard.extendLimits(ctx);
+            Object.assign(ctx, this.safetyGuard.buildLimitReset());
             this.logger.debug(
-              `[STREAM] User approved limit extension for thread ${conversationId}`,
+              `[STREAM] Limits extended for thread ${conversationId}: counters reset`,
             );
             continue;
           }
@@ -939,118 +958,126 @@ export class CodeBuddyAgentService {
       ? interruptUpdates
       : [interruptUpdates];
 
+    // Process only the first interrupt — subsequent ones will be emitted
+    // in the resumed stream. Handling multiple at once would require
+    // sequential stream creation which leaks intermediate iterators.
+    const [interrupt] = interrupts;
+    if (interrupts.length > 1) {
+      this.logger.warn(
+        `[STREAM] Received ${interrupts.length} interrupts in one event — processing only first`,
+      );
+    }
+
+    const interruptId = interrupt?.value?.id ?? `interrupt-${randomUUID()}`;
+    const toolNameRaw =
+      interrupt?.value?.name || interrupt?.value?.tool || "tool";
+    const toolArgs =
+      interrupt?.value?.input ||
+      interrupt?.value?.args ||
+      interrupt?.value?.parameters;
+    const { friendlyName, summary } = this.describeToolInvocation(
+      toolNameRaw,
+      toolArgs,
+      interrupt?.value?.description,
+    );
+
+    yield {
+      type: StreamEventType.METADATA,
+      content: "interrupt_waiting",
+      metadata: {
+        threadId: ctx.conversationId,
+        status: "interrupt_waiting",
+        toolName: friendlyName,
+        description: summary,
+      },
+    };
+    yield {
+      type: StreamEventType.CHUNK,
+      content: `Approval needed for ${friendlyName}: ${summary} Waiting for your approval...`,
+      metadata: { threadId: ctx.conversationId, timestamp: Date.now() },
+    };
+
+    const granted = await this.waitForActionConsent(ctx.conversationId);
+
     let newIterator: AgentStreamIterator | null = null;
 
-    for (const interrupt of interrupts) {
-      const interruptId = interrupt?.value?.id ?? `interrupt-${randomUUID()}`;
-      const toolNameRaw =
-        interrupt?.value?.name || interrupt?.value?.tool || "tool";
-      const toolArgs =
-        interrupt?.value?.input ||
-        interrupt?.value?.args ||
-        interrupt?.value?.parameters;
-      const { friendlyName, summary } = this.describeToolInvocation(
-        toolNameRaw,
-        toolArgs,
-        interrupt?.value?.description,
-      );
-
+    if (granted) {
       yield {
         type: StreamEventType.METADATA,
-        content: "interrupt_waiting",
+        content: "interrupt_approved",
         metadata: {
           threadId: ctx.conversationId,
-          status: "interrupt_waiting",
+          status: "interrupt_approved",
           toolName: friendlyName,
-          description: summary,
         },
       };
       yield {
         type: StreamEventType.CHUNK,
-        content: `Approval needed for ${friendlyName}: ${summary} Waiting for your approval...`,
+        content: `Approval received. Continuing with ${friendlyName}...`,
         metadata: { threadId: ctx.conversationId, timestamp: Date.now() },
       };
 
-      const granted = await this.waitForActionConsent(ctx.conversationId);
+      this.logger.debug(
+        `[STREAM] Resuming from interrupt ${interruptId} with approval`,
+      );
 
-      if (granted) {
+      const resumeCommand = new Command({ resume: "approve" });
+      const fallbackResume = { resume: { [interruptId]: "approve" } };
+      newIterator = await this.createStreamIterator(
+        agent,
+        resumeCommand,
+        config,
+        fallbackResume,
+      );
+      if (!newIterator) {
+        ctx.hasErrored = true;
         yield {
-          type: StreamEventType.METADATA,
-          content: "interrupt_approved",
+          type: StreamEventType.ERROR,
+          content: `Failed to resume after approval for ${friendlyName}.`,
           metadata: {
             threadId: ctx.conversationId,
-            status: "interrupt_approved",
             toolName: friendlyName,
           },
         };
-        yield {
-          type: StreamEventType.CHUNK,
-          content: `Approval received. Continuing with ${friendlyName}...`,
-          metadata: { threadId: ctx.conversationId, timestamp: Date.now() },
-        };
+      }
+    } else {
+      yield {
+        type: StreamEventType.METADATA,
+        content: "interrupt_denied",
+        metadata: {
+          threadId: ctx.conversationId,
+          status: "interrupt_denied",
+          toolName: friendlyName,
+        },
+      };
+      yield {
+        type: StreamEventType.CHUNK,
+        content: `Action denied. Skipping ${friendlyName}.`,
+        metadata: { threadId: ctx.conversationId, timestamp: Date.now() },
+      };
 
-        this.logger.debug(
-          `[STREAM] Resuming from interrupt ${interruptId} with approval`,
-        );
+      this.logger.debug(
+        `[STREAM] User denied interrupt ${interruptId}, resuming with deny`,
+      );
 
-        const resumeCommand = new Command({ resume: "approve" });
-        const fallbackResume = { resume: { [interruptId]: "approve" } };
-        newIterator = await this.createStreamIterator(
-          agent,
-          resumeCommand,
-          config,
-          fallbackResume,
-        );
-        if (!newIterator) {
-          ctx.hasErrored = true;
-          yield {
-            type: StreamEventType.ERROR,
-            content: `Failed to resume after approval for ${friendlyName}.`,
-            metadata: {
-              threadId: ctx.conversationId,
-              toolName: friendlyName,
-            },
-          };
-        }
-      } else {
+      const denyCommand = new Command({ resume: "deny" });
+      const fallbackDeny = { resume: { [interruptId]: "deny" } };
+      newIterator = await this.createStreamIterator(
+        agent,
+        denyCommand,
+        config,
+        fallbackDeny,
+      );
+      if (!newIterator) {
+        ctx.hasErrored = true;
         yield {
-          type: StreamEventType.METADATA,
-          content: "interrupt_denied",
+          type: StreamEventType.ERROR,
+          content: `Failed to process denial for ${friendlyName}. The agent may be in an inconsistent state.`,
           metadata: {
             threadId: ctx.conversationId,
-            status: "interrupt_denied",
             toolName: friendlyName,
           },
         };
-        yield {
-          type: StreamEventType.CHUNK,
-          content: `Action denied. Skipping ${friendlyName}.`,
-          metadata: { threadId: ctx.conversationId, timestamp: Date.now() },
-        };
-
-        this.logger.debug(
-          `[STREAM] User denied interrupt ${interruptId}, resuming with deny`,
-        );
-
-        const denyCommand = new Command({ resume: "deny" });
-        const fallbackDeny = { resume: { [interruptId]: "deny" } };
-        newIterator = await this.createStreamIterator(
-          agent,
-          denyCommand,
-          config,
-          fallbackDeny,
-        );
-        if (!newIterator) {
-          ctx.hasErrored = true;
-          yield {
-            type: StreamEventType.ERROR,
-            content: `Failed to process denial for ${friendlyName}. The agent may be in an inconsistent state.`,
-            metadata: {
-              threadId: ctx.conversationId,
-              toolName: friendlyName,
-            },
-          };
-        }
       }
     }
 
@@ -1535,7 +1562,7 @@ export class CodeBuddyAgentService {
     }
   }
 
-  dispose() {
+  async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
 
@@ -1555,20 +1582,29 @@ export class CodeBuddyAgentService {
     // Unsubscribe from model-change events
     this.modelChangeDisposable.dispose();
 
+    // Wait for pending initialization before closing, to avoid race condition
+    // where dispose() is called while initCheckpointer() is still running
+    const checkpointerToClose =
+      this.checkpointer ??
+      (this.checkpointerPromise
+        ? await this.checkpointerPromise.catch(() => null)
+        : null);
+
+    this.checkpointerPromise = null;
+
     // Close the SQLite handle if it was opened
     if (
-      this.checkpointer &&
-      typeof (this.checkpointer as unknown as Record<string, unknown>).close ===
-        "function"
+      checkpointerToClose &&
+      typeof (checkpointerToClose as unknown as Record<string, unknown>)
+        .close === "function"
     ) {
       try {
-        (this.checkpointer as unknown as { close(): void }).close();
+        (checkpointerToClose as unknown as { close(): void }).close();
       } catch (e) {
         this.logger.warn("Failed to close checkpointer", e);
       }
     }
     this.checkpointer = null;
-    this.checkpointerPromise = null;
 
     // Do NOT null the singleton — let the next getInstance() check `.disposed`
     // This avoids a race where concurrent getInstance() calls could create duplicates
