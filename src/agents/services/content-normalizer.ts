@@ -67,29 +67,48 @@ export class ContentNormalizer {
   /**
    * Remove embedded JSON tool_use / tool_call blocks from string content.
    * Uses structural JSON parsing instead of fragile regex patterns.
+   * Optimized to use slice-based copying instead of character-by-character
+   * iteration to avoid O(n²) performance on large responses.
    */
   filterToolUseFromString(text: string): string {
     if (!text) return "";
 
     const parts: string[] = [];
-    let i = 0;
-    while (i < text.length) {
-      if (text[i] === "{") {
-        const jsonStr = this.extractBalancedJson(text, i);
-        if (jsonStr) {
-          try {
-            const parsed = JSON.parse(jsonStr);
-            if (this.isToolMetadata(parsed)) {
-              i += jsonStr.length;
-              continue;
-            }
-          } catch {
-            // Not valid JSON — keep as-is
-          }
-        }
+    let cursor = 0;
+
+    while (cursor < text.length) {
+      const braceIdx = text.indexOf("{", cursor);
+      if (braceIdx === -1) {
+        // No more braces; copy remaining text and exit
+        parts.push(text.slice(cursor));
+        break;
       }
-      parts.push(text[i]);
-      i++;
+
+      // Copy everything before the brace
+      if (braceIdx > cursor) {
+        parts.push(text.slice(cursor, braceIdx));
+      }
+
+      const jsonStr = this.extractBalancedJson(text, braceIdx);
+      if (jsonStr) {
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (this.isToolMetadata(parsed)) {
+            // Skip the tool block entirely
+            cursor = braceIdx + jsonStr.length;
+            continue;
+          }
+        } catch {
+          // Not valid JSON — keep as-is
+        }
+        // Valid JSON but not tool metadata, or invalid JSON — keep the block
+        parts.push(jsonStr);
+        cursor = braceIdx + jsonStr.length;
+      } else {
+        // Unbalanced brace — keep just the opening brace and move on
+        parts.push("{");
+        cursor = braceIdx + 1;
+      }
     }
 
     return parts

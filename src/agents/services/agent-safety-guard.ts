@@ -52,6 +52,13 @@ export interface FileLoopResult {
   editCount: number;
 }
 
+/** Value object returned by buildLimitReset() for immutable limit extension. */
+export interface SafetyLimitReset {
+  readonly eventCount: 0;
+  readonly totalToolInvocations: 0;
+  readonly startTime: number;
+}
+
 /**
  * Encapsulates all safety-limit and loop-detection logic for agent streams.
  * Stateless — operates on the caller-provided counters and maps.
@@ -151,9 +158,26 @@ export class AgentSafetyGuard {
   }
 
   /**
+   * Build a reset object for extending safety limits.
+   * Returns an immutable value object — caller applies it via Object.assign().
+   * This pattern keeps AgentSafetyGuard stateless while making the mutation
+   * visible at the call site.
+   */
+  buildLimitReset(): SafetyLimitReset {
+    return {
+      eventCount: 0,
+      totalToolInvocations: 0,
+      startTime: Date.now(),
+    };
+  }
+
+  /**
    * Extend limits by resetting the stream context counters, giving the
    * agent another full quota of events, tool calls, and wall-clock time.
    * Called when the user approves continuation after a safety limit is hit.
+   *
+   * @deprecated Use buildLimitReset() and Object.assign(ctx, guard.buildLimitReset())
+   *   to make the mutation explicit at the call site.
    */
   extendLimits(
     ctx: Pick<
@@ -165,9 +189,10 @@ export class AgentSafetyGuard {
       LogLevel.INFO,
       `Extending limits: resetting counters (was events=${ctx.eventCount}, tools=${ctx.totalToolInvocations})`,
     );
-    ctx.eventCount = 0;
-    ctx.totalToolInvocations = 0;
-    ctx.startTime = Date.now();
+    const reset = this.buildLimitReset();
+    ctx.eventCount = reset.eventCount;
+    ctx.totalToolInvocations = reset.totalToolInvocations;
+    ctx.startTime = reset.startTime;
   }
 
   /**

@@ -316,11 +316,14 @@ export class CodeBuddyAgentService {
           "Failed to initialize SQLite checkpointer, falling back to in-memory",
           error,
         );
+        // Fall through to MemorySaver below
       }
     }
 
+    // Fallback: use in-memory checkpointer (conversation state won't persist)
     const memorySaver = new MemorySaver();
     this.checkpointer = memorySaver;
+    this.logger.log(LogLevel.INFO, "Using in-memory checkpointer");
     return memorySaver;
   }
 
@@ -353,7 +356,13 @@ export class CodeBuddyAgentService {
   }
 
   static getInstance(): CodeBuddyAgentService {
-    return (CodeBuddyAgentService.instance ??= new CodeBuddyAgentService());
+    if (
+      !CodeBuddyAgentService.instance ||
+      CodeBuddyAgentService.instance.disposed
+    ) {
+      CodeBuddyAgentService.instance = new CodeBuddyAgentService();
+    }
+    return CodeBuddyAgentService.instance;
   }
 
   /**
@@ -512,6 +521,11 @@ export class CodeBuddyAgentService {
 
   private async getAgent(): Promise<IStreamableAgent> {
     const cacheKey = this.buildAgentCacheKey();
+    if (!cacheKey) {
+      throw new Error(
+        "Agent configuration is invalid. Please check your API key and model settings.",
+      );
+    }
     if (!this.agentCache.has(cacheKey)) {
       const checkpointer = await this.getCheckpointer();
       const agent = await createAdvancedDeveloperAgent({
@@ -525,20 +539,23 @@ export class CodeBuddyAgentService {
     return this.agentCache.get(cacheKey)!;
   }
 
-  private buildAgentCacheKey(): string {
+  /**
+   * Build a cache key for the current provider/model configuration.
+   * Returns `null` if configuration is invalid (missing API key, etc.),
+   * causing getAgent() to fail fast with a user-readable error.
+   */
+  private buildAgentCacheKey(): string | null {
     const provider = getGenerativeAiModel() ?? "unknown";
     try {
       const cfg = getAPIKeyAndModel(provider.toLowerCase());
       const model = cfg.model ?? provider;
       return `agent:${provider}:${model}`;
     } catch (e) {
-      // Sentinel key ensures no cached agent is matched while config is broken.
-      // The next successful call produces a real key and populates the cache.
       this.logger.warn(
-        `getAPIKeyAndModel failed for "${provider}" — agent cache will miss until config is valid`,
+        `getAPIKeyAndModel failed for "${provider}" — agent cannot be created until config is valid`,
         e,
       );
-      return `agent:${provider}:__config_error__`;
+      return null;
     }
   }
 
@@ -925,7 +942,7 @@ export class CodeBuddyAgentService {
     let newIterator: AgentStreamIterator | null = null;
 
     for (const interrupt of interrupts) {
-      const interruptId = interrupt?.value?.id ?? `interrupt-${Date.now()}`;
+      const interruptId = interrupt?.value?.id ?? `interrupt-${randomUUID()}`;
       const toolNameRaw =
         interrupt?.value?.name || interrupt?.value?.tool || "tool";
       const toolArgs =
@@ -1481,8 +1498,9 @@ export class CodeBuddyAgentService {
     onError: (error: Error) => void,
     threadId?: string,
   ) {
+    let finalContent = "";
+
     try {
-      let finalContent = "";
       for await (const chunk of this.streamResponse(
         userInput,
         threadId,
@@ -1491,16 +1509,19 @@ export class CodeBuddyAgentService {
         if (chunk.type === StreamEventType.ERROR) {
           onError(new Error(chunk.content));
           if (threadId) this.cancelStream(threadId);
-          return;
+          break;
         }
         if (chunk.type === StreamEventType.END) {
           finalContent = chunk.content;
           break;
         }
       }
-      onComplete(finalContent);
     } catch (error) {
       onError(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      // Always call onComplete so callers can reset loading states, etc.
+      // Callers can check if content is empty to distinguish error from success.
+      onComplete(finalContent);
     }
   }
 
@@ -1549,8 +1570,8 @@ export class CodeBuddyAgentService {
     this.checkpointer = null;
     this.checkpointerPromise = null;
 
-    // Reset singleton so a fresh instance is created if needed
-    CodeBuddyAgentService.instance = null;
+    // Do NOT null the singleton — let the next getInstance() check `.disposed`
+    // This avoids a race where concurrent getInstance() calls could create duplicates
 
     this.logger.log(LogLevel.INFO, "CodeBuddyAgentService disposed");
   }

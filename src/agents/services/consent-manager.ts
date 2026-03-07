@@ -71,22 +71,27 @@ export class ConsentManager {
   }
 
   /**
-   * Respond to a pending consent request.
-   * @param granted Whether the user approved the action.
-   * @param threadId Optional — when provided, resolves the oldest waiter
-   *   for that thread. When omitted, resolves the single oldest waiter
-   *   across all threads (backward-compatible fallback for callers that
-   *   haven't been updated to pass threadId yet).
+   * Respond to pending consent requests.
+   *
+   * @param granted - Whether the action is approved.
+   * @param threadId - When provided, resolves only the oldest pending waiter
+   *   for that specific thread. When omitted, resolves the oldest pending
+   *   waiter in EVERY thread (global broadcast — intended for "approve all"
+   *   or "deny all" UI buttons).
    */
   respond(granted: boolean, threadId?: string): void {
     if (threadId) {
       this.resolveOldest(threadId, granted);
       return;
     }
-    // Backward-compatible fallback: resolve the oldest waiter in EACH thread.
-    // This matches the UI "global approve" use case where threadId is unknown.
-    this.logger.warn(
-      `respond() called without threadId — resolving oldest waiter in all ${this.waiters.size} threads`,
+
+    // Global broadcast: resolve one pending waiter per thread.
+    // This is intentional for the "approve all" / "deny all" UI flow.
+    if (this.waiters.size === 0) return;
+
+    this.logger.log(
+      LogLevel.INFO,
+      `Global consent broadcast (granted=${granted}) to ${this.waiters.size} active threads`,
     );
     // Snapshot keys to avoid mutation-during-iteration
     const threadIds = [...this.waiters.keys()];
