@@ -690,6 +690,13 @@ suite("summarizeToolResult — size guard & summaries", () => {
 
 // ═══════════════════════════════════════════════════════════════
 // 6. cancelStream / dispose lifecycle
+// NOTE: Tests use a hand-rolled TestStreamLifecycle instead of the real
+// CodeBuddyAgentService because the real class requires VS Code APIs,
+// a LangGraph agent, and other runtime dependencies that are unavailable
+// in the unit-test host. The test verifies the *contract* of the lifecycle
+// methods (cancelStream, dispose, isAnyAgentRunning) via a structural
+// mirror. If the real class logic diverges, consider extracting a
+// StreamLifecycleManager class and testing it directly.
 // ═══════════════════════════════════════════════════════════════
 
 suite("cancelStream & dispose — stream lifecycle management", () => {

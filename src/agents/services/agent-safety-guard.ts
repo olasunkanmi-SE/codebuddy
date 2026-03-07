@@ -1,4 +1,5 @@
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
+import type { IStreamContext } from "../interface/agent.interface";
 
 /** Safety limits for agent stream execution. */
 export const AGENT_SAFETY_LIMITS = {
@@ -154,11 +155,12 @@ export class AgentSafetyGuard {
    * agent another full quota of events, tool calls, and wall-clock time.
    * Called when the user approves continuation after a safety limit is hit.
    */
-  extendLimits(ctx: {
-    eventCount: number;
-    totalToolInvocations: number;
-    startTime: number;
-  }): void {
+  extendLimits(
+    ctx: Pick<
+      IStreamContext,
+      "eventCount" | "totalToolInvocations" | "startTime"
+    >,
+  ): void {
     this.logger.log(
       LogLevel.INFO,
       `Extending limits: resetting counters (was events=${ctx.eventCount}, tools=${ctx.totalToolInvocations})`,

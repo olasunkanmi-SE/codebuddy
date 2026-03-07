@@ -30,6 +30,16 @@ import { AgentSafetyGuard } from "./agent-safety-guard";
 import { ConsentManager } from "./consent-manager";
 import { ContentNormalizer } from "./content-normalizer";
 
+/** Typed alias for the async iterator from a LangGraph agent stream. */
+type AgentStreamIterator = AsyncIterator<unknown>;
+
+// Guaranteed fallback — extracted as a named constant for compile-time safety
+const DEFAULT_TOOL_DESCRIPTION: IToolDescription = Object.freeze({
+  name: "Tool",
+  description: "Executing tool...",
+  activityType: "working",
+});
+
 // Tool descriptions for user-friendly feedback
 const TOOL_DESCRIPTIONS: Record<string, IToolDescription> = {
   run_command: {
@@ -116,11 +126,6 @@ const TOOL_DESCRIPTIONS: Record<string, IToolDescription> = {
     name: "Directory Listing",
     description: "Exploring directory structure...",
     activityType: "reading",
-  },
-  default: {
-    name: "Tool",
-    description: "Executing tool...",
-    activityType: "working",
   },
 };
 
@@ -322,25 +327,29 @@ export class CodeBuddyAgentService {
   /**
    * Listen for file‐change events from DiffReviewService and register
    * each touched path with CheckpointService for future snapshots.
+   * Returns void synchronously — the async import is fire-and-forget
+   * with an explicit .catch() for observability.
    */
-  private async initFileTracking(): Promise<void> {
-    try {
-      const { DiffReviewService } =
-        await import("../../services/diff-review.service");
-      const diffService = DiffReviewService.getInstance();
-      diffService.onChangeEvent((evt) => {
-        try {
-          CheckpointService.getInstance().trackFile(evt.change.filePath);
-        } catch (trackError) {
-          this.logger.warn("Failed to track file change", trackError);
-        }
+  private initFileTracking(): void {
+    Promise.resolve()
+      .then(() => import("../../services/diff-review.service"))
+      .then(({ DiffReviewService }) => {
+        const diffService = DiffReviewService.getInstance();
+        diffService.onChangeEvent((evt) => {
+          try {
+            CheckpointService.getInstance().trackFile(evt.change.filePath);
+          } catch (trackError) {
+            this.logger.warn("Failed to track file change", trackError);
+          }
+        });
+        this.logger.log(LogLevel.DEBUG, "File tracking initialized");
+      })
+      .catch((importError) => {
+        this.logger.warn(
+          "Could not initialize file tracking for checkpoints",
+          importError,
+        );
       });
-    } catch (importError) {
-      this.logger.warn(
-        "Could not initialize file tracking for checkpoints",
-        importError,
-      );
-    }
   }
 
   static getInstance(): CodeBuddyAgentService {
@@ -380,7 +389,7 @@ export class CodeBuddyAgentService {
         `Unknown tool "${toolName}" not in TOOL_DESCRIPTIONS — using default`,
       );
     }
-    return TOOL_DESCRIPTIONS.default;
+    return DEFAULT_TOOL_DESCRIPTION;
   }
 
   /**
@@ -518,17 +527,19 @@ export class CodeBuddyAgentService {
 
   private buildAgentCacheKey(): string {
     const provider = getGenerativeAiModel() ?? "unknown";
-    let model = provider;
     try {
       const cfg = getAPIKeyAndModel(provider.toLowerCase());
-      model = cfg.model ?? provider;
+      const model = cfg.model ?? provider;
+      return `agent:${provider}:${model}`;
     } catch (e) {
-      this.logger.debug(
-        `getAPIKeyAndModel failed for "${provider}", using provider name as model key`,
+      // Sentinel key ensures no cached agent is matched while config is broken.
+      // The next successful call produces a real key and populates the cache.
+      this.logger.warn(
+        `getAPIKeyAndModel failed for "${provider}" — agent cache will miss until config is valid`,
         e,
       );
+      return `agent:${provider}:__config_error__`;
     }
-    return `agent:${provider}:${model}`;
   }
 
   /**
@@ -650,7 +661,7 @@ export class CodeBuddyAgentService {
         configurable: { thread_id: conversationId },
         recursionLimit: 100,
       };
-      let streamIterator = (
+      let streamIterator: AgentStreamIterator = (
         await agent.stream(
           { messages: [{ role: "user", content: sanitizedMessage }] },
           config,
@@ -863,18 +874,55 @@ export class CodeBuddyAgentService {
 
   // ── Stream sub-generators ────────────────────────────────
 
+  /**
+   * Create a new stream iterator from the agent, trying `primary` input first,
+   * then `fallback` if the primary throws. Returns null if both fail.
+   */
+  private async createStreamIterator(
+    agent: IStreamableAgent,
+    primary: unknown,
+    config: Record<string, unknown>,
+    fallback?: unknown,
+  ): Promise<AgentStreamIterator | null> {
+    try {
+      const iter = (await agent.stream(primary, config))[
+        Symbol.asyncIterator
+      ]() as AgentStreamIterator;
+      this.logger.debug("[STREAM] Created new stream iterator");
+      return iter;
+    } catch (primaryError) {
+      this.logger.error(
+        `[STREAM] Primary resume failed: ${primaryError instanceof Error ? primaryError.message : primaryError}`,
+      );
+      if (fallback !== undefined) {
+        try {
+          const iter = (await agent.stream(fallback, config))[
+            Symbol.asyncIterator
+          ]() as AgentStreamIterator;
+          this.logger.debug("[STREAM] Used fallback resume format");
+          return iter;
+        } catch (fallbackError) {
+          this.logger.error(
+            `[STREAM] Fallback also failed: ${fallbackError instanceof Error ? fallbackError.message : fallbackError}`,
+          );
+        }
+      }
+      return null;
+    }
+  }
+
   private async *handleInterrupt(
     interruptEntry: [string, IInterruptValue | IInterruptValue[]],
     ctx: IStreamContext,
     agent: IStreamableAgent,
     config: Record<string, unknown>,
-  ): AsyncGenerator<IStreamEvent, AsyncIterator<unknown> | null> {
+  ): AsyncGenerator<IStreamEvent, AgentStreamIterator | null> {
     const [, interruptUpdates] = interruptEntry;
     const interrupts = Array.isArray(interruptUpdates)
       ? interruptUpdates
       : [interruptUpdates];
 
-    let newIterator: AsyncIterator<unknown> | null = null;
+    let newIterator: AgentStreamIterator | null = null;
 
     for (const interrupt of interrupts) {
       const interruptId = interrupt?.value?.id ?? `interrupt-${Date.now()}`;
@@ -929,22 +977,23 @@ export class CodeBuddyAgentService {
         );
 
         const resumeCommand = new Command({ resume: "approve" });
-        try {
-          newIterator = (await agent.stream(resumeCommand, config))[
-            Symbol.asyncIterator
-          ]();
-          this.logger.debug(
-            `[STREAM] Successfully created new stream iterator after resume`,
-          );
-        } catch (resumeError) {
-          this.logger.error(
-            `[STREAM] Failed to resume: ${resumeError instanceof Error ? resumeError.message : resumeError}`,
-          );
-          const fallbackResume = { resume: { [interruptId]: "approve" } };
-          newIterator = (await agent.stream(fallbackResume, config))[
-            Symbol.asyncIterator
-          ]();
-          this.logger.debug(`[STREAM] Used fallback resume format`);
+        const fallbackResume = { resume: { [interruptId]: "approve" } };
+        newIterator = await this.createStreamIterator(
+          agent,
+          resumeCommand,
+          config,
+          fallbackResume,
+        );
+        if (!newIterator) {
+          ctx.hasErrored = true;
+          yield {
+            type: StreamEventType.ERROR,
+            content: `Failed to resume after approval for ${friendlyName}.`,
+            metadata: {
+              threadId: ctx.conversationId,
+              toolName: friendlyName,
+            },
+          };
         }
       } else {
         yield {
@@ -967,33 +1016,23 @@ export class CodeBuddyAgentService {
         );
 
         const denyCommand = new Command({ resume: "deny" });
-        try {
-          newIterator = (await agent.stream(denyCommand, config))[
-            Symbol.asyncIterator
-          ]();
-        } catch (denyError) {
-          this.logger.error(
-            `[STREAM] Failed to resume with deny: ${denyError instanceof Error ? denyError.message : denyError}`,
-          );
-          try {
-            const fallbackDeny = { resume: { [interruptId]: "deny" } };
-            newIterator = (await agent.stream(fallbackDeny, config))[
-              Symbol.asyncIterator
-            ]();
-          } catch (fallbackError) {
-            this.logger.error(
-              `[STREAM] Denial fallback also failed: ${fallbackError instanceof Error ? fallbackError.message : fallbackError}`,
-            );
-            ctx.hasErrored = true;
-            yield {
-              type: StreamEventType.ERROR,
-              content: `Failed to process denial for ${friendlyName}. The agent may be in an inconsistent state.`,
-              metadata: {
-                threadId: ctx.conversationId,
-                toolName: friendlyName,
-              },
-            };
-          }
+        const fallbackDeny = { resume: { [interruptId]: "deny" } };
+        newIterator = await this.createStreamIterator(
+          agent,
+          denyCommand,
+          config,
+          fallbackDeny,
+        );
+        if (!newIterator) {
+          ctx.hasErrored = true;
+          yield {
+            type: StreamEventType.ERROR,
+            content: `Failed to process denial for ${friendlyName}. The agent may be in an inconsistent state.`,
+            metadata: {
+              threadId: ctx.conversationId,
+              toolName: friendlyName,
+            },
+          };
         }
       }
     }
@@ -1011,7 +1050,7 @@ export class CodeBuddyAgentService {
     providerName: string,
     currentModelName: string,
     onChunk?: (chunk: IStreamEvent) => void,
-  ) {
+  ): AsyncGenerator<IStreamEvent> {
     for (const [nodeName, update] of entries) {
       if (update?.messages && Array.isArray(update.messages)) {
         for (const message of update.messages) {
@@ -1119,6 +1158,7 @@ export class CodeBuddyAgentService {
           span,
           streamManager,
         );
+        if (ctx.hasErrored) return;
       }
     }
   }
@@ -1127,13 +1167,13 @@ export class CodeBuddyAgentService {
     return collectToolCallsFromUpdate(update);
   }
 
-  private *processToolCalls(
+  private async *processToolCalls(
     toolCalls: IAgentToolCall[],
     nodeName: string,
     ctx: IStreamContext,
     span: Span,
     streamManager: StreamManager,
-  ) {
+  ): AsyncGenerator<IStreamEvent> {
     this.logger.debug(
       `[STREAM] Tool calls detected: ${toolCalls.length} tools - ${toolCalls.map((tc) => tc.name).join(", ")}`,
     );
@@ -1158,6 +1198,8 @@ export class CodeBuddyAgentService {
     };
 
     for (const toolCall of toolCalls) {
+      if (ctx.hasErrored) return;
+
       const isMiddlewareNode =
         nodeName.includes("Middleware") || nodeName.includes("before_model");
 
@@ -1207,7 +1249,7 @@ export class CodeBuddyAgentService {
                 fileEditCount: fileLoop.editCount,
               },
             };
-            break;
+            return;
           }
         }
 
@@ -1242,7 +1284,7 @@ export class CodeBuddyAgentService {
               limit: loopResult.limit,
             },
           };
-          break;
+          return;
         } else if (loopResult.isLooping && loopResult.isReadOnly) {
           this.logger.debug(
             `[STREAM] Read-only tool ${toolCall.name} called ${currentCount + 1} times - allowing`,
@@ -1304,13 +1346,13 @@ export class CodeBuddyAgentService {
     }
   }
 
-  private *emitCompletion(
+  private async *emitCompletion(
     ctx: IStreamContext,
     span: Span,
     streamManager: StreamManager,
     costTracker: CostTrackingService,
     conversationId: string,
-  ) {
+  ): AsyncGenerator<IStreamEvent> {
     if (ctx.hasErrored) {
       streamManager.endStream();
       return;
@@ -1366,25 +1408,11 @@ export class CodeBuddyAgentService {
   private summarizeToolResult(content: unknown, toolName: string): string {
     if (!content) return "Completed";
 
-    const MAX_CONTENT_LENGTH = 512_000; // 512 KB cap
-    let contentStr: string;
-    if (typeof content === "string") {
-      contentStr =
-        content.length > MAX_CONTENT_LENGTH
-          ? content.slice(0, MAX_CONTENT_LENGTH)
-          : content;
-    } else {
-      const raw = JSON.stringify(content);
-      contentStr =
-        raw.length > MAX_CONTENT_LENGTH
-          ? raw.slice(0, MAX_CONTENT_LENGTH)
-          : raw;
-    }
-
-    // Use synthesizer for web search results
+    // Handle web_search via synthesizer (requires `this`)
     if (toolName === "web_search") {
+      const contentStr =
+        typeof content === "string" ? content : JSON.stringify(content);
       try {
-        // Try to parse as search response
         const parsed =
           typeof content === "string" ? JSON.parse(content) : content;
         if (parsed?.results) {
@@ -1394,7 +1422,6 @@ export class CodeBuddyAgentService {
             : result.summary;
         }
       } catch {
-        // Fall back to regex extraction
         const resultMatch = contentStr.match(/Found (\d+) results/);
         if (resultMatch) {
           return `Found ${resultMatch[1]} search results`;
@@ -1403,13 +1430,10 @@ export class CodeBuddyAgentService {
       return "Search completed";
     }
 
-    if (toolName === "read_file") {
-      const lines = contentStr.split("\n").length;
-      return `Read ${lines} lines`;
-    }
-
+    // Handle analyze_files_for_question (extracts first sentence insight)
     if (toolName === "analyze_files_for_question") {
-      // Extract key insight from analysis
+      const contentStr =
+        typeof content === "string" ? content : JSON.stringify(content);
       const firstSentence = contentStr.match(/^[^.!?]+[.!?]/)?.[0];
       if (
         firstSentence &&
@@ -1421,16 +1445,8 @@ export class CodeBuddyAgentService {
       return "Code analysis complete";
     }
 
-    if (toolName === "search_codebase") {
-      const matchCount = (contentStr.match(/match/gi) || []).length;
-      return matchCount > 0 ? `Found ${matchCount} matches` : "Search complete";
-    }
-
-    if (contentStr.length > 100) {
-      return `Processed ${Math.ceil(contentStr.length / 1000)}KB of data`;
-    }
-
-    return "Completed successfully";
+    // Delegate all other tools to the exported pure function
+    return summarizeToolResultContent(content, toolName);
   }
 
   private countResultItems(content: unknown): number | undefined {
@@ -1513,6 +1529,7 @@ export class CodeBuddyAgentService {
 
     // Clear cached agents
     this.agentCache.clear();
+    this.warnedUnknownTools.clear();
 
     // Unsubscribe from model-change events
     this.modelChangeDisposable.dispose();

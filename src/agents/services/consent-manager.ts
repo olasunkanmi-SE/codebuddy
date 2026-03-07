@@ -83,12 +83,15 @@ export class ConsentManager {
       this.resolveOldest(threadId, granted);
       return;
     }
-    // Backward-compatible fallback: resolve the single oldest waiter
+    // Backward-compatible fallback: resolve the oldest waiter in EACH thread.
+    // This matches the UI "global approve" use case where threadId is unknown.
     this.logger.warn(
-      "respond() called without threadId — resolving oldest pending waiter",
+      `respond() called without threadId — resolving oldest waiter in all ${this.waiters.size} threads`,
     );
-    for (const [tid] of this.waiters) {
-      if (this.resolveOldest(tid, granted)) return;
+    // Snapshot keys to avoid mutation-during-iteration
+    const threadIds = [...this.waiters.keys()];
+    for (const tid of threadIds) {
+      this.resolveOldest(tid, granted);
     }
   }
 
