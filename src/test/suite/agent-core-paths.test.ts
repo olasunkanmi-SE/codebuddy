@@ -228,17 +228,16 @@ suite("ConsentManager — consent lifecycle", () => {
     assert.strictEqual(mgr.pendingCount("t1"), 0);
   });
 
-  test("respond without threadId resolves first waiter across all threads", async () => {
+  test("respond without threadId resolves first waiter in EACH thread (global broadcast)", async () => {
     const p1 = mgr.waitForConsent("tA");
     const p2 = mgr.waitForConsent("tB");
     assert.strictEqual(mgr.pendingCount(), 2);
 
-    mgr.respond(true); // no threadId → fallback
+    // Global broadcast: resolves one waiter per thread (approve all / deny all UI)
+    mgr.respond(true); // no threadId → resolves oldest in each thread
     assert.strictEqual(await p1, true);
-    assert.strictEqual(mgr.pendingCount(), 1);
-
-    mgr.respond(false);
-    assert.strictEqual(await p2, false);
+    assert.strictEqual(await p2, true);
+    assert.strictEqual(mgr.pendingCount(), 0);
   });
 
   test("clearThread denies all pending waiters", async () => {
