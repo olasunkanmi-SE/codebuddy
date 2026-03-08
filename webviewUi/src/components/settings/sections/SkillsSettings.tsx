@@ -213,6 +213,36 @@ const InfoText = styled.div`
   font-size: 13px;
   color: rgba(255, 255, 255, 0.8);
   line-height: 1.5;
+  flex: 1;
+`;
+
+const RefreshButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  color: #3b82f6;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+  
+  &:active {
+    transform: scale(0.98);
+  }
+  
+  svg {
+    width: 14px;
+    height: 14px;
+  }
 `;
 
 const ToggleSwitch = styled.button<{ checked: boolean }>`
@@ -401,6 +431,12 @@ export const SkillsSettings: React.FC<SkillsSettingsProps> = ({ searchQuery }) =
     });
   }, []);
 
+  // Refresh skills from disk
+  const handleRefresh = useCallback(() => {
+    setLoading(true);
+    vscode.postMessage({ command: 'refresh-skills' });
+  }, []);
+
   // Get status for a skill
   const getSkillStatus = (skill: Skill): 'enabled' | 'disabled' | 'not-installed' | 'needs-config' => {
     if (skill.state.enabled) {
@@ -466,6 +502,14 @@ export const SkillsSettings: React.FC<SkillsSettingsProps> = ({ searchQuery }) =
             </span>
           )}
         </InfoText>
+        <RefreshButton onClick={handleRefresh} title="Refresh skills from disk">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Refresh
+        </RefreshButton>
       </InfoBanner>
 
       {filteredSkills.length === 0 ? (

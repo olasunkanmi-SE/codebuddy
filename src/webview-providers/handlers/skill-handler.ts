@@ -25,6 +25,7 @@ export class SkillHandler implements WebviewMessageHandler {
     "configure-skill",
     "run-skill-setup",
     "get-platform-info",
+    "refresh-skills",
     // Environment management
     "get-skill-environments",
     "create-skill-environment",
@@ -108,6 +109,10 @@ export class SkillHandler implements WebviewMessageHandler {
 
       case "get-platform-info":
         await this.handleGetPlatformInfo(ctx);
+        break;
+
+      case "refresh-skills":
+        await this.handleRefreshSkills(ctx);
         break;
 
       // Environment management
@@ -431,6 +436,26 @@ export class SkillHandler implements WebviewMessageHandler {
       });
     } catch (error: any) {
       ctx.logger.error("Failed to get platform info", error);
+    }
+  }
+
+  /**
+   * Handle refreshing skills from disk
+   * Reloads all skill definitions and cleans up orphaned states
+   */
+  private async handleRefreshSkills(ctx: HandlerContext): Promise<void> {
+    try {
+      const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      await this.getSkillService().reload(workspacePath);
+
+      vscode.window.showInformationMessage("Skills refreshed from disk");
+      await this.postSkillsList(ctx);
+      await this.postCategories(ctx);
+    } catch (error: any) {
+      ctx.logger.error("Failed to refresh skills", error);
+      vscode.window.showErrorMessage(
+        `Failed to refresh skills: ${error.message}`,
+      );
     }
   }
 

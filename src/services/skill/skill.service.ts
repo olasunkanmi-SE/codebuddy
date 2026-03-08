@@ -389,11 +389,15 @@ export class SkillService {
   }
 
   /**
-   * Reload skills from all sources
+   * Reload skills from all sources and clean up orphaned states
    */
   public async reload(workspacePath?: string): Promise<void> {
     await this.registry.loadAll(workspacePath);
-    this.logger.log(LogLevel.INFO, "Skills reloaded");
+    await this.cleanupOrphanedStates();
+    this.logger.log(
+      LogLevel.INFO,
+      "Skills reloaded and orphaned states cleaned",
+    );
   }
 
   /**
