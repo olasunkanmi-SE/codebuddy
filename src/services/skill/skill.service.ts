@@ -32,6 +32,41 @@ import {
 
 const SKILL_STATES_CONFIG_KEY = "codebuddy.skills.states";
 
+/**
+ * Sensitive system environment variables that skills must not override.
+ * These could be used for privilege escalation or system manipulation.
+ */
+const SENSITIVE_SYSTEM_ENV_VARS = new Set([
+  // Dynamic linker preloading - major security risk
+  "LD_PRELOAD",
+  "LD_LIBRARY_PATH",
+  "DYLD_INSERT_LIBRARIES",
+  "DYLD_LIBRARY_PATH",
+  // PATH manipulation can redirect command execution
+  "PATH",
+  // Shell/environment manipulation
+  "SHELL",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "PWD",
+  // Temp directory redirection
+  "TMPDIR",
+  "TEMP",
+  "TMP",
+  // Field separator manipulation (for command injection)
+  "IFS",
+  // Editor/pager hijacking
+  "EDITOR",
+  "VISUAL",
+  "PAGER",
+  // SSH agent hijacking
+  "SSH_AUTH_SOCK",
+  // Process environment
+  "LD_AUDIT",
+  "LD_DEBUG",
+]);
+
 export class SkillService {
   private static instance: SkillService | null = null;
   private static extensionPath: string | null = null;
@@ -574,41 +609,78 @@ export class SkillService {
     const state = this.skillStates.get(skillId);
     const envId = environmentId ?? state?.activeEnvironment ?? "default";
 
-    // Get env var names from auth.envVars or config fields
+    // Get env var names from auth.envVars
     const envVarNames: string[] = skill.auth?.envVars ?? [];
 
-    // Also include config field names that look like env vars (uppercase with underscores)
+    // Map from envVarName to config field name for lookup
+    const envVarToFieldName: Record<string, string> = {};
+
+    // Also include config fields, using envVarName if specified, otherwise field.name
     if (skill.config) {
       for (const field of skill.config) {
-        if (
-          /^[A-Z][A-Z0-9_]*$/.test(field.name) &&
-          !envVarNames.includes(field.name)
-        ) {
-          envVarNames.push(field.name);
+        // Use explicit envVarName if specified, otherwise use field.name if it looks like an env var
+        const targetEnvVar = field.envVarName ?? field.name;
+        const shouldInclude =
+          field.envVarName || /^[A-Z][A-Z0-9_]*$/.test(field.name);
+
+        if (shouldInclude && !envVarNames.includes(targetEnvVar)) {
+          envVarNames.push(targetEnvVar);
+          // Track mapping so we can look up by field name when envVarName differs
+          if (field.envVarName) {
+            envVarToFieldName[targetEnvVar] = field.name;
+          }
         }
       }
     }
 
+    // Track collisions for logging (only warn once per skill)
+    const collisions: string[] = [];
+
     // Populate env vars from secrets and config values for the specific environment
     for (const envVar of envVarNames) {
-      // First check secrets (environment-specific)
-      const secretValue = await this.getSecret(skillId, envVar, envId);
+      // Security: Skip sensitive system env vars to prevent privilege escalation
+      if (SENSITIVE_SYSTEM_ENV_VARS.has(envVar.toUpperCase())) {
+        collisions.push(envVar);
+        continue;
+      }
+
+      // Determine field name to look up (may differ from envVar if envVarName mapping exists)
+      const fieldName = envVarToFieldName[envVar] ?? envVar;
+
+      // First check secrets (environment-specific) - try both envVar and fieldName
+      let secretValue = await this.getSecret(skillId, envVar, envId);
+      if (!secretValue && fieldName !== envVar) {
+        secretValue = await this.getSecret(skillId, fieldName, envId);
+      }
       if (secretValue) {
         envVars[envVar] = secretValue;
         continue;
       }
 
-      // Then check environment-specific config values
+      // Then check environment-specific config values - try both envVar and fieldName
       const envConfig = state?.environmentConfigs?.[envId];
       if (envConfig?.[envVar]) {
         envVars[envVar] = String(envConfig[envVar]);
         continue;
       }
+      if (fieldName !== envVar && envConfig?.[fieldName]) {
+        envVars[envVar] = String(envConfig[fieldName]);
+        continue;
+      }
 
-      // Fallback to legacy configValues (for backward compatibility)
+      // Fallback to legacy configValues (for backward compatibility) - try both
       if (state?.configValues?.[envVar]) {
         envVars[envVar] = String(state.configValues[envVar]);
+      } else if (fieldName !== envVar && state?.configValues?.[fieldName]) {
+        envVars[envVar] = String(state.configValues[fieldName]);
       }
+    }
+
+    // Log security warning if collisions were detected
+    if (collisions.length > 0) {
+      this.logger.warn(
+        `Security: Skill "${skillId}" attempted to set sensitive system env vars (blocked): ${collisions.join(", ")}`,
+      );
     }
 
     return envVars;

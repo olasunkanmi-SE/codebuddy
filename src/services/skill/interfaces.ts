@@ -94,6 +94,13 @@ export interface SkillConfigField {
   defaultValue?: string | number | boolean;
   /** Options for select type */
   options?: Array<{ label: string; value: string }>;
+  /**
+   * Explicit environment variable name to use (optional).
+   * When set, this overrides the default behavior of using `name` as the env var.
+   * Useful for mapping friendly field names to specific CLI env vars.
+   * Example: { name: "apiKey", envVarName: "JIRA_API_TOKEN" }
+   */
+  envVarName?: string;
 }
 
 /**

@@ -114,6 +114,15 @@ const PACKAGE_MANAGERS: Record<Platform, PackageManager[]> = {
 const BREW_INSTALL_SCRIPT =
   '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"';
 
+/** Cache TTL for dependency check results (10 seconds) */
+const DEPENDENCY_CHECK_CACHE_TTL_MS = 10_000;
+
+/** Cached dependency check result with timestamp */
+interface CachedCheckResult {
+  result: DependencyCheckResult;
+  timestamp: number;
+}
+
 export class SkillInstaller {
   private readonly logger: Logger;
   private readonly platform: Platform;
@@ -121,6 +130,8 @@ export class SkillInstaller {
   private readonly extensionPath: string;
   private availablePackageManagers: Set<string> = new Set();
   private packageManagersChecked = false;
+  /** Cache for checkInstalled results keyed by skill ID */
+  private installedCheckCache: Map<string, CachedCheckResult> = new Map();
 
   constructor(extensionPath: string) {
     this.extensionPath = extensionPath;
@@ -186,6 +197,31 @@ export class SkillInstaller {
       return "Command exceeds maximum allowed length";
     }
 
+    // Environment variable injection patterns - these can be used for privilege escalation
+    const envInjectionPatterns = [
+      /LD_PRELOAD/i, // Linux dynamic linker preloading
+      /LD_LIBRARY_PATH/i, // Linux dynamic linker library path
+      /DYLD_INSERT_LIBRARIES/i, // macOS dynamic linker preloading
+      /DYLD_LIBRARY_PATH/i, // macOS dynamic linker library path
+      /\bPATH\s*=/i, // Modifying PATH directly
+      /\bSHELL\s*=/i, // Modifying SHELL
+      /\bHOME\s*=/i, // Modifying HOME
+      /\bUSER\s*=/i, // Modifying USER
+      /\bLOGNAME\s*=/i, // Modifying LOGNAME
+      /\bTEMP\s*=/i, // Modifying TEMP directories
+      /\bTMPDIR\s*=/i, // Modifying TMPDIR
+      /\bIFS\s*=/i, // Input Field Separator manipulation
+    ];
+
+    for (const pattern of envInjectionPatterns) {
+      if (pattern.test(command)) {
+        this.logger.error(
+          `Security: Environment variable injection attempt detected in ${context}: ${pattern.toString()}`,
+        );
+        return `Command attempts to manipulate sensitive environment variables`;
+      }
+    }
+
     // Dangerous patterns that should NEVER be in install/setup commands
     const dangerousPatterns = [
       // Directory escape attempts
@@ -207,6 +243,11 @@ export class SkillInstaller {
       /rm\s+-rf?\s+[\/~]/i,
       // Eval with external content
       /eval\s+\$\(/i,
+      // Privilege escalation attempts
+      /sudo\s+/i,
+      /su\s+-/i,
+      /chmod\s+777/i,
+      /chown\s+root/i,
     ];
 
     for (const pattern of forbiddenPatterns) {
@@ -231,6 +272,23 @@ export class SkillInstaller {
           );
         }
       }
+    }
+
+    // Validate the command binary name itself
+    const commandParts = command.trim().split(/\s+/);
+    const commandBinary = commandParts[0];
+    // Allow paths within the extension or known safe commands
+    if (
+      commandBinary &&
+      !commandBinary.startsWith(this.extensionPath) &&
+      !isSafeCommandName(commandBinary) &&
+      !commandBinary.startsWith("/usr/") &&
+      !commandBinary.startsWith("/bin/") &&
+      !commandBinary.startsWith("/opt/")
+    ) {
+      this.logger.warn(
+        `Potentially unsafe command binary in ${context}: ${commandBinary}`,
+      );
     }
 
     return null; // Command is valid
@@ -282,6 +340,19 @@ export class SkillInstaller {
       return { installed: true };
     }
 
+    // Check cache first
+    const cacheKey = skill.name;
+    const cached = this.installedCheckCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < DEPENDENCY_CHECK_CACHE_TTL_MS) {
+      this.logger.log(
+        LogLevel.DEBUG,
+        `Using cached dependency check for skill ${skill.name}`,
+      );
+      return cached.result;
+    }
+
     const { checkCommand, cli } = skill.dependencies;
 
     try {
@@ -291,13 +362,21 @@ export class SkillInstaller {
       // Try to find the binary path
       const binaryPath = await this.findBinaryPath(cli);
 
-      return {
+      const result: DependencyCheckResult = {
         installed: true,
         version,
         binaryPath,
       };
+
+      // Cache the result
+      this.installedCheckCache.set(cacheKey, { result, timestamp: now });
+
+      return result;
     } catch {
-      return { installed: false };
+      const result: DependencyCheckResult = { installed: false };
+      // Cache the negative result too
+      this.installedCheckCache.set(cacheKey, { result, timestamp: now });
+      return result;
     }
   }
 
@@ -475,9 +554,32 @@ export class SkillInstaller {
   }
 
   /**
+   * Invalidate cached dependency check result for a skill
+   * Call this after installation to force a fresh check
+   */
+  public invalidateCache(skillId: string): void {
+    this.installedCheckCache.delete(skillId);
+    this.logger.log(
+      LogLevel.DEBUG,
+      `Invalidated dependency cache for skill ${skillId}`,
+    );
+  }
+
+  /**
+   * Clear all cached dependency check results
+   */
+  public clearCache(): void {
+    this.installedCheckCache.clear();
+    this.logger.log(LogLevel.DEBUG, "Cleared all dependency check cache");
+  }
+
+  /**
    * Install a skill's CLI dependency
    */
   public async install(skill: SkillDefinition): Promise<InstallResult> {
+    // Invalidate cache before installation attempt
+    this.invalidateCache(skill.name);
+
     // Collect all available install methods
     const methods = await this.getAvailableInstallMethods(skill);
     const availableMethods = methods.filter((m) => m.available);

@@ -11,6 +11,7 @@ export { SkillService } from "./skill.service";
 export {
   escapeShellArg,
   escapeShellArgWindows,
+  escapeShellArgPowershell,
   escapeShellArgPlatform,
   escapeShellArgs,
   buildSafeCommand,

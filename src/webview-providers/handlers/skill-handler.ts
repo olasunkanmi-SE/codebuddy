@@ -320,7 +320,8 @@ export class SkillHandler implements WebviewMessageHandler {
       }
 
       if (result.success) {
-        vscode.window.showInformationMessage(`Skill "${skillId}" enabled`);
+        // Use status bar for non-intrusive feedback on routine operations
+        vscode.window.setStatusBarMessage(`✓ Skill "${skillId}" enabled`, 3000);
       } else if (result.error) {
         vscode.window.showErrorMessage(
           `Failed to enable skill: ${result.error}`,
@@ -349,7 +350,11 @@ export class SkillHandler implements WebviewMessageHandler {
       const result = await this.getSkillService().disableSkill(skillId);
 
       if (result.success) {
-        vscode.window.showInformationMessage(`Skill "${skillId}" disabled`);
+        // Use status bar for non-intrusive feedback on routine operations
+        vscode.window.setStatusBarMessage(
+          `✓ Skill "${skillId}" disabled`,
+          3000,
+        );
       } else if (result.error) {
         vscode.window.showErrorMessage(
           `Failed to disable skill: ${result.error}`,
@@ -526,8 +531,10 @@ export class SkillHandler implements WebviewMessageHandler {
         );
 
         if (result.success) {
-          vscode.window.showInformationMessage(
-            `${skill.displayName} configured successfully`,
+          // Use status bar for non-intrusive feedback
+          vscode.window.setStatusBarMessage(
+            `✓ ${skill.displayName} configured successfully`,
+            3000,
           );
           await this.postSkillsList(ctx);
         } else {
@@ -607,7 +614,7 @@ export class SkillHandler implements WebviewMessageHandler {
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       await this.getSkillService().reload(workspacePath);
 
-      vscode.window.showInformationMessage("Skills refreshed from disk");
+      vscode.window.setStatusBarMessage("✓ Skills refreshed from disk", 3000);
       await this.postSkillsList(ctx);
       await this.postCategories(ctx);
     } catch (error: unknown) {
@@ -867,8 +874,10 @@ export class SkillHandler implements WebviewMessageHandler {
       });
 
       if (result.success) {
-        vscode.window.showInformationMessage(
-          `Deleted "${env?.displayName ?? environmentId}" environment`,
+        // Use status bar for non-intrusive feedback
+        vscode.window.setStatusBarMessage(
+          `✓ Deleted "${env?.displayName ?? environmentId}" environment`,
+          3000,
         );
         await this.handleGetEnvironments(
           { command: "get-skill-environments", skillId },

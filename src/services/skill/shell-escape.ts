@@ -42,7 +42,7 @@ export function escapeShellArg(arg: string): string {
  * Uses double quotes and escapes special characters.
  *
  * @param arg - The argument string to escape
- * @returns Safely escaped argument for Windows
+ * @returns Safely escaped argument for Windows cmd.exe
  */
 export function escapeShellArgWindows(arg: string): string {
   if (arg === null || arg === undefined) {
@@ -55,51 +55,86 @@ export function escapeShellArgWindows(arg: string): string {
     return '""';
   }
 
-  // Escape special characters for cmd.exe
-  // Characters that need escaping: " % ^ &amp; | < > ( )
-  let escaped = str
-    .replace(/"/g, '""')
-    .replace(/%/g, "%%")
-    .replace(/\^/g, "^^")
-    .replace(/&amp;/g, "^&amp;")
-    .replace(/\|/g, "^|")
-    .replace(/</g, "^<")
-    .replace(/>/g, "^>")
-    .replace(/\(/g, "^(")
-    .replace(/\)/g, "^)");
+  // cmd.exe escaping rules:
+  // - Double quotes need to be escaped as \"
+  // - Backlashes before quotes need escaping
+  // - Percent signs need doubling (%%)
+  // - Caret (^) is the escape character for special chars outside quotes
+  // - Special chars inside quotes: only " and % need escaping
 
-  // Wrap in double quotes if it contains spaces or special chars
-  if (/[\s"^&amp;|<>()]/.test(str)) {
-    escaped = '"' + escaped + '"';
+  // Escape backslashes that precede quotes
+  let escaped = str.replace(/(\\*)("|$)/g, (_match, slashes, quote) => {
+    // Double the backslashes before a quote or end of string
+    return slashes + slashes + (quote ? '\\"' : "");
+  });
+
+  // Escape percent signs (batch variable expansion)
+  escaped = escaped.replace(/%/g, "%%");
+
+  // Always wrap in double quotes for safety
+  return '"' + escaped + '"';
+}
+
+/**
+ * Escape an argument for Windows PowerShell.
+ * Uses single quotes which treat everything as literals except single quotes.
+ *
+ * @param arg - The argument string to escape
+ * @returns Safely escaped argument for PowerShell
+ */
+export function escapeShellArgPowershell(arg: string): string {
+  if (arg === null || arg === undefined) {
+    return "''";
   }
 
-  return escaped;
+  const str = String(arg);
+
+  if (str === "") {
+    return "''";
+  }
+
+  // PowerShell single quotes are the safest escaping mechanism:
+  // - Everything inside is treated as a literal string
+  // - Single quotes are the only character that needs escaping
+  // - Escape a single quote by doubling it: ''
+  return "'" + str.replace(/'/g, "''") + "'";
 }
 
 /**
  * Escape an argument based on the current platform.
  *
  * @param arg - The argument string to escape
+ * @param shell - Optional: specify 'cmd' or 'powershell' for Windows
  * @returns Safely escaped argument for the current platform
  */
-export function escapeShellArgPlatform(arg: string): string {
-  return process.platform === "win32"
-    ? escapeShellArgWindows(arg)
-    : escapeShellArg(arg);
+export function escapeShellArgPlatform(
+  arg: string,
+  shell?: "cmd" | "powershell",
+): string {
+  if (process.platform === "win32") {
+    return shell === "powershell"
+      ? escapeShellArgPowershell(arg)
+      : escapeShellArgWindows(arg);
+  }
+  return escapeShellArg(arg);
 }
 
 /**
- * Escape multiple arguments and join them with spaces.
+ * Escape multiple arguments for safe shell use.
  *
  * @param args - Array of arguments to escape
- * @returns Space-separated escaped arguments
+ * @param shell - Optional: specify 'cmd' or 'powershell' for Windows
+ * @returns Array of escaped arguments
  *
  * @example
  * escapeShellArgs(["ls", "-la", "/path/with spaces"])
- * // "'ls' '-la' '/path/with spaces'"
+ * // ["'ls'", "'-la'", "'/path/with spaces'"]
  */
-export function escapeShellArgs(args: string[]): string {
-  return args.map(escapeShellArgPlatform).join(" ");
+export function escapeShellArgs(
+  args: string[],
+  shell?: "cmd" | "powershell",
+): string[] {
+  return args.map((arg) => escapeShellArgPlatform(arg, shell));
 }
 
 /**
@@ -109,17 +144,22 @@ export function escapeShellArgs(args: string[]): string {
  *
  * @param command - The command/binary to run (NOT escaped)
  * @param args - Arguments to escape and append
+ * @param shell - Optional: specify 'cmd' or 'powershell' for Windows
  * @returns Complete shell command string
  *
  * @example
  * buildSafeCommand("gh", ["pr", "list", "--repo", "user/repo"])
  * // "gh 'pr' 'list' '--repo' 'user/repo'"
  */
-export function buildSafeCommand(command: string, args: string[]): string {
+export function buildSafeCommand(
+  command: string,
+  args: string[],
+  shell?: "cmd" | "powershell",
+): string {
   if (args.length === 0) {
     return command;
   }
-  return `${command} ${escapeShellArgs(args)}`;
+  return `${command} ${escapeShellArgs(args, shell).join(" ")}`;
 }
 
 /**
