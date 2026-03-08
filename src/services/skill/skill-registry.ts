@@ -11,6 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as vscode from "vscode";
+import * as yaml from "js-yaml";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import {
   SkillDefinition,
@@ -320,97 +321,25 @@ export class SkillRegistry {
   }
 
   /**
-   * Simple YAML frontmatter parser
-   * Handles basic key-value pairs and nested objects
+   * Parse YAML frontmatter using js-yaml library
+   * @param yamlContent - The raw YAML string from frontmatter
+   * @returns Parsed frontmatter object
    */
-  private parseYamlFrontmatter(yaml: string): ParsedFrontmatter {
-    const result: ParsedFrontmatter = {};
-    const lines = yaml.split("\n");
-    let currentKey: string | null = null;
-    let currentIndent = 0;
-    const stack: Array<{ obj: Record<string, unknown>; indent: number }> = [
-      { obj: result as Record<string, unknown>, indent: 0 },
-    ];
+  private parseYamlFrontmatter(yamlContent: string): ParsedFrontmatter {
+    try {
+      // Use yaml.load with safe schema to prevent code execution
+      const parsed = yaml.load(yamlContent, {
+        schema: yaml.JSON_SCHEMA, // Restrict to JSON-safe types only
+      }) as ParsedFrontmatter;
 
-    for (const line of lines) {
-      if (line.trim() === "" || line.trim().startsWith("#")) continue;
-
-      const indent = line.search(/\S/);
-      const trimmed = line.trim();
-
-      // Handle list items
-      if (trimmed.startsWith("- ")) {
-        const parent = stack[stack.length - 1].obj;
-        if (currentKey && Array.isArray(parent[currentKey])) {
-          const listItem = trimmed.slice(2).trim();
-          // Check if it's a complex list item
-          if (listItem.includes(":")) {
-            const obj: Record<string, unknown> = {};
-            const [key, value] = this.parseKeyValue(listItem);
-            obj[key] = value;
-            (parent[currentKey] as Array<unknown>).push(obj);
-            stack.push({ obj, indent: indent + 2 });
-          } else {
-            (parent[currentKey] as Array<unknown>).push(
-              this.parseValue(listItem),
-            );
-          }
-        }
-        continue;
-      }
-
-      // Pop stack if indent decreased
-      while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
-        stack.pop();
-      }
-
-      const colonIndex = trimmed.indexOf(":");
-      if (colonIndex === -1) continue;
-
-      const [key, value] = this.parseKeyValue(trimmed);
-      const parent = stack[stack.length - 1].obj;
-
-      if (value === "") {
-        // Nested object or array
-        const nextLine = lines[lines.indexOf(line) + 1];
-        if (nextLine && nextLine.trim().startsWith("-")) {
-          parent[key] = [];
-          currentKey = key;
-        } else {
-          parent[key] = {};
-          stack.push({ obj: parent[key] as Record<string, unknown>, indent });
-        }
-      } else {
-        parent[key] = this.parseValue(value);
-      }
-      currentKey = key;
-      currentIndent = indent;
+      return parsed || {};
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown parse error";
+      this.logger.error(`Failed to parse YAML frontmatter: ${errorMessage}`);
+      // Return empty object on parse failure to allow graceful degradation
+      return {};
     }
-
-    return result;
-  }
-
-  private parseKeyValue(line: string): [string, string] {
-    const colonIndex = line.indexOf(":");
-    const key = line.slice(0, colonIndex).trim();
-    const value = line.slice(colonIndex + 1).trim();
-    return [key, value];
-  }
-
-  private parseValue(value: string): string | number | boolean {
-    // Remove quotes
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      return value.slice(1, -1);
-    }
-    // Boolean
-    if (value === "true") return true;
-    if (value === "false") return false;
-    // Number
-    if (/^-?\d+(\.\d+)?$/.test(value)) return parseFloat(value);
-    return value;
   }
 
   private cleanString(value: string): string {

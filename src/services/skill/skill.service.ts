@@ -10,6 +10,11 @@ import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { SkillRegistry } from "./skill-registry";
 import { SkillInstaller } from "./skill-installer";
 import {
+  escapeShellArg,
+  isValidEnvVarName,
+  buildEnvExports,
+} from "./shell-escape";
+import {
   Skill,
   SkillDefinition,
   SkillState,
@@ -611,7 +616,14 @@ export class SkillService {
 
   /**
    * Run a command with skill's environment variables injected
-   * Returns the terminal for interaction
+   * Returns the terminal for interaction.
+   *
+   * Security: Environment variables are validated and injected via VS Code's
+   * terminal API, which is safer than shell-level export statements.
+   *
+   * @param skillId - The skill ID to get environment for
+   * @param command - The command to run (should be from trusted source)
+   * @param options - Optional terminal name and working directory
    */
   public async runSkillCommand(
     skillId: string,
@@ -621,18 +633,42 @@ export class SkillService {
     const skill = this.registry.getSkill(skillId);
     const displayName = skill?.displayName ?? skillId;
 
-    // Get env vars for the skill
+    // Validate command isn't empty or suspiciously long
+    if (!command || command.trim().length === 0) {
+      throw new Error("Cannot run empty command");
+    }
+    if (command.length > 5000) {
+      throw new Error("Command exceeds maximum allowed length");
+    }
+
+    // Get and validate env vars for the skill
     const skillEnvVars = await this.getSkillEnvVars(skillId);
 
-    // Merge with process env
+    // Filter env vars to only include valid names
+    const safeEnvVars: Record<string, string> = {};
+    for (const [key, value] of Object.entries(skillEnvVars)) {
+      if (isValidEnvVarName(key)) {
+        safeEnvVars[key] = value;
+      } else {
+        this.logger.warn(`Skipping invalid env var name: ${key}`);
+      }
+    }
+
+    // Merge with process env using VS Code's safe env injection
     const env: Record<string, string> = {
       ...process.env,
-      ...skillEnvVars,
+      ...safeEnvVars,
     } as Record<string, string>;
 
+    // Sanitize terminal name (prevent injection in terminal title)
+    const safeName = (options?.name ?? displayName)
+      .replace(/[^a-zA-Z0-9\s\-_]/g, "")
+      .slice(0, 50);
+
     // Create terminal with injected env vars
+    // VS Code handles env injection securely (not via shell export)
     const terminal = vscode.window.createTerminal({
-      name: options?.name ?? `${displayName}`,
+      name: safeName,
       env,
       cwd: options?.cwd,
     });
@@ -640,9 +676,10 @@ export class SkillService {
     terminal.show();
     terminal.sendText(command);
 
+    // Log without exposing command details (could contain sensitive info)
     this.logger.log(
       LogLevel.INFO,
-      `Running command for ${skillId} with ${Object.keys(skillEnvVars).length} env vars`,
+      `Running command for ${skillId} with ${Object.keys(safeEnvVars).length} env vars`,
     );
 
     return terminal;
@@ -650,7 +687,9 @@ export class SkillService {
 
   /**
    * Get environment variables as shell export statements
-   * Useful for agents to prepend to commands
+   * Useful for agents to prepend to commands.
+   *
+   * Security: Values are properly escaped using shell-safe escaping.
    */
   public async getSkillEnvExports(skillId: string): Promise<string> {
     const envVars = await this.getSkillEnvVars(skillId);
@@ -659,12 +698,8 @@ export class SkillService {
       return "";
     }
 
-    // Generate export statements (masking values in logs)
-    const exports = Object.entries(envVars)
-      .map(([key, value]) => `export ${key}="${value.replace(/"/g, '\\"')}"`)
-      .join(" && ");
-
-    return exports;
+    // Use the secure buildEnvExports utility which properly escapes values
+    return buildEnvExports(envVars);
   }
 
   /**

@@ -18,7 +18,13 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 VENV_DIR="$PROJECT_ROOT/.venv-gmail-cli"
 BIN_DIR="$PROJECT_ROOT/.codebuddy/bin"
 GMAIL_CLI_PATH="$BIN_DIR/gmail-cli"
+REQUIREMENTS_LOCKED="$SCRIPT_DIR/requirements-locked.txt"
 REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
+
+# Use locked requirements if available (has hashes for verification)
+if [ -f "$REQUIREMENTS_LOCKED" ]; then
+    REQUIREMENTS_FILE="$REQUIREMENTS_LOCKED"
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -91,18 +97,40 @@ echo ""
 
 # Install dependencies with hash verification
 echo "🔐 Installing dependencies with integrity verification..."
+
+# Function to try hash-verified installation
+install_with_hashes() {
+    local req_file="$1"
+    # Check if requirements file has actual hash entries (not example placeholders)
+    if grep -q "^[^#].*--hash=sha256:[a-f0-9]\{64\}" "$req_file" 2>/dev/null; then
+        log_info "Found hash entries in requirements.txt, attempting verified installation"
+        if pip install --require-hashes -r "$req_file" 2>/dev/null; then
+            return 0
+        else
+            log_warn "Hash verification failed. Hashes may be outdated."
+            return 1
+        fi
+    fi
+    return 1
+}
+
+# Function to install without hashes (fallback)
+install_without_hashes() {
+    local req_file="$1"
+    log_warn "Installing without hash verification"
+    log_warn "For production, run: ./generate-hashes.sh to add integrity verification"
+    
+    # Strip comments and hashes, then install
+    pip install -r <(grep -v "^#" "$req_file" | grep -v "^\s*$" | sed 's/ *\\$//' | sed 's/--hash=sha256:[a-f0-9]*//')
+}
+
 if [ -f "$REQUIREMENTS_FILE" ]; then
     log_info "Using requirements.txt from: $REQUIREMENTS_FILE"
     
-    # Note: Remove --require-hashes for initial setup since example hashes may not be valid
-    # In production, generate real hashes and uncomment this line:
-    # pip install --require-hashes -r "$REQUIREMENTS_FILE"
-    
-    log_warn "Installing without hash verification (example hashes not valid)"
-    log_warn "Generate real hashes for production: pip hash <package>"
-    
-    # Install without hash verification for now
-    pip install -r <(grep -v "^#" "$REQUIREMENTS_FILE" | grep -v "^\s*$" | sed 's/ \\$//' | sed 's/--hash=sha256:[a-f0-9]*//')
+    # Try hash-verified installation first, fall back to unverified
+    if ! install_with_hashes "$REQUIREMENTS_FILE"; then
+        install_without_hashes "$REQUIREMENTS_FILE"
+    fi
     
     if [ $? -eq 0 ]; then
         log_info "Dependencies installed successfully"

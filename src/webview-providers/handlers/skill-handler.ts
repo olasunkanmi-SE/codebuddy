@@ -14,6 +14,155 @@ import {
   SkillEnvironment,
 } from "../../services/skill";
 
+// ============================================
+// Message Type Definitions
+// ============================================
+
+/**
+ * Base interface for all skill-related messages
+ */
+interface SkillMessageBase {
+  command: string;
+}
+
+/**
+ * Message for enabling a skill
+ */
+interface EnableSkillMessage extends SkillMessageBase {
+  command: "enable-skill";
+  skillId: string;
+  scope?: "workspace" | "global";
+}
+
+/**
+ * Message for disabling a skill
+ */
+interface DisableSkillMessage extends SkillMessageBase {
+  command: "disable-skill";
+  skillId: string;
+}
+
+/**
+ * Message for checking skill dependencies
+ */
+interface CheckSkillDepsMessage extends SkillMessageBase {
+  command: "check-skill-deps";
+  skillId: string;
+}
+
+/**
+ * Message for installing skill dependencies
+ */
+interface InstallSkillDepsMessage extends SkillMessageBase {
+  command: "install-skill-deps";
+  skillId: string;
+}
+
+/**
+ * Message for configuring a skill
+ */
+interface ConfigureSkillMessage extends SkillMessageBase {
+  command: "configure-skill";
+  skillId: string;
+  config?: Record<string, string | number | boolean>;
+}
+
+/**
+ * Message for running skill setup
+ */
+interface RunSkillSetupMessage extends SkillMessageBase {
+  command: "run-skill-setup";
+  skillId: string;
+}
+
+/**
+ * Simple message types for commands without additional parameters
+ */
+interface GetSkillsMessage {
+  command: "get-skills";
+}
+
+interface GetSkillCategoriesMessage {
+  command: "get-skill-categories";
+}
+
+interface GetPlatformInfoMessage {
+  command: "get-platform-info";
+}
+
+interface RefreshSkillsMessage {
+  command: "refresh-skills";
+}
+
+/**
+ * Message for getting skill environments
+ */
+interface GetSkillEnvironmentsMessage extends SkillMessageBase {
+  command: "get-skill-environments";
+  skillId: string;
+}
+
+/**
+ * Message for creating a skill environment
+ */
+interface CreateSkillEnvironmentMessage extends SkillMessageBase {
+  command: "create-skill-environment";
+  skillId: string;
+  environment?: Omit<SkillEnvironment, "createdAt">;
+}
+
+/**
+ * Message for switching skill environment
+ */
+interface SwitchSkillEnvironmentMessage extends SkillMessageBase {
+  command: "switch-skill-environment";
+  skillId: string;
+  environmentId?: string;
+}
+
+/**
+ * Message for configuring a skill environment
+ */
+interface ConfigureSkillEnvironmentMessage extends SkillMessageBase {
+  command: "configure-skill-environment";
+  skillId: string;
+  environmentId: string;
+  config?: Record<string, string | number | boolean>;
+}
+
+/**
+ * Message for deleting a skill environment
+ */
+interface DeleteSkillEnvironmentMessage extends SkillMessageBase {
+  command: "delete-skill-environment";
+  skillId: string;
+  environmentId: string;
+}
+
+/**
+ * Union type for all skill messages
+ */
+type SkillMessage =
+  | EnableSkillMessage
+  | DisableSkillMessage
+  | CheckSkillDepsMessage
+  | InstallSkillDepsMessage
+  | ConfigureSkillMessage
+  | RunSkillSetupMessage
+  | GetSkillsMessage
+  | GetSkillCategoriesMessage
+  | GetPlatformInfoMessage
+  | RefreshSkillsMessage
+  | GetSkillEnvironmentsMessage
+  | CreateSkillEnvironmentMessage
+  | SwitchSkillEnvironmentMessage
+  | ConfigureSkillEnvironmentMessage
+  | DeleteSkillEnvironmentMessage;
+
+// ============================================
+// Handler Implementation
+// ============================================
+
 export class SkillHandler implements WebviewMessageHandler {
   readonly commands = [
     "get-skills",
@@ -48,11 +197,13 @@ export class SkillHandler implements WebviewMessageHandler {
         type: "skills-list",
         skills,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error("Failed to get skills list", error);
       await ctx.webview.webview.postMessage({
         type: "skills-error",
-        error: error.message,
+        error: errorMessage,
       });
     }
   }
@@ -71,7 +222,7 @@ export class SkillHandler implements WebviewMessageHandler {
   /**
    * Handle incoming webview messages
    */
-  async handle(message: any, ctx: HandlerContext): Promise<void> {
+  async handle(message: SkillMessage, ctx: HandlerContext): Promise<void> {
     const service = this.getSkillService();
 
     switch (message.command) {
@@ -142,7 +293,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle enabling a skill
    */
   private async handleEnableSkill(
-    message: any,
+    message: EnableSkillMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId, scope = "workspace" } = message;
@@ -177,11 +328,11 @@ export class SkillHandler implements WebviewMessageHandler {
       }
 
       await this.postSkillsList(ctx);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error(`Failed to enable skill ${skillId}`, error);
-      vscode.window.showErrorMessage(
-        `Failed to enable skill: ${error.message}`,
-      );
+      vscode.window.showErrorMessage(`Failed to enable skill: ${errorMessage}`);
     }
   }
 
@@ -189,7 +340,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle disabling a skill
    */
   private async handleDisableSkill(
-    message: any,
+    message: DisableSkillMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId } = message;
@@ -206,10 +357,12 @@ export class SkillHandler implements WebviewMessageHandler {
       }
 
       await this.postSkillsList(ctx);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error(`Failed to disable skill ${skillId}`, error);
       vscode.window.showErrorMessage(
-        `Failed to disable skill: ${error.message}`,
+        `Failed to disable skill: ${errorMessage}`,
       );
     }
   }
@@ -218,7 +371,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle checking skill dependencies
    */
   private async handleCheckDeps(
-    message: any,
+    message: CheckSkillDepsMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId } = message;
@@ -231,7 +384,7 @@ export class SkillHandler implements WebviewMessageHandler {
         skillId,
         result,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       ctx.logger.error(`Failed to check dependencies for ${skillId}`, error);
     }
   }
@@ -240,7 +393,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle installing skill dependencies
    */
   private async handleInstallDeps(
-    message: any,
+    message: InstallSkillDepsMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId } = message;
@@ -287,9 +440,11 @@ export class SkillHandler implements WebviewMessageHandler {
 
         await this.postSkillsList(ctx);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error(`Failed to install dependencies for ${skillId}`, error);
-      vscode.window.showErrorMessage(`Installation failed: ${error.message}`);
+      vscode.window.showErrorMessage(`Installation failed: ${errorMessage}`);
     }
   }
 
@@ -297,7 +452,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle skill configuration
    */
   private async handleConfigure(
-    message: any,
+    message: ConfigureSkillMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId, config } = message;
@@ -381,9 +536,11 @@ export class SkillHandler implements WebviewMessageHandler {
           );
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error(`Failed to configure skill ${skillId}`, error);
-      vscode.window.showErrorMessage(`Configuration failed: ${error.message}`);
+      vscode.window.showErrorMessage(`Configuration failed: ${errorMessage}`);
     }
   }
 
@@ -391,7 +548,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle running skill setup command
    */
   private async handleRunSetup(
-    message: any,
+    message: RunSkillSetupMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId } = message;
@@ -417,9 +574,11 @@ export class SkillHandler implements WebviewMessageHandler {
         type: "skill-setup-started",
         skillId,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error(`Failed to run setup for ${skillId}`, error);
-      vscode.window.showErrorMessage(`Setup failed: ${error.message}`);
+      vscode.window.showErrorMessage(`Setup failed: ${errorMessage}`);
     }
   }
 
@@ -434,7 +593,7 @@ export class SkillHandler implements WebviewMessageHandler {
         type: "platform-info",
         ...info,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       ctx.logger.error("Failed to get platform info", error);
     }
   }
@@ -451,10 +610,12 @@ export class SkillHandler implements WebviewMessageHandler {
       vscode.window.showInformationMessage("Skills refreshed from disk");
       await this.postSkillsList(ctx);
       await this.postCategories(ctx);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error("Failed to refresh skills", error);
       vscode.window.showErrorMessage(
-        `Failed to refresh skills: ${error.message}`,
+        `Failed to refresh skills: ${errorMessage}`,
       );
     }
   }
@@ -467,7 +628,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle getting environments for a skill
    */
   private async handleGetEnvironments(
-    message: any,
+    message: GetSkillEnvironmentsMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId } = message;
@@ -483,7 +644,7 @@ export class SkillHandler implements WebviewMessageHandler {
         environments,
         activeEnvironmentId: activeEnv?.id,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       ctx.logger.error(`Failed to get environments for ${skillId}`, error);
     }
   }
@@ -492,7 +653,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle creating a new environment
    */
   private async handleCreateEnvironment(
-    message: any,
+    message: CreateSkillEnvironmentMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId, environment } = message;
@@ -513,7 +674,10 @@ export class SkillHandler implements WebviewMessageHandler {
 
         if (result.success) {
           // Refresh environments list
-          await this.handleGetEnvironments({ skillId }, ctx);
+          await this.handleGetEnvironments(
+            { command: "get-skill-environments", skillId },
+            ctx,
+          );
           await this.postSkillsList(ctx);
         }
         return;
@@ -529,13 +693,18 @@ export class SkillHandler implements WebviewMessageHandler {
           success: true,
           environment: newEnv,
         });
-        await this.handleGetEnvironments({ skillId }, ctx);
+        await this.handleGetEnvironments(
+          { command: "get-skill-environments", skillId },
+          ctx,
+        );
         await this.postSkillsList(ctx);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error(`Failed to create environment for ${skillId}`, error);
       vscode.window.showErrorMessage(
-        `Failed to create environment: ${error.message}`,
+        `Failed to create environment: ${errorMessage}`,
       );
     }
   }
@@ -544,7 +713,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle switching active environment
    */
   private async handleSwitchEnvironment(
-    message: any,
+    message: SwitchSkillEnvironmentMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId, environmentId } = message;
@@ -565,7 +734,10 @@ export class SkillHandler implements WebviewMessageHandler {
         });
 
         if (result.success) {
-          await this.handleGetEnvironments({ skillId }, ctx);
+          await this.handleGetEnvironments(
+            { command: "get-skill-environments", skillId },
+            ctx,
+          );
           await this.postSkillsList(ctx);
         }
         return;
@@ -575,13 +747,18 @@ export class SkillHandler implements WebviewMessageHandler {
       const switched = await service.promptSwitchEnvironment(skillId);
 
       if (switched) {
-        await this.handleGetEnvironments({ skillId }, ctx);
+        await this.handleGetEnvironments(
+          { command: "get-skill-environments", skillId },
+          ctx,
+        );
         await this.postSkillsList(ctx);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error(`Failed to switch environment for ${skillId}`, error);
       vscode.window.showErrorMessage(
-        `Failed to switch environment: ${error.message}`,
+        `Failed to switch environment: ${errorMessage}`,
       );
     }
   }
@@ -590,7 +767,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle configuring an environment's credentials
    */
   private async handleConfigureEnvironment(
-    message: any,
+    message: ConfigureSkillEnvironmentMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId, environmentId, config } = message;
@@ -635,13 +812,15 @@ export class SkillHandler implements WebviewMessageHandler {
         });
         await this.postSkillsList(ctx);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error(
         `Failed to configure environment ${environmentId} for ${skillId}`,
         error,
       );
       vscode.window.showErrorMessage(
-        `Failed to configure environment: ${error.message}`,
+        `Failed to configure environment: ${errorMessage}`,
       );
     }
   }
@@ -650,7 +829,7 @@ export class SkillHandler implements WebviewMessageHandler {
    * Handle deleting an environment
    */
   private async handleDeleteEnvironment(
-    message: any,
+    message: DeleteSkillEnvironmentMessage,
     ctx: HandlerContext,
   ): Promise<void> {
     const { skillId, environmentId } = message;
@@ -691,20 +870,25 @@ export class SkillHandler implements WebviewMessageHandler {
         vscode.window.showInformationMessage(
           `Deleted "${env?.displayName ?? environmentId}" environment`,
         );
-        await this.handleGetEnvironments({ skillId }, ctx);
+        await this.handleGetEnvironments(
+          { command: "get-skill-environments", skillId },
+          ctx,
+        );
         await this.postSkillsList(ctx);
       } else {
         vscode.window.showErrorMessage(
           `Failed to delete environment: ${result.error}`,
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       ctx.logger.error(
         `Failed to delete environment ${environmentId} for ${skillId}`,
         error,
       );
       vscode.window.showErrorMessage(
-        `Failed to delete environment: ${error.message}`,
+        `Failed to delete environment: ${errorMessage}`,
       );
     }
   }

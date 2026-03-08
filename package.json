@@ -818,7 +818,15 @@
             "items": {
               "type": "string"
             },
-            "default": ["main", "master", "develop", "dev", "feature/*", "release/*", "hotfix/*"],
+            "default": [
+              "main",
+              "master",
+              "develop",
+              "dev",
+              "feature/*",
+              "release/*",
+              "hotfix/*"
+            ],
             "description": "%config.gitWatchdogProtectedBranches%"
           },
           "codebuddy.automations.codeHealth.hotspotMinChanges": {
@@ -875,7 +883,11 @@
           },
           "codebuddy.vectorDb.embeddingModel": {
             "type": "string",
-            "enum": ["gemini", "openai", "local"],
+            "enum": [
+              "gemini",
+              "openai",
+              "local"
+            ],
             "default": "gemini",
             "description": "Embedding model provider for vector database."
           },
@@ -910,7 +922,10 @@
           },
           "codebuddy.vectorDb.progressLocation": {
             "type": "string",
-            "enum": ["notification", "statusBar"],
+            "enum": [
+              "notification",
+              "statusBar"
+            ],
             "default": "notification",
             "description": "Where to show indexing progress."
           },
@@ -921,7 +936,11 @@
           },
           "codebuddy.vectorDb.performanceMode": {
             "type": "string",
-            "enum": ["balanced", "performance", "memory"],
+            "enum": [
+              "balanced",
+              "performance",
+              "memory"
+            ],
             "default": "balanced",
             "description": "Performance mode for vector database operations."
           },
@@ -937,7 +956,12 @@
           },
           "codebuddy.vectorDb.logLevel": {
             "type": "string",
-            "enum": ["debug", "info", "warn", "error"],
+            "enum": [
+              "debug",
+              "info",
+              "warn",
+              "error"
+            ],
             "default": "info",
             "description": "Log level for vector database operations."
           },
@@ -978,6 +1002,7 @@
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
     "@types/fast-levenshtein": "^0.0.4",
+    "@types/js-yaml": "^4.0.9",
     "@types/jsdom": "^21.1.7",
     "@types/markdown-it": "^13.0.7",
     "@types/mocha": "^10.0.1",
@@ -1025,6 +1050,7 @@
     "dotenv": "^16.1.4",
     "fast-levenshtein": "^3.0.0",
     "groq-sdk": "^0.22.0",
+    "js-yaml": "^4.1.1",
     "jsdom": "^26.0.0",
     "langchain": "^1.0.4",
     "llama3-tokenizer-js": "^1.2.0",

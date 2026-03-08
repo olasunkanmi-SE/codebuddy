@@ -18,6 +18,7 @@ import {
   DependencyCheckResult,
   CpuArch,
 } from "./interfaces";
+import { isSafeCommandName } from "./shell-escape";
 
 const execAsync = promisify(exec);
 
@@ -156,6 +157,83 @@ export class SkillInstaller {
     if (arch === "arm64") return "arm64";
     if (arch === "arm") return "arm";
     return "x64"; // x64, ia32, etc. default to x64
+  }
+
+  /**
+   * Sanitize display name to prevent terminal injection
+   * Only allows alphanumeric, spaces, hyphens, underscores, and dots
+   */
+  private sanitizeDisplayName(name: string): string {
+    // Remove any characters that could cause issues in terminal names
+    const sanitized = name.replace(/[^a-zA-Z0-9\s\-_./]/g, "").trim();
+    // Truncate to reasonable length
+    return sanitized.slice(0, 50) || "Unknown Skill";
+  }
+
+  /**
+   * Validate a command before execution
+   * Checks for potentially dangerous patterns
+   * @returns Error message if invalid, null if valid
+   */
+  private validateCommand(command: string, context: string): string | null {
+    // Reject empty commands
+    if (!command || command.trim().length === 0) {
+      return "Empty command";
+    }
+
+    // Reject commands that are suspiciously long (might indicate injection)
+    if (command.length > 2000) {
+      return "Command exceeds maximum allowed length";
+    }
+
+    // Dangerous patterns that should NEVER be in install/setup commands
+    const dangerousPatterns = [
+      // Directory escape attempts
+      /\.\.\//g,
+      // Null bytes (could bypass checks)
+      /\x00/g,
+      // Background execution without user visibility
+      /&\s*$/,
+      // Download and execute patterns (except known safe ones)
+      /curl.*\|\s*(ba)?sh/i, // curl pipe to shell - warn but don't block for Homebrew
+    ];
+
+    // Patterns that are outright forbidden
+    const forbiddenPatterns = [
+      // Direct file writes that could be dangerous
+      />\s*\/etc\//i,
+      />\s*~\/\.\w/i, // Writing to hidden config files
+      // rm -rf patterns that are clearly dangerous
+      /rm\s+-rf?\s+[\/~]/i,
+      // Eval with external content
+      /eval\s+\$\(/i,
+    ];
+
+    for (const pattern of forbiddenPatterns) {
+      if (pattern.test(command)) {
+        this.logger.warn(
+          `Forbidden command pattern detected in ${context}: ${pattern.toString()}`,
+        );
+        return `Command contains forbidden pattern: ${pattern.toString()}`;
+      }
+    }
+
+    // Log warnings for suspicious patterns but allow (user will see the command)
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(command)) {
+        this.logger.warn(
+          `Potentially risky command pattern in ${context}: ${pattern.toString()}`,
+        );
+        // For curl|sh we warn but allow, as Homebrew uses this legitimately
+        if (/curl.*\|\s*(ba)?sh/i.test(command)) {
+          this.logger.info(
+            "Allowing curl|sh pattern (common for package managers)",
+          );
+        }
+      }
+    }
+
+    return null; // Command is valid
   }
 
   /**
@@ -486,15 +564,34 @@ export class SkillInstaller {
 
   /**
    * Execute an install command in VS Code's integrated terminal
+   * Validates the command before execution to prevent injection attacks.
    */
   private async executeInTerminal(
     command: string,
     displayName: string,
   ): Promise<InstallResult> {
+    // Validate command before execution
+    const validationError = this.validateCommand(
+      command,
+      `install:${displayName}`,
+    );
+    if (validationError) {
+      this.logger.error(
+        `Command validation failed for ${displayName}: ${validationError}`,
+      );
+      return {
+        success: false,
+        error: `Security: ${validationError}`,
+      };
+    }
+
+    // Sanitize display name for terminal
+    const safeDisplayName = this.sanitizeDisplayName(displayName);
+
     return new Promise((resolve) => {
       const terminal = vscode.window.createTerminal({
-        name: `Install: ${displayName}`,
-        message: `Installing ${displayName}...\n`,
+        name: `Install: ${safeDisplayName}`,
+        message: `Installing ${safeDisplayName}...\n`,
       });
 
       terminal.show();
@@ -503,22 +600,24 @@ export class SkillInstaller {
       // We can't directly get the exit code from VS Code terminals
       // So we provide a best-effort result
       // The user will see the terminal output for verification
+      // NOTE: Command is logged for debugging but this could be a security concern
+      // if it contains sensitive data. Consider masking in production.
       this.logger.log(
         LogLevel.INFO,
-        `Install command sent to terminal: ${command}`,
+        `Install command sent to terminal for: ${safeDisplayName}`,
       );
 
       // Give user instructions
       vscode.window
         .showInformationMessage(
-          `Installing ${displayName}. Check the terminal for progress.`,
+          `Installing ${safeDisplayName}. Check the terminal for progress.`,
           "Verify Installation",
         )
         .then((action) => {
           if (action === "Verify Installation") {
             vscode.commands.executeCommand(
               "codebuddy.skills.verifyInstall",
-              displayName,
+              safeDisplayName,
             );
           }
         });
@@ -532,6 +631,7 @@ export class SkillInstaller {
 
   /**
    * Run a skill's setup command in the terminal
+   * Validates the setup command before execution to prevent injection attacks.
    */
   public async runSetupCommand(skill: SkillDefinition): Promise<void> {
     if (!skill.auth?.setupCommand) {
@@ -541,9 +641,27 @@ export class SkillInstaller {
       return;
     }
 
+    // Validate setup command
+    const validationError = this.validateCommand(
+      skill.auth.setupCommand,
+      `setup:${skill.name}`,
+    );
+    if (validationError) {
+      this.logger.error(
+        `Setup command validation failed for ${skill.name}: ${validationError}`,
+      );
+      vscode.window.showErrorMessage(
+        `Cannot run setup: ${validationError}. Please check the skill configuration.`,
+      );
+      return;
+    }
+
+    // Sanitize display name
+    const safeDisplayName = this.sanitizeDisplayName(skill.displayName);
+
     const terminal = vscode.window.createTerminal({
-      name: `Setup: ${skill.displayName}`,
-      message: `Running setup for ${skill.displayName}...\n`,
+      name: `Setup: ${safeDisplayName}`,
+      message: `Running setup for ${safeDisplayName}...\n`,
     });
 
     terminal.show();
@@ -551,7 +669,7 @@ export class SkillInstaller {
 
     this.logger.log(
       LogLevel.INFO,
-      `Setup command sent to terminal: ${skill.auth.setupCommand}`,
+      `Setup command sent to terminal for: ${safeDisplayName}`,
     );
   }
 
