@@ -7,6 +7,7 @@ export { SettingsHandler } from "./settings-handler";
 export { DockerHandler } from "./docker-handler";
 export { MCPHandler } from "./mcp-handler";
 export { ConnectorHandler } from "./connector-handler";
+export { SkillHandler } from "./skill-handler";
 export { NewsHandler } from "./news-handler";
 export { BrowserHandler } from "./browser-handler";
 export { NotificationHandler } from "./notification-handler";

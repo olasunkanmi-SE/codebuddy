@@ -37,6 +37,7 @@ import { ProjectRulesService } from "./services/project-rules.service";
 import { SchedulerService } from "./services/scheduler.service";
 import { SqliteDatabaseService } from "./services/sqlite-database.service";
 import { Terminal } from "./utils/terminal";
+import { SkillService } from "./services/skill";
 import { getConfigValue } from "./utils/utils";
 
 import { createBranchFromGitLabCommand } from "./commands/create-branch-from-gitlab";
@@ -201,6 +202,14 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize Terminal with extension path early for Docker Compose support
     const terminal = Terminal.getInstance();
     terminal.setExtensionPath(context.extensionPath);
+
+    // Initialize Skill Service with extension path
+    SkillService.setExtensionPath(context.extensionPath);
+    const skillService = SkillService.getInstance();
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    skillService.initialize(workspacePath).catch((err) => {
+      logger.warn("Failed to initialize SkillService:", err);
+    });
 
     // Initialize .codebuddyignore file exclusion service
     const ignoreService = CodebuddyIgnoreService.getInstance();

@@ -5,6 +5,7 @@ export type SettingsCategory =
   | "agents"
   | "mcp"
   | "connectors"
+  | "skills"
   | "conversation"
   | "models"
   | "context"
@@ -84,6 +85,12 @@ export const SETTINGS_CATEGORIES: SettingsCategoryInfo[] = [
     label: "Connectors",
     icon: "plug",
     description: "Connect to external services",
+  },
+  {
+    id: "skills",
+    label: "Skills",
+    icon: "tool",
+    description: "CLI integrations for external tools",
   },
   {
     id: "conversation",

@@ -1,0 +1,75 @@
+# Gmail CLI - Sensitive Files
+# CRITICAL: Never commit these files to version control!
+
+# OAuth2 Credentials (contains client_id and client_secret)
+credentials.json
+**/credentials.json
+**/.gmail-cli/credentials.json
+
+# Authentication Tokens (allows access to Gmail account)
+token.pickle
+token.json
+*.pickle
+**/token.pickle
+**/.gmail-cli/token.pickle
+
+# Encrypted credential files
+*.enc
+credentials.json.enc
+token.pickle.enc
+
+# Backup files that might contain credentials
+*.bak
+*.backup
+*~
+.DS_Store
+
+# Python environment
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and editor files (may cache sensitive data)
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Log files (may contain tokens or sensitive data)
+*.log
+logs/
+gmail-cli.log
+
+# Test files with real credentials
+test_credentials.json
+test_token.pickle
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+tmp/
+temp/
+
+# Configuration files that might contain secrets
+.env
+.env.local
+config.ini
+settings.ini
+
+# Security scan results
+security-report.txt
+vulnerability-scan.txt
