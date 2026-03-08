@@ -30,8 +30,10 @@ metadata:
 
 # gmail-cli
 
-Use `./.codebuddy/bin/gmail-cli` to interact with Gmail.
+Use `./.codebuddy/bin/gmail-cli-wrapper` to interact with Gmail.
 This tool allows you to read, send, and manage Gmail messages directly from the chat.
+
+> **Note**: The wrapper script ensures commands run within an isolated Python virtual environment for security.
 
 ## ⚠️ Security Warning
 
@@ -64,7 +66,7 @@ This script will:
 Before using, you must authenticate with Google OAuth2. Run the following command in the terminal:
 
 ```bash
-./.codebuddy/bin/gmail-cli auth
+./.codebuddy/bin/gmail-cli-wrapper auth
 ```
 
 This will:
@@ -79,22 +81,22 @@ This will:
 
 ### Authentication
 
-- Authenticate: `./.codebuddy/bin/gmail-cli auth`
-- Reset authentication: `./.codebuddy/bin/gmail-cli auth --reset`
+- Authenticate: `./.codebuddy/bin/gmail-cli-wrapper auth`
+- Reset authentication: `./.codebuddy/bin/gmail-cli-wrapper auth --reset`
 
 ### Reading Emails
 
-- List recent emails: `./.codebuddy/bin/gmail-cli list --max 10`
-- List unread emails: `./.codebuddy/bin/gmail-cli list --unread`
-- Search emails: `./.codebuddy/bin/gmail-cli list --query "subject:meeting"`
-- Read specific email: `./.codebuddy/bin/gmail-cli read <message-id>`
+- List recent emails: `./.codebuddy/bin/gmail-cli-wrapper list --max 10`
+- List unread emails: `./.codebuddy/bin/gmail-cli-wrapper list --unread`
+- Search emails: `./.codebuddy/bin/gmail-cli-wrapper list --query "subject:meeting"`
+- Read specific email: `./.codebuddy/bin/gmail-cli-wrapper read <message-id>`
 
 ### Sending Emails
 
-- Send email: `./.codebuddy/bin/gmail-cli send --to "user@example.com" --subject "Hello" --body "Message text"`
-- Send with CC: `./.codebuddy/bin/gmail-cli send --to "user@example.com" --cc "other@example.com" --subject "Hello" --body "Message"`
-- Send with attachment: `./.codebuddy/bin/gmail-cli send --to "user@example.com" --subject "Files" --body "See attached" --attach /path/to/file.pdf`
-- Multiple attachments: `./.codebuddy/bin/gmail-cli send --to "user@example.com" --subject "Files" --body "Documents" --attach file1.pdf file2.docx`
+- Send email: `./.codebuddy/bin/gmail-cli-wrapper send --to "user@example.com" --subject "Hello" --body "Message text"`
+- Send with CC: `./.codebuddy/bin/gmail-cli-wrapper send --to "user@example.com" --cc "other@example.com" --subject "Hello" --body "Message"`
+- Send with attachment: `./.codebuddy/bin/gmail-cli-wrapper send --to "user@example.com" --subject "Files" --body "See attached" --attach /path/to/file.pdf`
+- Multiple attachments: `./.codebuddy/bin/gmail-cli-wrapper send --to "user@example.com" --subject "Files" --body "Documents" --attach file1.pdf file2.docx`
 
 ## Search Query Examples
 
@@ -111,7 +113,7 @@ Gmail CLI supports advanced search queries similar to Gmail's web interface:
 Example:
 
 ```bash
-./.codebuddy/bin/gmail-cli list --query "from:client@company.com subject:invoice has:attachment"
+./.codebuddy/bin/gmail-cli-wrapper list --query "from:client@company.com subject:invoice has:attachment"
 ```
 
 ## Configuration
@@ -167,7 +169,7 @@ FILE="/path/to/document.pdf"
 # Validate before using
 [[ -f "$FILE" ]] || exit 1
 
-./.codebuddy/bin/gmail-cli send --to "$EMAIL" --subject "$SUBJECT" \
+./.codebuddy/bin/gmail-cli-wrapper send --to "$EMAIL" --subject "$SUBJECT" \
     --body "$BODY" --attach "$FILE"
 ```
 
@@ -176,10 +178,10 @@ FILE="/path/to/document.pdf"
 ```bash
 # DON'T DO THIS: Never use untrusted input directly
 read -p "Enter recipient: " RECIPIENT
-./.codebuddy/bin/gmail-cli send --to "$RECIPIENT" --subject "Test"
+./.codebuddy/bin/gmail-cli-wrapper send --to "$RECIPIENT" --subject "Test"
 
 # DON'T DO THIS: Sending sensitive files
-./.codebuddy/bin/gmail-cli send --to "user@example.com" \
+./.codebuddy/bin/gmail-cli-wrapper send --to "user@example.com" \
     --subject "Keys" --attach ~/.ssh/id_rsa  # ❌ DANGER!
 ```
 
@@ -196,10 +198,10 @@ read -p "Enter recipient: " RECIPIENT
 
 ## Troubleshooting
 
-- **Authentication fails**: Try `./.codebuddy/bin/gmail-cli auth --reset` to re-authenticate
+- **Authentication fails**: Try `./.codebuddy/bin/gmail-cli-wrapper auth --reset` to re-authenticate
 - **Package errors**: Install packages with `pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib`
 - **Credentials not found**: Make sure `~/.gmail-cli/credentials.json` exists (see SETUP.md)
-- **Permission denied**: Ensure the binary has execute permissions: `chmod +x ./.codebuddy/bin/gmail-cli`
+- **Permission denied**: Ensure the wrapper has execute permissions: `chmod +x ./.codebuddy/bin/gmail-cli-wrapper`
 
 ## 📚 Documentation
 

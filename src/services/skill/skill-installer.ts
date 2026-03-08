@@ -182,8 +182,35 @@ export class SkillInstaller {
   }
 
   /**
+   * Redact sensitive data from commands for safe logging
+   * Masks API keys, tokens, passwords, and other secrets
+   */
+  private redactSensitiveData(command: string): string {
+    // Patterns for sensitive data that should be redacted in logs
+    const sensitivePatterns = [
+      // API keys and tokens (common CLI flag patterns)
+      /(--api-key|--token|--api_key|--apikey|--access-token|--secret)\s+\S+/gi,
+      // Authorization headers
+      /(Authorization:\s*Bearer\s+)\S+/gi,
+      // Password flags
+      /(--password|--pass|--pwd|-p)\s+\S+/gi,
+      // Environment variable assignments with sensitive names
+      /((?:API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)[A-Z_]*=)\S+/gi,
+      // URLs with embedded credentials (user:pass@host)
+      /(https?:\/\/)[^:]+:[^@]+(@)/gi,
+    ];
+
+    let redacted = command;
+    for (const pattern of sensitivePatterns) {
+      redacted = redacted.replace(pattern, "$1******");
+    }
+
+    return redacted;
+  }
+
+  /**
    * Validate a command before execution
-   * Checks for potentially dangerous patterns
+   * Checks for potentially dangerous patterns using a categorized risk approach
    * @returns Error message if invalid, null if valid
    */
   private validateCommand(command: string, context: string): string | null {
@@ -197,81 +224,135 @@ export class SkillInstaller {
       return "Command exceeds maximum allowed length";
     }
 
-    // Environment variable injection patterns - these can be used for privilege escalation
-    const envInjectionPatterns = [
-      /LD_PRELOAD/i, // Linux dynamic linker preloading
-      /LD_LIBRARY_PATH/i, // Linux dynamic linker library path
-      /DYLD_INSERT_LIBRARIES/i, // macOS dynamic linker preloading
-      /DYLD_LIBRARY_PATH/i, // macOS dynamic linker library path
-      /\bPATH\s*=/i, // Modifying PATH directly
-      /\bSHELL\s*=/i, // Modifying SHELL
-      /\bHOME\s*=/i, // Modifying HOME
-      /\bUSER\s*=/i, // Modifying USER
-      /\bLOGNAME\s*=/i, // Modifying LOGNAME
-      /\bTEMP\s*=/i, // Modifying TEMP directories
-      /\bTMPDIR\s*=/i, // Modifying TMPDIR
-      /\bIFS\s*=/i, // Input Field Separator manipulation
+    // HIGH-RISK: Environment variable injection patterns - always blocked
+    // These can be used for privilege escalation via dynamic linker or shell manipulation
+    const envInjectionPatterns: Array<{
+      pattern: RegExp;
+      description: string;
+    }> = [
+      { pattern: /LD_PRELOAD/i, description: "Linux dynamic linker preload" },
+      {
+        pattern: /LD_LIBRARY_PATH/i,
+        description: "Linux dynamic linker path",
+      },
+      {
+        pattern: /DYLD_INSERT_LIBRARIES/i,
+        description: "macOS dynamic linker preload",
+      },
+      { pattern: /DYLD_LIBRARY_PATH/i, description: "macOS dynamic linker" },
+      { pattern: /\bPATH\s*=/i, description: "PATH modification" },
+      { pattern: /\bSHELL\s*=/i, description: "SHELL modification" },
+      { pattern: /\bHOME\s*=/i, description: "HOME modification" },
+      { pattern: /\bUSER\s*=/i, description: "USER modification" },
+      { pattern: /\bLOGNAME\s*=/i, description: "LOGNAME modification" },
+      { pattern: /\bTEMP\s*=/i, description: "TEMP directory modification" },
+      {
+        pattern: /\bTMPDIR\s*=/i,
+        description: "TMPDIR directory modification",
+      },
+      { pattern: /\bIFS\s*=/i, description: "IFS field separator attack" },
     ];
 
-    for (const pattern of envInjectionPatterns) {
+    for (const { pattern, description } of envInjectionPatterns) {
       if (pattern.test(command)) {
         this.logger.error(
-          `Security: Environment variable injection attempt detected in ${context}: ${pattern.toString()}`,
+          `Security: Environment variable injection attempt detected in ${context}: ${description}`,
         );
-        return `Command attempts to manipulate sensitive environment variables`;
+        return `Command attempts to manipulate sensitive environment variables (${description})`;
       }
     }
 
-    // Dangerous patterns that should NEVER be in install/setup commands
-    const dangerousPatterns = [
-      // Directory escape attempts
-      /\.\.\//g,
-      // Null bytes (could bypass checks)
-      /\x00/g,
-      // Background execution without user visibility
-      /&\s*$/,
-      // Download and execute patterns (except known safe ones)
-      /curl.*\|\s*(ba)?sh/i, // curl pipe to shell - warn but don't block for Homebrew
+    // HIGH-RISK: Patterns that are outright forbidden - always blocked
+    // These represent clear security violations with no legitimate use in install/setup
+    const highRiskPatterns: Array<{ pattern: RegExp; description: string }> = [
+      // Privilege escalation
+      { pattern: /sudo\s+/i, description: "sudo privilege escalation" },
+      { pattern: /su\s+-/i, description: "su user switching" },
+      { pattern: /chmod\s+777/i, description: "chmod 777 permission change" },
+      { pattern: /chown\s+root/i, description: "chown to root" },
+      // Dangerous file operations
+      { pattern: />\s*\/etc\//i, description: "write to /etc/" },
+      { pattern: />\s*~\/\.\w/i, description: "write to hidden config" },
+      { pattern: /rm\s+-rf?\s+[/~]/i, description: "recursive delete" },
+      // Code execution from external content
+      { pattern: /eval\s+\$\(/i, description: "eval command substitution" },
+      // Null byte injection
+      // eslint-disable-next-line no-control-regex
+      { pattern: /\x00/, description: "null byte injection" },
     ];
 
-    // Patterns that are outright forbidden
-    const forbiddenPatterns = [
-      // Direct file writes that could be dangerous
-      />\s*\/etc\//i,
-      />\s*~\/\.\w/i, // Writing to hidden config files
-      // rm -rf patterns that are clearly dangerous
-      /rm\s+-rf?\s+[\/~]/i,
-      // Eval with external content
-      /eval\s+\$\(/i,
-      // Privilege escalation attempts
-      /sudo\s+/i,
-      /su\s+-/i,
-      /chmod\s+777/i,
-      /chown\s+root/i,
-    ];
-
-    for (const pattern of forbiddenPatterns) {
+    for (const { pattern, description } of highRiskPatterns) {
       if (pattern.test(command)) {
         this.logger.warn(
-          `Forbidden command pattern detected in ${context}: ${pattern.toString()}`,
+          `Forbidden command pattern detected in ${context}: ${description}`,
         );
-        return `Command contains forbidden pattern: ${pattern.toString()}`;
+        return `Command contains forbidden pattern: ${description}`;
       }
     }
 
-    // Log warnings for suspicious patterns but allow (user will see the command)
-    for (const pattern of dangerousPatterns) {
+    // MEDIUM-RISK: Patterns that warrant warnings but may be legitimate
+    // These are logged but allowed because they have valid use cases
+    const mediumRiskPatterns: Array<{
+      pattern: RegExp;
+      description: string;
+      allowList?: RegExp[];
+    }> = [
+      // Directory traversal (could be legitimate in some contexts)
+      {
+        pattern: /\.\.\//g,
+        description: "directory traversal",
+      },
+      // Background execution
+      {
+        pattern: /&\s*$/,
+        description: "background execution",
+      },
+      // Download and execute - risky but common for package managers
+      {
+        pattern: /curl.*\|\s*(ba)?sh/i,
+        description: "curl pipe to shell",
+        // Explicitly allowed for known safe sources
+        allowList: [
+          /homebrew.*install/i,
+          /raw\.githubusercontent\.com.*homebrew/i,
+          /brew\.sh/i,
+        ],
+      },
+      {
+        pattern: /wget.*\|\s*(ba)?sh/i,
+        description: "wget pipe to shell",
+        allowList: [/homebrew.*install/i],
+      },
+    ];
+
+    let mediumRiskCount = 0;
+    const detectedMediumRisks: string[] = [];
+
+    for (const { pattern, description, allowList } of mediumRiskPatterns) {
       if (pattern.test(command)) {
-        this.logger.warn(
-          `Potentially risky command pattern in ${context}: ${pattern.toString()}`,
-        );
-        // For curl|sh we warn but allow, as Homebrew uses this legitimately
-        if (/curl.*\|\s*(ba)?sh/i.test(command)) {
+        // Check if this matches an allowed pattern
+        const isAllowed = allowList?.some((allowed) => allowed.test(command));
+
+        if (isAllowed) {
           this.logger.info(
-            "Allowing curl|sh pattern (common for package managers)",
+            `Allowing ${description} pattern in ${context} (matches allowlist)`,
+          );
+        } else {
+          mediumRiskCount++;
+          detectedMediumRisks.push(description);
+          this.logger.warn(
+            `Potentially risky command pattern in ${context}: ${description}`,
           );
         }
       }
+    }
+
+    // If multiple medium-risk patterns detected (and not on allowlist), reject
+    if (mediumRiskCount >= 2) {
+      this.logger.error(
+        `Multiple risky patterns detected in ${context}: ${detectedMediumRisks.join(", ")}`,
+      );
+      return `Command contains multiple risky patterns: ${detectedMediumRisks.join(", ")}. Please review carefully.`;
     }
 
     // Validate the command binary name itself
@@ -702,11 +783,11 @@ export class SkillInstaller {
       // We can't directly get the exit code from VS Code terminals
       // So we provide a best-effort result
       // The user will see the terminal output for verification
-      // NOTE: Command is logged for debugging but this could be a security concern
-      // if it contains sensitive data. Consider masking in production.
+      // Log with sensitive data redacted for security
+      const redactedCommand = this.redactSensitiveData(command);
       this.logger.log(
         LogLevel.INFO,
-        `Install command sent to terminal for: ${safeDisplayName}`,
+        `Install command sent to terminal for: ${safeDisplayName}. Command (redacted): ${redactedCommand}`,
       );
 
       // Give user instructions

@@ -240,12 +240,19 @@ export class SkillService {
 
       if (!checkResult.installed) {
         const installCommand = await this.installer.getInstallCommand(skill);
+        const platformInfo = this.installer.getPlatformInfo();
+
+        // Provide more specific error message when no install method found
+        let errorMessage = `${skill.dependencies.cli} is not installed`;
+        if (!installCommand) {
+          errorMessage = `${skill.dependencies.cli} is not installed and no automatic installation method is available for ${platformInfo.platform} (${platformInfo.arch}). Please install manually.`;
+        }
 
         return {
           success: false,
           requiresInstall: true,
           installCommand: installCommand ?? undefined,
-          error: `${skill.dependencies.cli} is not installed`,
+          error: errorMessage,
         };
       }
     }
