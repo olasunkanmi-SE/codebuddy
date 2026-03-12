@@ -1,12 +1,27 @@
+import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import type { IStreamContext } from "../interface/agent.interface";
 
+/** Read a numeric agent-limit setting, falling back to the provided default. */
+function agentLimitSetting(key: string, fallback: number): number {
+  return (
+    vscode.workspace.getConfiguration("codebuddy.agent").get<number>(key) ??
+    fallback
+  );
+}
+
 /** Safety limits for agent stream execution. */
 export const AGENT_SAFETY_LIMITS = {
-  maxEventCount: 1000,
-  maxToolInvocations: 200,
+  get maxEventCount() {
+    return agentLimitSetting("maxEventCount", 2000);
+  },
+  get maxToolInvocations() {
+    return agentLimitSetting("maxToolInvocations", 400);
+  },
   maxToolCallsPerType: 20,
-  maxDurationMs: 5 * 60 * 1000,
+  get maxDurationMs() {
+    return agentLimitSetting("maxDurationMinutes", 10) * 60 * 1000;
+  },
   fileEditLoopThreshold: 4,
   criticalToolLimits: {
     edit_file: 8,

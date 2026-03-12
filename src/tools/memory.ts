@@ -1,5 +1,6 @@
 import { SchemaType } from "@google/generative-ai";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
 
@@ -16,7 +17,7 @@ interface MemoryEntry {
 export class MemoryTool {
   public static getFormattedMemories(): string {
     const tool = new MemoryTool();
-    const memories = tool.loadMemories();
+    const memories = tool.loadAllMemories();
     if (memories.length === 0) return "";
 
     let prompt = "\n\n## 🧠 Core Memories (Context from previous sessions):\n";
@@ -40,7 +41,22 @@ export class MemoryTool {
     return prompt;
   }
 
-  private getStoragePath(): string | undefined {
+  /**
+   * Global storage path for user-scoped memories.
+   * Stored in ~/.codebuddy/user-memory.json so they persist across all workspaces.
+   */
+  private getGlobalStoragePath(): string {
+    const globalDir = path.join(os.homedir(), ".codebuddy");
+    if (!fs.existsSync(globalDir)) {
+      fs.mkdirSync(globalDir, { recursive: true });
+    }
+    return path.join(globalDir, "user-memory.json");
+  }
+
+  /**
+   * Workspace storage path for project-scoped memories.
+   */
+  private getWorkspaceStoragePath(): string | undefined {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
       return undefined;
@@ -49,29 +65,69 @@ export class MemoryTool {
     const codebuddyDir = path.join(rootPath, ".codebuddy");
 
     if (!fs.existsSync(codebuddyDir)) {
-      fs.mkdirSync(codebuddyDir);
+      fs.mkdirSync(codebuddyDir, { recursive: true });
     }
 
     return path.join(codebuddyDir, "memory.json");
   }
 
-  private loadMemories(): MemoryEntry[] {
-    const storagePath = this.getStoragePath();
-    if (!storagePath || !fs.existsSync(storagePath)) {
-      return [];
-    }
+  private loadFromFile(filePath: string): MemoryEntry[] {
+    if (!fs.existsSync(filePath)) return [];
     try {
-      return JSON.parse(fs.readFileSync(storagePath, "utf8"));
+      return JSON.parse(fs.readFileSync(filePath, "utf8"));
     } catch {
       return [];
     }
   }
 
-  private saveMemories(memories: MemoryEntry[]): void {
-    const storagePath = this.getStoragePath();
-    if (storagePath) {
-      fs.writeFileSync(storagePath, JSON.stringify(memories, null, 2));
+  private saveToFile(filePath: string, memories: MemoryEntry[]): void {
+    fs.writeFileSync(filePath, JSON.stringify(memories, null, 2));
+  }
+
+  /**
+   * Loads all memories: global user memories + workspace project memories.
+   */
+  private loadAllMemories(): MemoryEntry[] {
+    const globalMemories = this.loadFromFile(this.getGlobalStoragePath());
+    const wsPath = this.getWorkspaceStoragePath();
+    const wsMemories = wsPath ? this.loadFromFile(wsPath) : [];
+    return [...globalMemories, ...wsMemories];
+  }
+
+  /**
+   * Save a memory to the appropriate file based on scope.
+   * user-scoped → global (~/.codebuddy/user-memory.json)
+   * project-scoped → workspace (.codebuddy/memory.json)
+   */
+  private saveMemory(entry: MemoryEntry): void {
+    if (entry.scope === "user") {
+      const filePath = this.getGlobalStoragePath();
+      const memories = this.loadFromFile(filePath);
+      memories.push(entry);
+      this.saveToFile(filePath, memories);
+    } else {
+      const filePath = this.getWorkspaceStoragePath();
+      if (filePath) {
+        const memories = this.loadFromFile(filePath);
+        memories.push(entry);
+        this.saveToFile(filePath, memories);
+      }
     }
+  }
+
+  /**
+   * Returns memories for the given scope from the correct file.
+   */
+  private getMemoriesForScope(scope: "user" | "project"): {
+    memories: MemoryEntry[];
+    filePath: string | undefined;
+  } {
+    if (scope === "user") {
+      const filePath = this.getGlobalStoragePath();
+      return { memories: this.loadFromFile(filePath), filePath };
+    }
+    const filePath = this.getWorkspaceStoragePath();
+    return { memories: filePath ? this.loadFromFile(filePath) : [], filePath };
   }
 
   public async execute(
@@ -79,8 +135,6 @@ export class MemoryTool {
     memory?: Partial<MemoryEntry>,
     query?: string,
   ): Promise<string> {
-    const memories = this.loadMemories();
-
     switch (action) {
       case "add": {
         if (
@@ -100,41 +154,63 @@ export class MemoryTool {
           scope: memory.scope,
           timestamp: Date.now(),
         };
-        memories.push(newMemory);
-        this.saveMemories(memories);
+        this.saveMemory(newMemory);
         return `Memory added: [${newMemory.category}] ${newMemory.title}`;
       }
 
       case "update": {
         if (!memory?.id) return "Error: Memory ID is required for 'update'.";
+        // Find the memory in the correct scope file
+        const scope = memory.scope || "user";
+        const { memories, filePath } = this.getMemoriesForScope(scope);
+        if (!filePath) return "Error: No storage path available.";
         const index = memories.findIndex((m) => m.id === memory.id);
-        if (index === -1)
-          return `Error: Memory with ID ${memory.id} not found.`;
-
+        if (index === -1) {
+          // Try the other scope
+          const otherScope = scope === "user" ? "project" : "user";
+          const other = this.getMemoriesForScope(
+            otherScope as "user" | "project",
+          );
+          const otherIdx = other.memories.findIndex((m) => m.id === memory.id);
+          if (otherIdx === -1 || !other.filePath)
+            return `Error: Memory with ID ${memory.id} not found.`;
+          other.memories[otherIdx] = {
+            ...other.memories[otherIdx],
+            ...memory,
+            timestamp: Date.now(),
+          };
+          this.saveToFile(other.filePath, other.memories);
+          return `Memory updated: ${other.memories[otherIdx].title}`;
+        }
         memories[index] = {
           ...memories[index],
           ...memory,
           timestamp: Date.now(),
         };
-        this.saveMemories(memories);
+        this.saveToFile(filePath, memories);
         return `Memory updated: ${memories[index].title}`;
       }
 
       case "delete": {
         if (!memory?.id) return "Error: Memory ID is required for 'delete'.";
-        const initialLength = memories.length;
-        const filtered = memories.filter((m) => m.id !== memory.id);
-        if (filtered.length === initialLength)
-          return `Error: Memory with ID ${memory.id} not found.`;
-
-        this.saveMemories(filtered);
-        return "Memory deleted successfully.";
+        // Search both scopes for the ID
+        for (const scope of ["user", "project"] as const) {
+          const { memories, filePath } = this.getMemoriesForScope(scope);
+          if (!filePath) continue;
+          const filtered = memories.filter((m) => m.id !== memory.id);
+          if (filtered.length < memories.length) {
+            this.saveToFile(filePath, filtered);
+            return "Memory deleted successfully.";
+          }
+        }
+        return `Error: Memory with ID ${memory.id} not found.`;
       }
 
       case "search": {
-        if (!query) return JSON.stringify(memories, null, 2);
+        const allMemories = this.loadAllMemories();
+        if (!query) return JSON.stringify(allMemories, null, 2);
         const lowerQuery = query.toLowerCase();
-        const results = memories.filter(
+        const results = allMemories.filter(
           (m) =>
             m.title.toLowerCase().includes(lowerQuery) ||
             m.content.toLowerCase().includes(lowerQuery) ||

@@ -656,6 +656,27 @@
             "default": false,
             "description": "%config.requireDiffApproval%"
           },
+          "codebuddy.agent.maxEventCount": {
+            "type": "number",
+            "default": 2000,
+            "minimum": 500,
+            "maximum": 10000,
+            "description": "%config.agentMaxEventCount%"
+          },
+          "codebuddy.agent.maxToolInvocations": {
+            "type": "number",
+            "default": 400,
+            "minimum": 50,
+            "maximum": 2000,
+            "description": "%config.agentMaxToolInvocations%"
+          },
+          "codebuddy.agent.maxDurationMinutes": {
+            "type": "number",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 60,
+            "description": "%config.agentMaxDurationMinutes%"
+          },
           "codebuddy.completion.enabled": {
             "type": "boolean",
             "default": true,
@@ -818,7 +839,15 @@
             "items": {
               "type": "string"
             },
-            "default": ["main", "master", "develop", "dev", "feature/*", "release/*", "hotfix/*"],
+            "default": [
+              "main",
+              "master",
+              "develop",
+              "dev",
+              "feature/*",
+              "release/*",
+              "hotfix/*"
+            ],
             "description": "%config.gitWatchdogProtectedBranches%"
           },
           "codebuddy.automations.codeHealth.hotspotMinChanges": {
@@ -875,7 +904,11 @@
           },
           "codebuddy.vectorDb.embeddingModel": {
             "type": "string",
-            "enum": ["gemini", "openai", "local"],
+            "enum": [
+              "gemini",
+              "openai",
+              "local"
+            ],
             "default": "gemini",
             "description": "Embedding model provider for vector database."
           },
@@ -910,7 +943,10 @@
           },
           "codebuddy.vectorDb.progressLocation": {
             "type": "string",
-            "enum": ["notification", "statusBar"],
+            "enum": [
+              "notification",
+              "statusBar"
+            ],
             "default": "notification",
             "description": "Where to show indexing progress."
           },
@@ -921,7 +957,11 @@
           },
           "codebuddy.vectorDb.performanceMode": {
             "type": "string",
-            "enum": ["balanced", "performance", "memory"],
+            "enum": [
+              "balanced",
+              "performance",
+              "memory"
+            ],
             "default": "balanced",
             "description": "Performance mode for vector database operations."
           },
@@ -937,7 +977,12 @@
           },
           "codebuddy.vectorDb.logLevel": {
             "type": "string",
-            "enum": ["debug", "info", "warn", "error"],
+            "enum": [
+              "debug",
+              "info",
+              "warn",
+              "error"
+            ],
             "default": "info",
             "description": "Log level for vector database operations."
           },
@@ -1020,7 +1065,7 @@
     "@vscode/ripgrep": "^1.17.0",
     "apache-arrow": "18.1.0",
     "axios": "^1.7.9",
-    "deepagents": "^1.1.1",
+    "deepagents": "^1.8.2",
     "dompurify": "^3.2.6",
     "dotenv": "^16.1.4",
     "fast-levenshtein": "^3.0.0",

@@ -7,9 +7,12 @@ import { rgPath } from "@vscode/ripgrep";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import {
+  BackendFactory,
   BackendProtocol,
   CompositeBackend,
   createDeepAgent,
+  createMemoryMiddleware,
+  createSkillsMiddleware,
   StateBackend,
   StoreBackend,
 } from "deepagents";
@@ -100,7 +103,7 @@ export class DeveloperAgent {
   /**
    * Constructs the Backend Factory specifically for DeepAgents
    */
-  private getBackendFactory() {
+  private getBackendFactory(): BackendFactory {
     const vscodeFsBackend = this.createVscodeBackend();
     const { assistantId, store: configStore } = this.config;
 
@@ -315,16 +318,35 @@ export class DeveloperAgent {
         ? undefined
         : this.getInterruptConfiguration();
 
+    const backendFactory = this.getBackendFactory();
+
+    // Memory middleware: injects AGENTS.md content into system prompt
+    // for continual learning across sessions.
+    const memoryMw: any = createMemoryMiddleware({
+      backend: backendFactory,
+      sources: ["/workspace/.codebuddy/AGENTS.md", "/workspace/AGENTS.md"],
+      addCacheControl: true,
+    });
+
+    // Skills middleware: progressive disclosure of .codebuddy/skills/
+    // Only skill names+descriptions are loaded upfront; full content is
+    // read on-demand, keeping the initial context lean.
+    const skillsMw: any = createSkillsMiddleware({
+      backend: backendFactory,
+      sources: ["/workspace/.codebuddy/skills/"],
+    });
+
     return createDeepAgent({
       model: this.model,
       tools: this.tools,
       systemPrompt: this.getSystemPrompt(),
-      backend: this.getBackendFactory(),
+      backend: backendFactory,
       store,
       checkpointer: checkPointer,
       name: "DeveloperAgent",
       subagents,
       interruptOn: interruptConfig,
+      middleware: [memoryMw, skillsMw],
     });
   }
 

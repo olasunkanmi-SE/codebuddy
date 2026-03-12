@@ -447,25 +447,73 @@ export class CodeBuddyAgentService {
     } else if (toolName === "think" && typeof args?.thought === "string") {
       description = args.thought;
     } else if (toolName === "read_file" && typeof args?.path === "string") {
-      description = `Reading file: ${args.path.split("/").pop()}`;
+      const fileName = (args.path as string).split("/").pop();
+      description = `Reading ${fileName}`;
+    } else if (
+      toolName === "read_file" &&
+      typeof args?.file_path === "string"
+    ) {
+      const fileName = (args.file_path as string).split("/").pop();
+      description = `Reading ${fileName}`;
     } else if (
       toolName === "analyze_files_for_question" &&
       Array.isArray(args?.files)
     ) {
-      description = `Analyzing ${args.files.length} file(s)...`;
+      const names = (args.files as string[])
+        .slice(0, 3)
+        .map((f: string) => f.split("/").pop())
+        .join(", ");
+      const suffix =
+        args.files.length > 3 ? ` +${args.files.length - 3} more` : "";
+      description = `Analyzing ${names}${suffix}`;
     } else if (
-      (toolName === "run_command" || toolName === "command") &&
+      (toolName === "run_command" ||
+        toolName === "run_terminal_command" ||
+        toolName === "command") &&
       args?.command
     ) {
       const cmd = `${args.command}`;
       const trimmed = cmd.length > 80 ? `${cmd.slice(0, 77)}...` : cmd;
-      description = `Command: ${trimmed}`;
-    } else if (args && typeof args === "object") {
-      const keys = Object.keys(args);
-      if (keys.length > 0) {
-        const shown = keys.slice(0, 3).join(", ");
-        description = `${toolInfo.description} (inputs: ${shown}${keys.length > 3 ? "…" : ""})`;
-      }
+      description = `Running: ${trimmed}`;
+    } else if (
+      (toolName === "write_file" || toolName === "edit_file") &&
+      typeof args?.file_path === "string"
+    ) {
+      const fileName = (args.file_path as string).split("/").pop();
+      const verb = toolName === "write_file" ? "Writing" : "Editing";
+      description = `${verb} ${fileName}`;
+    } else if (
+      toolName === "search_codebase" &&
+      typeof args?.query === "string"
+    ) {
+      const q = args.query as string;
+      description = `Searching for: "${q.substring(0, 50)}${q.length > 50 ? "..." : ""}"`;
+    } else if (
+      toolName === "list_directory" &&
+      typeof args?.path === "string"
+    ) {
+      const dirName = (args.path as string).split("/").pop() || args.path;
+      description = `Listing ${dirName}/`;
+    } else if (toolName === "git_diff") {
+      description = "Checking file changes";
+    } else if (toolName === "git_log") {
+      description = "Reviewing commit history";
+    } else if (
+      toolName === "git_branch" &&
+      typeof args?.branch_name === "string"
+    ) {
+      description = `Branch: ${args.branch_name}`;
+    } else if (
+      toolName === "run_tests" &&
+      typeof args?.test_file === "string"
+    ) {
+      const testFile = (args.test_file as string).split("/").pop();
+      description = `Testing ${testFile}`;
+    } else if (
+      toolName === "manage_tasks" &&
+      typeof args?.operation === "string"
+    ) {
+      description = `Tasks: ${args.operation}`;
     }
 
     return {

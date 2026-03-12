@@ -194,17 +194,16 @@ const StatusDot = styled.div<{ $status: string }>`
 `;
 
 const IconCircle = styled.div`
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.70);
+  background: rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
 `;
 
 const ActionBody = styled.div`
@@ -317,21 +316,36 @@ const StatusPill = styled.span<{ $status: string }>`
       : "rgba(140, 180, 255, 0.16)"};
 `;
 
-const ACTION_ICONS: Record<string, string> = {
-  tool: "TL",
-  decision: "DC",
-  reading: "RD",
-  searching: "SR",
-  reviewing: "RV",
-  analyzing: "AN",
-  executing: "EX",
-  working: "WK",
-  summarizing: "SM",
+/** Inline SVG icons — 14×14, stroke-based, no emoji. */
+const svgIcon = (d: string, stroke = "currentColor") => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
+);
+
+const ActionIcon: Record<string, React.ReactNode> = {
+  tool:        svgIcon("M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"),
+  decision:    svgIcon("M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"),
+  reading:     svgIcon("M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8"),
+  searching:   svgIcon("M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35"),
+  reviewing:   svgIcon("M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"),
+  analyzing:   svgIcon("M18 20V10M12 20V4M6 20v-6"),
+  executing:   svgIcon("M4 17l6-6-6-6M12 19h8"),
+  working:     svgIcon("M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"),
+  summarizing: svgIcon("M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"),
 };
 
 const formatLabel = (action: AgentTimelineState["actions"][number]) => {
-  if (action.toolName) return action.toolName;
-  return action.label || action.type;
+  // For tool events, show the friendly label directly
+  if (action.type === "tool" && action.label && action.label !== "Tool") {
+    return action.label;
+  }
+  // For activity events, show the label if it's a friendly name (not raw type)
+  if (action.label && action.label !== action.type) {
+    return action.label;
+  }
+  // Capitalize fallback
+  return action.type.charAt(0).toUpperCase() + action.type.slice(1);
 };
 
 export const AgentTimeline: React.FC<AgentTimelineProps> = ({
@@ -429,16 +443,19 @@ export const AgentTimeline: React.FC<AgentTimelineProps> = ({
               <ActionRow key={action.id} $status={action.status}>
                 <ActionHeader>
                   <StatusDot $status={action.status} />
-                  <IconCircle>{ACTION_ICONS[action.type] || "AC"}</IconCircle>
+                  <IconCircle>{ActionIcon[action.type] || ActionIcon.tool}</IconCircle>
                   <ActionBody>
                     <ActionTitle>
-                      {formatLabel(action)} <StatusPill $status={action.status}>{action.status}</StatusPill>
+                      {formatLabel(action)}
+                      {action.status !== "active" && (
+                        <StatusPill $status={action.status}>{action.status === "completed" ? "done" : action.status}</StatusPill>
+                      )}
+                      {action.duration !== undefined && action.duration !== null && (
+                        <Meta style={{ display: "inline", marginLeft: 4 }}>{formatDuration(action.duration)}</Meta>
+                      )}
                     </ActionTitle>
                     <Meta>
                       {action.detail || ""}
-                      {action.duration !== undefined && action.duration !== null
-                        ? ` · ${formatDuration(action.duration)}`
-                        : ""}
                     </Meta>
                     {typeof action.progress === "number" && action.progress >= 0 && action.progress <= 100 && (
                       <ProgressBar>
