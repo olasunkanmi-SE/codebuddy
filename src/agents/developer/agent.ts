@@ -320,21 +320,34 @@ export class DeveloperAgent {
 
     const backendFactory = this.getBackendFactory();
 
-    // Memory middleware: injects AGENTS.md content into system prompt
-    // for continual learning across sessions.
-    const memoryMw: any = createMemoryMiddleware({
-      backend: backendFactory,
-      sources: ["/workspace/.codebuddy/AGENTS.md", "/workspace/AGENTS.md"],
-      addCacheControl: true,
-    });
+    // Build middleware with defensive initialization — a failing middleware
+    // should not prevent the agent from starting.
+    // Cast to `any[]` to avoid TS2589 (excessively deep type instantiation)
+    // caused by createDeepAgent's generic middleware type inference.
+    const middleware: any[] = [];
 
-    // Skills middleware: progressive disclosure of .codebuddy/skills/
-    // Only skill names+descriptions are loaded upfront; full content is
-    // read on-demand, keeping the initial context lean.
-    const skillsMw: any = createSkillsMiddleware({
-      backend: backendFactory,
-      sources: ["/workspace/.codebuddy/skills/"],
-    });
+    try {
+      middleware.push(
+        createMemoryMiddleware({
+          backend: backendFactory,
+          sources: ["/workspace/.codebuddy/AGENTS.md", "/workspace/AGENTS.md"],
+          addCacheControl: true,
+        }),
+      );
+    } catch (err) {
+      this.logger.warn(`Memory middleware init failed: ${err}`);
+    }
+
+    try {
+      middleware.push(
+        createSkillsMiddleware({
+          backend: backendFactory,
+          sources: ["/workspace/.codebuddy/skills/"],
+        }),
+      );
+    } catch (err) {
+      this.logger.warn(`Skills middleware init failed: ${err}`);
+    }
 
     return createDeepAgent({
       model: this.model,
@@ -346,7 +359,7 @@ export class DeveloperAgent {
       name: "DeveloperAgent",
       subagents,
       interruptOn: interruptConfig,
-      middleware: [memoryMw, skillsMw],
+      middleware,
     });
   }
 

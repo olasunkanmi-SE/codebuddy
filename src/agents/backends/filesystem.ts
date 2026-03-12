@@ -335,66 +335,76 @@ class VscodeFsBackend implements BackendProtocol {
     const globRegex = glob
       ? globToRegExp(glob.startsWith("/") ? glob : `/${glob}`)
       : null;
-    let totalMatches = 0;
 
-    const walkAndSearch = async (dir: string): Promise<GrepMatch[]> => {
-      if (totalMatches >= MAX_GREP_RESULTS) return [];
+    // Shared accumulator — single source of truth for match count.
+    // Eliminates TOCTOU races from parallel promises sharing a mutable counter.
+    const acc: { results: GrepMatch[]; isFull: boolean } = {
+      results: [],
+      isFull: false,
+    };
+
+    const walkAndSearch = async (dir: string): Promise<void> => {
+      if (acc.isFull) return;
       let entries: fs.Dirent[];
       try {
         entries = await fsp.readdir(dir, { withFileTypes: true });
       } catch {
-        return [];
+        return;
       }
 
-      const promises = entries.map(async (e): Promise<GrepMatch[]> => {
-        if (totalMatches >= MAX_GREP_RESULTS) return [];
-        const child = path.join(dir, e.name);
-        if (e.isDirectory()) {
-          return walkAndSearch(child); // Recurse into subdirectories
-        }
-
-        const relPosix = `/${path.relative(this.rootDir, child).replace(/\\/g, "/")}`;
-        if (globRegex && !globRegex.test(relPosix)) return [];
-
-        // Optimization: Stream files to avoid high memory usage and process line-by-line.
-        const fileMatches: GrepMatch[] = [];
-        let fileStream: fs.ReadStream | undefined;
-        try {
-          fileStream = fs.createReadStream(child, { encoding: "utf-8" });
-          const rl = readline.createInterface({
-            input: fileStream,
-            crlfDelay: Infinity,
-          });
-
-          let lineNum = 0;
-          try {
-            for await (const line of rl) {
-              lineNum++;
-              if (totalMatches >= MAX_GREP_RESULTS) break;
-              if (re.test(line)) {
-                fileMatches.push({ path: relPosix, line: lineNum, text: line });
-                totalMatches++;
-              }
-            }
-          } finally {
-            rl.close();
-            fileStream.destroy();
+      await Promise.all(
+        entries.map(async (e): Promise<void> => {
+          if (acc.isFull) return;
+          const child = path.join(dir, e.name);
+          if (e.isDirectory()) {
+            return walkAndSearch(child);
           }
-        } catch (err) {
-          console.warn(
-            `[VscodeFsBackend] Failed to grep file ${child}: ${err}`,
-          );
-          fileStream?.destroy();
-        }
-        return fileMatches;
-      });
 
-      const nestedMatches = await Promise.all(promises);
-      return ([] as GrepMatch[]).concat(...nestedMatches);
+          const relPosix = `/${path.relative(this.rootDir, child).replace(/\\/g, "/")}`;
+          if (globRegex && !globRegex.test(relPosix)) return;
+
+          let fileStream: fs.ReadStream | undefined;
+          try {
+            fileStream = fs.createReadStream(child, { encoding: "utf-8" });
+            const rl = readline.createInterface({
+              input: fileStream,
+              crlfDelay: Infinity,
+            });
+
+            let lineNum = 0;
+            try {
+              for await (const line of rl) {
+                lineNum++;
+                if (acc.isFull) break;
+                if (re.test(line)) {
+                  acc.results.push({
+                    path: relPosix,
+                    line: lineNum,
+                    text: line,
+                  });
+                  if (acc.results.length >= MAX_GREP_RESULTS) {
+                    acc.isFull = true;
+                    break;
+                  }
+                }
+              }
+            } finally {
+              rl.close();
+              fileStream.destroy();
+            }
+          } catch (err) {
+            console.warn(
+              `[VscodeFsBackend] Failed to grep file ${child}: ${err}`,
+            );
+            fileStream?.destroy();
+          }
+        }),
+      );
     };
 
     try {
-      return await walkAndSearch(absBase);
+      await walkAndSearch(absBase);
+      return acc.results;
     } catch (err: any) {
       return `Error: ${err?.message ?? String(err)}`;
     }

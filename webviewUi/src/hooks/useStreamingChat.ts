@@ -1,5 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+/** Module-level constant — zero allocation on every friendlyToolName call. */
+const FRIENDLY_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  run_command: "Terminal",
+  run_terminal_command: "Terminal",
+  command: "Terminal",
+  web_search: "Web Search",
+  read_file: "Read File",
+  write_file: "Write File",
+  edit_file: "Edit File",
+  analyze_files_for_question: "Analyze Code",
+  think: "Reasoning",
+  search_codebase: "Search Codebase",
+  manage_tasks: "Task Manager",
+  manage_core_memory: "Memory",
+  git_diff: "Git Diff",
+  git_log: "Git Log",
+  git_branch: "Git Branch",
+  run_tests: "Run Tests",
+  list_directory: "List Directory",
+});
+
 type TimelineStatus = "active" | "completed" | "failed";
 
 export interface AgentTimelineThinking {
@@ -279,25 +300,6 @@ export const useStreamingChat = (
   const friendlyToolName = useCallback(
     (toolName: string | undefined): string => {
       if (!toolName) return "Tool";
-      const FRIENDLY_NAMES: Record<string, string> = {
-        run_command: "Terminal",
-        run_terminal_command: "Terminal",
-        command: "Terminal",
-        web_search: "Web Search",
-        read_file: "Read File",
-        write_file: "Write File",
-        edit_file: "Edit File",
-        analyze_files_for_question: "Analyze Code",
-        think: "Reasoning",
-        search_codebase: "Search Codebase",
-        manage_tasks: "Task Manager",
-        manage_core_memory: "Memory",
-        git_diff: "Git Diff",
-        git_log: "Git Log",
-        git_branch: "Git Branch",
-        run_tests: "Run Tests",
-        list_directory: "List Directory",
-      };
       return (
         FRIENDLY_NAMES[toolName] ||
         toolName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())

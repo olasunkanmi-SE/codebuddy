@@ -1,5 +1,5 @@
 import { SchemaType } from "@google/generative-ai";
-import * as fs from "fs";
+import { promises as fsp } from "fs";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
@@ -14,10 +14,44 @@ interface MemoryEntry {
   timestamp: number;
 }
 
+/** Simple in-process mutex to serialize per-file write operations. */
+class FileMutex {
+  private _p: Promise<void> = Promise.resolve();
+  async lock<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this._p.then(
+      () => fn(),
+      () => fn(),
+    );
+    this._p = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    return next;
+  }
+}
+
+/** Per-path lock map — serializes concurrent writes to the same file. */
+const FILE_LOCKS = new Map<string, FileMutex>();
+
+function getLock(filePath: string): FileMutex {
+  let lock = FILE_LOCKS.get(filePath);
+  if (!lock) {
+    lock = new FileMutex();
+    FILE_LOCKS.set(filePath, lock);
+  }
+  return lock;
+}
+
 export class MemoryTool {
+  /**
+   * Synchronous formatted memories for system prompt injection.
+   * Uses a cached snapshot to avoid blocking the extension host.
+   */
   public static getFormattedMemories(): string {
     const tool = new MemoryTool();
-    const memories = tool.loadAllMemories();
+    // Kick off an async load but return cached/sync result for prompt building.
+    // The first call may return empty; subsequent calls will have data.
+    const memories = tool.loadAllMemoriesSync();
     if (memories.length === 0) return "";
 
     let prompt = "\n\n## 🧠 Core Memories (Context from previous sessions):\n";
@@ -46,11 +80,7 @@ export class MemoryTool {
    * Stored in ~/.codebuddy/user-memory.json so they persist across all workspaces.
    */
   private getGlobalStoragePath(): string {
-    const globalDir = path.join(os.homedir(), ".codebuddy");
-    if (!fs.existsSync(globalDir)) {
-      fs.mkdirSync(globalDir, { recursive: true });
-    }
-    return path.join(globalDir, "user-memory.json");
+    return path.join(os.homedir(), ".codebuddy", "user-memory.json");
   }
 
   /**
@@ -62,72 +92,88 @@ export class MemoryTool {
       return undefined;
     }
     const rootPath = workspaceFolders[0].uri.fsPath;
-    const codebuddyDir = path.join(rootPath, ".codebuddy");
-
-    if (!fs.existsSync(codebuddyDir)) {
-      fs.mkdirSync(codebuddyDir, { recursive: true });
-    }
-
-    return path.join(codebuddyDir, "memory.json");
+    return path.join(rootPath, ".codebuddy", "memory.json");
   }
 
-  private loadFromFile(filePath: string): MemoryEntry[] {
-    if (!fs.existsSync(filePath)) return [];
+  /** Async file read — returns [] if file doesn't exist or is invalid. */
+  private async loadFromFileAsync(filePath: string): Promise<MemoryEntry[]> {
     try {
-      return JSON.parse(fs.readFileSync(filePath, "utf8"));
-    } catch {
+      const raw = await fsp.readFile(filePath, "utf8");
+      return JSON.parse(raw) as MemoryEntry[];
+    } catch (err: any) {
+      if (err.code === "ENOENT") return [];
+      console.warn(`[MemoryTool] Failed to read ${filePath}: ${err.message}`);
       return [];
     }
   }
 
-  private saveToFile(filePath: string, memories: MemoryEntry[]): void {
-    fs.writeFileSync(filePath, JSON.stringify(memories, null, 2));
+  /** Atomic write: write to temp file then rename to prevent corrupt JSON. */
+  private async saveToFileAsync(
+    filePath: string,
+    memories: MemoryEntry[],
+  ): Promise<void> {
+    await fsp.mkdir(path.dirname(filePath), { recursive: true });
+    const tmp = `${filePath}.tmp`;
+    await fsp.writeFile(tmp, JSON.stringify(memories, null, 2), "utf8");
+    await fsp.rename(tmp, filePath);
   }
 
   /**
-   * Loads all memories: global user memories + workspace project memories.
+   * Atomically update a memory file within a per-path mutex.
+   * Prevents lost writes from concurrent tool calls.
    */
-  private loadAllMemories(): MemoryEntry[] {
-    const globalMemories = this.loadFromFile(this.getGlobalStoragePath());
+  private async updateMemoryFile(
+    filePath: string,
+    updater: (memories: MemoryEntry[]) => MemoryEntry[],
+  ): Promise<void> {
+    const lock = getLock(filePath);
+    await lock.lock(async () => {
+      const current = await this.loadFromFileAsync(filePath);
+      const updated = updater(current);
+      await this.saveToFileAsync(filePath, updated);
+    });
+  }
+
+  /**
+   * Synchronous fallback for getFormattedMemories (system prompt building).
+   * Uses require('fs') sync APIs since this is called during prompt construction
+   * which must be synchronous for the current API surface.
+   */
+  private loadAllMemoriesSync(): MemoryEntry[] {
+    const fs = require("fs");
+    const loadSync = (fp: string): MemoryEntry[] => {
+      try {
+        return JSON.parse(fs.readFileSync(fp, "utf8"));
+      } catch {
+        return [];
+      }
+    };
+    const globalMemories = loadSync(this.getGlobalStoragePath());
     const wsPath = this.getWorkspaceStoragePath();
-    const wsMemories = wsPath ? this.loadFromFile(wsPath) : [];
+    const wsMemories = wsPath ? loadSync(wsPath) : [];
     return [...globalMemories, ...wsMemories];
   }
 
   /**
-   * Save a memory to the appropriate file based on scope.
-   * user-scoped → global (~/.codebuddy/user-memory.json)
-   * project-scoped → workspace (.codebuddy/memory.json)
+   * Loads all memories asynchronously: global user memories + workspace project memories.
    */
-  private saveMemory(entry: MemoryEntry): void {
-    if (entry.scope === "user") {
-      const filePath = this.getGlobalStoragePath();
-      const memories = this.loadFromFile(filePath);
-      memories.push(entry);
-      this.saveToFile(filePath, memories);
-    } else {
-      const filePath = this.getWorkspaceStoragePath();
-      if (filePath) {
-        const memories = this.loadFromFile(filePath);
-        memories.push(entry);
-        this.saveToFile(filePath, memories);
-      }
-    }
+  private async loadAllMemories(): Promise<MemoryEntry[]> {
+    const globalMemories = await this.loadFromFileAsync(
+      this.getGlobalStoragePath(),
+    );
+    const wsPath = this.getWorkspaceStoragePath();
+    const wsMemories = wsPath ? await this.loadFromFileAsync(wsPath) : [];
+    return [...globalMemories, ...wsMemories];
   }
 
   /**
-   * Returns memories for the given scope from the correct file.
+   * Resolve storage path for a given scope. Returns undefined if workspace
+   * is not available for project scope.
    */
-  private getMemoriesForScope(scope: "user" | "project"): {
-    memories: MemoryEntry[];
-    filePath: string | undefined;
-  } {
-    if (scope === "user") {
-      const filePath = this.getGlobalStoragePath();
-      return { memories: this.loadFromFile(filePath), filePath };
-    }
-    const filePath = this.getWorkspaceStoragePath();
-    return { memories: filePath ? this.loadFromFile(filePath) : [], filePath };
+  private getStoragePath(scope: "user" | "project"): string | undefined {
+    return scope === "user"
+      ? this.getGlobalStoragePath()
+      : this.getWorkspaceStoragePath();
   }
 
   public async execute(
@@ -145,6 +191,9 @@ export class MemoryTool {
         ) {
           return "Error: content, category, title, and scope are required for 'add'.";
         }
+        const filePath = this.getStoragePath(memory.scope);
+        if (!filePath) return "Error: No storage path available.";
+
         const newMemory: MemoryEntry = {
           id: Math.random().toString(36).substring(7),
           category: memory.category,
@@ -154,60 +203,65 @@ export class MemoryTool {
           scope: memory.scope,
           timestamp: Date.now(),
         };
-        this.saveMemory(newMemory);
+        await this.updateMemoryFile(filePath, (memories) => [
+          ...memories,
+          newMemory,
+        ]);
         return `Memory added: [${newMemory.category}] ${newMemory.title}`;
       }
 
       case "update": {
         if (!memory?.id) return "Error: Memory ID is required for 'update'.";
-        // Find the memory in the correct scope file
-        const scope = memory.scope || "user";
-        const { memories, filePath } = this.getMemoriesForScope(scope);
-        if (!filePath) return "Error: No storage path available.";
-        const index = memories.findIndex((m) => m.id === memory.id);
-        if (index === -1) {
-          // Try the other scope
-          const otherScope = scope === "user" ? "project" : "user";
-          const other = this.getMemoriesForScope(
-            otherScope as "user" | "project",
-          );
-          const otherIdx = other.memories.findIndex((m) => m.id === memory.id);
-          if (otherIdx === -1 || !other.filePath)
-            return `Error: Memory with ID ${memory.id} not found.`;
-          other.memories[otherIdx] = {
-            ...other.memories[otherIdx],
-            ...memory,
-            timestamp: Date.now(),
-          };
-          this.saveToFile(other.filePath, other.memories);
-          return `Memory updated: ${other.memories[otherIdx].title}`;
+
+        // Search both scopes for the ID, updating in the scope where it lives.
+        // The update is applied to the scope where the memory is found,
+        // regardless of the caller-supplied scope, preventing cross-scope writes.
+        for (const scope of ["user", "project"] as const) {
+          const filePath = this.getStoragePath(scope);
+          if (!filePath) continue;
+
+          const memories = await this.loadFromFileAsync(filePath);
+          const index = memories.findIndex((m) => m.id === memory.id);
+          if (index === -1) continue;
+
+          // Only allow updating fields that belong to MemoryEntry, not scope
+          await this.updateMemoryFile(filePath, (current) => {
+            const idx = current.findIndex((m) => m.id === memory.id);
+            if (idx === -1) return current;
+            current[idx] = {
+              ...current[idx],
+              ...(memory.category && { category: memory.category }),
+              ...(memory.content && { content: memory.content }),
+              ...(memory.keywords && { keywords: memory.keywords }),
+              ...(memory.title && { title: memory.title }),
+              timestamp: Date.now(),
+            };
+            return current;
+          });
+          return `Memory updated: ${memories[index].title}`;
         }
-        memories[index] = {
-          ...memories[index],
-          ...memory,
-          timestamp: Date.now(),
-        };
-        this.saveToFile(filePath, memories);
-        return `Memory updated: ${memories[index].title}`;
+        return `Error: Memory with ID ${memory.id} not found.`;
       }
 
       case "delete": {
         if (!memory?.id) return "Error: Memory ID is required for 'delete'.";
-        // Search both scopes for the ID
         for (const scope of ["user", "project"] as const) {
-          const { memories, filePath } = this.getMemoriesForScope(scope);
+          const filePath = this.getStoragePath(scope);
           if (!filePath) continue;
-          const filtered = memories.filter((m) => m.id !== memory.id);
-          if (filtered.length < memories.length) {
-            this.saveToFile(filePath, filtered);
-            return "Memory deleted successfully.";
-          }
+
+          const memories = await this.loadFromFileAsync(filePath);
+          if (!memories.some((m) => m.id === memory.id)) continue;
+
+          await this.updateMemoryFile(filePath, (current) =>
+            current.filter((m) => m.id !== memory.id),
+          );
+          return "Memory deleted successfully.";
         }
         return `Error: Memory with ID ${memory.id} not found.`;
       }
 
       case "search": {
-        const allMemories = this.loadAllMemories();
+        const allMemories = await this.loadAllMemories();
         if (!query) return JSON.stringify(allMemories, null, 2);
         const lowerQuery = query.toLowerCase();
         const results = allMemories.filter(

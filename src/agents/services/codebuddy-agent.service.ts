@@ -30,9 +30,14 @@ import { CostTrackingService } from "../../services/cost-tracking.service";
 import { CheckpointService } from "../../services/checkpoint.service";
 import { getGenerativeAiModel, getAPIKeyAndModel } from "../../utils/utils";
 import { Orchestrator } from "../../orchestrator";
-import { AgentSafetyGuard } from "./agent-safety-guard";
+import {
+  AgentSafetyGuard,
+  readAgentSafetyLimits,
+  type AgentSafetyLimits,
+} from "./agent-safety-guard";
 import { ConsentManager } from "./consent-manager";
 import { ContentNormalizer } from "./content-normalizer";
+import { TOOL_NAMES } from "../constants/tool-names";
 
 /** Typed alias for the async iterator from a LangGraph agent stream. */
 type AgentStreamIterator = AsyncIterator<unknown>;
@@ -46,87 +51,87 @@ const DEFAULT_TOOL_DESCRIPTION: IToolDescription = Object.freeze({
 
 // Tool descriptions for user-friendly feedback
 const TOOL_DESCRIPTIONS: Record<string, IToolDescription> = {
-  run_command: {
+  [TOOL_NAMES.RUN_COMMAND]: {
     name: "Terminal",
     description: "Running command...",
     activityType: "executing",
   },
-  run_terminal_command: {
+  [TOOL_NAMES.RUN_TERMINAL_COMMAND]: {
     name: "Terminal",
     description: "Executing terminal command...",
     activityType: "executing",
   },
-  command: {
+  [TOOL_NAMES.COMMAND]: {
     name: "Terminal",
     description: "Running command...",
     activityType: "executing",
   },
-  web_search: {
+  [TOOL_NAMES.WEB_SEARCH]: {
     name: "Web Search",
     description: "Searching the web for relevant information...",
     activityType: "searching",
   },
-  read_file: {
+  [TOOL_NAMES.READ_FILE]: {
     name: "File Reader",
     description: "Reading file contents...",
     activityType: "reading",
   },
-  analyze_files_for_question: {
+  [TOOL_NAMES.ANALYZE_FILES]: {
     name: "Code Analyzer",
     description: "Analyzing code files...",
     activityType: "analyzing",
   },
-  think: {
+  [TOOL_NAMES.THINK]: {
     name: "Reasoning",
     description: "Thinking through the problem...",
     activityType: "thinking",
   },
-  write_file: {
+  [TOOL_NAMES.WRITE_FILE]: {
     name: "File Writer",
     description: "Writing to file...",
     activityType: "working",
   },
-  edit_file: {
+  [TOOL_NAMES.EDIT_FILE]: {
     name: "File Editor",
     description: "Editing file contents...",
     activityType: "working",
   },
-  search_codebase: {
+  [TOOL_NAMES.SEARCH_CODEBASE]: {
     name: "Codebase Search",
     description: "Searching the codebase...",
     activityType: "searching",
   },
-  manage_tasks: {
+  [TOOL_NAMES.MANAGE_TASKS]: {
     name: "Task Manager",
     description: "Managing tasks...",
     activityType: "working",
   },
-  manage_core_memory: {
+  [TOOL_NAMES.MANAGE_CORE_MEMORY]: {
     name: "Core Memory",
     description: "Managing memory...",
     activityType: "working",
   },
-  git_diff: {
+  [TOOL_NAMES.GIT_DIFF]: {
     name: "Git Diff",
     description: "Checking file changes...",
     activityType: "reviewing",
   },
-  git_log: {
+  [TOOL_NAMES.GIT_LOG]: {
     name: "Git Log",
     description: "Reviewing commit history...",
     activityType: "reviewing",
   },
-  git_branch: {
+  [TOOL_NAMES.GIT_BRANCH]: {
     name: "Git Branch",
     description: "Managing branches...",
     activityType: "working",
   },
-  run_tests: {
+  [TOOL_NAMES.RUN_TESTS]: {
     name: "Test Runner",
     description: "Running tests...",
     activityType: "executing",
   },
-  list_directory: {
+  [TOOL_NAMES.LIST_DIRECTORY]: {
     name: "Directory Listing",
     description: "Exploring directory structure...",
     activityType: "reading",
@@ -222,12 +227,12 @@ export function summarizeToolResultContent(
       raw.length > MAX_CONTENT_LENGTH ? raw.slice(0, MAX_CONTENT_LENGTH) : raw;
   }
 
-  if (toolName === "read_file") {
+  if (toolName === TOOL_NAMES.READ_FILE) {
     const lines = contentStr.split("\n").length;
     return `Read ${lines} lines`;
   }
 
-  if (toolName === "search_codebase") {
+  if (toolName === TOOL_NAMES.SEARCH_CODEBASE) {
     const matchCount = (contentStr.match(/match/gi) || []).length;
     return matchCount > 0 ? `Found ${matchCount} matches` : "Search complete";
   }
@@ -441,22 +446,28 @@ export class CodeBuddyAgentService {
     let description = toolInfo.description;
 
     // Customize description based on tool args
-    if (toolName === "web_search" && typeof args?.query === "string") {
+    if (toolName === TOOL_NAMES.WEB_SEARCH && typeof args?.query === "string") {
       const q = args.query;
       description = `Searching the web for: "${q.substring(0, 50)}${q.length > 50 ? "..." : ""}"`;
-    } else if (toolName === "think" && typeof args?.thought === "string") {
+    } else if (
+      toolName === TOOL_NAMES.THINK &&
+      typeof args?.thought === "string"
+    ) {
       description = args.thought;
-    } else if (toolName === "read_file" && typeof args?.path === "string") {
+    } else if (
+      toolName === TOOL_NAMES.READ_FILE &&
+      typeof args?.path === "string"
+    ) {
       const fileName = (args.path as string).split("/").pop();
       description = `Reading ${fileName}`;
     } else if (
-      toolName === "read_file" &&
+      toolName === TOOL_NAMES.READ_FILE &&
       typeof args?.file_path === "string"
     ) {
       const fileName = (args.file_path as string).split("/").pop();
       description = `Reading ${fileName}`;
     } else if (
-      toolName === "analyze_files_for_question" &&
+      toolName === TOOL_NAMES.ANALYZE_FILES &&
       Array.isArray(args?.files)
     ) {
       const names = (args.files as string[])
@@ -467,39 +478,40 @@ export class CodeBuddyAgentService {
         args.files.length > 3 ? ` +${args.files.length - 3} more` : "";
       description = `Analyzing ${names}${suffix}`;
     } else if (
-      (toolName === "run_command" ||
-        toolName === "run_terminal_command" ||
-        toolName === "command") &&
+      (toolName === TOOL_NAMES.RUN_COMMAND ||
+        toolName === TOOL_NAMES.RUN_TERMINAL_COMMAND ||
+        toolName === TOOL_NAMES.COMMAND) &&
       args?.command
     ) {
       const cmd = `${args.command}`;
       const trimmed = cmd.length > 80 ? `${cmd.slice(0, 77)}...` : cmd;
       description = `Running: ${trimmed}`;
     } else if (
-      (toolName === "write_file" || toolName === "edit_file") &&
+      (toolName === TOOL_NAMES.WRITE_FILE ||
+        toolName === TOOL_NAMES.EDIT_FILE) &&
       typeof args?.file_path === "string"
     ) {
       const fileName = (args.file_path as string).split("/").pop();
-      const verb = toolName === "write_file" ? "Writing" : "Editing";
+      const verb = toolName === TOOL_NAMES.WRITE_FILE ? "Writing" : "Editing";
       description = `${verb} ${fileName}`;
     } else if (
-      toolName === "search_codebase" &&
+      toolName === TOOL_NAMES.SEARCH_CODEBASE &&
       typeof args?.query === "string"
     ) {
       const q = args.query as string;
       description = `Searching for: "${q.substring(0, 50)}${q.length > 50 ? "..." : ""}"`;
     } else if (
-      toolName === "list_directory" &&
+      toolName === TOOL_NAMES.LIST_DIRECTORY &&
       typeof args?.path === "string"
     ) {
       const dirName = (args.path as string).split("/").pop() || args.path;
       description = `Listing ${dirName}/`;
-    } else if (toolName === "git_diff") {
+    } else if (toolName === TOOL_NAMES.GIT_DIFF) {
       description = "Checking file changes";
-    } else if (toolName === "git_log") {
+    } else if (toolName === TOOL_NAMES.GIT_LOG) {
       description = "Reviewing commit history";
     } else if (
-      toolName === "git_branch" &&
+      toolName === TOOL_NAMES.GIT_BRANCH &&
       typeof args?.branch_name === "string"
     ) {
       description = `Branch: ${args.branch_name}`;
@@ -698,6 +710,9 @@ export class CodeBuddyAgentService {
       agentState: "planning",
     };
 
+    // Snapshot safety limits once per stream session (O(1) config reads)
+    const limits = readAgentSafetyLimits();
+
     const tracer = trace.getTracer("codebuddy-agent-service");
     const span = tracer.startSpan("streamAgent", {
       attributes: {
@@ -777,6 +792,7 @@ export class CodeBuddyAgentService {
           ctx.eventCount,
           ctx.totalToolInvocations,
           elapsed,
+          limits,
         );
 
         if (safetyResult.shouldStop) {
@@ -905,6 +921,7 @@ export class CodeBuddyAgentService {
           conversationId,
           providerName,
           currentModelName,
+          limits,
           onChunk,
         );
       }
@@ -1148,6 +1165,7 @@ export class CodeBuddyAgentService {
     conversationId: string,
     providerName: string,
     currentModelName: string,
+    limits: AgentSafetyLimits,
     onChunk?: (chunk: IStreamEvent) => void,
   ): AsyncGenerator<IStreamEvent> {
     for (const [nodeName, update] of entries) {
@@ -1256,6 +1274,7 @@ export class CodeBuddyAgentService {
           ctx,
           span,
           streamManager,
+          limits,
         );
         if (ctx.hasErrored) return;
       }
@@ -1272,6 +1291,7 @@ export class CodeBuddyAgentService {
     ctx: IStreamContext,
     span: Span,
     streamManager: StreamManager,
+    limits: AgentSafetyLimits,
   ): AsyncGenerator<IStreamEvent> {
     this.logger.debug(
       `[STREAM] Tool calls detected: ${toolCalls.length} tools - ${toolCalls.map((tc) => tc.name).join(", ")}`,
@@ -1315,13 +1335,15 @@ export class CodeBuddyAgentService {
 
       if (!isMiddlewareNode) {
         if (
-          (toolCall.name === "edit_file" || toolCall.name === "write_file") &&
+          (toolCall.name === TOOL_NAMES.EDIT_FILE ||
+            toolCall.name === TOOL_NAMES.WRITE_FILE) &&
           toolCall.args?.file_path
         ) {
           const filePath = toolCall.args.file_path as string;
           const fileLoop = this.safetyGuard.detectFileLoop(
             filePath,
             ctx.fileEditCounts,
+            limits,
           );
           ctx.fileEditCounts.set(filePath, fileLoop.editCount);
           if (fileLoop.isLooping) {
@@ -1355,6 +1377,7 @@ export class CodeBuddyAgentService {
         const loopResult = this.safetyGuard.detectToolLoop(
           toolCall.name,
           currentCount,
+          limits,
         );
         if (loopResult.isLooping && !loopResult.isReadOnly) {
           this.logger.log(
@@ -1417,7 +1440,7 @@ export class CodeBuddyAgentService {
         },
       };
 
-      if (toolCall.name === "think") {
+      if (toolCall.name === TOOL_NAMES.THINK) {
         yield {
           type: StreamEventType.THINKING_START,
           content: toolActivity.description,
@@ -1468,7 +1491,7 @@ export class CodeBuddyAgentService {
           duration: activity.endTime - activity.startTime,
         },
       };
-      if (toolName === "think") {
+      if (toolName === TOOL_NAMES.THINK) {
         yield {
           type: StreamEventType.THINKING_END,
           content: activity.description,
@@ -1508,7 +1531,7 @@ export class CodeBuddyAgentService {
     if (!content) return "Completed";
 
     // Handle web_search via synthesizer (requires `this`)
-    if (toolName === "web_search") {
+    if (toolName === TOOL_NAMES.WEB_SEARCH) {
       const contentStr =
         typeof content === "string" ? content : JSON.stringify(content);
       try {
