@@ -280,8 +280,9 @@ export const AgentTimeline: React.FC<AgentTimelineProps> = ({
   const hasContent =
     !!timeline.thinking || !!timeline.plan || timeline.actions.length > 0 || timeline.summarizing;
 
-  const toggle = useCallback((id: string) => {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggle = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const id = e.currentTarget.dataset.actionId;
+    if (id) setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
   const fmtDur = useMemo(
@@ -376,7 +377,8 @@ export const AgentTimeline: React.FC<AgentTimelineProps> = ({
                       )}
                       {hasDetails && (
                         <DetailToggle
-                          onClick={() => toggle(action.id)}
+                          data-action-id={action.id}
+                          onClick={toggle}
                           aria-expanded={isOpen}
                           aria-label={isOpen ? `Collapse details for ${formatLabel(action)}` : `Expand details for ${formatLabel(action)}`}
                         >

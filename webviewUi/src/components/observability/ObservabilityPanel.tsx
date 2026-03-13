@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import styled, { keyframes, css } from "styled-components";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
-import { SpanData, SpanEvent, spanStartMs, spanEndMs, fmtDuration, fmtCost, fmtTokens } from "../../utils/telemetry.utils";
+import { SpanData, SpanEvent, spanStartMs, spanEndMs, spanDurationMs, fmtDuration, fmtCost, fmtTokens } from "../../utils/telemetry.utils";
 
 interface TraceGroup {
   traceId: string;
@@ -938,8 +938,10 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
     }
     return Array.from(groups.entries()).map(([traceId, spans]): TraceGroup => {
       const root = spans.find(s => !s.parentSpanId) ?? spans[0];
-      const start = Math.min(...spans.map(spanStartMs));
-      const end = Math.max(...spans.map(spanEndMs));
+      const starts = spans.map(spanStartMs).filter(isFinite);
+      const ends = spans.map(spanEndMs).filter(isFinite);
+      const start = starts.length ? Math.min(...starts) : 0;
+      const end = ends.length ? Math.max(...ends) : 0;
       return {
         traceId, spans, root, start, end,
         duration: end - start,
@@ -969,11 +971,16 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
     }
     const result: TreeNode[] = [];
     const visited = new Set<string>();
-    const walk = (parentId: string | undefined, depth: number) => {
+    const MAX_TREE_DEPTH = 20;
+    const walk = (parentId: string | undefined, depth: number): void => {
+      if (depth > MAX_TREE_DEPTH) {
+        console.warn(`[ObservabilityPanel] Trace tree exceeded ${MAX_TREE_DEPTH} levels — possible cycle`);
+        return;
+      }
       for (const s of children.get(parentId) ?? []) {
         const sid = s.context?.spanId;
-        if (sid && visited.has(sid)) continue;
-        if (sid) visited.add(sid);
+        if (!sid || visited.has(sid)) continue;
+        visited.add(sid);
         result.push({ span: s, depth });
         walk(sid, depth + 1);
       }
@@ -1283,7 +1290,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                           <span>{new Date(g.start).toLocaleTimeString()}</span>
                           <span>{fmtDuration(g.duration)}</span>
                           <span>{g.spans.length} span{g.spans.length !== 1 ? 's' : ''}</span>
-                          {g.totalTokens > 0 && <span>⌃ {fmtTokens(g.totalTokens)}</span>}
+                          {g.totalTokens > 0 && <span><span className="codicon codicon-symbol-numeric" /> {fmtTokens(g.totalTokens)}</span>}
                           {g.cost > 0 && <span>{fmtCost(g.cost)}</span>}
                         </TraceListMeta>
                       </TraceListBody>
@@ -1305,7 +1312,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                       </span>
                     </TreeBreadcrumb>
                     {selectedTraceTree.map(({ span: s, depth }) => {
-                      const dur = spanEndMs(s) - spanStartMs(s);
+                      const dur = spanDurationMs(s);
                       const isErr = s.status?.code === 2;
                       return (
                         <TreeNode
@@ -1326,7 +1333,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                   <DetailPane>
                     {selectedSpan ? (() => {
                       const group = traceGroups.find(g => g.traceId === selectedTraceId)!;
-                      const dur = spanEndMs(selectedSpan) - spanStartMs(selectedSpan);
+                      const dur = spanDurationMs(selectedSpan);
                       const attrs = selectedSpan.attributes || {};
                       const isRoot = !selectedSpan.parentSpanId;
 
@@ -1345,7 +1352,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                               {!!attrs['gen_ai.system'] && <DetailBadge $variant="info">{String(attrs['gen_ai.system'])}</DetailBadge>}
                               {!!attrs['gen_ai.request.model'] && <DetailBadge $variant="info">{String(attrs['gen_ai.request.model'])}</DetailBadge>}
                               {!!attrs['gen_ai.usage.total_tokens'] && (
-                                <DetailBadge>⌃ {fmtTokens(Number(attrs['gen_ai.usage.total_tokens']))}</DetailBadge>
+                                <DetailBadge><span className="codicon codicon-symbol-numeric" /> {fmtTokens(Number(attrs['gen_ai.usage.total_tokens']))}</DetailBadge>
                               )}
                               {attrs['gen_ai.usage.cost'] != null && Number(attrs['gen_ai.usage.cost']) > 0 && (
                                 <DetailBadge>{fmtCost(Number(attrs['gen_ai.usage.cost']))}</DetailBadge>

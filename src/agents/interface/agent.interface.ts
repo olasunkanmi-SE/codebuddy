@@ -1,6 +1,5 @@
 import { StructuredTool } from "@langchain/core/tools";
 import { BaseStore } from "@langchain/langgraph";
-import { Span } from "@opentelemetry/api";
 
 export enum AGENT_NODES {
   LLM_CALL = "llmCall",
@@ -218,8 +217,8 @@ export interface IStreamContext {
   hasErrored: boolean;
   forceStopReason: "max_events" | "max_tools" | "timeout" | null;
   agentState: "planning" | "running" | "summarizing" | "completed" | "failed";
-  /** Tracks in-flight OTel child spans per tool invocation. */
-  toolSpans: Map<string, Span>;
+  /** Opaque handles for in-flight tracing spans. Keys are invocationIds. */
+  toolSpans: Map<string, unknown>;
 }
 
 /** Tool description registry entry. */

@@ -276,6 +276,7 @@ export class CodeBuddyAgentService {
   private readonly safetyGuard: AgentSafetyGuard;
   private readonly consentManager: ConsentManager;
   private readonly contentNormalizer: ContentNormalizer;
+  private readonly errorRecovery: ErrorRecoveryService;
   private readonly modelChangeDisposable: { dispose(): void };
   private static readonly MAX_WARNED_TOOLS = 100;
   private static readonly MAX_CACHED_AGENTS = 3;
@@ -292,6 +293,7 @@ export class CodeBuddyAgentService {
     this.safetyGuard = new AgentSafetyGuard();
     this.consentManager = new ConsentManager();
     this.contentNormalizer = new ContentNormalizer();
+    this.errorRecovery = new ErrorRecoveryService();
 
     // Invalidate cached agents when the user switches model/provider
     this.modelChangeDisposable =
@@ -794,7 +796,7 @@ export class CodeBuddyAgentService {
         )
       )[Symbol.asyncIterator]();
 
-      const recovery = new ErrorRecoveryService();
+      const recovery = this.errorRecovery;
       let retryAttempt = 0;
 
       // Labeled loop: on transient errors we retry with a nudge message
@@ -1025,13 +1027,27 @@ export class CodeBuddyAgentService {
               LogLevel.INFO,
               `[ErrorRecovery] Nudging agent for thread ${conversationId} (attempt ${retryAttempt})`,
             );
+
+            // Close the old iterator to release HTTP connections / internal state
+            try {
+              await streamIterator.return?.();
+            } catch {
+              // Suppress — we're already in error recovery
+            }
+
+            // Use a static nudge message (human role) to avoid prompt injection
+            const safeNudge =
+              retryAttempt <= 1
+                ? "There was a temporary interruption. Please continue from where you left off and complete your response."
+                : "The previous attempt was interrupted again. Please provide your final answer based on the information gathered so far.";
+
             streamIterator = (
               await agent.stream(
                 {
                   messages: [
                     {
-                      role: "system",
-                      content: `[INTERNAL RECOVERY] ${decision.nudgeMessage}`,
+                      role: "human",
+                      content: safeNudge,
                     },
                   ],
                 },
@@ -1295,21 +1311,21 @@ export class CodeBuddyAgentService {
     tracing?: TraceBundle,
   ): AsyncGenerator<IStreamEvent> {
     for (const [nodeName, update] of entries) {
-      // Create a child span per graph node for hierarchical tracing
+      // Always create a span — noop if tracing is off (Null Object pattern)
       const nodeSpan = tracing
         ? tracing.tracer.startSpan(
             nodeName,
             { attributes: { "graph.node": nodeName } },
             tracing.parentCtx,
           )
+        : trace.getTracer("noop").startSpan(nodeName);
+      const nodeCtx = trace.setSpan(
+        tracing?.parentCtx ?? context.active(),
+        nodeSpan,
+      );
+      const childTracing: TraceBundle | undefined = tracing
+        ? { tracer: tracing.tracer, parentCtx: nodeCtx }
         : undefined;
-      const nodeCtx = nodeSpan
-        ? trace.setSpan(tracing!.parentCtx, nodeSpan)
-        : tracing?.parentCtx;
-      const childTracing: TraceBundle | undefined =
-        tracing && nodeCtx
-          ? { tracer: tracing.tracer, parentCtx: nodeCtx }
-          : undefined;
 
       try {
         if (update?.messages && Array.isArray(update.messages)) {
@@ -1322,22 +1338,20 @@ export class CodeBuddyAgentService {
               const usage = message.usage_metadata;
 
               // Record LLM usage on the node span for per-node token visibility
-              if (nodeSpan) {
-                nodeSpan.setAttribute("gen_ai.system", providerName);
-                nodeSpan.setAttribute("gen_ai.request.model", currentModelName);
-                nodeSpan.setAttribute(
-                  "gen_ai.usage.input_tokens",
-                  usage.input_tokens ?? 0,
-                );
-                nodeSpan.setAttribute(
-                  "gen_ai.usage.output_tokens",
-                  usage.output_tokens ?? 0,
-                );
-                nodeSpan.setAttribute(
-                  "gen_ai.usage.total_tokens",
-                  (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
-                );
-              }
+              nodeSpan.setAttribute("gen_ai.system", providerName);
+              nodeSpan.setAttribute("gen_ai.request.model", currentModelName);
+              nodeSpan.setAttribute(
+                "gen_ai.usage.input_tokens",
+                usage.input_tokens ?? 0,
+              );
+              nodeSpan.setAttribute(
+                "gen_ai.usage.output_tokens",
+                usage.output_tokens ?? 0,
+              );
+              nodeSpan.setAttribute(
+                "gen_ai.usage.total_tokens",
+                (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
+              );
 
               const costData = costTracker.recordUsage(
                 conversationId,
@@ -1359,7 +1373,10 @@ export class CodeBuddyAgentService {
 
             if (message.type === "tool" || message.name) {
               const toolName = message.name || "unknown";
-              const toolActivity = ctx.pendingToolCalls.get(toolName);
+              // Find the pending activity by toolName (pendingToolCalls is keyed by invocationId)
+              const toolActivity = [...ctx.pendingToolCalls.values()].find(
+                (a) => a.toolName === toolName,
+              );
 
               if (toolActivity) {
                 toolActivity.status = "completed";
@@ -1378,7 +1395,7 @@ export class CodeBuddyAgentService {
 
                 // End the child span for this tool (keyed by invocationId)
                 const spanKey = toolActivity.invocationId ?? toolName;
-                const toolSpan = ctx.toolSpans.get(spanKey);
+                const toolSpan = ctx.toolSpans.get(spanKey) as Span | undefined;
                 if (toolSpan) {
                   toolSpan.setAttribute(
                     "tool.result_summary",
@@ -1414,7 +1431,9 @@ export class CodeBuddyAgentService {
                   },
                 };
 
-                ctx.pendingToolCalls.delete(toolName);
+                ctx.pendingToolCalls.delete(
+                  toolActivity.invocationId ?? toolName,
+                );
               }
             }
           }
@@ -1457,20 +1476,20 @@ export class CodeBuddyAgentService {
             childTracing,
           );
           if (ctx.hasErrored) {
-            nodeSpan?.setStatus({ code: SpanStatusCode.ERROR });
+            nodeSpan.setStatus({ code: SpanStatusCode.ERROR });
             return;
           }
         }
 
-        nodeSpan?.setStatus({ code: SpanStatusCode.OK });
+        nodeSpan.setStatus({ code: SpanStatusCode.OK });
       } catch (err) {
-        nodeSpan?.setStatus({
+        nodeSpan.setStatus({
           code: SpanStatusCode.ERROR,
           message: err instanceof Error ? err.message : String(err),
         });
         throw err;
       } finally {
-        nodeSpan?.end();
+        nodeSpan.end();
       }
     }
   }
@@ -1618,7 +1637,7 @@ export class CodeBuddyAgentService {
         toolCall.id ??
         `${toolCall.name}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
       toolActivity.invocationId = invocationId;
-      ctx.pendingToolCalls.set(toolCall.name, toolActivity);
+      ctx.pendingToolCalls.set(invocationId, toolActivity);
 
       // Create a child span for this tool invocation (keyed by unique invocationId)
       const toolSpan = tracing
@@ -1693,7 +1712,8 @@ export class CodeBuddyAgentService {
     code: SpanStatusCode,
     reason?: string,
   ): void {
-    for (const [key, toolSpan] of ctx.toolSpans) {
+    for (const [key, opaqueSpan] of ctx.toolSpans) {
+      const toolSpan = opaqueSpan as Span;
       toolSpan.setStatus({ code, message: reason ?? `Stream ended (${key})` });
       toolSpan.end();
     }

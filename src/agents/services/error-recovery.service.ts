@@ -35,10 +35,12 @@ const TRANSIENT_ERROR_PATTERNS: RegExp[] = [
   /ECONNREFUSED/i,
   /ENOTFOUND/i,
   /rate.limit/i,
-  /429/,
-  /503/,
-  /502/,
-  /500/,
+  /\b429\b/,
+  /\b503\b/,
+  /\b502\b/,
+  /\bHTTP\s+500\b/i,
+  /status\s*(?:code\s*)?500\b/i,
+  /internal\s+server\s+error/i,
   /overloaded/i,
   /capacity/i,
   /network/i,
@@ -56,6 +58,11 @@ export interface RecoveryDecision {
   delayMs: number;
   /** A nudge message to send to the agent so it can continue. */
   nudgeMessage: string;
+}
+
+/** Type-safe access to the ES2022 Error.cause property. */
+interface ErrorWithCause extends Error {
+  readonly cause?: unknown;
 }
 
 export class ErrorRecoveryService {
@@ -170,7 +177,7 @@ export class ErrorRecoveryService {
       if (TRANSIENT_ERROR_PATTERNS.some((rx) => rx.test(msg))) {
         return true;
       }
-      current = (current as any).cause;
+      current = (current as ErrorWithCause).cause;
       depth++;
     }
 
