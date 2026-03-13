@@ -108,6 +108,7 @@ export enum StreamEventType {
 export interface IToolActivity {
   id: string;
   toolName: string;
+  invocationId?: string;
   status: "starting" | "running" | "completed" | "failed";
   description: string;
   startTime: number;
@@ -216,6 +217,8 @@ export interface IStreamContext {
   hasErrored: boolean;
   forceStopReason: "max_events" | "max_tools" | "timeout" | null;
   agentState: "planning" | "running" | "summarizing" | "completed" | "failed";
+  /** Opaque handles for in-flight tracing spans. Keys are invocationIds. */
+  toolSpans: Map<string, unknown>;
 }
 
 /** Tool description registry entry. */

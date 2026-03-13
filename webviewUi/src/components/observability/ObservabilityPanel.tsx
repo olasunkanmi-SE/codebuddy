@@ -1,6 +1,24 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import styled, { keyframes, css } from "styled-components";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
+import { SpanData, SpanEvent, spanStartMs, spanEndMs, spanDurationMs, fmtDuration, fmtCost, fmtTokens } from "../../utils/telemetry.utils";
+
+interface TraceGroup {
+  traceId: string;
+  spans: SpanData[];
+  root: SpanData;
+  start: number;
+  end: number;
+  duration: number;
+  hasErrors: boolean;
+  totalTokens: number;
+  cost: number;
+}
+
+interface TreeNode {
+  span: SpanData;
+  depth: number;
+}
 
 /* ─── Animations ─── */
 const fadeIn = keyframes`
@@ -71,6 +89,7 @@ const Container = styled.div`
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   background: var(--vscode-editor-background);
   color: var(--vscode-foreground);
   font-family: var(--vscode-font-family);
@@ -83,6 +102,8 @@ const Header = styled.div`
   padding: 12px 16px;
   background: var(--vscode-sideBar-background);
   border-bottom: 1px solid var(--vscode-panel-border);
+  flex-shrink: 0;
+  z-index: 2;
 `;
 
 const Title = styled.h2`
@@ -153,6 +174,8 @@ const Content = styled.div`
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--vscode-editor-background);
+  position: relative;
+  min-height: 0;
 `;
 
 /* ─── Dashboard ─── */
@@ -387,147 +410,233 @@ const LogMessage = styled.span`
   word-break: break-word;
 `;
 
-/* ─── Traces ─── */
+/* ─── Traces — LangSmith-style ─── */
 const TraceContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  height: 100%;
   animation: ${fadeIn} 0.3s ease;
 `;
 
-const TraceCard = styled.div`
-  background: var(--vscode-sideBar-background);
-  border: 1px solid var(--vscode-panel-border);
-  border-radius: 6px;
-  overflow: hidden;
-  transition: border-color 0.15s ease;
-
-  &:hover {
-    border-color: var(--vscode-focusBorder);
-  }
-`;
-
-const TraceHeader = styled.div`
-  padding: 10px 14px;
-  background: var(--vscode-sideBar-background);
-  border-bottom: 1px solid var(--vscode-panel-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const TraceTitle = styled.div`
-  font-weight: 600;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--vscode-foreground);
-`;
-
-const TraceMeta = styled.span`
-  font-size: 10px;
-  font-weight: 400;
-  color: var(--vscode-descriptionForeground);
-  font-family: 'JetBrains Mono', monospace;
-`;
-
-const WaterfallContainer = styled.div`
+/** Top-level trace list (when no trace is selected) */
+const TraceList = styled.div`
   display: flex;
   flex-direction: column;
-  background: var(--vscode-editor-background);
+  overflow-y: auto;
 `;
 
-const WaterfallRow = styled.div`
-  display: grid;
-  grid-template-columns: 200px 1fr 80px;
-  gap: 0;
-  align-items: stretch;
-  font-size: 11px;
+const TraceListItem = styled.div<{ $selected?: boolean; $hasError?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
   border-bottom: 1px solid var(--vscode-panel-border);
-  min-height: 28px;
-
-  &:last-child { border-bottom: none; }
+  background: ${p => p.$selected ? 'var(--vscode-list-activeSelectionBackground)' : 'transparent'};
   &:hover { background: var(--vscode-list-hoverBackground); }
 `;
 
-const SpanName = styled.div<{ depth: number }>`
-  padding-left: ${p => 10 + p.depth * 14}px;
-  padding-right: 8px;
+const TraceListDot = styled.span<{ $error?: boolean }>`
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: ${p => p.$error ? 'var(--vscode-errorForeground)' : 'var(--vscode-testing-iconPassed)'};
+`;
+
+const TraceListBody = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const TraceListName = styled.div`
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+`;
+
+const TraceListMeta = styled.div`
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
   display: flex;
-  align-items: center;
-  gap: 5px;
+  gap: 10px;
+  margin-top: 2px;
+`;
+
+const Badge = styled.span<{ $color?: string }>`
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  color: ${p => p.$color || 'var(--vscode-badge-foreground)'};
+  background: var(--vscode-badge-background);
+  font-family: 'JetBrains Mono', monospace;
+`;
+
+/** Split view: tree (left) + detail (right) */
+const TraceSplit = styled.div`
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+`;
+
+const TreePane = styled.div`
+  width: 260px;
+  min-width: 200px;
   border-right: 1px solid var(--vscode-panel-border);
-  color: var(--vscode-foreground);
+  overflow-y: auto;
+  background: var(--vscode-sideBar-background);
+`;
+
+const TreeBreadcrumb = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
   font-size: 11px;
-
-  &::before {
-    content: '';
-    display: inline-block;
-    width: 5px;
-    height: 5px;
-    border-radius: 1px;
-    background: var(--vscode-symbolIcon-functionForeground);
-    flex-shrink: 0;
-  }
+  color: var(--vscode-descriptionForeground);
+  position: sticky;
+  top: 0;
+  background: var(--vscode-sideBar-background);
+  z-index: 1;
 `;
 
-const SpanBarWrapper = styled.div`
-  padding: 0 12px;
+const TreeBackBtn = styled.button`
+  background: none;
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
   display: flex;
   align-items: center;
-  position: relative;
+  font-size: 11px;
+  &:hover { background: var(--vscode-list-hoverBackground); }
 `;
 
-const SpanBar = styled.div<{ left: number; width: number; status: string }>`
-  position: absolute;
-  left: ${p => p.left}%;
-  width: ${p => p.width}%;
-  height: 10px;
-  background: ${p => p.status === 'ERROR' ? 'var(--vscode-errorForeground)' : 'var(--vscode-progressBar-background)'};
-  border-radius: 2px;
-  opacity: 0.85;
-  transition: opacity 0.1s;
-
-  &:hover {
-    opacity: 1;
-  }
-`;
-
-const SpanDuration = styled.div`
-  padding: 0 10px;
+const TreeNode = styled.div<{ $depth: number; $selected?: boolean }>`
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  gap: 6px;
+  padding: 5px 10px 5px ${p => 10 + p.$depth * 14}px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--vscode-foreground);
+  background: ${p => p.$selected ? 'var(--vscode-list-activeSelectionBackground)' : 'transparent'};
+  border-left: 2px solid ${p => p.$selected ? 'var(--vscode-focusBorder)' : 'transparent'};
+  &:hover { background: var(--vscode-list-hoverBackground); }
+`;
+
+const TreeNodeDot = styled.span<{ $status?: string }>`
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: ${p =>
+    p.$status === 'error' ? 'var(--vscode-errorForeground)' :
+    p.$status === 'running' ? 'var(--vscode-progressBar-background)' :
+    'var(--vscode-testing-iconPassed)'};
+`;
+
+const TreeNodeName = styled.span`
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const TreeNodeDuration = styled.span`
+  font-size: 10px;
   color: var(--vscode-descriptionForeground);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  border-left: 1px solid var(--vscode-panel-border);
+  white-space: nowrap;
 `;
 
-const SpanDetails = styled.div`
-  padding: 10px 16px;
+/** Detail (right pane) */
+const DetailPane = styled.div`
+  flex: 1;
+  overflow-y: auto;
   background: var(--vscode-editor-background);
-  border-top: 1px solid var(--vscode-panel-border);
-  font-size: 11px;
+`;
+
+const DetailHeader = styled.div`
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
   display: flex;
   flex-direction: column;
   gap: 6px;
+  position: sticky;
+  top: 0;
+  background: var(--vscode-editor-background);
+  z-index: 1;
+`;
+
+const DetailTitle = styled.div`
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const DetailBadges = styled.div`
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+`;
+
+const DetailBadge = styled.span<{ $variant?: 'default' | 'success' | 'error' | 'info' }>`
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  border: 1px solid var(--vscode-panel-border);
+  color: ${p => {
+    switch (p.$variant) {
+      case 'success': return 'var(--vscode-testing-iconPassed)';
+      case 'error': return 'var(--vscode-errorForeground)';
+      case 'info': return 'var(--vscode-charts-blue, #8cb4ff)';
+      default: return 'var(--vscode-descriptionForeground)';
+    }
+  }};
+  background: transparent;
+`;
+
+const DetailSectionTitle = styled.div`
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--vscode-descriptionForeground);
+  padding: 10px 16px 4px;
+`;
+
+const DetailBody = styled.div`
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 `;
 
 const DetailRow = styled.div`
   display: flex;
   gap: 8px;
+  padding: 3px 0;
+  font-size: 11px;
 
   span:first-child {
     font-weight: 600;
     color: var(--vscode-descriptionForeground);
-    min-width: 90px;
+    min-width: 110px;
     font-size: 10px;
+    flex-shrink: 0;
   }
 
   span:last-child {
@@ -538,49 +647,64 @@ const DetailRow = styled.div`
   }
 `;
 
-const TimeGrid = styled.div`
-  position: absolute;
-  top: 0;
-  left: 200px;
-  right: 80px;
-  height: 100%;
-  pointer-events: none;
+/** Waterfall mini-bar inside the detail pane */
+const WaterfallMini = styled.div`
+  margin: 8px 16px 0;
+  padding: 12px;
+  background: var(--vscode-sideBar-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+`;
+
+const WaterfallRow = styled.div`
+  display: grid;
+  grid-template-columns: 140px 1fr 70px;
+  gap: 0;
+  align-items: stretch;
+  font-size: 11px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  min-height: 24px;
+  &:last-child { border-bottom: none; }
+`;
+
+const SpanName = styled.div<{ depth: number }>`
+  padding-left: ${p => 6 + p.depth * 12}px;
+  padding-right: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   display: flex;
-  justify-content: space-between;
-  opacity: 0.08;
-  border-left: 1px solid var(--vscode-panel-border);
-  border-right: 1px solid var(--vscode-panel-border);
-`;
-
-const GridLine = styled.div`
-  width: 1px;
-  height: 100%;
-  background: var(--vscode-panel-border);
-`;
-
-const GridLabel = styled.div`
-  position: absolute;
-  top: -14px;
-  font-size: 9px;
-  color: var(--vscode-descriptionForeground);
-  transform: translateX(-50%);
-  font-family: 'JetBrains Mono', monospace;
-`;
-
-const GridLabels = styled.div`
-  position: relative;
-  height: 18px;
-  margin-left: 200px;
-  margin-right: 80px;
-  margin-bottom: 2px;
-`;
-
-const TraceInfo = styled.div`
-  display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 4px;
+  color: var(--vscode-foreground);
   font-size: 10px;
+`;
+
+const SpanBarWrapper = styled.div`
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  position: relative;
+`;
+
+const SpanBar = styled.div<{ left: number; width: number; status: string }>`
+  position: absolute;
+  left: ${p => p.left}%;
+  width: ${p => p.width}%;
+  height: 8px;
+  background: ${p => p.status === 'ERROR' ? 'var(--vscode-errorForeground)' : 'var(--vscode-progressBar-background)'};
+  border-radius: 2px;
+  opacity: 0.8;
+`;
+
+const SpanDuration = styled.div`
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   color: var(--vscode-descriptionForeground);
-  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
 `;
 
 /* ─── Empty States ─── */
@@ -657,11 +781,41 @@ const ProgressBarFill = styled.div<{ pct: number; color?: string }>`
   transition: width 0.4s ease;
 `;
 
+interface VSCodeApi {
+  postMessage(message: Record<string, unknown>): void;
+}
+
+interface LogEntry {
+  level: string;
+  message: string;
+  timestamp: number;
+  module?: string;
+}
+
+interface MetricsData {
+  avgSearchLatency?: number;
+  p95SearchLatency?: number;
+  avgMemoryUsage?: number;
+  avgIndexingThroughput?: number;
+  errorRate?: number;
+  cacheHitRate?: number;
+  mcpStats?: {
+    totalInvocations: number;
+    failedInvocations: number;
+    averageLatency: number;
+    connectedServers?: number;
+    isGatewayMode?: boolean;
+    totalTools?: number;
+    uniqueTools?: number;
+    toolsByServer?: Record<string, number>;
+  };
+}
+
 interface ObservabilityPanelProps {
-  vsCode: any;
-  logs: any[];
-  metrics: any;
-  traces: any[];
+  vsCode: VSCodeApi;
+  logs: LogEntry[];
+  metrics: MetricsData | null;
+  traces: SpanData[];
   isOpen: boolean;
   onClose: () => void;
 }
@@ -669,6 +823,7 @@ interface ObservabilityPanelProps {
 export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, logs, metrics, traces, isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedSpanId, setSelectedSpanId] = useState<string | null>(null);
+  const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   const [logFilter, setLogFilter] = useState<string | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -680,17 +835,32 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
       vsCode.postMessage({ command: "observability-get-logs" });
       vsCode.postMessage({ command: "observability-get-traces" });
     }
-  }, [isOpen]);
+  }, [isOpen, vsCode]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        onClose();
+        // If viewing a span detail, go back one level first
+        if (selectedSpanId) {
+          setSelectedSpanId(null);
+        } else if (selectedTraceId) {
+          setSelectedTraceId(null);
+        } else {
+          onClose();
+        }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, selectedSpanId, selectedTraceId]);
+
+  // Reset trace selection when panel closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedTraceId(null);
+      setSelectedSpanId(null);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (activeTab === "logs" && logEndRef.current) {
@@ -719,7 +889,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
     }
 
     return () => { if (interval) clearInterval(interval); };
-  }, [activeTab, isOpen]);
+  }, [activeTab, isOpen, vsCode]);
 
   const handleRefresh = () => {
     vsCode.postMessage({ command: "observability-get-metrics" });
@@ -754,6 +924,94 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
       : 100
     : null;
 
+  /* ── Trace tree helpers ── */
+
+  /** Group spans by traceId, compute summary per trace */
+  const traceGroups = useMemo((): TraceGroup[] => {
+    if (!traces?.length) return [];
+    const groups = new Map<string, SpanData[]>();
+    for (const span of traces) {
+      const tid = span.context?.traceId || 'unknown';
+      const bucket = groups.get(tid) ?? [];
+      bucket.push(span);
+      groups.set(tid, bucket);
+    }
+    return Array.from(groups.entries()).map(([traceId, spans]): TraceGroup => {
+      const root = spans.find(s => !s.parentSpanId) ?? spans[0];
+      const starts = spans.map(spanStartMs).filter(isFinite);
+      const ends = spans.map(spanEndMs).filter(isFinite);
+      const start = starts.length ? Math.min(...starts) : 0;
+      const end = ends.length ? Math.max(...ends) : 0;
+      return {
+        traceId, spans, root, start, end,
+        duration: end - start,
+        hasErrors: spans.some(s => s.status?.code === 2),
+        totalTokens: spans.reduce((t, s) =>
+          t + ((s.attributes?.['gen_ai.usage.total_tokens'] as number) ?? 0), 0),
+        cost: spans.reduce((t, s) =>
+          t + ((s.attributes?.['gen_ai.usage.cost'] as number) ?? 0), 0),
+      };
+    }).sort((a, b) => b.start - a.start);
+  }, [traces]);
+
+  /** Build tree-ordered list with depth for the selected trace */
+  const selectedTraceTree = useMemo((): TreeNode[] => {
+    const group = traceGroups.find(g => g.traceId === selectedTraceId);
+    if (!group) return [];
+    const { spans } = group;
+    const children = new Map<string | undefined, SpanData[]>();
+    for (const s of spans) {
+      const pid = s.parentSpanId || undefined;
+      if (!children.has(pid)) children.set(pid, []);
+      children.get(pid)!.push(s);
+    }
+    // Sort children by start time
+    for (const arr of children.values()) {
+      arr.sort((a, b) => spanStartMs(a) - spanStartMs(b));
+    }
+    const result: TreeNode[] = [];
+    const visited = new Set<string>();
+    const MAX_TREE_DEPTH = 20;
+    const walk = (parentId: string | undefined, depth: number): void => {
+      if (depth > MAX_TREE_DEPTH) {
+        console.warn(`[ObservabilityPanel] Trace tree exceeded ${MAX_TREE_DEPTH} levels — possible cycle`);
+        return;
+      }
+      for (const s of children.get(parentId) ?? []) {
+        const sid = s.context?.spanId;
+        if (!sid || visited.has(sid)) continue;
+        visited.add(sid);
+        result.push({ span: s, depth });
+        walk(sid, depth + 1);
+      }
+    };
+    // Start from root(s) — spans without parent or whose parent is not in this trace
+    const spanIds = new Set(spans.map(s => s.context?.spanId));
+    const roots = spans.filter(s => !s.parentSpanId || !spanIds.has(s.parentSpanId));
+    roots.sort((a, b) => spanStartMs(a) - spanStartMs(b));
+    for (const r of roots) {
+      result.push({ span: r, depth: 0 });
+      walk(r.context?.spanId, 1);
+    }
+    return result;
+  }, [traceGroups, selectedTraceId]);
+
+  /** Currently selected span's data */
+  const selectedSpan = useMemo((): SpanData | null => {
+    if (!selectedSpanId || !selectedTraceTree.length) return null;
+    return selectedTraceTree.find(n => n.span.context?.spanId === selectedSpanId)?.span ?? null;
+  }, [selectedSpanId, selectedTraceTree]);
+
+  const handleSelectTrace = useCallback((traceId: string) => {
+    setSelectedTraceId(traceId);
+    setSelectedSpanId(null);
+  }, []);
+
+  const handleBackToList = useCallback(() => {
+    setSelectedTraceId(null);
+    setSelectedSpanId(null);
+  }, []);
+
   return (
     <>
       <Overlay $isOpen={isOpen} onClick={onClose} />
@@ -767,15 +1025,15 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
         <div style={{ display: 'flex', gap: '2px' }}>
           {activeTab === "traces" && (
             <>
-              <VSCodeButton appearance="icon" onClick={handleSendTestTrace} title="Send Test Trace">
+              <VSCodeButton appearance="icon" onClick={handleSendTestTrace} title="Send Test Trace" aria-label="Send test trace">
                 <span className="codicon codicon-beaker"></span>
               </VSCodeButton>
-              <VSCodeButton appearance="icon" onClick={handleClear} title="Clear Traces">
+              <VSCodeButton appearance="icon" onClick={handleClear} title="Clear Traces" aria-label="Clear traces">
                 <span className="codicon codicon-clear-all"></span>
               </VSCodeButton>
             </>
           )}
-          <VSCodeButton appearance="icon" onClick={handleRefresh} title="Refresh">
+          <VSCodeButton appearance="icon" onClick={handleRefresh} title="Refresh" aria-label="Refresh traces">
             <span className="codicon codicon-refresh"></span>
           </VSCodeButton>
           <CloseButton onClick={onClose} aria-label="Close observability panel">
@@ -850,19 +1108,19 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                     </MetricValue>
                   </MetricCard>
 
-                  <MetricCard accent={metrics.errorRate > 0.05 ? 'var(--vscode-errorForeground)' : 'var(--vscode-charts-yellow, #cca700)'}>
+                  <MetricCard accent={(metrics.errorRate ?? 0) > 0.05 ? 'var(--vscode-errorForeground)' : 'var(--vscode-charts-yellow, #cca700)'}>
                     <MetricLabel>
                       <MetricIcon className="codicon codicon-warning" />
                       Error Rate
                     </MetricLabel>
-                    <MetricValue style={{ color: metrics.errorRate > 0.05 ? 'var(--vscode-errorForeground)' : 'inherit' }}>
-                      {(metrics.errorRate * 100)?.toFixed(1) || 0}
+                    <MetricValue style={{ color: (metrics.errorRate ?? 0) > 0.05 ? 'var(--vscode-errorForeground)' : 'inherit' }}>
+                      {((metrics.errorRate ?? 0) * 100).toFixed(1)}
                       <MetricUnit>%</MetricUnit>
                     </MetricValue>
                     <ProgressBarBg>
                       <ProgressBarFill
-                        pct={metrics.errorRate * 100 * 10}
-                        color={metrics.errorRate > 0.05 ? 'var(--vscode-errorForeground)' : 'var(--vscode-charts-yellow, #cca700)'}
+                        pct={(metrics.errorRate ?? 0) * 100 * 10}
+                        color={(metrics.errorRate ?? 0) > 0.05 ? 'var(--vscode-errorForeground)' : 'var(--vscode-charts-yellow, #cca700)'}
                       />
                     </ProgressBarBg>
                   </MetricCard>
@@ -873,11 +1131,11 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                       Cache Hit Rate
                     </MetricLabel>
                     <MetricValue>
-                      {(metrics.cacheHitRate * 100)?.toFixed(1) || 0}
+                      {((metrics.cacheHitRate ?? 0) * 100)?.toFixed(1) || 0}
                       <MetricUnit>%</MetricUnit>
                     </MetricValue>
                     <ProgressBarBg>
-                      <ProgressBarFill pct={metrics.cacheHitRate * 100} />
+                      <ProgressBarFill pct={(metrics.cacheHitRate ?? 0) * 100} />
                     </ProgressBarBg>
                   </MetricCard>
                 </MetricGrid>
@@ -897,7 +1155,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                 <SectionTitle>MCP Infrastructure</SectionTitle>
                 <SectionLine />
                 {mcpStats && (
-                  <StatusDot status={mcpStats.connectedServers > 0 ? 'good' : 'warn'} />
+                  <StatusDot status={(mcpStats.connectedServers ?? 0) > 0 ? 'good' : 'warn'} />
                 )}
               </SectionHeader>
 
@@ -955,7 +1213,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
 
                   {mcpStats.toolsByServer && Object.keys(mcpStats.toolsByServer).length > 0 && (
                     <MCPStatusRow style={{ marginTop: '8px' }}>
-                      {Object.entries(mcpStats.toolsByServer).map(([name, count]: [string, any]) => (
+                      {Object.entries(mcpStats.toolsByServer).map(([name, count]: [string, number]) => (
                         <MCPServerChip key={name} connected>
                           {name}
                           <span style={{ opacity: 0.5, fontSize: '10px' }}>{count} tools</span>
@@ -1019,120 +1277,163 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
 
         {activeTab === "traces" && (
           <TraceContainer>
-            {traces && traces.length > 0 ? (
-              Object.entries(
-                traces.reduce((acc: any, span: any) => {
-                  const traceId = span.context?.traceId || 'unknown';
-                  if (!acc[traceId]) acc[traceId] = [];
-                  acc[traceId].push(span);
-                  return acc;
-                }, {})
-              ).map(([traceId, spans]: [string, any]) => {
-                const rootSpan = spans.find((s: any) => !s.parentSpanId) || spans[0];
-                const startTime = Math.min(...spans.map((s: any) => s.startTime?.[0] * 1000 + s.startTime?.[1] / 1000000));
-                const endTime = Math.max(...spans.map((s: any) => s.endTime?.[0] * 1000 + s.endTime?.[1] / 1000000));
-                const totalDuration = endTime - startTime;
+            {traceGroups.length > 0 ? (
+              !selectedTraceId ? (
+                /* ── Trace List View ── */
+                <TraceList>
+                  {traceGroups.map(g => (
+                    <TraceListItem key={g.traceId} onClick={() => handleSelectTrace(g.traceId)}>
+                      <TraceListDot $error={g.hasErrors} />
+                      <TraceListBody>
+                        <TraceListName>{g.root.name}</TraceListName>
+                        <TraceListMeta>
+                          <span>{new Date(g.start).toLocaleTimeString()}</span>
+                          <span>{fmtDuration(g.duration)}</span>
+                          <span>{g.spans.length} span{g.spans.length !== 1 ? 's' : ''}</span>
+                          {g.totalTokens > 0 && <span><span className="codicon codicon-symbol-numeric" /> {fmtTokens(g.totalTokens)}</span>}
+                          {g.cost > 0 && <span>{fmtCost(g.cost)}</span>}
+                        </TraceListMeta>
+                      </TraceListBody>
+                      <Badge>{g.traceId.substring(0, 8)}</Badge>
+                    </TraceListItem>
+                  ))}
+                </TraceList>
+              ) : (
+                /* ── Trace Detail View (Split: Tree + Detail) ── */
+                <TraceSplit>
+                  {/* Left: span tree */}
+                  <TreePane>
+                    <TreeBreadcrumb>
+                      <TreeBackBtn onClick={handleBackToList} title="Back to trace list" aria-label="Back to trace list">
+                        <span className="codicon codicon-arrow-left" style={{ fontSize: '12px' }}></span>
+                      </TreeBackBtn>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {traceGroups.find(g => g.traceId === selectedTraceId)?.root.name ?? 'Trace'}
+                      </span>
+                    </TreeBreadcrumb>
+                    {selectedTraceTree.map(({ span: s, depth }) => {
+                      const dur = spanDurationMs(s);
+                      const isErr = s.status?.code === 2;
+                      return (
+                        <TreeNode
+                          key={s.context?.spanId}
+                          $depth={depth}
+                          $selected={selectedSpanId === s.context?.spanId}
+                          onClick={() => setSelectedSpanId(s.context?.spanId ?? null)}
+                        >
+                          <TreeNodeDot $status={isErr ? 'error' : 'good'} />
+                          <TreeNodeName title={s.name}>{s.name}</TreeNodeName>
+                          <TreeNodeDuration>{fmtDuration(dur)}</TreeNodeDuration>
+                        </TreeNode>
+                      );
+                    })}
+                  </TreePane>
 
-                const sortedSpans = [...spans].sort((a: any, b: any) => {
-                  const aStart = a.startTime?.[0] * 1000 + a.startTime?.[1] / 1000000;
-                  const bStart = b.startTime?.[0] * 1000 + b.startTime?.[1] / 1000000;
-                  return aStart - bStart;
-                });
+                  {/* Right: span detail */}
+                  <DetailPane>
+                    {selectedSpan ? (() => {
+                      const group = traceGroups.find(g => g.traceId === selectedTraceId)!;
+                      const dur = spanDurationMs(selectedSpan);
+                      const attrs = selectedSpan.attributes || {};
+                      const isRoot = !selectedSpan.parentSpanId;
 
-                const hasErrors = spans.some((s: any) => s.status?.code === 2);
+                      return (
+                        <>
+                          <DetailHeader>
+                            <DetailTitle>
+                              <StatusDot status={selectedSpan.status?.code === 2 ? 'error' : 'good'} />
+                              {selectedSpan.name}
+                            </DetailTitle>
+                            <DetailBadges>
+                              <DetailBadge $variant={selectedSpan.status?.code === 2 ? 'error' : 'success'}>
+                                {selectedSpan.status?.code === 2 ? 'ERROR' : 'OK'}
+                              </DetailBadge>
+                              <DetailBadge>{fmtDuration(dur)}</DetailBadge>
+                              {!!attrs['gen_ai.system'] && <DetailBadge $variant="info">{String(attrs['gen_ai.system'])}</DetailBadge>}
+                              {!!attrs['gen_ai.request.model'] && <DetailBadge $variant="info">{String(attrs['gen_ai.request.model'])}</DetailBadge>}
+                              {!!attrs['gen_ai.usage.total_tokens'] && (
+                                <DetailBadge><span className="codicon codicon-symbol-numeric" /> {fmtTokens(Number(attrs['gen_ai.usage.total_tokens']))}</DetailBadge>
+                              )}
+                              {attrs['gen_ai.usage.cost'] != null && Number(attrs['gen_ai.usage.cost']) > 0 && (
+                                <DetailBadge>{fmtCost(Number(attrs['gen_ai.usage.cost']))}</DetailBadge>
+                              )}
+                            </DetailBadges>
+                          </DetailHeader>
 
-                return (
-                  <TraceCard key={traceId}>
-                    <TraceHeader>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <TraceTitle>
-                          <StatusDot status={hasErrors ? 'error' : 'good'} />
-                          {rootSpan.name}
-                          <TraceMeta>{traceId.substring(0, 8)}</TraceMeta>
-                        </TraceTitle>
-                        <TraceInfo>
-                          <span>{new Date(startTime).toLocaleTimeString()}</span>
-                          <span>{totalDuration.toFixed(1)}ms</span>
-                          <span>{spans.length} span{spans.length !== 1 ? 's' : ''}</span>
-                        </TraceInfo>
-                      </div>
-                      <VSCodeButton appearance="icon" onClick={() => setSelectedSpanId(null)} title="Collapse">
-                        <span className="codicon codicon-chevron-up"></span>
-                      </VSCodeButton>
-                    </TraceHeader>
+                          {/* Waterfall mini for root span */}
+                          {isRoot && group.spans.length > 1 && (
+                            <WaterfallMini>
+                              {selectedTraceTree.map(({ span: ws, depth: wd }) => {
+                                const wsStart = spanStartMs(ws);
+                                const wsEnd = spanEndMs(ws);
+                                const wsDur = wsEnd - wsStart;
+                                const left = group.duration > 0 ? ((wsStart - group.start) / group.duration) * 100 : 0;
+                                const width = group.duration > 0 ? Math.max((wsDur / group.duration) * 100, 0.5) : 100;
+                                return (
+                                  <WaterfallRow key={ws.context?.spanId}>
+                                    <SpanName depth={wd}>{ws.name}</SpanName>
+                                    <SpanBarWrapper>
+                                      <SpanBar left={left} width={width} status={ws.status?.code === 2 ? 'ERROR' : 'OK'} />
+                                    </SpanBarWrapper>
+                                    <SpanDuration>{fmtDuration(wsDur)}</SpanDuration>
+                                  </WaterfallRow>
+                                );
+                              })}
+                            </WaterfallMini>
+                          )}
 
-                    <GridLabels>
-                      {[0, 25, 50, 75, 100].map(p => (
-                        <GridLabel key={p} style={{ left: `${p}%` }}>
-                          {((totalDuration * p) / 100).toFixed(0)}ms
-                        </GridLabel>
-                      ))}
-                    </GridLabels>
+                          {/* Metadata */}
+                          <DetailSectionTitle>Metadata</DetailSectionTitle>
+                          <DetailBody>
+                            <DetailRow><span>Span ID</span><span>{selectedSpan.context?.spanId}</span></DetailRow>
+                            <DetailRow><span>Trace ID</span><span>{selectedTraceId}</span></DetailRow>
+                            {selectedSpan.parentSpanId && <DetailRow><span>Parent Span</span><span>{selectedSpan.parentSpanId}</span></DetailRow>}
+                            <DetailRow><span>Start</span><span>{new Date(spanStartMs(selectedSpan)).toLocaleTimeString()}</span></DetailRow>
+                            <DetailRow><span>Duration</span><span>{fmtDuration(dur)}</span></DetailRow>
+                            <DetailRow><span>Status</span><span>{selectedSpan.status?.code === 2 ? 'ERROR' : 'OK'}</span></DetailRow>
+                          </DetailBody>
 
-                    <WaterfallContainer style={{ position: 'relative' }}>
-                      <TimeGrid>
-                        {[25, 50, 75].map(p => <GridLine key={p} />)}
-                      </TimeGrid>
-
-                      {sortedSpans.map((span: any) => {
-                        const spanStart = span.startTime?.[0] * 1000 + span.startTime?.[1] / 1000000;
-                        const spanEnd = span.endTime?.[0] * 1000 + span.endTime?.[1] / 1000000;
-                        const spanDuration = spanEnd - spanStart;
-                        const left = ((spanStart - startTime) / totalDuration) * 100;
-                        const width = Math.max((spanDuration / totalDuration) * 100, 0.5);
-                        const isSelected = selectedSpanId === span.context?.spanId;
-
-                        let depth = 0;
-                        let current = span;
-                        while (current.parentSpanId) {
-                          depth++;
-                          current = spans.find((s: any) => s.context?.spanId === current.parentSpanId) || {};
-                          if (depth > 10) break;
-                        }
-
-                        return (
-                          <React.Fragment key={span.context?.spanId}>
-                            <WaterfallRow
-                              onClick={() => setSelectedSpanId(isSelected ? null : span.context?.spanId)}
-                              style={{ cursor: 'pointer', background: isSelected ? 'var(--vscode-list-activeSelectionBackground)' : 'transparent' }}
-                            >
-                              <SpanName depth={depth} title={span.name}>{span.name}</SpanName>
-                              <SpanBarWrapper>
-                                <SpanBar
-                                  left={left}
-                                  width={width}
-                                  status={span.status?.code === 2 ? 'ERROR' : 'OK'}
-                                  title={`${span.name}: ${spanDuration.toFixed(2)}ms`}
-                                />
-                              </SpanBarWrapper>
-                              <SpanDuration>{spanDuration.toFixed(1)}ms</SpanDuration>
-                            </WaterfallRow>
-
-                            {isSelected && (
-                              <SpanDetails>
-                                <DetailRow>
-                                  <span>Span ID</span>
-                                  <span>{span.context?.spanId}</span>
-                                </DetailRow>
-                                <DetailRow>
-                                  <span>Status</span>
-                                  <span>{span.status?.code === 2 ? 'ERROR' : 'OK'}</span>
-                                </DetailRow>
-                                {span.attributes && Object.entries(span.attributes).map(([k, v]: [string, any]) => (
+                          {/* Attributes */}
+                          {Object.keys(attrs).length > 0 && (
+                            <>
+                              <DetailSectionTitle>Attributes</DetailSectionTitle>
+                              <DetailBody>
+                                {Object.entries(attrs).map(([k, v]) => (
                                   <DetailRow key={k}>
                                     <span>{k}</span>
                                     <span>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
                                   </DetailRow>
                                 ))}
-                              </SpanDetails>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </WaterfallContainer>
-                  </TraceCard>
-                );
-              })
+                              </DetailBody>
+                            </>
+                          )}
+
+                          {/* Events */}
+                          {(selectedSpan.events?.length ?? 0) > 0 && (
+                            <>
+                              <DetailSectionTitle>Events ({selectedSpan.events!.length})</DetailSectionTitle>
+                              <DetailBody>
+                                {selectedSpan.events!.map((ev: SpanEvent, i: number) => (
+                                  <DetailRow key={i}>
+                                    <span>{ev.name}</span>
+                                    <span>{ev.attributes ? JSON.stringify(ev.attributes) : ''}</span>
+                                  </DetailRow>
+                                ))}
+                              </DetailBody>
+                            </>
+                          )}
+                        </>
+                      );
+                    })() : (
+                      <EmptyState>
+                        <span className="codicon codicon-list-tree"></span>
+                        <h3>Select a span</h3>
+                        <p>Click a span in the tree to view its details, attributes, and timeline.</p>
+                      </EmptyState>
+                    )}
+                  </DetailPane>
+                </TraceSplit>
+              )
             ) : (
               <EmptyState>
                 <span className="codicon codicon-pulse"></span>
