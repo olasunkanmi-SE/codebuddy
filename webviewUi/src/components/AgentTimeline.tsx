@@ -238,13 +238,13 @@ const ProgressFill = styled.div<{ $value: number }>`
 
 /* ── Result ─────────────────────────────────────────────────────── */
 
-const ResultRow = styled.div`
+const ResultRow = styled.div<{ $active?: boolean }>`
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
   color: var(--vscode-foreground, rgba(255, 255, 255, 0.8));
-  animation: ${pulse} 1.6s ease-in-out infinite;
+  ${(p) => p.$active && css`animation: ${pulse} 1.6s ease-in-out infinite;`}
 `;
 
 const Empty = styled.div`
@@ -315,8 +315,8 @@ export const AgentTimeline: React.FC<AgentTimelineProps> = ({
             Run <strong>{pendingApproval.toolName || "tool"}</strong>?
           </ApprovalText>
           <ApprovalButtons>
-            <ApprovalButton onClick={onDeny}>Deny</ApprovalButton>
-            <ApprovalButton $primary onClick={onApprove}>Allow</ApprovalButton>
+            <ApprovalButton onClick={onDeny} aria-label={`Deny ${pendingApproval.toolName || 'tool'}`}>Deny</ApprovalButton>
+            <ApprovalButton $primary onClick={onApprove} aria-label={`Allow ${pendingApproval.toolName || 'tool'}`}>Allow</ApprovalButton>
           </ApprovalButtons>
         </ApprovalBar>
       )}
@@ -375,7 +375,11 @@ export const AgentTimeline: React.FC<AgentTimelineProps> = ({
                         <span>{fmtDur(action.duration)}</span>
                       )}
                       {hasDetails && (
-                        <DetailToggle onClick={() => toggle(action.id)}>
+                        <DetailToggle
+                          onClick={() => toggle(action.id)}
+                          aria-expanded={isOpen}
+                          aria-label={isOpen ? `Collapse details for ${formatLabel(action)}` : `Expand details for ${formatLabel(action)}`}
+                        >
                           {isOpen ? "▾" : "▸"}
                         </DetailToggle>
                       )}
@@ -404,7 +408,7 @@ export const AgentTimeline: React.FC<AgentTimelineProps> = ({
       {timeline.summarizing && (
         <>
           <Divider />
-          <ResultRow>
+          <ResultRow $active>
             <Spinner /> Preparing response…
           </ResultRow>
         </>

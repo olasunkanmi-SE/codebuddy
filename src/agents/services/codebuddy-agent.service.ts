@@ -878,6 +878,11 @@ export class CodeBuddyAgentService {
 
               // User denied — stop gracefully
               ctx.forceStopReason = safetyResult.reason;
+              this.drainToolSpans(
+                ctx,
+                SpanStatusCode.ERROR,
+                "stream_force_stopped",
+              );
 
               yield {
                 type: StreamEventType.METADATA,
@@ -977,6 +982,9 @@ export class CodeBuddyAgentService {
               "error.message": err.message.substring(0, 500),
             });
 
+            // Drain any open tool spans from the failed stream
+            this.drainToolSpans(ctx, SpanStatusCode.ERROR, "retry_attempt");
+
             // Mark pending tools as failed (they're stale from the old stream)
             for (const [toolName, activity] of ctx.pendingToolCalls) {
               activity.status = "failed";
@@ -1020,7 +1028,12 @@ export class CodeBuddyAgentService {
             streamIterator = (
               await agent.stream(
                 {
-                  messages: [{ role: "user", content: decision.nudgeMessage }],
+                  messages: [
+                    {
+                      role: "system",
+                      content: `[INTERNAL RECOVERY] ${decision.nudgeMessage}`,
+                    },
+                  ],
                 },
                 config,
               )
@@ -1029,7 +1042,8 @@ export class CodeBuddyAgentService {
             continue streamLoop;
           }
 
-          // Not retryable — rethrow to the outer catch
+          // Not retryable — drain remaining tool spans and rethrow
+          this.drainToolSpans(ctx, SpanStatusCode.ERROR, err.message);
           throw err;
         }
       } // end streamLoop
@@ -1046,6 +1060,9 @@ export class CodeBuddyAgentService {
       ctx.agentState = "failed";
       ctx.hasErrored = true;
       span.recordException(err);
+
+      // Drain any remaining tool spans
+      this.drainToolSpans(ctx, SpanStatusCode.ERROR, err.message);
 
       // Mark pending tools as failed
       for (const [toolName, activity] of ctx.pendingToolCalls) {
@@ -1359,8 +1376,9 @@ export class CodeBuddyAgentService {
                   duration_ms: toolActivity.endTime - toolActivity.startTime,
                 });
 
-                // End the child span for this tool
-                const toolSpan = ctx.toolSpans.get(toolName);
+                // End the child span for this tool (keyed by invocationId)
+                const spanKey = toolActivity.invocationId ?? toolName;
+                const toolSpan = ctx.toolSpans.get(spanKey);
                 if (toolSpan) {
                   toolSpan.setAttribute(
                     "tool.result_summary",
@@ -1372,7 +1390,7 @@ export class CodeBuddyAgentService {
                   );
                   toolSpan.setStatus({ code: SpanStatusCode.OK });
                   toolSpan.end();
-                  ctx.toolSpans.delete(toolName);
+                  ctx.toolSpans.delete(spanKey);
                 }
 
                 yield {
@@ -1596,15 +1614,20 @@ export class CodeBuddyAgentService {
         toolCall.args,
       );
       toolActivity.status = "running";
+      const invocationId =
+        toolCall.id ??
+        `${toolCall.name}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+      toolActivity.invocationId = invocationId;
       ctx.pendingToolCalls.set(toolCall.name, toolActivity);
 
-      // Create a child span for this tool invocation
+      // Create a child span for this tool invocation (keyed by unique invocationId)
       const toolSpan = tracing
         ? tracing.tracer.startSpan(
             `tool:${toolCall.name}`,
             {
               attributes: {
                 "tool.name": toolCall.name,
+                "tool.invocation_id": invocationId,
                 "tool.args": JSON.stringify(toolCall.args).substring(0, 1000),
                 "node.name": nodeName,
                 "tool.is_middleware": isMiddlewareNode,
@@ -1614,7 +1637,7 @@ export class CodeBuddyAgentService {
           )
         : undefined;
       if (toolSpan) {
-        ctx.toolSpans.set(toolCall.name, toolSpan);
+        ctx.toolSpans.set(invocationId, toolSpan);
       }
 
       span.addEvent("tool_start", {
@@ -1664,6 +1687,19 @@ export class CodeBuddyAgentService {
     }
   }
 
+  /** Ends all in-flight tool spans with a given status. Call on any early exit. */
+  private drainToolSpans(
+    ctx: IStreamContext,
+    code: SpanStatusCode,
+    reason?: string,
+  ): void {
+    for (const [key, toolSpan] of ctx.toolSpans) {
+      toolSpan.setStatus({ code, message: reason ?? `Stream ended (${key})` });
+      toolSpan.end();
+    }
+    ctx.toolSpans.clear();
+  }
+
   private async *emitCompletion(
     ctx: IStreamContext,
     span: Span,
@@ -1671,6 +1707,9 @@ export class CodeBuddyAgentService {
     costTracker: CostTrackingService,
     conversationId: string,
   ): AsyncGenerator<IStreamEvent> {
+    // Defensively close any remaining tool spans
+    this.drainToolSpans(ctx, SpanStatusCode.OK);
+
     if (ctx.hasErrored) {
       streamManager.endStream();
       return;

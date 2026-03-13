@@ -109,6 +109,7 @@ export enum StreamEventType {
 export interface IToolActivity {
   id: string;
   toolName: string;
+  invocationId?: string;
   status: "starting" | "running" | "completed" | "failed";
   description: string;
   startTime: number;

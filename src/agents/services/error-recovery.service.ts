@@ -157,22 +157,26 @@ export class ErrorRecoveryService {
    * match a specific pattern.  LLM provider SDKs often wrap the real cause.
    */
   private looksTransient(error: Error): boolean {
-    // Most LangChain/LangGraph errors that bubble during streaming are
-    // transient.  Check the prototype chain for common "retryable" signals.
     const name = error.name ?? "";
+
+    // Explicit network/HTTP error class names
     if (/fetch|network|http|timeout|connection/i.test(name)) return true;
 
-    // Check for nested `cause`
-    const cause = (error as any).cause;
-    if (cause instanceof Error) {
-      const causeMsg = cause.message ?? "";
-      if (TRANSIENT_ERROR_PATTERNS.some((rx) => rx.test(causeMsg))) return true;
+    // Walk the cause chain looking for a known-transient message
+    let current: unknown = error;
+    let depth = 0;
+    while (current instanceof Error && depth < 5) {
+      const msg = current.message ?? "";
+      if (TRANSIENT_ERROR_PATTERNS.some((rx) => rx.test(msg))) {
+        return true;
+      }
+      current = (current as any).cause;
+      depth++;
     }
 
-    // Default: treat generic Error + non-permanent message as retryable
-    // when the name is the generic "Error" (versus something specific like
-    // "ValidationError" or "AssertionError").
-    return name === "Error" || name === "";
+    // Do NOT fall back to "it's a generic Error so retry it".
+    // If no transient signal is found anywhere in the chain, it's permanent.
+    return false;
   }
 
   private buildNudgeMessage(_error: Error, attempt: number): string {

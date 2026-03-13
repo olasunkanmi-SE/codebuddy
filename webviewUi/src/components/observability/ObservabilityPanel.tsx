@@ -1,7 +1,24 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import styled, { keyframes, css } from "styled-components";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
-import { spanStartMs, spanEndMs, fmtDuration, fmtCost, fmtTokens } from "../../utils/telemetry.utils";
+import { SpanData, spanStartMs, spanEndMs, fmtDuration, fmtCost, fmtTokens } from "../../utils/telemetry.utils";
+
+interface TraceGroup {
+  traceId: string;
+  spans: SpanData[];
+  root: SpanData;
+  start: number;
+  end: number;
+  duration: number;
+  hasErrors: boolean;
+  totalTokens: number;
+  cost: number;
+}
+
+interface TreeNode {
+  span: SpanData;
+  depth: number;
+}
 
 /* ─── Animations ─── */
 const fadeIn = keyframes`
@@ -878,33 +895,39 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
     : null;
 
   /* ── Trace tree helpers ── */
-  const spanMs = spanStartMs;
 
   /** Group spans by traceId, compute summary per trace */
-  const traceGroups = useMemo(() => {
+  const traceGroups = useMemo((): TraceGroup[] => {
     if (!traces?.length) return [];
-    const groups: Record<string, any[]> = {};
+    const groups = new Map<string, SpanData[]>();
     for (const span of traces) {
       const tid = span.context?.traceId || 'unknown';
-      (groups[tid] ??= []).push(span);
+      const bucket = groups.get(tid) ?? [];
+      bucket.push(span);
+      groups.set(tid, bucket);
     }
-    return Object.entries(groups).map(([traceId, spans]) => {
-      const root = spans.find((s: any) => !s.parentSpanId) || spans[0];
-      const start = Math.min(...spans.map(spanMs));
+    return Array.from(groups.entries()).map(([traceId, spans]): TraceGroup => {
+      const root = spans.find(s => !s.parentSpanId) ?? spans[0];
+      const start = Math.min(...spans.map(spanStartMs));
       const end = Math.max(...spans.map(spanEndMs));
-      const hasErrors = spans.some((s: any) => s.status?.code === 2);
-      const totalTokens = spans.reduce((t: number, s: any) => t + (s.attributes?.['gen_ai.usage.total_tokens'] ?? 0), 0);
-      const cost = spans.reduce((t: number, s: any) => t + (s.attributes?.['gen_ai.usage.cost'] ?? 0), 0);
-      return { traceId, spans, root, start, end, duration: end - start, hasErrors, totalTokens, cost };
+      return {
+        traceId, spans, root, start, end,
+        duration: end - start,
+        hasErrors: spans.some(s => s.status?.code === 2),
+        totalTokens: spans.reduce((t, s) =>
+          t + ((s.attributes?.['gen_ai.usage.total_tokens'] as number) ?? 0), 0),
+        cost: spans.reduce((t, s) =>
+          t + ((s.attributes?.['gen_ai.usage.cost'] as number) ?? 0), 0),
+      };
     }).sort((a, b) => b.start - a.start);
   }, [traces]);
 
   /** Build tree-ordered list with depth for the selected trace */
-  const selectedTraceTree = useMemo(() => {
+  const selectedTraceTree = useMemo((): TreeNode[] => {
     const group = traceGroups.find(g => g.traceId === selectedTraceId);
     if (!group) return [];
     const { spans } = group;
-    const children = new Map<string | undefined, any[]>();
+    const children = new Map<string | undefined, SpanData[]>();
     for (const s of spans) {
       const pid = s.parentSpanId || undefined;
       if (!children.has(pid)) children.set(pid, []);
@@ -912,9 +935,9 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
     }
     // Sort children by start time
     for (const arr of children.values()) {
-      arr.sort((a: any, b: any) => spanMs(a) - spanMs(b));
+      arr.sort((a, b) => spanStartMs(a) - spanStartMs(b));
     }
-    const result: { span: any; depth: number }[] = [];
+    const result: TreeNode[] = [];
     const visited = new Set<string>();
     const walk = (parentId: string | undefined, depth: number) => {
       for (const s of children.get(parentId) ?? []) {
@@ -926,9 +949,9 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
       }
     };
     // Start from root(s) — spans without parent or whose parent is not in this trace
-    const spanIds = new Set(spans.map((s: any) => s.context?.spanId));
-    const roots = spans.filter((s: any) => !s.parentSpanId || !spanIds.has(s.parentSpanId));
-    roots.sort((a: any, b: any) => spanMs(a) - spanMs(b));
+    const spanIds = new Set(spans.map(s => s.context?.spanId));
+    const roots = spans.filter(s => !s.parentSpanId || !spanIds.has(s.parentSpanId));
+    roots.sort((a, b) => spanStartMs(a) - spanStartMs(b));
     for (const r of roots) {
       result.push({ span: r, depth: 0 });
       walk(r.context?.spanId, 1);
@@ -937,7 +960,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
   }, [traceGroups, selectedTraceId]);
 
   /** Currently selected span's data */
-  const selectedSpan = useMemo(() => {
+  const selectedSpan = useMemo((): SpanData | null => {
     if (!selectedSpanId || !selectedTraceTree.length) return null;
     return selectedTraceTree.find(n => n.span.context?.spanId === selectedSpanId)?.span ?? null;
   }, [selectedSpanId, selectedTraceTree]);
@@ -951,8 +974,6 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
     setSelectedTraceId(null);
     setSelectedSpanId(null);
   }, []);
-
-  const fmtDur = fmtDuration;
 
   return (
     <>
@@ -1230,7 +1251,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                         <TraceListName>{g.root.name}</TraceListName>
                         <TraceListMeta>
                           <span>{new Date(g.start).toLocaleTimeString()}</span>
-                          <span>{fmtDur(g.duration)}</span>
+                          <span>{fmtDuration(g.duration)}</span>
                           <span>{g.spans.length} span{g.spans.length !== 1 ? 's' : ''}</span>
                           {g.totalTokens > 0 && <span>⌃ {fmtTokens(g.totalTokens)}</span>}
                           {g.cost > 0 && <span>{fmtCost(g.cost)}</span>}
@@ -1254,18 +1275,18 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                       </span>
                     </TreeBreadcrumb>
                     {selectedTraceTree.map(({ span: s, depth }) => {
-                      const dur = spanEndMs(s) - spanMs(s);
+                      const dur = spanEndMs(s) - spanStartMs(s);
                       const isErr = s.status?.code === 2;
                       return (
                         <TreeNode
                           key={s.context?.spanId}
                           $depth={depth}
                           $selected={selectedSpanId === s.context?.spanId}
-                          onClick={() => setSelectedSpanId(s.context?.spanId)}
+                          onClick={() => setSelectedSpanId(s.context?.spanId ?? null)}
                         >
                           <TreeNodeDot $status={isErr ? 'error' : 'good'} />
                           <TreeNodeName title={s.name}>{s.name}</TreeNodeName>
-                          <TreeNodeDuration>{fmtDur(dur)}</TreeNodeDuration>
+                          <TreeNodeDuration>{fmtDuration(dur)}</TreeNodeDuration>
                         </TreeNode>
                       );
                     })}
@@ -1275,7 +1296,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                   <DetailPane>
                     {selectedSpan ? (() => {
                       const group = traceGroups.find(g => g.traceId === selectedTraceId)!;
-                      const dur = spanEndMs(selectedSpan) - spanMs(selectedSpan);
+                      const dur = spanEndMs(selectedSpan) - spanStartMs(selectedSpan);
                       const attrs = selectedSpan.attributes || {};
                       const isRoot = !selectedSpan.parentSpanId;
 
@@ -1290,7 +1311,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                               <DetailBadge $variant={selectedSpan.status?.code === 2 ? 'error' : 'success'}>
                                 {selectedSpan.status?.code === 2 ? 'ERROR' : 'OK'}
                               </DetailBadge>
-                              <DetailBadge>{fmtDur(dur)}</DetailBadge>
+                              <DetailBadge>{fmtDuration(dur)}</DetailBadge>
                               {attrs['gen_ai.system'] && <DetailBadge $variant="info">{attrs['gen_ai.system']}</DetailBadge>}
                               {attrs['gen_ai.request.model'] && <DetailBadge $variant="info">{attrs['gen_ai.request.model']}</DetailBadge>}
                               {attrs['gen_ai.usage.total_tokens'] && (
@@ -1306,7 +1327,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                           {isRoot && group.spans.length > 1 && (
                             <WaterfallMini>
                               {selectedTraceTree.map(({ span: ws, depth: wd }) => {
-                                const wsStart = spanMs(ws);
+                                const wsStart = spanStartMs(ws);
                                 const wsEnd = spanEndMs(ws);
                                 const wsDur = wsEnd - wsStart;
                                 const left = group.duration > 0 ? ((wsStart - group.start) / group.duration) * 100 : 0;
@@ -1317,7 +1338,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                                     <SpanBarWrapper>
                                       <SpanBar left={left} width={width} status={ws.status?.code === 2 ? 'ERROR' : 'OK'} />
                                     </SpanBarWrapper>
-                                    <SpanDuration>{fmtDur(wsDur)}</SpanDuration>
+                                    <SpanDuration>{fmtDuration(wsDur)}</SpanDuration>
                                   </WaterfallRow>
                                 );
                               })}
@@ -1330,8 +1351,8 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                             <DetailRow><span>Span ID</span><span>{selectedSpan.context?.spanId}</span></DetailRow>
                             <DetailRow><span>Trace ID</span><span>{selectedTraceId}</span></DetailRow>
                             {selectedSpan.parentSpanId && <DetailRow><span>Parent Span</span><span>{selectedSpan.parentSpanId}</span></DetailRow>}
-                            <DetailRow><span>Start</span><span>{new Date(spanMs(selectedSpan)).toLocaleTimeString()}</span></DetailRow>
-                            <DetailRow><span>Duration</span><span>{fmtDur(dur)}</span></DetailRow>
+                            <DetailRow><span>Start</span><span>{new Date(spanStartMs(selectedSpan)).toLocaleTimeString()}</span></DetailRow>
+                            <DetailRow><span>Duration</span><span>{fmtDuration(dur)}</span></DetailRow>
                             <DetailRow><span>Status</span><span>{selectedSpan.status?.code === 2 ? 'ERROR' : 'OK'}</span></DetailRow>
                           </DetailBody>
 
@@ -1351,11 +1372,11 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                           )}
 
                           {/* Events */}
-                          {selectedSpan.events?.length > 0 && (
+                          {(selectedSpan.events?.length ?? 0) > 0 && (
                             <>
-                              <DetailSectionTitle>Events ({selectedSpan.events.length})</DetailSectionTitle>
+                              <DetailSectionTitle>Events ({selectedSpan.events!.length})</DetailSectionTitle>
                               <DetailBody>
-                                {selectedSpan.events.map((ev: any, i: number) => (
+                                {selectedSpan.events!.map((ev: any, i: number) => (
                                   <DetailRow key={i}>
                                     <span>{ev.name}</span>
                                     <span>{ev.attributes ? JSON.stringify(ev.attributes) : ''}</span>

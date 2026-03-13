@@ -20,9 +20,11 @@ export const spanEndMs = (s: SpanData): number => hrTimeToMs(s.endTime);
 
 export const fmtDuration = (ms: number): string => {
   if (ms < 1) return "<1ms";
-  if (ms < 1000) return `${ms.toFixed(0)}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.floor(ms / 60000)}m${((ms % 60000) / 1000).toFixed(0)}s`;
+  if (ms < 1000) return `${Math.floor(ms)}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const m = Math.floor(ms / 60_000);
+  const s = Math.floor((ms % 60_000) / 1000);
+  return `${m}m${s}s`;
 };
 
 export const fmtCost = (usd: number): string =>
