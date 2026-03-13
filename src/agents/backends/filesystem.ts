@@ -197,12 +197,13 @@ class VscodeFsBackend implements BackendProtocol {
   }
 
   async read(filePath: string, offset = 0, limit = 2000): Promise<string> {
+    let fileStream: fs.ReadStream | undefined;
     try {
       const abs = this.resolveAgentPath(filePath);
 
       // Optimization: Use streams to read the file line-by-line. This avoids loading
       // the entire file into memory, providing O(1) memory usage regardless of file size.
-      const fileStream = fs.createReadStream(abs, { encoding: "utf-8" });
+      fileStream = fs.createReadStream(abs, { encoding: "utf-8" });
       const rl = readline.createInterface({
         input: fileStream,
         crlfDelay: Infinity,
@@ -212,22 +213,25 @@ class VscodeFsBackend implements BackendProtocol {
       let currentLine = 0;
       let fileIsEmpty = true;
 
-      for await (const line of rl) {
-        fileIsEmpty = false;
-        if (currentLine >= offset) {
-          if (out.length < limit) {
-            const truncatedLine = line.slice(0, 2000);
-            out.push(
-              `${String(currentLine + 1).padStart(6, " ")}\t${truncatedLine}`,
-            );
+      try {
+        for await (const line of rl) {
+          fileIsEmpty = false;
+          if (currentLine >= offset) {
+            if (out.length < limit) {
+              const truncatedLine = line.slice(0, 2000);
+              out.push(
+                `${String(currentLine + 1).padStart(6, " ")}\t${truncatedLine}`,
+              );
+            }
+          }
+          currentLine++;
+          if (out.length >= limit) {
+            break;
           }
         }
-        currentLine++;
-        if (out.length >= limit) {
-          rl.close(); // Stop reading once the limit is reached
-          fileStream.destroy();
-          break;
-        }
+      } finally {
+        rl.close();
+        fileStream.destroy();
       }
 
       if (fileIsEmpty)
@@ -327,58 +331,80 @@ class VscodeFsBackend implements BackendProtocol {
     }
 
     // --- JS Fallback: Optimized with parallel, streaming directory traversal ---
+    const MAX_GREP_RESULTS = 500;
     const globRegex = glob
       ? globToRegExp(glob.startsWith("/") ? glob : `/${glob}`)
       : null;
 
-    const walkAndSearch = async (dir: string): Promise<GrepMatch[]> => {
+    // Shared accumulator — single source of truth for match count.
+    // Eliminates TOCTOU races from parallel promises sharing a mutable counter.
+    const acc: { results: GrepMatch[]; isFull: boolean } = {
+      results: [],
+      isFull: false,
+    };
+
+    const walkAndSearch = async (dir: string): Promise<void> => {
+      if (acc.isFull) return;
       let entries: fs.Dirent[];
       try {
         entries = await fsp.readdir(dir, { withFileTypes: true });
       } catch {
-        return [];
+        return;
       }
 
-      const promises = entries.map(async (e): Promise<GrepMatch[]> => {
-        const child = path.join(dir, e.name);
-        if (e.isDirectory()) {
-          return walkAndSearch(child); // Recurse into subdirectories
-        }
-
-        const relPosix = `/${path.relative(this.rootDir, child).replace(/\\/g, "/")}`;
-        if (globRegex && !globRegex.test(relPosix)) return [];
-
-        // Optimization: Stream files to avoid high memory usage and process line-by-line.
-        const fileMatches: GrepMatch[] = [];
-        try {
-          const fileStream = fs.createReadStream(child, { encoding: "utf-8" });
-          fileStream.on("error", () => fileStream.destroy());
-          const rl = readline.createInterface({
-            input: fileStream,
-            crlfDelay: Infinity,
-          });
-
-          let lineNum = 0;
-          for await (const line of rl) {
-            lineNum++;
-            if (re.test(line)) {
-              fileMatches.push({ path: relPosix, line: lineNum, text: line });
-            }
+      await Promise.all(
+        entries.map(async (e): Promise<void> => {
+          if (acc.isFull) return;
+          const child = path.join(dir, e.name);
+          if (e.isDirectory()) {
+            return walkAndSearch(child);
           }
-        } catch (err) {
-          console.warn(
-            `[VscodeFsBackend] Failed to grep file ${child}: ${err}`,
-          );
-        }
-        return fileMatches;
-      });
 
-      const nestedMatches = await Promise.all(promises);
-      return ([] as GrepMatch[]).concat(...nestedMatches);
+          const relPosix = `/${path.relative(this.rootDir, child).replace(/\\/g, "/")}`;
+          if (globRegex && !globRegex.test(relPosix)) return;
+
+          let fileStream: fs.ReadStream | undefined;
+          try {
+            fileStream = fs.createReadStream(child, { encoding: "utf-8" });
+            const rl = readline.createInterface({
+              input: fileStream,
+              crlfDelay: Infinity,
+            });
+
+            let lineNum = 0;
+            try {
+              for await (const line of rl) {
+                lineNum++;
+                if (acc.isFull) break;
+                if (re.test(line)) {
+                  acc.results.push({
+                    path: relPosix,
+                    line: lineNum,
+                    text: line,
+                  });
+                  if (acc.results.length >= MAX_GREP_RESULTS) {
+                    acc.isFull = true;
+                    break;
+                  }
+                }
+              }
+            } finally {
+              rl.close();
+              fileStream.destroy();
+            }
+          } catch (err) {
+            console.warn(
+              `[VscodeFsBackend] Failed to grep file ${child}: ${err}`,
+            );
+            fileStream?.destroy();
+          }
+        }),
+      );
     };
 
     try {
-      return await walkAndSearch(absBase);
+      await walkAndSearch(absBase);
+      return acc.results;
     } catch (err: any) {
       return `Error: ${err?.message ?? String(err)}`;
     }
@@ -554,7 +580,9 @@ function parseRipgrepStdout(stdout: string, rootDir: string): GrepMatch[] {
 }
 
 /**
- * Return a BackendFactory bound to the given options.
+ * Create a VscodeFsBackend bound to the given options.
+ * Probes ripgrep availability at creation time and disables it
+ * if the binary cannot be found and no JS wrapper was provided.
  */
 export function createVscodeFsBackendFactory(
   opts: VscodeFsBackendFactoryOptions,
@@ -574,12 +602,15 @@ export function createVscodeFsBackendFactory(
     }
   }
 
-  const useRipgrep = opts.useRipgrep !== false;
+  // Disable ripgrep if binary is unavailable and no JS wrapper was provided
+  const effectiveUseRipgrep =
+    opts.useRipgrep !== false && (!!opts.ripgrepSearch || probeRgAvailable);
 
-  const backend = new VscodeFsBackend({ rootDir, ...rest });
+  const backend = new VscodeFsBackend({
+    rootDir,
+    ...rest,
+    useRipgrep: effectiveUseRipgrep,
+  });
 
-  if (useRipgrep && !opts.ripgrepSearch && !probeRgAvailable) {
-    (backend as any).useRipgrep = false;
-  }
   return backend;
 }

@@ -7,9 +7,12 @@ import { rgPath } from "@vscode/ripgrep";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import {
+  BackendFactory,
   BackendProtocol,
   CompositeBackend,
   createDeepAgent,
+  createMemoryMiddleware,
+  createSkillsMiddleware,
   StateBackend,
   StoreBackend,
 } from "deepagents";
@@ -100,7 +103,7 @@ export class DeveloperAgent {
   /**
    * Constructs the Backend Factory specifically for DeepAgents
    */
-  private getBackendFactory() {
+  private getBackendFactory(): BackendFactory {
     const vscodeFsBackend = this.createVscodeBackend();
     const { assistantId, store: configStore } = this.config;
 
@@ -315,16 +318,48 @@ export class DeveloperAgent {
         ? undefined
         : this.getInterruptConfiguration();
 
+    const backendFactory = this.getBackendFactory();
+
+    // Build middleware with defensive initialization — a failing middleware
+    // should not prevent the agent from starting.
+    // Cast to `any[]` to avoid TS2589 (excessively deep type instantiation)
+    // caused by createDeepAgent's generic middleware type inference.
+    const middleware: any[] = [];
+
+    try {
+      middleware.push(
+        createMemoryMiddleware({
+          backend: backendFactory,
+          sources: ["/workspace/.codebuddy/AGENTS.md", "/workspace/AGENTS.md"],
+          addCacheControl: true,
+        }),
+      );
+    } catch (err) {
+      this.logger.warn(`Memory middleware init failed: ${err}`);
+    }
+
+    try {
+      middleware.push(
+        createSkillsMiddleware({
+          backend: backendFactory,
+          sources: ["/workspace/.codebuddy/skills/"],
+        }),
+      );
+    } catch (err) {
+      this.logger.warn(`Skills middleware init failed: ${err}`);
+    }
+
     return createDeepAgent({
       model: this.model,
       tools: this.tools,
       systemPrompt: this.getSystemPrompt(),
-      backend: this.getBackendFactory(),
+      backend: backendFactory,
       store,
       checkpointer: checkPointer,
       name: "DeveloperAgent",
       subagents,
       interruptOn: interruptConfig,
+      middleware,
     });
   }
 

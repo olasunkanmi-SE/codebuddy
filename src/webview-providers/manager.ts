@@ -642,13 +642,16 @@ export class WebViewProviderManager implements vscode.Disposable {
     event: IEventPayload,
   ) {
     if (this.webviewView?.webview) {
+      const metadata = event.message?.metadata || event.metadata;
       await this.webviewView.webview.postMessage({
         type: eventType,
         payload: {
           requestId: event.message?.requestId,
           threadId: event.message?.threadId,
           content: event.message?.content || event.message,
-          metadata: event.message?.metadata || event.metadata,
+          toolName: metadata?.toolName,
+          activityType: metadata?.activityType,
+          metadata,
           timestamp: Date.now(),
         },
       });

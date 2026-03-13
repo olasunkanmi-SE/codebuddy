@@ -1,35 +1,41 @@
+import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import type { IStreamContext } from "../interface/agent.interface";
+import { TOOL_NAMES, READ_ONLY_TOOLS } from "../constants/tool-names";
 
-/** Safety limits for agent stream execution. */
-export const AGENT_SAFETY_LIMITS = {
-  maxEventCount: 1000,
-  maxToolInvocations: 200,
-  maxToolCallsPerType: 20,
-  maxDurationMs: 5 * 60 * 1000,
-  fileEditLoopThreshold: 4,
-  criticalToolLimits: {
-    edit_file: 8,
-    write_file: 8,
-    delete_file: 3,
-    run_command: 10,
-    run_terminal_command: 100,
-    web_search: 8,
-  } as Record<string, number>,
-  readOnlyTools: new Set([
-    "read_file",
-    "list_directory",
-    "search_codebase",
-    "grep",
-    "glob",
-    "analyze_files_for_question",
-    "git_log",
-    "git_diff",
-    "git_status",
-    "think",
-    "run_tests",
-  ]),
-} as const;
+export interface AgentSafetyLimits {
+  readonly maxEventCount: number;
+  readonly maxToolInvocations: number;
+  readonly maxToolCallsPerType: number;
+  readonly maxDurationMs: number;
+  readonly fileEditLoopThreshold: number;
+  readonly criticalToolLimits: Record<string, number>;
+  readonly readOnlyTools: ReadonlySet<string>;
+}
+
+/**
+ * Reads agent safety limits from VS Code config exactly once.
+ * Call at the start of each stream session, not in a hot loop.
+ */
+export function readAgentSafetyLimits(): AgentSafetyLimits {
+  const cfg = vscode.workspace.getConfiguration("codebuddy.agent");
+  return Object.freeze({
+    maxEventCount: cfg.get<number>("maxEventCount", 2000),
+    maxToolInvocations: cfg.get<number>("maxToolInvocations", 400),
+    maxToolCallsPerType: 20,
+    maxDurationMs: cfg.get<number>("maxDurationMinutes", 10) * 60_000,
+    fileEditLoopThreshold: 4,
+    criticalToolLimits: {
+      [TOOL_NAMES.EDIT_FILE]: 8,
+      [TOOL_NAMES.WRITE_FILE]: 8,
+      [TOOL_NAMES.DELETE_FILE]: 3,
+      [TOOL_NAMES.RUN_COMMAND]: 10,
+      [TOOL_NAMES.RUN_TERMINAL_COMMAND]: 100,
+      [TOOL_NAMES.WEB_SEARCH]: 8,
+    } as Record<string, number>,
+    readOnlyTools: READ_ONLY_TOOLS,
+  });
+}
 
 export type ForceStopReason = "max_events" | "max_tools" | "timeout";
 
@@ -78,33 +84,34 @@ export class AgentSafetyGuard {
   }
 
   /**
-   * Check whether the global safety limits have been exceeded.
+   * Check whether the safety limits have been exceeded.
    */
   checkLimits(
     eventCount: number,
     totalToolInvocations: number,
     elapsedMs: number,
+    limits: AgentSafetyLimits,
   ): SafetyCheckResult {
-    if (eventCount >= AGENT_SAFETY_LIMITS.maxEventCount) {
+    if (eventCount >= limits.maxEventCount) {
       this.logger.log(
         LogLevel.WARN,
-        `Force stopping: exceeded ${AGENT_SAFETY_LIMITS.maxEventCount} events (${totalToolInvocations} tool calls in ${Math.round(elapsedMs / 1000)}s)`,
+        `Force stopping: exceeded ${limits.maxEventCount} events (${totalToolInvocations} tool calls in ${Math.round(elapsedMs / 1000)}s)`,
       );
       return { shouldStop: true, reason: "max_events" };
     }
 
-    if (totalToolInvocations >= AGENT_SAFETY_LIMITS.maxToolInvocations) {
+    if (totalToolInvocations >= limits.maxToolInvocations) {
       this.logger.log(
         LogLevel.WARN,
-        `Force stopping: exceeded ${AGENT_SAFETY_LIMITS.maxToolInvocations} tool invocations`,
+        `Force stopping: exceeded ${limits.maxToolInvocations} tool invocations`,
       );
       return { shouldStop: true, reason: "max_tools" };
     }
 
-    if (elapsedMs >= AGENT_SAFETY_LIMITS.maxDurationMs) {
+    if (elapsedMs >= limits.maxDurationMs) {
       this.logger.log(
         LogLevel.WARN,
-        `Force stopping: exceeded ${AGENT_SAFETY_LIMITS.maxDurationMs / 1000}s timeout`,
+        `Force stopping: exceeded ${limits.maxDurationMs / 1000}s timeout`,
       );
       return { shouldStop: true, reason: "timeout" };
     }
@@ -115,11 +122,14 @@ export class AgentSafetyGuard {
   /**
    * Detect whether a specific tool is in a call-count loop.
    */
-  detectToolLoop(toolName: string, currentCount: number): ToolLoopResult {
-    const isReadOnly = AGENT_SAFETY_LIMITS.readOnlyTools.has(toolName);
+  detectToolLoop(
+    toolName: string,
+    currentCount: number,
+    limits: AgentSafetyLimits,
+  ): ToolLoopResult {
+    const isReadOnly = limits.readOnlyTools.has(toolName);
     const limit =
-      AGENT_SAFETY_LIMITS.criticalToolLimits[toolName] ??
-      AGENT_SAFETY_LIMITS.maxToolCallsPerType;
+      limits.criticalToolLimits[toolName] ?? limits.maxToolCallsPerType;
     const isLooping = currentCount >= limit;
 
     return { isLooping, isReadOnly, limit, currentCount };
@@ -131,10 +141,11 @@ export class AgentSafetyGuard {
   detectFileLoop(
     filePath: string,
     fileEditCounts: Map<string, number>,
+    limits: AgentSafetyLimits,
   ): FileLoopResult {
     const editCount = (fileEditCounts.get(filePath) || 0) + 1;
     return {
-      isLooping: editCount >= AGENT_SAFETY_LIMITS.fileEditLoopThreshold,
+      isLooping: editCount >= limits.fileEditLoopThreshold,
       filePath,
       editCount,
     };
@@ -199,10 +210,13 @@ export class AgentSafetyGuard {
    * Build a user-facing error message for a looping tool.
    */
   buildToolLoopErrorMessage(toolName: string, callCount: number): string {
-    if (toolName === "edit_file" || toolName === "write_file") {
+    if (
+      toolName === TOOL_NAMES.EDIT_FILE ||
+      toolName === TOOL_NAMES.WRITE_FILE
+    ) {
       return `I've attempted to edit this file ${callCount} times but the edit isn't completing successfully. This usually happens when the edit operation is interrupted or the file content doesn't match exactly. I'll stop here to avoid an infinite loop. You may need to make the change manually.`;
     }
-    if (toolName === "web_search") {
+    if (toolName === TOOL_NAMES.WEB_SEARCH) {
       return `I've searched for this information multiple times but couldn't find definitive results. For GitHub issues, try using the GitHub MCP tools directly or visit the repository issues page manually.`;
     }
     return `I've called ${toolName} ${callCount} times which indicates a loop. I'll stop here to prevent infinite processing.`;

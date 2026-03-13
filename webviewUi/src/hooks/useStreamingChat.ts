@@ -1,5 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+/** Module-level constant — zero allocation on every friendlyToolName call. */
+const FRIENDLY_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  run_command: "Terminal",
+  run_terminal_command: "Terminal",
+  command: "Terminal",
+  web_search: "Web Search",
+  read_file: "Read File",
+  write_file: "Write File",
+  edit_file: "Edit File",
+  analyze_files_for_question: "Analyze Code",
+  think: "Reasoning",
+  search_codebase: "Search Codebase",
+  manage_tasks: "Task Manager",
+  manage_core_memory: "Memory",
+  git_diff: "Git Diff",
+  git_log: "Git Log",
+  git_branch: "Git Branch",
+  run_tests: "Run Tests",
+  list_directory: "List Directory",
+});
+
 type TimelineStatus = "active" | "completed" | "failed";
 
 export interface AgentTimelineThinking {
@@ -275,54 +296,45 @@ export const useStreamingChat = (
     [enableStreaming],
   );
 
+  // Map raw tool names to user-friendly labels
+  const friendlyToolName = useCallback(
+    (toolName: string | undefined): string => {
+      if (!toolName) return "Tool";
+      return (
+        FRIENDLY_NAMES[toolName] ||
+        toolName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+      );
+    },
+    [],
+  );
+
   // Tool activity handlers
-  const handleToolStart = useCallback((payload: any) => {
-    const summarizeArgs = (args: any): string | null => {
-      if (!args || typeof args !== "object") return null;
-      if (typeof args.command === "string") {
-        const trimmed =
-          args.command.length > 120
-            ? `${args.command.slice(0, 117)}...`
-            : args.command;
-        return `command: ${trimmed}`;
-      }
-      const entries = Object.entries(args).slice(0, 2);
-      if (entries.length === 0) return null;
-      const parts = entries.map(([key, value]) => {
-        const raw = typeof value === "string" ? value : JSON.stringify(value);
-        const trimmed = raw.length > 60 ? `${raw.slice(0, 57)}...` : raw;
-        return `${key}=${trimmed}`;
-      });
-      const suffix = Object.keys(args).length > 2 ? ", …" : "";
-      return parts.join(", ") + suffix;
-    };
+  const handleToolStart = useCallback(
+    (payload: any) => {
+      const description =
+        payload.description || `Running ${friendlyToolName(payload.toolName)}`;
 
-    const argSummary = summarizeArgs(payload.args);
-    const description =
-      payload.description || `Running ${payload.toolName || "tool"}`;
-    const annotatedDescription = argSummary
-      ? `${description} (${argSummary})`
-      : description;
+      const action: AgentTimelineAction = {
+        id: payload.toolId || `action-${Date.now()}`,
+        type: "tool",
+        toolName: payload.toolName,
+        label: friendlyToolName(payload.toolName),
+        detail: description,
+        status: "active",
+        timestamp: Date.now(),
+      };
 
-    const action: AgentTimelineAction = {
-      id: payload.toolId || `action-${Date.now()}`,
-      type: "tool",
-      toolName: payload.toolName,
-      label: payload.toolName || "Tool",
-      detail: annotatedDescription,
-      status: "active",
-      timestamp: Date.now(),
-    };
-
-    setTimeline((prev) => ({
-      ...prev,
-      plan:
-        prev.plan && prev.plan.status === "active"
-          ? { ...prev.plan, status: "completed" }
-          : prev.plan,
-      actions: [...prev.actions, action],
-    }));
-  }, []);
+      setTimeline((prev) => ({
+        ...prev,
+        plan:
+          prev.plan && prev.plan.status === "active"
+            ? { ...prev.plan, status: "completed" }
+            : prev.plan,
+        actions: [...prev.actions, action],
+      }));
+    },
+    [friendlyToolName],
+  );
 
   const handleToolEnd = useCallback((payload: any) => {
     setTimeline((prev) => ({
@@ -465,7 +477,8 @@ export const useStreamingChat = (
       status: TimelineStatus = "active",
     ) => {
       const detail = payload.content || `Agent is ${type}...`;
-      const label = payload.toolName || type;
+      const toolName = payload.toolName || payload.metadata?.toolName;
+      const label = toolName ? friendlyToolName(toolName) : type;
       // De-duplicate consecutive working updates with the same detail
       if (type === "working") {
         setTimeline((prev) => {
@@ -481,6 +494,7 @@ export const useStreamingChat = (
                 id: payload.id || `action-${Date.now()}`,
                 type,
                 label,
+                toolName,
                 detail,
                 status,
                 timestamp: Date.now(),
@@ -500,6 +514,7 @@ export const useStreamingChat = (
         id: payload.id || `action-${Date.now()}`,
         type,
         label,
+        toolName,
         detail,
         status,
         timestamp: Date.now(),
@@ -515,7 +530,7 @@ export const useStreamingChat = (
         summarizing: false,
       }));
     },
-    [],
+    [friendlyToolName],
   );
 
   const handleTerminalOutput = useCallback((payload: any) => {
