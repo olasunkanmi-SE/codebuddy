@@ -88,11 +88,12 @@ export function sanitizeForLLMContext(text: string): string {
     "[REDACTED_PROMPT]",
   );
   // Strip invisible Unicode control characters (zero-width spaces, RTL overrides, etc.)
-  // eslint-disable-next-line no-control-regex
+  /* eslint-disable no-control-regex */
   sanitized = sanitized.replace(
     /[\u200B-\u200F\u2028-\u202F\uFEFF\u0000-\u0008\u000E-\u001F]/g,
     "",
   );
+  /* eslint-enable no-control-regex */
 
   // Wrap in clear delimiters so the LLM knows this is untrusted user content
   return `--- BEGIN UNTRUSTED ARTICLE CONTENT ---\n${sanitized}\n--- END UNTRUSTED ARTICLE CONTENT ---`;
