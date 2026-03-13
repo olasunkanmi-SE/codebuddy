@@ -147,7 +147,7 @@ export class SqliteDatabaseService {
   }
 
   /**
-   * Create necessary tables for codebase analysis
+   * Create necessary tables for codebase analysis.
    */
   private async createTables(): Promise<void> {
     if (!this.db) {
@@ -198,7 +198,41 @@ export class SqliteDatabaseService {
     this.saveToDisk();
   }
 
+  /**
+   * Initialize additional schema tables and run versioned migrations.
+   * Migrations are tracked in a `schema_version` table so that
+   * ALTER TABLE / column additions are applied exactly once.
+   */
   private async initializeSchema(): Promise<void> {
+    // ── Schema version tracking ─────────────────────────────────────────
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER PRIMARY KEY
+      )
+    `);
+
+    const versionRows = this.db.exec(
+      "SELECT MAX(version) as v FROM schema_version",
+    );
+    const currentVersion =
+      versionRows.length > 0 && versionRows[0].values.length > 0
+        ? ((versionRows[0].values[0][0] as number | null) ?? 0)
+        : 0;
+
+    const runMigration = (version: number, sql: string) => {
+      if (currentVersion < version) {
+        try {
+          this.db!.run(sql);
+          this.db!.run("INSERT INTO schema_version (version) VALUES (?)", [
+            version,
+          ]);
+          this.logger.info(`Applied schema migration v${version}`);
+        } catch (e: any) {
+          this.logger.warn(`Schema migration v${version} note: ${e.message}`);
+        }
+      }
+    };
+
     try {
       this.db.run(`
         CREATE TABLE IF NOT EXISTS chat_history (
@@ -293,19 +327,11 @@ export class SqliteDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_news_saved ON news_items(saved)
       `);
 
-      // Migration: Add saved column if it doesn't exist
-      try {
-        this.logger.info("Attempting to add 'saved' column to news_items...");
-        this.db.run(
-          `ALTER TABLE news_items ADD COLUMN saved INTEGER DEFAULT 0`,
-        );
-        this.logger.info("Successfully added 'saved' column to news_items");
-      } catch (e: any) {
-        // Ignore "duplicate column name" error, log others
-        if (!e.message?.includes("duplicate column")) {
-          this.logger.warn(`Migration note (saved column): ${e.message}`);
-        }
-      }
+      // Versioned migration: Add saved column to news_items
+      runMigration(
+        1,
+        `ALTER TABLE news_items ADD COLUMN saved INTEGER DEFAULT 0`,
+      );
     } catch (error: any) {
       this.logger.warn("Failed to initialize chat history schema:", error);
     }
@@ -347,6 +373,29 @@ export class SqliteDatabaseService {
       `);
     } catch (error: any) {
       this.logger.warn("Failed to initialize bookmarks schema:", error);
+    }
+
+    try {
+      // Saved Articles — Smart Reader offline reading
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS saved_articles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          url TEXT NOT NULL UNIQUE,
+          title TEXT NOT NULL,
+          author TEXT,
+          site_name TEXT,
+          content_html TEXT NOT NULL,
+          content_text TEXT NOT NULL,
+          excerpt TEXT,
+          saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_saved_articles_saved_at ON saved_articles(saved_at)
+      `);
+    } catch (error: any) {
+      this.logger.warn("Failed to initialize saved_articles schema:", error);
     }
   }
 

@@ -32,6 +32,24 @@ const TrashIcon = () => (
   </svg>
 );
 
+const SaveIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+    <polyline points="17 21 17 13 7 13 7 21" />
+    <polyline points="7 3 7 8 15 8" />
+  </svg>
+);
+
+const ArticleIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+    <polyline points="10 9 9 9 8 9" />
+  </svg>
+);
+
 const GlobeIcon = () => (
   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
@@ -284,10 +302,12 @@ interface BrowserPanelProps {
 }
 
 export const BrowserPanel: React.FC<BrowserPanelProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<"history" | "bookmarks">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "bookmarks" | "saved">("history");
   const [urlValue, setUrlValue] = useState("");
   const browsingHistory = useContentStore((s) => s.browsingHistory);
   const bookmarks = useContentStore((s) => s.bookmarks);
+  const savedArticles = useContentStore((s) => s.savedArticles);
+  const scrapeStatus = useContentStore((s) => s.scrapeStatus);
 
   const handleNavigate = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -324,6 +344,27 @@ export const BrowserPanel: React.FC<BrowserPanelProps> = ({ isOpen, onClose }) =
     return bookmarks.some((b) => b.url === url);
   }, [bookmarks]);
 
+  const handleScrapeAndSave = useCallback((url: string) => {
+    useContentStore.getState().handleScrapeAndSave(url);
+  }, []);
+
+  const handleDeleteSavedArticle = useCallback((id: number) => {
+    useContentStore.getState().handleDeleteSavedArticle(id);
+  }, []);
+
+  const handleOpenSavedArticle = useCallback((id: number) => {
+    useContentStore.getState().handleOpenSavedArticle(id);
+    onClose();
+  }, [onClose]);
+
+  // Load saved articles when switching to saved tab
+  const handleTabChange = useCallback((tab: "history" | "bookmarks" | "saved") => {
+    setActiveTab(tab);
+    if (tab === "saved") {
+      useContentStore.getState().handleGetSavedArticles();
+    }
+  }, []);
+
   if (!isOpen) return null;
 
   return (
@@ -351,15 +392,38 @@ export const BrowserPanel: React.FC<BrowserPanelProps> = ({ isOpen, onClose }) =
           <GoButton type="submit">Go</GoButton>
         </UrlBar>
 
-        {/* Tab bar — History / Bookmarks */}
+        {/* Tab bar — History / Bookmarks / Saved */}
         <TabBar>
-          <Tab active={activeTab === "history"} onClick={() => setActiveTab("history")}>
+          <Tab active={activeTab === "history"} onClick={() => handleTabChange("history")}>
             History <TabCount>{browsingHistory.length}</TabCount>
           </Tab>
-          <Tab active={activeTab === "bookmarks"} onClick={() => setActiveTab("bookmarks")}>
+          <Tab active={activeTab === "bookmarks"} onClick={() => handleTabChange("bookmarks")}>
             <BookmarkIcon /> Bookmarks <TabCount>{bookmarks.length}</TabCount>
           </Tab>
+          <Tab active={activeTab === "saved"} onClick={() => handleTabChange("saved")}>
+            <ArticleIcon /> Saved <TabCount>{savedArticles.length}</TabCount>
+          </Tab>
         </TabBar>
+
+        {/* Scrape status banner */}
+        {scrapeStatus && (
+          <div style={{
+            padding: "6px 16px",
+            fontSize: 11,
+            background: scrapeStatus.status === "error"
+              ? "var(--vscode-inputValidation-errorBackground, rgba(255,0,0,0.1))"
+              : "var(--vscode-inputValidation-infoBackground, rgba(0,122,204,0.1))",
+            borderBottom: "1px solid var(--vscode-widget-border)",
+            color: scrapeStatus.status === "error"
+              ? "var(--vscode-errorForeground, #f48771)"
+              : "var(--vscode-foreground)",
+          }}>
+            {scrapeStatus.status === "scraping" && "Scraping page via Playwright..."}
+            {scrapeStatus.status === "saving" && "Saving article..."}
+            {scrapeStatus.status === "done" && "Article scraped & saved!"}
+            {scrapeStatus.status === "error" && `Error: ${scrapeStatus.error}`}
+          </div>
+        )}
 
         {/* Content */}
         <ListContent>
@@ -385,6 +449,13 @@ export const BrowserPanel: React.FC<BrowserPanelProps> = ({ isOpen, onClose }) =
                       style={isBookmarked(item.url) ? { color: "var(--vscode-notificationsInfoIcon-foreground, #3794ff)", opacity: 1 } : undefined}
                     >
                       <BookmarkIcon filled={isBookmarked(item.url)} />
+                    </IconButton>
+                    <IconButton
+                      title="Scrape & Save (bypass paywall)"
+                      aria-label={`Scrape ${item.title} and save to Smart Reader`}
+                      onClick={() => handleScrapeAndSave(item.url)}
+                    >
+                      <SaveIcon />
                     </IconButton>
                     <IconButton
                       title="Add to Chat"
@@ -422,6 +493,13 @@ export const BrowserPanel: React.FC<BrowserPanelProps> = ({ isOpen, onClose }) =
                   </ItemInfo>
                   <ItemActions className="item-actions">
                     <IconButton
+                      title="Scrape & Save (bypass paywall)"
+                      aria-label={`Scrape ${bm.title} and save to Smart Reader`}
+                      onClick={() => handleScrapeAndSave(bm.url)}
+                    >
+                      <SaveIcon />
+                    </IconButton>
+                    <IconButton
                       title="Add to Chat"
                       aria-label={`Add ${bm.title} to chat`}
                       onClick={() => handleAddToChat(bm.url, bm.title)}
@@ -432,6 +510,52 @@ export const BrowserPanel: React.FC<BrowserPanelProps> = ({ isOpen, onClose }) =
                       title="Remove bookmark"
                       aria-label={`Remove bookmark ${bm.title}`}
                       onClick={() => handleRemoveBookmark(bm.url)}
+                      style={{ color: "var(--vscode-errorForeground, #f48771)" }}
+                    >
+                      <TrashIcon />
+                    </IconButton>
+                  </ItemActions>
+                </ItemRow>
+              ))
+            )
+          )}
+
+          {activeTab === "saved" && (
+            savedArticles.length === 0 ? (
+              <EmptyState>
+                <ArticleIcon />
+                No saved articles yet.<br />
+                Use the scrape button on history or bookmark items to bypass paywalls and save articles for offline reading.
+              </EmptyState>
+            ) : (
+              savedArticles.map((article) => (
+                <ItemRow key={article.id}>
+                  <ItemInfo onClick={() => handleOpenSavedArticle(article.id)}>
+                    <ItemTitle>{article.title}</ItemTitle>
+                    <ItemUrl>
+                      {article.author ? `${article.author} · ` : ""}
+                      {article.site_name ? `${article.site_name} · ` : ""}
+                      {new Date(article.saved_at).toLocaleDateString()}
+                    </ItemUrl>
+                    {article.excerpt && (
+                      <ItemUrl style={{ marginTop: 2, whiteSpace: "normal", lineHeight: 1.3 }}>
+                        {article.excerpt.substring(0, 120)}
+                        {article.excerpt.length > 120 ? "..." : ""}
+                      </ItemUrl>
+                    )}
+                  </ItemInfo>
+                  <ItemActions className="item-actions">
+                    <IconButton
+                      title="Open in Smart Reader"
+                      aria-label={`Open ${article.title}`}
+                      onClick={() => handleOpenSavedArticle(article.id)}
+                    >
+                      <ArticleIcon />
+                    </IconButton>
+                    <IconButton
+                      title="Delete saved article"
+                      aria-label={`Delete ${article.title}`}
+                      onClick={() => handleDeleteSavedArticle(article.id)}
                       style={{ color: "var(--vscode-errorForeground, #f48771)" }}
                     >
                       <TrashIcon />
