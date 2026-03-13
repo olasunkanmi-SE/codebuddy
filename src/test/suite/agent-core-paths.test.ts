@@ -17,7 +17,8 @@
 import * as assert from "assert";
 import { ContentNormalizer } from "../../agents/services/content-normalizer";
 import { ConsentManager } from "../../agents/services/consent-manager";
-import { AgentSafetyGuard } from "../../agents/services/agent-safety-guard";
+import { AgentSafetyGuard, type AgentSafetyLimits } from "../../agents/services/agent-safety-guard";
+import { TOOL_NAMES, READ_ONLY_TOOLS } from "../../agents/constants/tool-names";
 import {
   collectToolCallsFromUpdate,
   summarizeToolResultContent,
@@ -33,6 +34,23 @@ const noopLogger = {
   warn: (_message: string, _data?: unknown) => {},
   debug: (_message: string, _data?: unknown) => {},
 };
+
+const defaultLimits: AgentSafetyLimits = Object.freeze({
+  maxEventCount: 2000,
+  maxToolInvocations: 400,
+  maxToolCallsPerType: 20,
+  maxDurationMs: 10 * 60_000,
+  fileEditLoopThreshold: 4,
+  criticalToolLimits: {
+    [TOOL_NAMES.EDIT_FILE]: 8,
+    [TOOL_NAMES.WRITE_FILE]: 8,
+    [TOOL_NAMES.DELETE_FILE]: 3,
+    [TOOL_NAMES.RUN_COMMAND]: 10,
+    [TOOL_NAMES.RUN_TERMINAL_COMMAND]: 100,
+    [TOOL_NAMES.WEB_SEARCH]: 8,
+  } as Record<string, number>,
+  readOnlyTools: READ_ONLY_TOOLS,
+});
 
 // ═══════════════════════════════════════════════════════════════
 // 1. ContentNormalizer (real import — zero external deps)
@@ -290,43 +308,43 @@ suite("AgentSafetyGuard — checkLimits", () => {
   });
 
   test("under all limits → shouldStop false", () => {
-    const r = guard.checkLimits(500, 100, 60_000);
+    const r = guard.checkLimits(500, 100, 60_000, defaultLimits);
     assert.strictEqual(r.shouldStop, false);
     assert.strictEqual(r.reason, null);
   });
 
   test("at exact maxEventCount → stops", () => {
-    const r = guard.checkLimits(1000, 0, 0);
+    const r = guard.checkLimits(2000, 0, 0, defaultLimits);
     assert.strictEqual(r.shouldStop, true);
     assert.strictEqual(r.reason, "max_events");
   });
 
   test("over maxEventCount → stops", () => {
-    const r = guard.checkLimits(1500, 0, 0);
+    const r = guard.checkLimits(2500, 0, 0, defaultLimits);
     assert.strictEqual(r.shouldStop, true);
     assert.strictEqual(r.reason, "max_events");
   });
 
   test("at exact maxToolInvocations → stops", () => {
-    const r = guard.checkLimits(0, 200, 0);
+    const r = guard.checkLimits(0, 400, 0, defaultLimits);
     assert.strictEqual(r.shouldStop, true);
     assert.strictEqual(r.reason, "max_tools");
   });
 
   test("at exact maxDurationMs → stops", () => {
-    const r = guard.checkLimits(0, 0, 300_000);
+    const r = guard.checkLimits(0, 0, 600_000, defaultLimits);
     assert.strictEqual(r.shouldStop, true);
     assert.strictEqual(r.reason, "timeout");
   });
 
   test("events checked before tools (priority)", () => {
     // Both exceeded but events should be returned first
-    const r = guard.checkLimits(1000, 200, 300_000);
+    const r = guard.checkLimits(2000, 400, 600_000, defaultLimits);
     assert.strictEqual(r.reason, "max_events");
   });
 
   test("just under all limits → safe", () => {
-    const r = guard.checkLimits(999, 199, 299_999);
+    const r = guard.checkLimits(1999, 399, 599_999, defaultLimits);
     assert.strictEqual(r.shouldStop, false);
   });
 });
@@ -339,50 +357,50 @@ suite("AgentSafetyGuard — detectToolLoop", () => {
   });
 
   test("edit_file has critical limit of 8", () => {
-    const r = guard.detectToolLoop("edit_file", 8);
+    const r = guard.detectToolLoop("edit_file", 8, defaultLimits);
     assert.strictEqual(r.isLooping, true);
     assert.strictEqual(r.limit, 8);
     assert.strictEqual(r.isReadOnly, false);
   });
 
   test("edit_file under limit is not looping", () => {
-    assert.strictEqual(guard.detectToolLoop("edit_file", 7).isLooping, false);
+    assert.strictEqual(guard.detectToolLoop("edit_file", 7, defaultLimits).isLooping, false);
   });
 
   test("delete_file has critical limit of 3", () => {
-    assert.strictEqual(guard.detectToolLoop("delete_file", 3).isLooping, true);
-    assert.strictEqual(guard.detectToolLoop("delete_file", 2).isLooping, false);
+    assert.strictEqual(guard.detectToolLoop("delete_file", 3, defaultLimits).isLooping, true);
+    assert.strictEqual(guard.detectToolLoop("delete_file", 2, defaultLimits).isLooping, false);
   });
 
   test("read_file is read-only", () => {
-    const r = guard.detectToolLoop("read_file", 0);
+    const r = guard.detectToolLoop("read_file", 0, defaultLimits);
     assert.strictEqual(r.isReadOnly, true);
   });
 
   test("edit_file is not read-only", () => {
-    assert.strictEqual(guard.detectToolLoop("edit_file", 0).isReadOnly, false);
+    assert.strictEqual(guard.detectToolLoop("edit_file", 0, defaultLimits).isReadOnly, false);
   });
 
   test("unknown tool uses default maxToolCallsPerType (20)", () => {
-    const r = guard.detectToolLoop("custom_tool", 19);
+    const r = guard.detectToolLoop("custom_tool", 19, defaultLimits);
     assert.strictEqual(r.isLooping, false);
     assert.strictEqual(r.limit, 20);
 
-    const r2 = guard.detectToolLoop("custom_tool", 20);
+    const r2 = guard.detectToolLoop("custom_tool", 20, defaultLimits);
     assert.strictEqual(r2.isLooping, true);
   });
 
   test("run_terminal_command has high limit of 100", () => {
-    assert.strictEqual(guard.detectToolLoop("run_terminal_command", 99).isLooping, false);
-    assert.strictEqual(guard.detectToolLoop("run_terminal_command", 100).isLooping, true);
+    assert.strictEqual(guard.detectToolLoop("run_terminal_command", 99, defaultLimits).isLooping, false);
+    assert.strictEqual(guard.detectToolLoop("run_terminal_command", 100, defaultLimits).isLooping, true);
   });
 
   test("think is read-only", () => {
-    assert.strictEqual(guard.detectToolLoop("think", 0).isReadOnly, true);
+    assert.strictEqual(guard.detectToolLoop("think", 0, defaultLimits).isReadOnly, true);
   });
 
   test("run_tests is read-only", () => {
-    assert.strictEqual(guard.detectToolLoop("run_tests", 0).isReadOnly, true);
+    assert.strictEqual(guard.detectToolLoop("run_tests", 0, defaultLimits).isReadOnly, true);
   });
 });
 
@@ -398,33 +416,33 @@ suite("AgentSafetyGuard — detectFileLoop (pure query, no mutation)", () => {
 
   test("first edit returns editCount 1, not looping", () => {
     const counts = new Map<string, number>();
-    const r = guard.detectFileLoop("/src/a.ts", counts);
+    const r = guard.detectFileLoop("/src/a.ts", counts, defaultLimits);
     assert.strictEqual(r.editCount, 1);
     assert.strictEqual(r.isLooping, false);
   });
 
   test("does NOT mutate the caller's map — caller must persist count itself", () => {
     const counts = new Map<string, number>();
-    guard.detectFileLoop("/src/a.ts", counts);
+    guard.detectFileLoop("/src/a.ts", counts, defaultLimits);
     assert.strictEqual(counts.has("/src/a.ts"), false);
   });
 
   test("at threshold (4) → looping", () => {
     const counts = new Map<string, number>([[ "/src/a.ts", 3 ]]);
-    const r = guard.detectFileLoop("/src/a.ts", counts);
+    const r = guard.detectFileLoop("/src/a.ts", counts, defaultLimits);
     assert.strictEqual(r.editCount, 4);
     assert.strictEqual(r.isLooping, true);
   });
 
   test("above threshold → looping", () => {
     const counts = new Map<string, number>([[ "/src/a.ts", 10 ]]);
-    assert.strictEqual(guard.detectFileLoop("/src/a.ts", counts).isLooping, true);
+    assert.strictEqual(guard.detectFileLoop("/src/a.ts", counts, defaultLimits).isLooping, true);
   });
 
   test("different files tracked independently", () => {
     const counts = new Map<string, number>([[ "/src/a.ts", 3 ]]);
-    assert.strictEqual(guard.detectFileLoop("/src/b.ts", counts).editCount, 1);
-    assert.strictEqual(guard.detectFileLoop("/src/a.ts", counts).editCount, 4);
+    assert.strictEqual(guard.detectFileLoop("/src/b.ts", counts, defaultLimits).editCount, 1);
+    assert.strictEqual(guard.detectFileLoop("/src/a.ts", counts, defaultLimits).editCount, 4);
   });
 });
 
@@ -436,19 +454,19 @@ suite("AgentSafetyGuard — buildStopMessage", () => {
   });
 
   test("max_events includes event count", () => {
-    const msg = guard.buildStopMessage("max_events", 1000, 50, 60_000);
-    assert.ok(msg.includes("Processed 1000 events"));
+    const msg = guard.buildStopMessage("max_events", 2000, 50, 60_000);
+    assert.ok(msg.includes("Processed 2000 events"));
     assert.ok(msg.includes("⚠️"));
   });
 
   test("max_tools includes tool count", () => {
-    const msg = guard.buildStopMessage("max_tools", 500, 200, 120_000);
-    assert.ok(msg.includes("Made 200 tool calls"));
+    const msg = guard.buildStopMessage("max_tools", 500, 400, 120_000);
+    assert.ok(msg.includes("Made 400 tool calls"));
   });
 
   test("timeout includes elapsed seconds", () => {
-    const msg = guard.buildStopMessage("timeout", 100, 50, 300_000);
-    assert.ok(msg.includes("Ran for 300 seconds"));
+    const msg = guard.buildStopMessage("timeout", 100, 50, 600_000);
+    assert.ok(msg.includes("Ran for 600 seconds"));
   });
 });
 
