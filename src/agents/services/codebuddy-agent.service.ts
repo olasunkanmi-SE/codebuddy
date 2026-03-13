@@ -7,7 +7,7 @@ import {
   MemorySaver,
   BaseCheckpointSaver,
 } from "@langchain/langgraph";
-import { trace, Span, SpanStatusCode } from "@opentelemetry/api";
+import { trace, context, Span, SpanStatusCode } from "@opentelemetry/api";
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { createAdvancedDeveloperAgent } from "../developer/agent";
@@ -720,6 +720,7 @@ export class CodeBuddyAgentService {
         user_message: sanitizedMessage.substring(0, 500),
       },
     });
+    const parentCtx = trace.setSpan(context.active(), span);
 
     // Cost tracking — resolve current provider/model for pricing lookup
     const costTracker = CostTrackingService.getInstance();
@@ -731,6 +732,10 @@ export class CodeBuddyAgentService {
     } catch {
       // Non-critical — fallback pricing will be used
     }
+
+    // Enrich root span with model metadata for the trace detail panel
+    span.setAttribute("llm.provider", providerName);
+    span.setAttribute("llm.model", currentModelName);
 
     try {
       const agent = await this.getAgent();
@@ -923,6 +928,8 @@ export class CodeBuddyAgentService {
           currentModelName,
           limits,
           onChunk,
+          tracer,
+          parentCtx,
         );
       }
 
@@ -1167,8 +1174,23 @@ export class CodeBuddyAgentService {
     currentModelName: string,
     limits: AgentSafetyLimits,
     onChunk?: (chunk: IStreamEvent) => void,
+    tracer?: ReturnType<typeof trace.getTracer>,
+    parentCtx?: ReturnType<typeof context.active>,
   ): AsyncGenerator<IStreamEvent> {
     for (const [nodeName, update] of entries) {
+      // Create a child span per graph node for hierarchical tracing
+      const nodeSpan =
+        tracer && parentCtx
+          ? tracer.startSpan(
+              nodeName,
+              { attributes: { "graph.node": nodeName } },
+              parentCtx,
+            )
+          : undefined;
+      const nodeCtx = nodeSpan
+        ? trace.setSpan(parentCtx!, nodeSpan)
+        : parentCtx;
+
       if (update?.messages && Array.isArray(update.messages)) {
         for (const message of update.messages) {
           if (
@@ -1177,6 +1199,25 @@ export class CodeBuddyAgentService {
               message.usage_metadata.output_tokens)
           ) {
             const usage = message.usage_metadata;
+
+            // Record LLM usage on the node span for per-node token visibility
+            if (nodeSpan) {
+              nodeSpan.setAttribute("llm.provider", providerName);
+              nodeSpan.setAttribute("llm.model", currentModelName);
+              nodeSpan.setAttribute(
+                "llm.input_tokens",
+                usage.input_tokens ?? 0,
+              );
+              nodeSpan.setAttribute(
+                "llm.output_tokens",
+                usage.output_tokens ?? 0,
+              );
+              nodeSpan.setAttribute(
+                "llm.total_tokens",
+                (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
+              );
+            }
+
             const costData = costTracker.recordUsage(
               conversationId,
               providerName,
@@ -1213,6 +1254,25 @@ export class CodeBuddyAgentService {
                 "node.name": nodeName,
                 duration_ms: toolActivity.endTime - toolActivity.startTime,
               });
+
+              // End the child span for this tool
+              const toolSpans = (ctx as any).__toolSpans as
+                | Map<string, Span>
+                | undefined;
+              const toolSpan = toolSpans?.get(toolName);
+              if (toolSpan) {
+                toolSpan.setAttribute(
+                  "tool.result_summary",
+                  toolActivity.result.summary ?? "",
+                );
+                toolSpan.setAttribute(
+                  "tool.duration_ms",
+                  toolActivity.endTime! - toolActivity.startTime,
+                );
+                toolSpan.setStatus({ code: SpanStatusCode.OK });
+                toolSpan.end();
+                toolSpans!.delete(toolName);
+              }
 
               yield {
                 type: StreamEventType.TOOL_END,
@@ -1275,9 +1335,19 @@ export class CodeBuddyAgentService {
           span,
           streamManager,
           limits,
+          tracer,
+          nodeCtx,
         );
-        if (ctx.hasErrored) return;
+        if (ctx.hasErrored) {
+          nodeSpan?.setStatus({ code: SpanStatusCode.ERROR });
+          nodeSpan?.end();
+          return;
+        }
       }
+
+      // End the node span
+      nodeSpan?.setStatus({ code: SpanStatusCode.OK });
+      nodeSpan?.end();
     }
   }
 
@@ -1292,6 +1362,8 @@ export class CodeBuddyAgentService {
     span: Span,
     streamManager: StreamManager,
     limits: AgentSafetyLimits,
+    tracer?: ReturnType<typeof trace.getTracer>,
+    parentCtx?: ReturnType<typeof context.active>,
   ): AsyncGenerator<IStreamEvent> {
     this.logger.debug(
       `[STREAM] Tool calls detected: ${toolCalls.length} tools - ${toolCalls.map((tc) => tc.name).join(", ")}`,
@@ -1421,6 +1493,29 @@ export class CodeBuddyAgentService {
       toolActivity.status = "running";
       ctx.pendingToolCalls.set(toolCall.name, toolActivity);
 
+      // Create a child span for this tool invocation
+      const toolSpan =
+        tracer && parentCtx
+          ? tracer.startSpan(
+              `tool:${toolCall.name}`,
+              {
+                attributes: {
+                  "tool.name": toolCall.name,
+                  "tool.args": JSON.stringify(toolCall.args).substring(0, 1000),
+                  "node.name": nodeName,
+                  "tool.is_middleware": isMiddlewareNode,
+                },
+              },
+              parentCtx,
+            )
+          : undefined;
+      if (toolSpan) {
+        // Store the span so it can be ended when the tool result arrives
+        (ctx as any).__toolSpans =
+          (ctx as any).__toolSpans || new Map<string, Span>();
+        (ctx as any).__toolSpans.set(toolCall.name, toolSpan);
+      }
+
       span.addEvent("tool_start", {
         "tool.name": toolCall.name,
         "tool.args": JSON.stringify(toolCall.args),
@@ -1514,6 +1609,16 @@ export class CodeBuddyAgentService {
     streamManager.endStream(ctx.accumulatedContent);
 
     const finalCost = costTracker.getConversationCost(conversationId);
+
+    // Enrich root span with final cost/token data
+    if (finalCost) {
+      span.setAttribute("cost.total_usd", finalCost.estimatedCostUSD ?? 0);
+      span.setAttribute("cost.input_tokens", finalCost.inputTokens ?? 0);
+      span.setAttribute("cost.output_tokens", finalCost.outputTokens ?? 0);
+      span.setAttribute("cost.total_tokens", finalCost.totalTokens ?? 0);
+      span.setAttribute("cost.request_count", finalCost.requestCount ?? 0);
+    }
+
     yield {
       type: StreamEventType.END,
       content: ctx.accumulatedContent,
