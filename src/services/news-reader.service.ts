@@ -176,7 +176,27 @@ export class NewsReaderService implements vscode.Disposable {
     }
   }
 
-  public showPanel(html: string, title: string): void {
+  /**
+   * Display a pre-fetched article in the reader panel.
+   * Accepts the normalized article shape already held in memory (e.g., from offline DB).
+   */
+  public async displayOfflineArticle(article: {
+    title: string;
+    content: string;
+    byline: string;
+    siteName: string;
+    url: string;
+  }): Promise<void> {
+    const html = this.getReaderHtml(article);
+    this.showPanel(html, article.title);
+    this.currentArticle = {
+      title: article.title,
+      content: article.content,
+      url: article.url,
+    };
+  }
+
+  private showPanel(html: string, title: string): void {
     if (this.currentPanel) {
       this.currentPanel.reveal(vscode.ViewColumn.One);
     } else {
@@ -287,7 +307,7 @@ export class NewsReaderService implements vscode.Disposable {
     }
   }
 
-  public getReaderHtml(article: {
+  private getReaderHtml(article: {
     title: string;
     content: string;
     byline: string;

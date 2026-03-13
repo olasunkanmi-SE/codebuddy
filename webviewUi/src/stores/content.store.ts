@@ -19,6 +19,12 @@ interface SavedArticle {
   saved_at: string;
 }
 
+type ScrapeStatus =
+  | { status: "scraping"; url: string }
+  | { status: "saving"; url: string }
+  | { status: "done"; url: string }
+  | { status: "error"; url: string; error: string };
+
 interface ContentState {
   newsItems: any[];
   logs: any[];
@@ -27,7 +33,7 @@ interface ContentState {
   browsingHistory: Array<{ url: string; title: string; timestamp: number }>;
   bookmarks: Bookmark[];
   savedArticles: SavedArticle[];
-  scrapeStatus: { status: string; url: string; error?: string } | null;
+  scrapeStatus: ScrapeStatus | null;
 
   setNewsItems: (items: any[]) => void;
   setLogs: (logs: any[]) => void;
@@ -39,9 +45,7 @@ interface ContentState {
   ) => void;
   setBookmarks: (bookmarks: Bookmark[]) => void;
   setSavedArticles: (articles: SavedArticle[]) => void;
-  setScrapeStatus: (
-    status: { status: string; url: string; error?: string } | null,
-  ) => void;
+  setScrapeStatus: (status: ScrapeStatus | null) => void;
 
   handleMarkNewsAsRead: (id: number) => void;
   handleRefreshNews: () => void;
