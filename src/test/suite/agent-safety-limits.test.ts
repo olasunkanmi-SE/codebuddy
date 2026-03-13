@@ -1,433 +1,272 @@
 /**
- * Core Agent Safety Limits Tests
+ * Agent Safety Guard Tests
  *
- * Tests the safety boundaries in CodeBuddyAgentService.streamResponse():
- * - Maximum stream event count (1000)
- * - Maximum tool invocations (200)
- * - Per-tool call limits (20 generic, critical limits per tool)
- * - Per-file edit loop detection (4 edits to same file)
- * - Timeout enforcement (5 minutes)
- * - Read-only tools are not blocked by loop detection
- * - Middleware nodes are excluded from tool counts
+ * Tests AgentSafetyGuard class methods and readAgentSafetyLimits():
+ * - checkLimits() force-stop logic with configurable limits
+ * - detectToolLoop() with read-only vs mutating tools
+ * - detectFileLoop() per-file edit tracking
+ * - buildStopMessage() and buildToolLoopErrorMessage() output
+ * - buildLimitReset() and extendLimits() counter resets
+ * - readAgentSafetyLimits() returns correct defaults from config
  */
 
 import * as assert from "assert";
 import * as sinon from "sinon";
+import {
+  AgentSafetyGuard,
+  readAgentSafetyLimits,
+  type AgentSafetyLimits,
+} from "../../agents/services/agent-safety-guard";
+import { TOOL_NAMES, READ_ONLY_TOOLS } from "../../agents/constants/tool-names";
 
-// The constants are defined locally in streamResponse. We replicate them
-// here to assert their expected values. If they ever drift, these tests
-// will catch it.
-
-suite("Agent Safety Limits — Constants", () => {
-  // These are the values defined in codebuddy-agent.service.ts streamResponse()
-  const EXPECTED = {
-    maxEventCount: 1000,
-    maxToolInvocations: 200,
+/** Build a limits object with sensible test defaults, overrideable per-test. */
+function makeLimits(overrides?: Partial<AgentSafetyLimits>): AgentSafetyLimits {
+  return Object.freeze({
+    maxEventCount: 2000,
+    maxToolInvocations: 400,
     maxToolCallsPerType: 20,
-    maxDurationMs: 5 * 60 * 1000, // 5 minutes
+    maxDurationMs: 10 * 60_000,
+    fileEditLoopThreshold: 4,
     criticalToolLimits: {
-      edit_file: 8,
-      write_file: 8,
-      delete_file: 3,
-      run_command: 10,
-      run_terminal_command: 100,
-      web_search: 8,
+      [TOOL_NAMES.EDIT_FILE]: 8,
+      [TOOL_NAMES.WRITE_FILE]: 8,
+      [TOOL_NAMES.DELETE_FILE]: 3,
+      [TOOL_NAMES.RUN_COMMAND]: 10,
+      [TOOL_NAMES.RUN_TERMINAL_COMMAND]: 100,
+      [TOOL_NAMES.WEB_SEARCH]: 8,
     },
-    readOnlyTools: [
-      "read_file",
-      "list_directory",
-      "search_codebase",
-      "grep",
-      "glob",
-      "analyze_files_for_question",
-      "git_log",
-      "git_diff",
-      "git_status",
-      "think",
-    ],
-    perFileEditLimit: 4,
-  };
+    readOnlyTools: READ_ONLY_TOOLS,
+    ...overrides,
+  });
+}
 
-  test("Max event count is 1000", () => {
-    assert.strictEqual(EXPECTED.maxEventCount, 1000);
+suite("readAgentSafetyLimits — Config-Driven Defaults", () => {
+  teardown(() => sinon.restore());
+
+  test("Returns frozen object with expected default values", () => {
+    const limits = readAgentSafetyLimits();
+    assert.strictEqual(typeof limits.maxEventCount, "number");
+    assert.strictEqual(typeof limits.maxToolInvocations, "number");
+    assert.strictEqual(limits.maxToolCallsPerType, 20);
+    assert.strictEqual(limits.fileEditLoopThreshold, 4);
+    assert.ok(limits.readOnlyTools instanceof Set);
+    assert.ok(Object.isFrozen(limits));
   });
 
-  test("Max tool invocations is 200", () => {
-    assert.strictEqual(EXPECTED.maxToolInvocations, 200);
+  test("criticalToolLimits uses TOOL_NAMES constants", () => {
+    const limits = readAgentSafetyLimits();
+    assert.strictEqual(limits.criticalToolLimits[TOOL_NAMES.EDIT_FILE], 8);
+    assert.strictEqual(limits.criticalToolLimits[TOOL_NAMES.WRITE_FILE], 8);
+    assert.strictEqual(limits.criticalToolLimits[TOOL_NAMES.DELETE_FILE], 3);
+    assert.strictEqual(limits.criticalToolLimits[TOOL_NAMES.RUN_COMMAND], 10);
+    assert.strictEqual(limits.criticalToolLimits[TOOL_NAMES.RUN_TERMINAL_COMMAND], 100);
+    assert.strictEqual(limits.criticalToolLimits[TOOL_NAMES.WEB_SEARCH], 8);
   });
 
-  test("Max calls per tool type is 20", () => {
-    assert.strictEqual(EXPECTED.maxToolCallsPerType, 20);
+  test("readOnlyTools contains all expected entries", () => {
+    const limits = readAgentSafetyLimits();
+    assert.ok(limits.readOnlyTools.has(TOOL_NAMES.READ_FILE));
+    assert.ok(limits.readOnlyTools.has(TOOL_NAMES.THINK));
+    assert.ok(limits.readOnlyTools.has(TOOL_NAMES.RUN_TESTS));
+    assert.ok(!limits.readOnlyTools.has(TOOL_NAMES.EDIT_FILE));
   });
 
-  test("Timeout is 5 minutes (300,000ms)", () => {
-    assert.strictEqual(EXPECTED.maxDurationMs, 300_000);
-  });
-
-  test("Per-file edit limit is 4 edits", () => {
-    assert.strictEqual(EXPECTED.perFileEditLimit, 4);
-  });
-
-  test("Destructive tool limits are stricter than generic limit", () => {
-    const destructiveTools = ["edit_file", "write_file", "delete_file", "run_command", "web_search"];
-    for (const tool of destructiveTools) {
-      const limit = EXPECTED.criticalToolLimits[tool as keyof typeof EXPECTED.criticalToolLimits];
+  test("Destructive tool limits are ≤ generic maxToolCallsPerType", () => {
+    const limits = readAgentSafetyLimits();
+    const destructive = [TOOL_NAMES.EDIT_FILE, TOOL_NAMES.WRITE_FILE, TOOL_NAMES.DELETE_FILE, TOOL_NAMES.RUN_COMMAND, TOOL_NAMES.WEB_SEARCH];
+    for (const tool of destructive) {
       assert.ok(
-        limit <= EXPECTED.maxToolCallsPerType,
-        `Destructive tool '${tool}' limit (${limit}) should not exceed generic limit (${EXPECTED.maxToolCallsPerType})`,
+        limits.criticalToolLimits[tool] <= limits.maxToolCallsPerType,
+        `${tool} limit (${limits.criticalToolLimits[tool]}) should not exceed generic (${limits.maxToolCallsPerType})`,
       );
     }
   });
 
-  test("run_terminal_command has an explicit override above generic limit", () => {
+  test("run_terminal_command has a permissive limit above generic", () => {
+    const limits = readAgentSafetyLimits();
     assert.ok(
-      EXPECTED.criticalToolLimits.run_terminal_command > EXPECTED.maxToolCallsPerType,
+      limits.criticalToolLimits[TOOL_NAMES.RUN_TERMINAL_COMMAND] > limits.maxToolCallsPerType,
       "run_terminal_command should have a higher limit than generic maxToolCallsPerType",
     );
   });
+});
 
-  test("edit_file has a limit of 8", () => {
-    assert.strictEqual(EXPECTED.criticalToolLimits.edit_file, 8);
+suite("AgentSafetyGuard.checkLimits()", () => {
+  let guard: AgentSafetyGuard;
+  let limits: AgentSafetyLimits;
+
+  setup(() => {
+    guard = new AgentSafetyGuard({ log() {}, warn() {}, debug() {} });
+    limits = makeLimits();
   });
 
-  test("write_file has a limit of 8", () => {
-    assert.strictEqual(EXPECTED.criticalToolLimits.write_file, 8);
+  test("Returns shouldStop=false when all counters are below limits", () => {
+    const result = guard.checkLimits(500, 100, 60_000, limits);
+    assert.strictEqual(result.shouldStop, false);
+    assert.strictEqual(result.reason, null);
   });
 
-  test("delete_file has the strictest limit (3)", () => {
-    const limits = Object.values(EXPECTED.criticalToolLimits);
-    assert.strictEqual(
-      EXPECTED.criticalToolLimits.delete_file,
-      Math.min(...limits),
-      "delete_file should have the lowest limit among critical tools",
-    );
+  test("Stops on max_events when eventCount >= maxEventCount", () => {
+    const result = guard.checkLimits(2000, 0, 0, limits);
+    assert.strictEqual(result.shouldStop, true);
+    assert.strictEqual(result.reason, "max_events");
   });
 
-  test("run_terminal_command has a permissive limit (100)", () => {
-    assert.strictEqual(EXPECTED.criticalToolLimits.run_terminal_command, 100);
+  test("Stops on max_tools when totalToolInvocations >= maxToolInvocations", () => {
+    const result = guard.checkLimits(0, 400, 0, limits);
+    assert.strictEqual(result.shouldStop, true);
+    assert.strictEqual(result.reason, "max_tools");
   });
 
-  test("All 10 read-only tools are accounted for", () => {
-    assert.strictEqual(EXPECTED.readOnlyTools.length, 10);
+  test("Stops on timeout when elapsedMs >= maxDurationMs", () => {
+    const result = guard.checkLimits(0, 0, 10 * 60_001, limits);
+    assert.strictEqual(result.shouldStop, true);
+    assert.strictEqual(result.reason, "timeout");
   });
 
-  test("think is classified as read-only", () => {
-    assert.ok(EXPECTED.readOnlyTools.includes("think"));
+  test("Check precedence: events → tools → timeout", () => {
+    const result = guard.checkLimits(2000, 400, 10 * 60_001, limits);
+    assert.strictEqual(result.reason, "max_events");
   });
 
-  test("read_file is classified as read-only", () => {
-    assert.ok(EXPECTED.readOnlyTools.includes("read_file"));
-  });
-
-  test("git operations are classified as read-only", () => {
-    const gitTools = EXPECTED.readOnlyTools.filter((t) => t.startsWith("git_"));
-    assert.ok(
-      gitTools.length >= 3,
-      `Expected at least 3 git read-only tools, got ${gitTools.length}`,
-    );
-  });
-
-  test("Mutating tools are NOT in the read-only set", () => {
-    const mutatingTools = [
-      "edit_file",
-      "write_file",
-      "delete_file",
-      "run_command",
-      "run_terminal_command",
-      "web_search",
-    ];
-    for (const tool of mutatingTools) {
-      assert.ok(
-        !EXPECTED.readOnlyTools.includes(tool),
-        `'${tool}' should NOT be classified as read-only`,
-      );
-    }
+  test("Custom limits are respected", () => {
+    const custom = makeLimits({ maxEventCount: 5 });
+    const result = guard.checkLimits(5, 0, 0, custom);
+    assert.strictEqual(result.shouldStop, true);
+    assert.strictEqual(result.reason, "max_events");
   });
 });
 
-suite("Agent Safety Limits — Tool Call Counting Logic", () => {
-  test("toolCallCounts map correctly tracks per-tool call counts", () => {
-    // Simulate the tracking logic from streamResponse
-    const toolCallCounts = new Map<string, number>();
+suite("AgentSafetyGuard.detectToolLoop()", () => {
+  let guard: AgentSafetyGuard;
+  let limits: AgentSafetyLimits;
 
-    const recordCall = (name: string) => {
-      const current = toolCallCounts.get(name) || 0;
-      toolCallCounts.set(name, current + 1);
-    };
-
-    recordCall("edit_file");
-    recordCall("edit_file");
-    recordCall("read_file");
-    recordCall("edit_file");
-
-    assert.strictEqual(toolCallCounts.get("edit_file"), 3);
-    assert.strictEqual(toolCallCounts.get("read_file"), 1);
-    assert.strictEqual(toolCallCounts.get("grep"), undefined);
+  setup(() => {
+    guard = new AgentSafetyGuard({ log() {}, warn() {}, debug() {} });
+    limits = makeLimits();
   });
 
-  test("Loop detection triggers at exact limit for critical tools", () => {
-    const criticalToolLimits: Record<string, number> = {
-      edit_file: 8,
-      delete_file: 3,
-    };
-    const maxToolCallsPerType = 20;
-    const toolCallCounts = new Map<string, number>();
-
-    const isLooping = (name: string) => {
-      const currentCount = toolCallCounts.get(name) || 0;
-      toolCallCounts.set(name, currentCount + 1);
-      const toolLimit = criticalToolLimits[name] ?? maxToolCallsPerType;
-      return currentCount >= toolLimit;
-    };
-
-    // delete_file: limit is 3
-    assert.strictEqual(isLooping("delete_file"), false); // call 1 (current=0)
-    assert.strictEqual(isLooping("delete_file"), false); // call 2 (current=1)
-    assert.strictEqual(isLooping("delete_file"), false); // call 3 (current=2)
-    assert.strictEqual(isLooping("delete_file"), true);  // call 4 (current=3) → LOOPING
-
-    // edit_file: limit is 8
-    for (let i = 0; i < 8; i++) {
-      assert.strictEqual(isLooping("edit_file"), false, `edit_file call ${i + 1} should not loop`);
-    }
-    assert.strictEqual(isLooping("edit_file"), true, "edit_file call 9 should trigger loop detection");
+  test("Critical tool triggers loop at its specific limit", () => {
+    const r = guard.detectToolLoop(TOOL_NAMES.DELETE_FILE, 3, limits);
+    assert.strictEqual(r.isLooping, true);
+    assert.strictEqual(r.limit, 3);
   });
 
-  test("Read-only tools continue even when looping", () => {
-    const readOnlyTools = new Set(["read_file", "think", "grep"]);
-    const maxToolCallsPerType = 20;
-    const toolCallCounts = new Map<string, number>();
-
-    // Simulate 25 calls to read_file
-    let blockedCount = 0;
-    for (let i = 0; i < 25; i++) {
-      const currentCount = toolCallCounts.get("read_file") || 0;
-      toolCallCounts.set("read_file", currentCount + 1);
-      const isLooping = currentCount >= maxToolCallsPerType;
-      const isReadOnly = readOnlyTools.has("read_file");
-
-      if (isLooping && !isReadOnly) {
-        blockedCount++;
-      }
-      // Read-only + looping → warning but not blocked
-    }
-
-    assert.strictEqual(blockedCount, 0, "Read-only tools should never be blocked");
+  test("Below critical limit → not looping", () => {
+    const r = guard.detectToolLoop(TOOL_NAMES.DELETE_FILE, 2, limits);
+    assert.strictEqual(r.isLooping, false);
   });
 
-  test("Non-read-only tools ARE blocked when looping", () => {
-    const readOnlyTools = new Set(["read_file", "think"]);
-    const maxToolCallsPerType = 20;
-    const toolCallCounts = new Map<string, number>();
-
-    let blocked = false;
-    for (let i = 0; i < 25; i++) {
-      const currentCount = toolCallCounts.get("web_search") || 0;
-      toolCallCounts.set("web_search", currentCount + 1);
-      const toolLimit = 8; // web_search critical limit
-      const isLooping = currentCount >= toolLimit;
-      const isReadOnly = readOnlyTools.has("web_search");
-
-      if (isLooping && !isReadOnly) {
-        blocked = true;
-        break;
-      }
-    }
-
-    assert.ok(blocked, "Non-read-only tool should be blocked when exceeding limit");
+  test("Non-critical tool uses generic maxToolCallsPerType", () => {
+    const r = guard.detectToolLoop("some_unknown_tool", 20, limits);
+    assert.strictEqual(r.isLooping, true);
+    assert.strictEqual(r.limit, 20);
   });
 
-  test("Middleware nodes are excluded from tool invocation count", () => {
-    let totalToolInvocations = 0;
+  test("Read-only tool is flagged as read-only even when looping", () => {
+    const r = guard.detectToolLoop(TOOL_NAMES.READ_FILE, 999, limits);
+    assert.strictEqual(r.isLooping, true);
+    assert.strictEqual(r.isReadOnly, true);
+  });
 
-    const processNode = (nodeName: string) => {
-      const isMiddlewareNode =
-        nodeName.includes("Middleware") || nodeName.includes("before_model");
-      if (!isMiddlewareNode) {
-        totalToolInvocations++;
-      }
-    };
+  test("Mutating tool is NOT read-only", () => {
+    const r = guard.detectToolLoop(TOOL_NAMES.EDIT_FILE, 0, limits);
+    assert.strictEqual(r.isReadOnly, false);
+  });
 
-    processNode("tools");           // Counted
-    processNode("tools");           // Counted  
-    processNode("toolsMiddleware"); // Excluded
-    processNode("before_model");    // Excluded
-    processNode("tools");           // Counted
-
-    assert.strictEqual(totalToolInvocations, 3);
+  test("run_terminal_command has permissive critical limit", () => {
+    const r = guard.detectToolLoop(TOOL_NAMES.RUN_TERMINAL_COMMAND, 99, limits);
+    assert.strictEqual(r.isLooping, false);
+    assert.strictEqual(r.limit, 100);
   });
 });
 
-suite("Agent Safety Limits — Per-File Edit Loop Detection", () => {
-  test("Tracks per-file edit counts independently", () => {
-    const fileEditCounts = new Map<string, number>();
+suite("AgentSafetyGuard.detectFileLoop()", () => {
+  let guard: AgentSafetyGuard;
+  let limits: AgentSafetyLimits;
 
-    const recordFileEdit = (filePath: string) => {
-      const count = (fileEditCounts.get(filePath) || 0) + 1;
-      fileEditCounts.set(filePath, count);
-      return count;
-    };
-
-    recordFileEdit("/src/a.ts");
-    recordFileEdit("/src/b.ts");
-    recordFileEdit("/src/a.ts");
-
-    assert.strictEqual(fileEditCounts.get("/src/a.ts"), 2);
-    assert.strictEqual(fileEditCounts.get("/src/b.ts"), 1);
+  setup(() => {
+    guard = new AgentSafetyGuard({ log() {}, warn() {}, debug() {} });
+    limits = makeLimits();
   });
 
-  test("Triggers error at 4 edits to the same file", () => {
-    const fileEditCounts = new Map<string, number>();
-    const perFileEditLimit = 4;
-    let hasErrored = false;
-
-    const editFile = (filePath: string): boolean => {
-      const count = (fileEditCounts.get(filePath) || 0) + 1;
-      fileEditCounts.set(filePath, count);
-      if (count >= perFileEditLimit) {
-        hasErrored = true;
-        return false; // Stop
-      }
-      return true; // Continue
-    };
-
-    assert.ok(editFile("/src/app.ts"));   // edit 1
-    assert.ok(editFile("/src/app.ts"));   // edit 2
-    assert.ok(editFile("/src/app.ts"));   // edit 3
-    assert.ok(!editFile("/src/app.ts"));  // edit 4 → STOP
-    assert.ok(hasErrored);
-  });
-
-  test("Different files have independent edit counts", () => {
-    const fileEditCounts = new Map<string, number>();
-    const perFileEditLimit = 4;
-
-    const editFile = (filePath: string): boolean => {
-      const count = (fileEditCounts.get(filePath) || 0) + 1;
-      fileEditCounts.set(filePath, count);
-      return count < perFileEditLimit;
-    };
-
-    // 3 edits to file A (ok)
-    assert.ok(editFile("/src/a.ts"));
-    assert.ok(editFile("/src/a.ts"));
-    assert.ok(editFile("/src/a.ts"));
-
-    // 3 edits to file B (ok — independent counter)
-    assert.ok(editFile("/src/b.ts"));
-    assert.ok(editFile("/src/b.ts"));
-    assert.ok(editFile("/src/b.ts"));
-
-    // 4th edit to file A → blocked
-    assert.ok(!editFile("/src/a.ts"));
-
-    // But file B still has 1 more edit left
-    assert.ok(!editFile("/src/b.ts"));
-  });
-
-  test("Only edit_file and write_file trigger per-file tracking", () => {
-    const trackableTools = new Set(["edit_file", "write_file"]);
-    const nonTrackable = ["read_file", "delete_file", "run_command", "grep"];
-
-    for (const tool of nonTrackable) {
-      assert.ok(
-        !trackableTools.has(tool),
-        `'${tool}' should not trigger per-file edit tracking`,
-      );
+  test("Returns isLooping=false for first 3 edits (threshold=4)", () => {
+    const counts = new Map<string, number>();
+    for (let i = 0; i < 3; i++) {
+      const r = guard.detectFileLoop("/src/a.ts", counts, limits);
+      assert.strictEqual(r.isLooping, false, `edit ${i + 1} should not loop`);
+      counts.set("/src/a.ts", r.editCount);
     }
+  });
 
-    assert.ok(trackableTools.has("edit_file"));
-    assert.ok(trackableTools.has("write_file"));
+  test("Triggers at 4th edit to same file", () => {
+    const counts = new Map([[ "/src/a.ts", 3 ]]);
+    const r = guard.detectFileLoop("/src/a.ts", counts, limits);
+    assert.strictEqual(r.isLooping, true);
+    assert.strictEqual(r.editCount, 4);
+  });
+
+  test("Different files have independent counters", () => {
+    const counts = new Map([[ "/src/a.ts", 3 ]]);
+    const r = guard.detectFileLoop("/src/b.ts", counts, limits);
+    assert.strictEqual(r.isLooping, false);
+    assert.strictEqual(r.editCount, 1);
   });
 });
 
-suite("Agent Safety Limits — Force Stop Reasons", () => {
-  test("Force stop yields correct reason for max events", () => {
-    const maxEventCount = 1000;
-    let eventCount = maxEventCount;
-    let forceStopReason: string | null = null;
+suite("AgentSafetyGuard — Message Builders", () => {
+  let guard: AgentSafetyGuard;
 
-    if (eventCount >= maxEventCount) {
-      forceStopReason = "max_events";
-    }
-
-    assert.strictEqual(forceStopReason, "max_events");
+  setup(() => {
+    guard = new AgentSafetyGuard({ log() {}, warn() {}, debug() {} });
   });
 
-  test("Force stop yields correct reason for max tools", () => {
-    const maxToolInvocations = 200;
-    let totalToolInvocations = maxToolInvocations;
-    let forceStopReason: string | null = null;
-
-    if (totalToolInvocations >= maxToolInvocations) {
-      forceStopReason = "max_tools";
-    }
-
-    assert.strictEqual(forceStopReason, "max_tools");
+  test("buildStopMessage includes event count for max_events", () => {
+    const msg = guard.buildStopMessage("max_events", 2000, 350, 120_000);
+    assert.ok(msg.includes("2000"), "Should mention event count");
+    assert.ok(msg.includes("Stopping"), "Should indicate stopping");
   });
 
-  test("Force stop yields correct reason for timeout", () => {
-    const maxDurationMs = 5 * 60 * 1000;
-    const startTime = Date.now() - (maxDurationMs + 1);
-    const elapsed = Date.now() - startTime;
-    let forceStopReason: string | null = null;
-
-    if (elapsed >= maxDurationMs) {
-      forceStopReason = "timeout";
-    }
-
-    assert.strictEqual(forceStopReason, "timeout");
+  test("buildStopMessage includes tool count for max_tools", () => {
+    const msg = guard.buildStopMessage("max_tools", 500, 400, 120_000);
+    assert.ok(msg.includes("400"), "Should mention tool count");
   });
 
-  test("Check order: events → tools → timeout", () => {
-    // The code checks in order: events first, then tools, then timeout
-    const maxEventCount = 1000;
-    const maxToolInvocations = 200;
-    const maxDurationMs = 300_000;
-
-    // Simulate all limits exceeded simultaneously
-    const eventCount = 1000;
-    const totalToolInvocations = 200;
-    const elapsed = 400_000;
-
-    let forceStopReason: string | null = null;
-
-    if (eventCount >= maxEventCount) {
-      forceStopReason = "max_events";
-    } else if (totalToolInvocations >= maxToolInvocations) {
-      forceStopReason = "max_tools";
-    } else if (elapsed >= maxDurationMs) {
-      forceStopReason = "timeout";
-    }
-
-    // Events check happens first
-    assert.strictEqual(forceStopReason, "max_events");
+  test("buildStopMessage includes elapsed seconds for timeout", () => {
+    const msg = guard.buildStopMessage("timeout", 500, 200, 600_000);
+    assert.ok(msg.includes("600"), "Should mention elapsed seconds");
   });
 
-  test("Below all limits: no force stop", () => {
-    const maxEventCount = 1000;
-    const maxToolInvocations = 200;
-    const maxDurationMs = 300_000;
+  test("buildToolLoopErrorMessage mentions edit attempts for edit_file", () => {
+    const msg = guard.buildToolLoopErrorMessage(TOOL_NAMES.EDIT_FILE, 8);
+    assert.ok(msg.includes("8 times"));
+    assert.ok(msg.includes("edit"));
+  });
 
-    const eventCount = 500;
-    const totalToolInvocations = 100;
-    const elapsed = 120_000;
+  test("buildToolLoopErrorMessage mentions web_search fallback", () => {
+    const msg = guard.buildToolLoopErrorMessage(TOOL_NAMES.WEB_SEARCH, 8);
+    assert.ok(msg.includes("searched") || msg.includes("search"));
+  });
 
-    let forceStopReason: string | null = null;
-    let shouldStop = false;
+  test("buildToolLoopErrorMessage generic fallback for unknown tool", () => {
+    const msg = guard.buildToolLoopErrorMessage("custom_tool", 20);
+    assert.ok(msg.includes("custom_tool"));
+    assert.ok(msg.includes("20 times"));
+  });
 
-    if (eventCount >= maxEventCount) {
-      forceStopReason = "max_events";
-      shouldStop = true;
-    } else if (totalToolInvocations >= maxToolInvocations) {
-      forceStopReason = "max_tools";
-      shouldStop = true;
-    } else if (elapsed >= maxDurationMs) {
-      forceStopReason = "timeout";
-      shouldStop = true;
-    }
+  test("buildLimitReset resets counters to zero with fresh startTime", () => {
+    const before = Date.now();
+    const reset = guard.buildLimitReset();
+    assert.strictEqual(reset.eventCount, 0);
+    assert.strictEqual(reset.totalToolInvocations, 0);
+    assert.ok(reset.startTime >= before);
+  });
 
-    assert.strictEqual(forceStopReason, null);
-    assert.strictEqual(shouldStop, false);
+  test("extendLimits mutates context counters to zero", () => {
+    const ctx = { eventCount: 1500, totalToolInvocations: 300, startTime: 0 };
+    guard.extendLimits(ctx);
+    assert.strictEqual(ctx.eventCount, 0);
+    assert.strictEqual(ctx.totalToolInvocations, 0);
+    assert.ok(ctx.startTime > 0);
   });
 });
