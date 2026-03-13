@@ -2,6 +2,52 @@ import * as vscode from "vscode";
 import { WebviewMessageHandler, HandlerContext } from "./types";
 import { AgentService } from "../../services/agent-state";
 
+/**
+ * Sanitize article content before passing to LLM context to defend against
+ * prompt injection attacks embedded in scraped web content.
+ */
+function sanitizeForLLMContext(text: string): string {
+  let sanitized = text;
+
+  // Strip common prompt injection patterns
+  sanitized = sanitized.replace(
+    /\[\s*(SYSTEM|INST|INSTRUCTION|ADMIN|ASSISTANT)\s*\]\s*:?/gi,
+    "[REDACTED_TAG]",
+  );
+  sanitized = sanitized.replace(
+    /(?:ignore|forget|disregard|override)\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|prompts?|context|rules)/gi,
+    "[REDACTED_INJECTION]",
+  );
+  sanitized = sanitized.replace(
+    /you\s+are\s+now\s+(?:a|an|the)\s+/gi,
+    "[REDACTED_ROLEPLAY] ",
+  );
+  sanitized = sanitized.replace(
+    /(?:new\s+)?(?:system\s+)?prompt\s*:/gi,
+    "[REDACTED_PROMPT]",
+  );
+  // Strip invisible Unicode control characters (zero-width spaces, RTL overrides, etc.)
+  // eslint-disable-next-line no-control-regex
+  sanitized = sanitized.replace(
+    /[\u200B-\u200F\u2028-\u202F\uFEFF\u0000-\u0008\u000E-\u001F]/g,
+    "",
+  );
+
+  // Wrap in clear delimiters so the LLM knows this is untrusted user content
+  return `--- BEGIN UNTRUSTED ARTICLE CONTENT ---\n${sanitized}\n--- END UNTRUSTED ARTICLE CONTENT ---`;
+}
+
+/**
+ * Sanitize HTML content using DOMPurify before storage (defense-in-depth).
+ */
+async function sanitizeHtmlContent(html: string): Promise<string> {
+  const { JSDOM } = await import("jsdom");
+  const createDOMPurify = (await import("dompurify")).default;
+  const window = new JSDOM("").window;
+  const DOMPurify = createDOMPurify(window as any);
+  return DOMPurify.sanitize(html);
+}
+
 export class BrowserHandler implements WebviewMessageHandler {
   readonly commands = [
     "openExternal",
@@ -14,6 +60,10 @@ export class BrowserHandler implements WebviewMessageHandler {
     "add-bookmark",
     "remove-bookmark",
     "get-bookmarks",
+    "scrape-and-save-article",
+    "get-saved-articles",
+    "delete-saved-article",
+    "open-saved-article",
   ];
 
   constructor(
@@ -130,12 +180,13 @@ export class BrowserHandler implements WebviewMessageHandler {
           const { NewsReaderService } =
             await import("../../services/news-reader.service");
           const reader = NewsReaderService.getInstance();
+          const sanitizedText = sanitizeForLLMContext(message.text);
           reader.currentArticle = {
             title: reader.currentArticle?.title || "Reader Selection",
-            content: message.text,
+            content: await sanitizeHtmlContent(message.text),
             url: reader.currentArticle?.url || "reader-selection",
           };
-          const readerContent = `📎 **Context added from Reader:**\n\n${message.text}\n\n*This content will be included as context in your next message to the AI.*`;
+          const readerContent = `📎 **Context added from Reader:**\n\n${sanitizedText}\n\n*This content will be included as context in your next message to the AI.*`;
           await this.agentService.addChatMessage("agentId", {
             content: readerContent,
             type: "model",
@@ -165,7 +216,7 @@ export class BrowserHandler implements WebviewMessageHandler {
             const article = reader.currentArticle;
             const title = article?.title || message.title || message.text;
             const content = article?.content
-              ? article.content.substring(0, 5000)
+              ? article.content
               : "Page content could not be extracted.";
             const snippet = `**[From Web: ${title}]**\n\n${content}`;
             await vscode.commands.executeCommand(
@@ -248,6 +299,643 @@ export class BrowserHandler implements WebviewMessageHandler {
           });
         } catch (err) {
           ctx.logger.warn("Failed to get bookmarks", err);
+        }
+        break;
+      }
+
+      case "scrape-and-save-article": {
+        if (message.url) {
+          try {
+            const url: string = message.url;
+
+            await ctx.webview.webview.postMessage({
+              type: "scrape-article-status",
+              status: "scraping",
+              url,
+            });
+
+            const { NewsReaderService } =
+              await import("../../services/news-reader.service");
+            const reader = NewsReaderService.getInstance();
+            const { JSDOM } = await import("jsdom");
+            const { Readability } = await import("@mozilla/readability");
+            const axios = (await import("axios")).default;
+
+            let article: any = null;
+
+            // Helper: check if parsed article has enough content (not truncated by paywall)
+            const isFullArticle = (parsed: any) =>
+              parsed &&
+              parsed.content &&
+              parsed.textContent &&
+              parsed.textContent.length > 500;
+
+            // Helper: extract structured HTML from Playwright accessibility snapshot.
+            // Handles headings, lists, blockquotes, code, links — not just paragraphs.
+            const extractTextFromSnapshot = (
+              snapshot: string,
+              skipPaywallMarkers = true,
+            ): { title: string | null; html: string; text: string } => {
+              const lines = snapshot.split("\n");
+              const htmlParts: string[] = [];
+              const textParts: string[] = [];
+              let title: string | null = null;
+              let inList = false;
+
+              const closeList = () => {
+                if (inList) {
+                  htmlParts.push("</ul>");
+                  inList = false;
+                }
+              };
+
+              // Extract h1 title
+              const h1Match = snapshot.match(/heading\s+"(.+?)"\s+\[level=1\]/);
+              if (h1Match) {
+                title = h1Match[1];
+              }
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+
+                // Stop at paywall/sign-up walls (only for direct scraping, not archive.ph)
+                if (
+                  skipPaywallMarkers &&
+                  /Create an account to read|Sign up to read|Subscribe to read|member.only/i.test(
+                    trimmed,
+                  )
+                ) {
+                  break;
+                }
+
+                // Headings: heading "Title" [level=N]
+                const headingMatch = trimmed.match(
+                  /^-?\s*heading\s+"(.+?)"\s+\[level=(\d)\]/,
+                );
+                if (headingMatch) {
+                  closeList();
+                  const level = Math.min(
+                    Math.max(parseInt(headingMatch[2], 10), 1),
+                    6,
+                  );
+                  htmlParts.push(`<h${level}>${headingMatch[1]}</h${level}>`);
+                  textParts.push(headingMatch[1]);
+                  continue;
+                }
+
+                // List items: listitem or - listitem [ref=...]: text
+                const listItemMatch = trimmed.match(
+                  /^-?\s*listitem\s*(?:\[ref=\w+\])?\s*:?\s*(.*)$/,
+                );
+                if (listItemMatch) {
+                  if (!inList) {
+                    htmlParts.push("<ul>");
+                    inList = true;
+                  }
+                  const itemText = listItemMatch[1].trim();
+                  if (itemText.length > 0) {
+                    htmlParts.push(`<li>${itemText}</li>`);
+                    textParts.push(`• ${itemText}`);
+                  }
+                  continue;
+                }
+
+                // Blockquote: blockquote [ref=...]: text
+                const blockquoteMatch = trimmed.match(
+                  /^-?\s*blockquote\s*(?:\[ref=\w+\])?\s*:?\s*(.+)$/,
+                );
+                if (blockquoteMatch) {
+                  closeList();
+                  htmlParts.push(
+                    `<blockquote>${blockquoteMatch[1].trim()}</blockquote>`,
+                  );
+                  textParts.push(`> ${blockquoteMatch[1].trim()}`);
+                  continue;
+                }
+
+                // Pre-formatted / code blocks: code [ref=...]: content
+                const codeMatch = trimmed.match(
+                  /^-?\s*code\s+\[ref=\w+\]\s*:?\s*(.+)$/,
+                );
+                if (codeMatch) {
+                  closeList();
+                  htmlParts.push(`<pre><code>${codeMatch[1]}</code></pre>`);
+                  textParts.push(codeMatch[1]);
+                  continue;
+                }
+
+                // Links: link "text" [ref=...] — extract link text
+                const linkMatch = trimmed.match(
+                  /^-?\s*link\s+"(.+?)"\s*(?:\[ref=\w+\])?/,
+                );
+                if (linkMatch && linkMatch[1].length > 2) {
+                  // Links inside text flow, don't close list or add block element
+                  textParts.push(linkMatch[1]);
+                  continue;
+                }
+
+                // Paragraph with inline text: paragraph [ref=...]: Text here
+                const paraDirectMatch = trimmed.match(
+                  /^-?\s*paragraph\s+\[ref=\w+\]\s*:?\s*(.+)$/,
+                );
+                if (paraDirectMatch && paraDirectMatch[1].trim().length > 5) {
+                  closeList();
+                  htmlParts.push(`<p>${paraDirectMatch[1].trim()}</p>`);
+                  textParts.push(paraDirectMatch[1].trim());
+                  continue;
+                }
+
+                // Text nodes: text "content" or text: content
+                const textMatch = trimmed.match(
+                  /^-?\s*text\s*:?\s*"?(.+?)"?\s*$/,
+                );
+                if (
+                  textMatch &&
+                  textMatch[1].length > 3 &&
+                  // Exclude navigation/UI text patterns
+                  !/^(text|paragraph|heading|list|link|button|navigation|banner|img)\s/i.test(
+                    textMatch[1],
+                  )
+                ) {
+                  closeList();
+                  htmlParts.push(`<p>${textMatch[1]}</p>`);
+                  textParts.push(textMatch[1]);
+                  continue;
+                }
+
+                // Image alt text: img "alt text" [ref=...]
+                const imgMatch = trimmed.match(
+                  /^-?\s*img\s+"(.+?)"\s*(?:\[ref=\w+\])?/,
+                );
+                if (imgMatch && imgMatch[1].length > 3) {
+                  closeList();
+                  htmlParts.push(`<p><em>[Image: ${imgMatch[1]}]</em></p>`);
+                  textParts.push(`[Image: ${imgMatch[1]}]`);
+                  continue;
+                }
+              }
+
+              closeList();
+
+              return {
+                title,
+                html: htmlParts.join("\n"),
+                text: textParts.join("\n\n"),
+              };
+            };
+
+            // Helper: use browser_evaluate to extract real HTML from a navigated page,
+            // then parse with Readability for properly formatted content.
+            const extractHtmlViaEvaluate = async (
+              mcp: any,
+              sourceUrl: string,
+            ): Promise<any | null> => {
+              try {
+                const evalResult = await mcp.callTool(
+                  "browser_evaluate",
+                  {
+                    expression: `(() => {
+                      const article = document.querySelector('article');
+                      if (article) return article.innerHTML;
+                      const main = document.querySelector('main, [role="main"], .post-content, .article-content, .entry-content');
+                      if (main) return main.innerHTML;
+                      return document.body.innerHTML;
+                    })()`,
+                  },
+                  "playwright",
+                );
+
+                if (!evalResult.isError && evalResult.content?.length) {
+                  const rawHtml = evalResult.content
+                    .map((c: any) => c.text ?? "")
+                    .join("");
+
+                  if (rawHtml.length > 200) {
+                    const dom = new JSDOM(rawHtml, { url: sourceUrl });
+                    const parsed = new Readability(dom.window.document).parse();
+                    if (
+                      parsed &&
+                      parsed.textContent &&
+                      parsed.textContent.length > 300
+                    ) {
+                      return parsed;
+                    }
+                  }
+                }
+              } catch {
+                // browser_evaluate not available or failed — fall back to snapshot
+              }
+              return null;
+            };
+
+            // --- Strategy 1: HTTP fetch with Google referrer ---
+            // Many paywalled sites (Medium, etc.) serve full content to Google-referred visitors
+            try {
+              const response = await axios.get(url, {
+                headers: {
+                  Referer: "https://www.google.com/",
+                  "User-Agent":
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                },
+                timeout: 15000,
+              });
+              if (response.data && typeof response.data === "string") {
+                const dom = new JSDOM(response.data, { url });
+                const parsed = new Readability(dom.window.document).parse();
+                if (isFullArticle(parsed)) {
+                  article = parsed;
+                  ctx.logger.info(
+                    "Scrape: bypassed paywall via Google referrer",
+                  );
+                }
+              }
+            } catch {
+              ctx.logger.info("Scrape strategy 1 (Google referrer) failed");
+            }
+
+            // --- Strategy 2: Google Cache ---
+            if (!article) {
+              try {
+                const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(url)}`;
+                const response = await axios.get(cacheUrl, {
+                  headers: {
+                    "User-Agent":
+                      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                  },
+                  timeout: 15000,
+                });
+                if (response.data && typeof response.data === "string") {
+                  const dom = new JSDOM(response.data, { url });
+                  const parsed = new Readability(dom.window.document).parse();
+                  if (isFullArticle(parsed)) {
+                    article = parsed;
+                    ctx.logger.info("Scrape: got content from Google Cache");
+                  }
+                }
+              } catch {
+                ctx.logger.info("Scrape strategy 2 (Google Cache) failed");
+              }
+            }
+
+            // --- Strategy 3: archive.ph via Playwright MCP ---
+            // archive.ph stores full copies of paywalled articles; most reliable bypass
+            if (!article) {
+              try {
+                const { MCPService } = await import("../../MCP/service");
+                const mcp = MCPService.getInstance();
+
+                const archiveUrl = `https://archive.ph/newest/${url}`;
+                const navResult = await mcp.callTool(
+                  "browser_navigate",
+                  { url: archiveUrl },
+                  "playwright",
+                );
+
+                if (!navResult.isError) {
+                  // Primary: extract real HTML via browser_evaluate + Readability
+                  const evaluated = await extractHtmlViaEvaluate(mcp, url);
+                  if (evaluated && isFullArticle(evaluated)) {
+                    article = evaluated;
+                    ctx.logger.info(
+                      "Scrape: got full article from archive.ph via browser_evaluate",
+                    );
+                  }
+
+                  // Fallback: parse accessibility snapshot
+                  if (!article) {
+                    const snapResult = await mcp.callTool(
+                      "browser_snapshot",
+                      {},
+                      "playwright",
+                    );
+
+                    if (!snapResult.isError && snapResult.content?.length) {
+                      const snapshotRaw = snapResult.content
+                        .map((c: any) => c.text ?? "")
+                        .join("\n");
+
+                      // Check we didn't land on an archive.ph error/search page
+                      const isArchiveError =
+                        /No results found|Webpage archive|Save a new page/i.test(
+                          snapshotRaw.substring(0, 500),
+                        );
+
+                      if (!isArchiveError) {
+                        // archive.ph has full content — don't stop at paywall markers
+                        const {
+                          title: snapTitle,
+                          html: snapHtml,
+                          text: snapText,
+                        } = extractTextFromSnapshot(snapshotRaw, false);
+                        if (snapText.length > 500) {
+                          article = {
+                            title: snapTitle || url,
+                            content: snapHtml,
+                            textContent: snapText,
+                            byline: null,
+                            siteName: null,
+                            excerpt: snapText.substring(0, 200),
+                          };
+                          ctx.logger.info(
+                            "Scrape: got full article from archive.ph via snapshot",
+                          );
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch {
+                ctx.logger.info("Scrape strategy 3 (archive.ph) failed");
+              }
+            }
+
+            // --- Strategy 4: Playwright MCP via Google Cache ---
+            if (!article) {
+              try {
+                const { MCPService } = await import("../../MCP/service");
+                const mcp = MCPService.getInstance();
+
+                const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(url)}`;
+                const navResult = await mcp.callTool(
+                  "browser_navigate",
+                  { url: cacheUrl },
+                  "playwright",
+                );
+
+                if (!navResult.isError) {
+                  // Primary: extract real HTML via browser_evaluate + Readability
+                  const evaluated = await extractHtmlViaEvaluate(mcp, url);
+                  if (evaluated && isFullArticle(evaluated)) {
+                    article = evaluated;
+                    ctx.logger.info(
+                      "Scrape: got content from Playwright + Google Cache via browser_evaluate",
+                    );
+                  }
+
+                  // Fallback: parse accessibility snapshot
+                  if (!article) {
+                    const snapResult = await mcp.callTool(
+                      "browser_snapshot",
+                      {},
+                      "playwright",
+                    );
+                    if (!snapResult.isError && snapResult.content?.length) {
+                      const snapshotRaw = snapResult.content
+                        .map((c: any) => c.text ?? "")
+                        .join("\n");
+                      const {
+                        title: snapTitle,
+                        html: snapHtml,
+                        text: snapText,
+                      } = extractTextFromSnapshot(snapshotRaw);
+                      if (snapText.length > 500) {
+                        article = {
+                          title: snapTitle || url,
+                          content: snapHtml,
+                          textContent: snapText,
+                          byline: null,
+                          siteName: null,
+                          excerpt: snapText.substring(0, 200),
+                        };
+                        ctx.logger.info(
+                          "Scrape: got content from Playwright + Google Cache via snapshot",
+                        );
+                      }
+                    }
+                  }
+                }
+              } catch {
+                ctx.logger.info(
+                  "Scrape strategy 4 (Playwright + Google Cache) failed",
+                );
+              }
+            }
+
+            // --- Strategy 5: Playwright MCP direct navigate + snapshot text extraction ---
+            if (!article) {
+              try {
+                const { MCPService } = await import("../../MCP/service");
+                const mcp = MCPService.getInstance();
+
+                const navResult = await mcp.callTool(
+                  "browser_navigate",
+                  { url },
+                  "playwright",
+                );
+
+                if (!navResult.isError) {
+                  // Primary: extract real HTML via browser_evaluate + Readability
+                  const evaluated = await extractHtmlViaEvaluate(mcp, url);
+                  if (evaluated && isFullArticle(evaluated)) {
+                    article = evaluated;
+                    ctx.logger.info(
+                      "Scrape: got content from direct Playwright via browser_evaluate",
+                    );
+                  }
+
+                  // Fallback: parse accessibility snapshot
+                  if (!article) {
+                    const snapResult = await mcp.callTool(
+                      "browser_snapshot",
+                      {},
+                      "playwright",
+                    );
+                    if (!snapResult.isError && snapResult.content?.length) {
+                      const snapshotRaw = snapResult.content
+                        .map((c: any) => c.text ?? "")
+                        .join("\n");
+                      const {
+                        title: snapTitle,
+                        html: snapHtml,
+                        text: snapText,
+                      } = extractTextFromSnapshot(snapshotRaw);
+                      if (snapText.length > 200) {
+                        article = {
+                          title: snapTitle || url,
+                          content: snapHtml,
+                          textContent: snapText,
+                          byline: null,
+                          siteName: null,
+                          excerpt: snapText.substring(0, 200),
+                        };
+                        ctx.logger.info(
+                          "Scrape: extracted text from direct Playwright snapshot (may be partial)",
+                        );
+                      }
+                    }
+                  }
+                }
+              } catch {
+                ctx.logger.info(
+                  "Scrape strategy 5 (direct Playwright snapshot) failed",
+                );
+              }
+            }
+
+            // --- Strategy 6: plain Readability via HTTP (for non-paywalled pages) ---
+            if (!article) {
+              try {
+                const fetched = await reader.fetchArticle(url);
+                if (isFullArticle(fetched)) {
+                  article = fetched;
+                }
+              } catch {
+                ctx.logger.info("Scrape strategy 5 (plain Readability) failed");
+              }
+            }
+
+            if (!article) {
+              await ctx.webview.webview.postMessage({
+                type: "scrape-article-status",
+                status: "error",
+                url,
+                error:
+                  "Could not extract article content behind the paywall. All bypass strategies failed.",
+              });
+              break;
+            }
+
+            await ctx.webview.webview.postMessage({
+              type: "scrape-article-status",
+              status: "saving",
+              url,
+            });
+
+            // Save to SQLite
+            const { SqliteDatabaseService } =
+              await import("../../services/sqlite-database.service");
+            const db = SqliteDatabaseService.getInstance();
+            await db.ensureInitialized();
+
+            // Sanitize HTML before storage (defense-in-depth)
+            const cleanHtml = await sanitizeHtmlContent(article.content || "");
+
+            db.executeSqlCommand(
+              `INSERT OR REPLACE INTO saved_articles (url, title, author, site_name, content_html, content_text, excerpt)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [
+                url,
+                article.title || url,
+                article.byline || null,
+                article.siteName || null,
+                cleanHtml,
+                article.textContent || "",
+                article.excerpt || null,
+              ],
+            );
+
+            // Fetch updated list
+            const savedArticles = db.executeSql(
+              `SELECT id, url, title, author, site_name, excerpt, saved_at FROM saved_articles ORDER BY saved_at DESC`,
+            );
+
+            await ctx.webview.webview.postMessage({
+              type: "scrape-article-status",
+              status: "done",
+              url,
+            });
+
+            await ctx.webview.webview.postMessage({
+              type: "saved-articles-list",
+              articles: savedArticles,
+            });
+
+            // Also open it immediately in the Smart Reader
+            reader.openReader(url, article.title);
+          } catch (err: any) {
+            ctx.logger.warn("Failed to scrape and save article", err);
+            await ctx.webview.webview.postMessage({
+              type: "scrape-article-status",
+              status: "error",
+              url: message.url,
+              error: err.message || "Failed to scrape article",
+            });
+          }
+        }
+        break;
+      }
+
+      case "get-saved-articles": {
+        try {
+          const { SqliteDatabaseService } =
+            await import("../../services/sqlite-database.service");
+          const db = SqliteDatabaseService.getInstance();
+          await db.ensureInitialized();
+          const articles = db.executeSql(
+            `SELECT id, url, title, author, site_name, excerpt, saved_at FROM saved_articles ORDER BY saved_at DESC`,
+          );
+          await ctx.webview.webview.postMessage({
+            type: "saved-articles-list",
+            articles,
+          });
+        } catch (err) {
+          ctx.logger.warn("Failed to get saved articles", err);
+        }
+        break;
+      }
+
+      case "delete-saved-article": {
+        if (message.id) {
+          try {
+            const { SqliteDatabaseService } =
+              await import("../../services/sqlite-database.service");
+            const db = SqliteDatabaseService.getInstance();
+            await db.ensureInitialized();
+            db.executeSqlCommand(`DELETE FROM saved_articles WHERE id = ?`, [
+              message.id,
+            ]);
+            const articles = db.executeSql(
+              `SELECT id, url, title, author, site_name, excerpt, saved_at FROM saved_articles ORDER BY saved_at DESC`,
+            );
+            await ctx.webview.webview.postMessage({
+              type: "saved-articles-list",
+              articles,
+            });
+          } catch (err) {
+            ctx.logger.warn("Failed to delete saved article", err);
+          }
+        }
+        break;
+      }
+
+      case "open-saved-article": {
+        if (message.id) {
+          try {
+            const { SqliteDatabaseService } =
+              await import("../../services/sqlite-database.service");
+            const db = SqliteDatabaseService.getInstance();
+            await db.ensureInitialized();
+            const rows = db.executeSql(
+              `SELECT url, title, content_html, author, site_name FROM saved_articles WHERE id = ?`,
+              [message.id],
+            );
+
+            if (rows.length > 0) {
+              const row = rows[0];
+              const { NewsReaderService } =
+                await import("../../services/news-reader.service");
+              const reader = NewsReaderService.getInstance();
+
+              // Set current article for agent context (sanitize for LLM safety)
+              reader.currentArticle = {
+                title: row.title,
+                content: await sanitizeHtmlContent(row.content_html),
+                url: row.url,
+              };
+
+              // Build reader HTML from saved content and show it
+              const readerHtml = reader.getReaderHtml({
+                title: row.title,
+                content: row.content_html,
+                byline: row.author || "",
+                siteName: row.site_name || "",
+                url: row.url,
+              });
+              reader.showPanel(readerHtml, row.title || "Saved Article");
+            }
+          } catch (err) {
+            ctx.logger.warn("Failed to open saved article", err);
+          }
         }
         break;
       }

@@ -6,6 +6,25 @@ import { Logger } from "../infrastructure/logger/logger";
 import createDOMPurify from "dompurify";
 import { EnhancedCacheManager } from "./enhanced-cache-manager.service";
 
+/** Escape HTML special characters for safe interpolation into templates. */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Escape a string for safe inclusion in a JavaScript single-quoted string literal. */
+function escapeJsString(str: string): string {
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
+}
+
 export class NewsReaderService implements vscode.Disposable {
   private static instance: NewsReaderService;
   private logger: Logger;
@@ -63,7 +82,7 @@ export class NewsReaderService implements vscode.Disposable {
   public async analyzeContent(url: string): Promise<void> {
     try {
       this.logger.info(`Analyzing content for context: ${url}`);
-      const article = await this._fetchArticle(url);
+      const article = await this.fetchArticle(url);
       if (article) {
         this.currentArticle = {
           title: article.title,
@@ -76,7 +95,7 @@ export class NewsReaderService implements vscode.Disposable {
     }
   }
 
-  private async _fetchArticle(url: string): Promise<any> {
+  public async fetchArticle(url: string): Promise<any> {
     const response = await axios.get(url, {
       headers: {
         "User-Agent":
@@ -116,7 +135,7 @@ export class NewsReaderService implements vscode.Disposable {
         async (progress) => {
           progress.report({ message: "Fetching content..." });
 
-          const article = await this._fetchArticle(url);
+          const article = await this.fetchArticle(url);
 
           if (!article) {
             throw new Error("Could not parse article content");
@@ -157,7 +176,7 @@ export class NewsReaderService implements vscode.Disposable {
     }
   }
 
-  private showPanel(html: string, title: string): void {
+  public showPanel(html: string, title: string): void {
     if (this.currentPanel) {
       this.currentPanel.reveal(vscode.ViewColumn.One);
     } else {
@@ -268,7 +287,7 @@ export class NewsReaderService implements vscode.Disposable {
     }
   }
 
-  private getReaderHtml(article: {
+  public getReaderHtml(article: {
     title: string;
     content: string;
     byline: string;
@@ -285,7 +304,7 @@ export class NewsReaderService implements vscode.Disposable {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${article.title}</title>
+    <title>${escapeHtml(article.title)}</title>
     <style>
         :root {
             --bg-color: var(--vscode-editor-background);
@@ -506,7 +525,7 @@ export class NewsReaderService implements vscode.Disposable {
             </button>
         </div>
         <div class="url-bar">
-            <span class="url-text">${article.url}</span>
+            <span class="url-text">${escapeHtml(article.url)}</span>
         </div>
         <div class="browser-actions">
             <button class="browser-btn" id="font-decrease-btn" title="Decrease Font Size">
@@ -530,10 +549,10 @@ export class NewsReaderService implements vscode.Disposable {
     </div>
     <div class="article-container">
     <article>
-        <h1>${article.title}</h1>
+        <h1>${escapeHtml(article.title)}</h1>
         <div class="meta">
-            ${article.siteName ? `<span>${article.siteName}</span> • ` : ""}
-            ${article.byline ? `<span>${article.byline}</span>` : ""}
+            ${article.siteName ? `<span>${escapeHtml(article.siteName)}</span> • ` : ""}
+            ${article.byline ? `<span>${escapeHtml(article.byline)}</span>` : ""}
         </div>
         <div class="content">
             ${cleanContent}
@@ -624,7 +643,7 @@ export class NewsReaderService implements vscode.Disposable {
 
         // Browser header buttons
         document.getElementById('refresh-btn').addEventListener('click', () => {
-            vscode.postMessage({ command: 'open', url: '${article.url}' });
+            vscode.postMessage({ command: 'open', url: '${escapeJsString(article.url)}' });
         });
 
         document.getElementById('add-to-chat-btn').addEventListener('click', () => {
@@ -636,18 +655,18 @@ export class NewsReaderService implements vscode.Disposable {
                 // Send the full article content if nothing is selected
                 const content = document.querySelector('.content')?.textContent || '';
                 const title = document.querySelector('h1')?.textContent || '';
-                vscode.postMessage({ command: 'add-to-chat', text: content.substring(0, 5000), title: title });
+                vscode.postMessage({ command: 'add-to-chat', text: content, title: title });
             }
         });
 
         document.getElementById('open-external-btn').addEventListener('click', () => {
-            vscode.postMessage({ command: 'open-new', url: '${article.url}' });
+            vscode.postMessage({ command: 'open-new', url: '${escapeJsString(article.url)}' });
         });
 
         document.getElementById('summarize-btn').addEventListener('click', () => {
             const content = document.querySelector('.content')?.textContent || '';
             const title = document.querySelector('h1')?.textContent || '';
-            vscode.postMessage({ command: 'summarize-article', text: content.substring(0, 5000), title: title });
+            vscode.postMessage({ command: 'summarize-article', text: content, title: title });
         });
 
         // Font size controls

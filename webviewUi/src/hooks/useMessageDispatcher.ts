@@ -162,6 +162,24 @@ export function useMessageDispatcher(streamingChat: StreamingChatAPI) {
           }
           break;
 
+        case "saved-articles-list":
+          if (message.articles) {
+            content.setSavedArticles(message.articles);
+          }
+          break;
+
+        case "scrape-article-status":
+          content.setScrapeStatus({
+            status: message.status,
+            url: message.url,
+            error: message.error,
+          });
+          if (message.status === "done" || message.status === "error") {
+            // Auto-clear status after 5s
+            setTimeout(() => content.setScrapeStatus(null), 5000);
+          }
+          break;
+
         case "set-locale":
           if (message.locale) {
             i18n.changeLanguage(message.locale);

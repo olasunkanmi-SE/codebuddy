@@ -348,6 +348,29 @@ export class SqliteDatabaseService {
     } catch (error: any) {
       this.logger.warn("Failed to initialize bookmarks schema:", error);
     }
+
+    try {
+      // Saved Articles — Smart Reader offline reading
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS saved_articles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          url TEXT NOT NULL UNIQUE,
+          title TEXT NOT NULL,
+          author TEXT,
+          site_name TEXT,
+          content_html TEXT NOT NULL,
+          content_text TEXT NOT NULL,
+          excerpt TEXT,
+          saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      this.db.run(`
+        CREATE INDEX IF NOT EXISTS idx_saved_articles_saved_at ON saved_articles(saved_at)
+      `);
+    } catch (error: any) {
+      this.logger.warn("Failed to initialize saved_articles schema:", error);
+    }
   }
 
   /**

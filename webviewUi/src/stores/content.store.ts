@@ -9,6 +9,16 @@ interface Bookmark {
   created_at: string;
 }
 
+interface SavedArticle {
+  id: number;
+  url: string;
+  title: string;
+  author: string | null;
+  site_name: string | null;
+  excerpt: string | null;
+  saved_at: string;
+}
+
 interface ContentState {
   newsItems: any[];
   logs: any[];
@@ -16,6 +26,8 @@ interface ContentState {
   traces: any[];
   browsingHistory: Array<{ url: string; title: string; timestamp: number }>;
   bookmarks: Bookmark[];
+  savedArticles: SavedArticle[];
+  scrapeStatus: { status: string; url: string; error?: string } | null;
 
   setNewsItems: (items: any[]) => void;
   setLogs: (logs: any[]) => void;
@@ -26,6 +38,10 @@ interface ContentState {
     history: Array<{ url: string; title: string; timestamp: number }>,
   ) => void;
   setBookmarks: (bookmarks: Bookmark[]) => void;
+  setSavedArticles: (articles: SavedArticle[]) => void;
+  setScrapeStatus: (
+    status: { status: string; url: string; error?: string } | null,
+  ) => void;
 
   handleMarkNewsAsRead: (id: number) => void;
   handleRefreshNews: () => void;
@@ -40,6 +56,10 @@ interface ContentState {
   handleAddBookmark: (url: string, title: string) => void;
   handleRemoveBookmark: (url: string) => void;
   handleGetBookmarks: () => void;
+  handleScrapeAndSave: (url: string) => void;
+  handleGetSavedArticles: () => void;
+  handleDeleteSavedArticle: (id: number) => void;
+  handleOpenSavedArticle: (id: number) => void;
 }
 
 export const useContentStore = create<ContentState>()((set) => ({
@@ -49,6 +69,8 @@ export const useContentStore = create<ContentState>()((set) => ({
   traces: [],
   browsingHistory: [],
   bookmarks: [],
+  savedArticles: [],
+  scrapeStatus: null,
 
   setNewsItems: (items) => set({ newsItems: items }),
   setLogs: (logs) => set({ logs }),
@@ -57,6 +79,8 @@ export const useContentStore = create<ContentState>()((set) => ({
   setTraces: (traces) => set({ traces }),
   setBrowsingHistory: (history) => set({ browsingHistory: history }),
   setBookmarks: (bookmarks) => set({ bookmarks }),
+  setSavedArticles: (articles) => set({ savedArticles: articles }),
+  setScrapeStatus: (status) => set({ scrapeStatus: status }),
 
   handleMarkNewsAsRead: (id) => {
     vscode.postMessage({ command: "news-mark-read", ids: [id] });
@@ -100,5 +124,17 @@ export const useContentStore = create<ContentState>()((set) => ({
   },
   handleGetBookmarks: () => {
     vscode.postMessage({ command: "get-bookmarks" });
+  },
+  handleScrapeAndSave: (url) => {
+    vscode.postMessage({ command: "scrape-and-save-article", url });
+  },
+  handleGetSavedArticles: () => {
+    vscode.postMessage({ command: "get-saved-articles" });
+  },
+  handleDeleteSavedArticle: (id) => {
+    vscode.postMessage({ command: "delete-saved-article", id });
+  },
+  handleOpenSavedArticle: (id) => {
+    vscode.postMessage({ command: "open-saved-article", id });
   },
 }));
