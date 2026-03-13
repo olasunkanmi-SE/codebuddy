@@ -1019,7 +1019,12 @@ export async function activate(context: vscode.ExtensionContext) {
         .getConfiguration("codebuddy.telemetry")
         .get<boolean>("persistTraces", true);
       if (persistEnabled) {
-        await TelemetryPersistenceService.getInstance().initialize();
+        const retentionDays = vscode.workspace
+          .getConfiguration("codebuddy.telemetry")
+          .get<number>("retentionDays", 7);
+        await TelemetryPersistenceService.getInstance().initialize({
+          retentionDays,
+        });
       }
     } catch (obsError) {
       logger.error("Failed to initialize observability:", obsError);
@@ -1087,7 +1092,7 @@ async function restartExtension(context: vscode.ExtensionContext) {
   }
 }
 
-export function deactivate(context: vscode.ExtensionContext) {
+export async function deactivate(context: vscode.ExtensionContext) {
   logger.info("Deactivating CodeBuddy extension...");
 
   // Stop Scheduler Service
@@ -1121,9 +1126,9 @@ export function deactivate(context: vscode.ExtensionContext) {
 
   // Flush and close telemetry persistence
   try {
-    TelemetryPersistenceService.getInstance().shutdown();
+    await TelemetryPersistenceService.getInstance().shutdown();
   } catch (error) {
-    console.warn("Error shutting down telemetry persistence:", error);
+    logger.error("Error shutting down telemetry persistence:", error);
   }
 
   context.subscriptions.forEach((subscription) => subscription.dispose());

@@ -64,9 +64,9 @@ export class ObservabilityService {
     LocalObservabilityService.getInstance().clearSpans();
   }
 
-  clearPersistedTraces() {
+  async clearPersistedTraces() {
     try {
-      TelemetryPersistenceService.getInstance().clearAll();
+      await TelemetryPersistenceService.getInstance().clearAll();
     } catch {
       // non-fatal
     }

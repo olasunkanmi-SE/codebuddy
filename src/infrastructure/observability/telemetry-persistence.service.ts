@@ -1,9 +1,26 @@
 import * as path from "path";
 import * as fs from "fs";
+import * as fsPromises from "fs/promises";
 import * as os from "os";
-import * as vscode from "vscode";
+import type { Database, SqlJsStatic, ParamsObject } from "sql.js";
 import { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import { Logger, LogLevel } from "../logger/logger";
+
+/** Seconds in one day — avoids magic number `86_400`. */
+const SECONDS_IN_DAY = 86_400;
+
+/** Access `parentSpanId` which exists on the concrete Span but not on ReadableSpan. */
+interface SpanWithParent extends ReadableSpan {
+  readonly parentSpanId?: string;
+}
+
+/**
+ * Configuration injected at initialization time so the service
+ * is decoupled from the VS Code settings API.
+ */
+export interface TelemetryPersistenceConfig {
+  retentionDays: number;
+}
 
 /**
  * Serialized span row stored in SQLite.
@@ -29,6 +46,32 @@ export interface PersistedSpan {
 }
 
 /**
+ * Shape returned by `querySpans()` — matches what ObservabilityPanel expects.
+ */
+export interface QueriedSpan {
+  name: string;
+  kind: number;
+  context: { spanId: string; traceId: string };
+  parentSpanId?: string;
+  startTime: [number, number];
+  endTime: [number, number];
+  status: { code: number; message?: string };
+  attributes: Record<string, unknown>;
+  events: Array<{
+    name: string;
+    time?: [number, number];
+    attributes?: Record<string, unknown>;
+  }>;
+  links: Array<{
+    context: { spanId: string; traceId: string };
+    attributes?: Record<string, unknown>;
+  }>;
+  duration: [number, number];
+  _sessionId: string;
+  _persisted: boolean;
+}
+
+/**
  * Persists OTel spans to a local SQLite database so telemetry survives
  * across VS Code sessions.
  *
@@ -42,14 +85,16 @@ export interface PersistedSpan {
 export class TelemetryPersistenceService {
   private static instance: TelemetryPersistenceService;
   private readonly logger: Logger;
-  private db: any = null;
-  private SQL: any = null;
+  private db: Database | null = null;
+  private SQL: SqlJsStatic | null = null;
   private dbPath = "";
   private initialized = false;
   private initPromise: Promise<void> | null = null;
   private pendingSpans: PersistedSpan[] = [];
   private flushTimer: ReturnType<typeof setInterval> | null = null;
+  private needsVacuum = false;
   private sessionId: string;
+  private config: TelemetryPersistenceConfig | null = null;
 
   /** Maximum spans buffered before auto-flush. */
   private static readonly FLUSH_THRESHOLD = 50;
@@ -73,10 +118,11 @@ export class TelemetryPersistenceService {
 
   // ── Lifecycle ──────────────────────────────────────────
 
-  async initialize(): Promise<void> {
+  async initialize(config: TelemetryPersistenceConfig): Promise<void> {
     if (this.initialized) return;
     if (this.initPromise) return this.initPromise;
 
+    this.config = config;
     this.initPromise = this._initialize();
     return this.initPromise;
   }
@@ -99,28 +145,36 @@ export class TelemetryPersistenceService {
       }
       this.dbPath = path.join(telemetryDir, "traces.db");
 
-      // Load existing DB or create new
+      // Load existing DB or create new (async read to avoid blocking)
       let data: Uint8Array | undefined;
-      if (fs.existsSync(this.dbPath)) {
-        this.logger.info("Loading existing telemetry database...");
-        data = new Uint8Array(fs.readFileSync(this.dbPath));
+      try {
+        if (fs.existsSync(this.dbPath)) {
+          this.logger.info("Loading existing telemetry database...");
+          data = new Uint8Array(await fsPromises.readFile(this.dbPath));
+        }
+      } catch (readError) {
+        this.logger.error(
+          `Failed to read existing telemetry database at ${this.dbPath}`,
+          readError,
+        );
+        data = undefined;
       }
 
       this.db = new this.SQL.Database(data);
       this.createSchema();
 
-      // Prune old data
-      const retentionDays = this.getRetentionDays();
+      // Prune old data using injected config
+      const retentionDays = this.config!.retentionDays;
       this.pruneOldSpans(retentionDays);
 
-      // Start periodic flush
+      // Start periodic flush (fire-and-forget — errors handled inside flush)
       this.flushTimer = setInterval(
-        () => this.flush(),
+        () => void this.flush(),
         TelemetryPersistenceService.FLUSH_INTERVAL_MS,
       );
 
       this.initialized = true;
-      this.saveToDisk();
+      await this.saveToDisk();
       this.logger.info(
         `✓ Telemetry persistence initialized (session ${this.sessionId}, retention ${retentionDays}d)`,
       );
@@ -131,7 +185,7 @@ export class TelemetryPersistenceService {
   }
 
   private createSchema(): void {
-    this.db.run(`
+    this.db!.run(`
       CREATE TABLE IF NOT EXISTS spans (
         span_id      TEXT PRIMARY KEY,
         trace_id     TEXT NOT NULL,
@@ -153,16 +207,16 @@ export class TelemetryPersistenceService {
     `);
 
     // Create indexes for common query patterns
-    this.db.run(
+    this.db!.run(
       `CREATE INDEX IF NOT EXISTS idx_spans_trace ON spans(trace_id)`,
     );
-    this.db.run(
+    this.db!.run(
       `CREATE INDEX IF NOT EXISTS idx_spans_created ON spans(created_at)`,
     );
-    this.db.run(
+    this.db!.run(
       `CREATE INDEX IF NOT EXISTS idx_spans_session ON spans(session_id)`,
     );
-    this.db.run(`CREATE INDEX IF NOT EXISTS idx_spans_name ON spans(name)`);
+    this.db!.run(`CREATE INDEX IF NOT EXISTS idx_spans_name ON spans(name)`);
   }
 
   // ── Write path ─────────────────────────────────────────
@@ -178,7 +232,7 @@ export class TelemetryPersistenceService {
     const row: PersistedSpan = {
       span_id: ctx.spanId,
       trace_id: ctx.traceId,
-      parent_id: (span as any).parentSpanId || null,
+      parent_id: (span as SpanWithParent).parentSpanId || null,
       name: span.name,
       kind: span.kind,
       start_time_s: span.startTime[0],
@@ -210,14 +264,14 @@ export class TelemetryPersistenceService {
     if (
       this.pendingSpans.length >= TelemetryPersistenceService.FLUSH_THRESHOLD
     ) {
-      this.flush();
+      void this.flush();
     }
   }
 
   /**
    * Write all buffered spans to SQLite and persist to disk.
    */
-  flush(): void {
+  async flush(): Promise<void> {
     if (!this.db || this.pendingSpans.length === 0) return;
 
     const batch = this.pendingSpans.splice(0);
@@ -255,7 +309,7 @@ export class TelemetryPersistenceService {
 
       stmt.free();
       this.db.run("COMMIT");
-      this.saveToDisk();
+      await this.saveToDisk();
 
       this.logger.debug(`Flushed ${batch.length} spans to telemetry database`);
     } catch (error) {
@@ -279,11 +333,12 @@ export class TelemetryPersistenceService {
    * @param days  Number of days of history to load (default: from settings)
    * @param limit Maximum number of spans to return
    */
-  querySpans(days?: number, limit = 10_000): any[] {
+  querySpans(days?: number, limit = 10_000): QueriedSpan[] {
     if (!this.db) return [];
 
-    const retentionDays = days ?? this.getRetentionDays();
-    const cutoff = Math.floor(Date.now() / 1000) - retentionDays * 86_400;
+    const retentionDays = days ?? this.config?.retentionDays ?? 7;
+    const cutoff =
+      Math.floor(Date.now() / 1000) - retentionDays * SECONDS_IN_DAY;
 
     const stmt = this.db.prepare(`
       SELECT span_id, trace_id, parent_id, name, kind,
@@ -297,23 +352,23 @@ export class TelemetryPersistenceService {
     `);
     stmt.bind({ ":cutoff": cutoff, ":limit": limit });
 
-    const results: any[] = [];
+    const results: QueriedSpan[] = [];
     while (stmt.step()) {
-      const obj = stmt.getAsObject();
+      const obj = stmt.getAsObject() as ParamsObject;
 
       results.push({
-        name: obj.name,
-        kind: obj.kind,
+        name: obj.name as string,
+        kind: obj.kind as number,
         context: {
-          spanId: obj.span_id,
-          traceId: obj.trace_id,
+          spanId: obj.span_id as string,
+          traceId: obj.trace_id as string,
         },
-        parentSpanId: obj.parent_id || undefined,
-        startTime: [obj.start_time_s, obj.start_time_ns] as [number, number],
-        endTime: [obj.end_time_s, obj.end_time_ns] as [number, number],
+        parentSpanId: (obj.parent_id as string) || undefined,
+        startTime: [obj.start_time_s as number, obj.start_time_ns as number],
+        endTime: [obj.end_time_s as number, obj.end_time_ns as number],
         status: {
-          code: obj.status_code,
-          message: obj.status_message || undefined,
+          code: obj.status_code as number,
+          message: (obj.status_message as string) || undefined,
         },
         attributes: JSON.parse((obj.attributes as string) || "{}"),
         events: JSON.parse((obj.events as string) || "[]"),
@@ -322,7 +377,7 @@ export class TelemetryPersistenceService {
           (obj.end_time_s as number) - (obj.start_time_s as number),
           (obj.end_time_ns as number) - (obj.start_time_ns as number),
         ],
-        _sessionId: obj.session_id,
+        _sessionId: obj.session_id as string,
         _persisted: true,
       });
     }
@@ -367,7 +422,7 @@ export class TelemetryPersistenceService {
   pruneOldSpans(days: number): number {
     if (!this.db) return 0;
 
-    const cutoff = Math.floor(Date.now() / 1000) - days * 86_400;
+    const cutoff = Math.floor(Date.now() / 1000) - days * SECONDS_IN_DAY;
 
     // Get count before deletion for logging
     const countStmt = this.db.prepare(
@@ -387,8 +442,7 @@ export class TelemetryPersistenceService {
       delStmt.bind({ ":cutoff": cutoff });
       delStmt.step();
       delStmt.free();
-      this.db.run(`VACUUM`);
-      this.saveToDisk();
+      this.needsVacuum = true;
       this.logger.info(
         `Pruned ${count} spans older than ${days} days from telemetry database`,
       );
@@ -400,12 +454,13 @@ export class TelemetryPersistenceService {
   /**
    * Delete all persisted spans.
    */
-  clearAll(): void {
+  async clearAll(): Promise<void> {
     if (!this.db) return;
 
     this.db.run(`DELETE FROM spans`);
     this.pendingSpans = [];
-    this.saveToDisk();
+    this.needsVacuum = true;
+    await this.saveToDisk();
     this.logger.info("Cleared all persisted telemetry spans");
   }
 
@@ -415,7 +470,7 @@ export class TelemetryPersistenceService {
    * Flush remaining spans and close the database.
    * Call from extension deactivate().
    */
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     this.logger.info("Shutting down telemetry persistence...");
 
     if (this.flushTimer) {
@@ -424,10 +479,16 @@ export class TelemetryPersistenceService {
     }
 
     // Final flush of any buffered spans
-    this.flush();
+    await this.flush();
 
     if (this.db) {
       try {
+        // Execute deferred VACUUM before closing
+        if (this.needsVacuum) {
+          this.db.run("VACUUM");
+          this.needsVacuum = false;
+          await this.saveToDisk();
+        }
         this.db.close();
       } catch {
         // suppress
@@ -442,20 +503,12 @@ export class TelemetryPersistenceService {
 
   // ── Helpers ────────────────────────────────────────────
 
-  private getRetentionDays(): number {
-    return (
-      vscode.workspace
-        .getConfiguration("codebuddy.telemetry")
-        .get<number>("retentionDays") ?? 7
-    );
-  }
-
-  private saveToDisk(): void {
+  private async saveToDisk(): Promise<void> {
     if (!this.db || !this.dbPath) return;
 
     try {
       const data = this.db.export();
-      fs.writeFileSync(this.dbPath, data);
+      await fsPromises.writeFile(this.dbPath, data);
     } catch (error) {
       this.logger.error("Failed to save telemetry database to disk", error);
     }
