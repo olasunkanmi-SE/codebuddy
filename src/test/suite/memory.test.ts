@@ -21,10 +21,13 @@ let tmpRoot: string;
 let userDir: string;
 let projectDir: string;
 let originalHome: string | undefined;
+let originalUserProfile: string | undefined;
 
 /**
  * Create isolated temp dirs and redirect MemoryTool storage paths.
- * os.homedir() is non-configurable so we redirect via the HOME env var instead.
+ * On POSIX, os.homedir() reads $HOME.
+ * On Windows, os.homedir() reads $USERPROFILE (ignoring $HOME).
+ * We set both to cover cross-platform CI runners.
  */
 function setupTempDirs() {
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "memory-test-"));
@@ -35,6 +38,12 @@ function setupTempDirs() {
 
   originalHome = process.env.HOME;
   process.env.HOME = userDir;
+
+  // On Windows, os.homedir() uses USERPROFILE, not HOME
+  if (process.platform === "win32") {
+    originalUserProfile = process.env.USERPROFILE;
+    process.env.USERPROFILE = userDir;
+  }
 
   sinon.stub(vscode.workspace, "workspaceFolders").value([
     { uri: { fsPath: projectDir }, name: "test-ws", index: 0 },
@@ -47,6 +56,13 @@ function teardownTempDirs() {
     process.env.HOME = originalHome;
   } else {
     delete process.env.HOME;
+  }
+  if (process.platform === "win32") {
+    if (originalUserProfile !== undefined) {
+      process.env.USERPROFILE = originalUserProfile;
+    } else {
+      delete process.env.USERPROFILE;
+    }
   }
   try {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
