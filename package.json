@@ -8,7 +8,7 @@
   },
   "publisher": "fiatinnovations",
   "description": "%description%",
-  "version": "4.1.10",
+  "version": "4.1.12",
   "engines": {
     "vscode": "^1.78.0"
   },
@@ -997,6 +997,23 @@
             "minimum": 5000,
             "maximum": 600000,
             "description": "Timeout in milliseconds for test execution (default: 120000 = 2 minutes)."
+          },
+          "codebuddy.telemetry.persistTraces": {
+            "type": "boolean",
+            "default": true,
+            "description": "Persist agent telemetry traces to disk so they survive across VS Code sessions."
+          },
+          "codebuddy.telemetry.retentionDays": {
+            "type": "number",
+            "default": 7,
+            "minimum": 1,
+            "maximum": 90,
+            "description": "Number of days to retain persisted telemetry traces before auto-pruning."
+          },
+          "codebuddy.telemetry.otlpEndpoint": {
+            "type": "string",
+            "default": "",
+            "description": "Optional OTLP HTTP endpoint for exporting traces to an external backend (e.g. LangFuse, LangSmith, Jaeger). Leave empty to disable."
           }
         }
       }
