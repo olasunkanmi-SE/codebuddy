@@ -7,8 +7,13 @@ export interface SpanData {
   parentSpanId?: string;
   name?: string;
   status?: { code?: number; message?: string };
-  attributes?: Record<string, any>;
-  events?: any[];
+  attributes?: Record<string, unknown>;
+  events?: SpanEvent[];
+}
+
+export interface SpanEvent {
+  name?: string;
+  attributes?: Record<string, unknown>;
 }
 
 /** Convert OTel hrtime [seconds, nanoseconds] to epoch milliseconds */

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import styled, { keyframes, css } from "styled-components";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
-import { SpanData, spanStartMs, spanEndMs, fmtDuration, fmtCost, fmtTokens } from "../../utils/telemetry.utils";
+import { SpanData, SpanEvent, spanStartMs, spanEndMs, fmtDuration, fmtCost, fmtTokens } from "../../utils/telemetry.utils";
 
 interface TraceGroup {
   traceId: string;
@@ -781,11 +781,41 @@ const ProgressBarFill = styled.div<{ pct: number; color?: string }>`
   transition: width 0.4s ease;
 `;
 
+interface VSCodeApi {
+  postMessage(message: Record<string, unknown>): void;
+}
+
+interface LogEntry {
+  level: string;
+  message: string;
+  timestamp: number;
+  module?: string;
+}
+
+interface MetricsData {
+  avgSearchLatency?: number;
+  p95SearchLatency?: number;
+  avgMemoryUsage?: number;
+  avgIndexingThroughput?: number;
+  errorRate?: number;
+  cacheHitRate?: number;
+  mcpStats?: {
+    totalInvocations: number;
+    failedInvocations: number;
+    averageLatency: number;
+    connectedServers?: number;
+    isGatewayMode?: boolean;
+    totalTools?: number;
+    uniqueTools?: number;
+    toolsByServer?: Record<string, number>;
+  };
+}
+
 interface ObservabilityPanelProps {
-  vsCode: any;
-  logs: any[];
-  metrics: any;
-  traces: any[];
+  vsCode: VSCodeApi;
+  logs: LogEntry[];
+  metrics: MetricsData | null;
+  traces: SpanData[];
   isOpen: boolean;
   onClose: () => void;
 }
@@ -805,7 +835,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
       vsCode.postMessage({ command: "observability-get-logs" });
       vsCode.postMessage({ command: "observability-get-traces" });
     }
-  }, [isOpen]);
+  }, [isOpen, vsCode]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -859,7 +889,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
     }
 
     return () => { if (interval) clearInterval(interval); };
-  }, [activeTab, isOpen]);
+  }, [activeTab, isOpen, vsCode]);
 
   const handleRefresh = () => {
     vsCode.postMessage({ command: "observability-get-metrics" });
@@ -1071,19 +1101,19 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                     </MetricValue>
                   </MetricCard>
 
-                  <MetricCard accent={metrics.errorRate > 0.05 ? 'var(--vscode-errorForeground)' : 'var(--vscode-charts-yellow, #cca700)'}>
+                  <MetricCard accent={(metrics.errorRate ?? 0) > 0.05 ? 'var(--vscode-errorForeground)' : 'var(--vscode-charts-yellow, #cca700)'}>
                     <MetricLabel>
                       <MetricIcon className="codicon codicon-warning" />
                       Error Rate
                     </MetricLabel>
-                    <MetricValue style={{ color: metrics.errorRate > 0.05 ? 'var(--vscode-errorForeground)' : 'inherit' }}>
-                      {(metrics.errorRate * 100)?.toFixed(1) || 0}
+                    <MetricValue style={{ color: (metrics.errorRate ?? 0) > 0.05 ? 'var(--vscode-errorForeground)' : 'inherit' }}>
+                      {((metrics.errorRate ?? 0) * 100).toFixed(1)}
                       <MetricUnit>%</MetricUnit>
                     </MetricValue>
                     <ProgressBarBg>
                       <ProgressBarFill
-                        pct={metrics.errorRate * 100 * 10}
-                        color={metrics.errorRate > 0.05 ? 'var(--vscode-errorForeground)' : 'var(--vscode-charts-yellow, #cca700)'}
+                        pct={(metrics.errorRate ?? 0) * 100 * 10}
+                        color={(metrics.errorRate ?? 0) > 0.05 ? 'var(--vscode-errorForeground)' : 'var(--vscode-charts-yellow, #cca700)'}
                       />
                     </ProgressBarBg>
                   </MetricCard>
@@ -1094,11 +1124,11 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                       Cache Hit Rate
                     </MetricLabel>
                     <MetricValue>
-                      {(metrics.cacheHitRate * 100)?.toFixed(1) || 0}
+                      {((metrics.cacheHitRate ?? 0) * 100)?.toFixed(1) || 0}
                       <MetricUnit>%</MetricUnit>
                     </MetricValue>
                     <ProgressBarBg>
-                      <ProgressBarFill pct={metrics.cacheHitRate * 100} />
+                      <ProgressBarFill pct={(metrics.cacheHitRate ?? 0) * 100} />
                     </ProgressBarBg>
                   </MetricCard>
                 </MetricGrid>
@@ -1118,7 +1148,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                 <SectionTitle>MCP Infrastructure</SectionTitle>
                 <SectionLine />
                 {mcpStats && (
-                  <StatusDot status={mcpStats.connectedServers > 0 ? 'good' : 'warn'} />
+                  <StatusDot status={(mcpStats.connectedServers ?? 0) > 0 ? 'good' : 'warn'} />
                 )}
               </SectionHeader>
 
@@ -1176,7 +1206,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
 
                   {mcpStats.toolsByServer && Object.keys(mcpStats.toolsByServer).length > 0 && (
                     <MCPStatusRow style={{ marginTop: '8px' }}>
-                      {Object.entries(mcpStats.toolsByServer).map(([name, count]: [string, any]) => (
+                      {Object.entries(mcpStats.toolsByServer).map(([name, count]: [string, number]) => (
                         <MCPServerChip key={name} connected>
                           {name}
                           <span style={{ opacity: 0.5, fontSize: '10px' }}>{count} tools</span>
@@ -1312,13 +1342,13 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                                 {selectedSpan.status?.code === 2 ? 'ERROR' : 'OK'}
                               </DetailBadge>
                               <DetailBadge>{fmtDuration(dur)}</DetailBadge>
-                              {attrs['gen_ai.system'] && <DetailBadge $variant="info">{attrs['gen_ai.system']}</DetailBadge>}
-                              {attrs['gen_ai.request.model'] && <DetailBadge $variant="info">{attrs['gen_ai.request.model']}</DetailBadge>}
-                              {attrs['gen_ai.usage.total_tokens'] && (
-                                <DetailBadge>⌃ {fmtTokens(attrs['gen_ai.usage.total_tokens'])}</DetailBadge>
+                              {!!attrs['gen_ai.system'] && <DetailBadge $variant="info">{String(attrs['gen_ai.system'])}</DetailBadge>}
+                              {!!attrs['gen_ai.request.model'] && <DetailBadge $variant="info">{String(attrs['gen_ai.request.model'])}</DetailBadge>}
+                              {!!attrs['gen_ai.usage.total_tokens'] && (
+                                <DetailBadge>⌃ {fmtTokens(Number(attrs['gen_ai.usage.total_tokens']))}</DetailBadge>
                               )}
-                              {attrs['gen_ai.usage.cost'] != null && attrs['gen_ai.usage.cost'] > 0 && (
-                                <DetailBadge>{fmtCost(attrs['gen_ai.usage.cost'])}</DetailBadge>
+                              {attrs['gen_ai.usage.cost'] != null && Number(attrs['gen_ai.usage.cost']) > 0 && (
+                                <DetailBadge>{fmtCost(Number(attrs['gen_ai.usage.cost']))}</DetailBadge>
                               )}
                             </DetailBadges>
                           </DetailHeader>
@@ -1361,7 +1391,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                             <>
                               <DetailSectionTitle>Attributes</DetailSectionTitle>
                               <DetailBody>
-                                {Object.entries(attrs).map(([k, v]: [string, any]) => (
+                                {Object.entries(attrs).map(([k, v]) => (
                                   <DetailRow key={k}>
                                     <span>{k}</span>
                                     <span>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
@@ -1376,7 +1406,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                             <>
                               <DetailSectionTitle>Events ({selectedSpan.events!.length})</DetailSectionTitle>
                               <DetailBody>
-                                {selectedSpan.events!.map((ev: any, i: number) => (
+                                {selectedSpan.events!.map((ev: SpanEvent, i: number) => (
                                   <DetailRow key={i}>
                                     <span>{ev.name}</span>
                                     <span>{ev.attributes ? JSON.stringify(ev.attributes) : ''}</span>
