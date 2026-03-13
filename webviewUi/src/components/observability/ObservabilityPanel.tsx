@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import styled, { keyframes, css } from "styled-components";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
+import { spanStartMs, spanEndMs, fmtDuration, fmtCost, fmtTokens } from "../../utils/telemetry.utils";
 
 /* ─── Animations ─── */
 const fadeIn = keyframes`
@@ -877,8 +878,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
     : null;
 
   /* ── Trace tree helpers ── */
-  const spanMs = (s: any) => (s.startTime?.[0] ?? 0) * 1000 + (s.startTime?.[1] ?? 0) / 1e6;
-  const spanEndMs = (s: any) => (s.endTime?.[0] ?? 0) * 1000 + (s.endTime?.[1] ?? 0) / 1e6;
+  const spanMs = spanStartMs;
 
   /** Group spans by traceId, compute summary per trace */
   const traceGroups = useMemo(() => {
@@ -893,8 +893,8 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
       const start = Math.min(...spans.map(spanMs));
       const end = Math.max(...spans.map(spanEndMs));
       const hasErrors = spans.some((s: any) => s.status?.code === 2);
-      const totalTokens = spans.reduce((t: number, s: any) => t + (s.attributes?.['cost.total_tokens'] ?? s.attributes?.['llm.total_tokens'] ?? 0), 0);
-      const cost = spans.reduce((t: number, s: any) => t + (s.attributes?.['cost.total_usd'] ?? 0), 0);
+      const totalTokens = spans.reduce((t: number, s: any) => t + (s.attributes?.['gen_ai.usage.total_tokens'] ?? 0), 0);
+      const cost = spans.reduce((t: number, s: any) => t + (s.attributes?.['gen_ai.usage.cost'] ?? 0), 0);
       return { traceId, spans, root, start, end, duration: end - start, hasErrors, totalTokens, cost };
     }).sort((a, b) => b.start - a.start);
   }, [traces]);
@@ -915,10 +915,14 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
       arr.sort((a: any, b: any) => spanMs(a) - spanMs(b));
     }
     const result: { span: any; depth: number }[] = [];
+    const visited = new Set<string>();
     const walk = (parentId: string | undefined, depth: number) => {
       for (const s of children.get(parentId) ?? []) {
+        const sid = s.context?.spanId;
+        if (sid && visited.has(sid)) continue;
+        if (sid) visited.add(sid);
         result.push({ span: s, depth });
-        walk(s.context?.spanId, depth + 1);
+        walk(sid, depth + 1);
       }
     };
     // Start from root(s) — spans without parent or whose parent is not in this trace
@@ -948,18 +952,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
     setSelectedSpanId(null);
   }, []);
 
-  const fmtDur = (ms: number) => {
-    if (ms < 1) return '<1ms';
-    if (ms < 1000) return `${ms.toFixed(0)}ms`;
-    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-    return `${Math.floor(ms / 60000)}m${((ms % 60000) / 1000).toFixed(0)}s`;
-  };
-
-  const fmtCost = (usd: number) =>
-    usd < 0.01 ? `$${usd.toFixed(6)}` : `$${usd.toFixed(4)}`;
-
-  const fmtTokens = (n: number) =>
-    n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+  const fmtDur = fmtDuration;
 
   return (
     <>
@@ -974,15 +967,15 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
         <div style={{ display: 'flex', gap: '2px' }}>
           {activeTab === "traces" && (
             <>
-              <VSCodeButton appearance="icon" onClick={handleSendTestTrace} title="Send Test Trace">
+              <VSCodeButton appearance="icon" onClick={handleSendTestTrace} title="Send Test Trace" aria-label="Send test trace">
                 <span className="codicon codicon-beaker"></span>
               </VSCodeButton>
-              <VSCodeButton appearance="icon" onClick={handleClear} title="Clear Traces">
+              <VSCodeButton appearance="icon" onClick={handleClear} title="Clear Traces" aria-label="Clear traces">
                 <span className="codicon codicon-clear-all"></span>
               </VSCodeButton>
             </>
           )}
-          <VSCodeButton appearance="icon" onClick={handleRefresh} title="Refresh">
+          <VSCodeButton appearance="icon" onClick={handleRefresh} title="Refresh" aria-label="Refresh traces">
             <span className="codicon codicon-refresh"></span>
           </VSCodeButton>
           <CloseButton onClick={onClose} aria-label="Close observability panel">
@@ -1253,7 +1246,7 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                   {/* Left: span tree */}
                   <TreePane>
                     <TreeBreadcrumb>
-                      <TreeBackBtn onClick={handleBackToList} title="Back to trace list">
+                      <TreeBackBtn onClick={handleBackToList} title="Back to trace list" aria-label="Back to trace list">
                         <span className="codicon codicon-arrow-left" style={{ fontSize: '12px' }}></span>
                       </TreeBackBtn>
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1298,13 +1291,13 @@ export const ObservabilityPanel: React.FC<ObservabilityPanelProps> = ({ vsCode, 
                                 {selectedSpan.status?.code === 2 ? 'ERROR' : 'OK'}
                               </DetailBadge>
                               <DetailBadge>{fmtDur(dur)}</DetailBadge>
-                              {attrs['llm.provider'] && <DetailBadge $variant="info">{attrs['llm.provider']}</DetailBadge>}
-                              {attrs['llm.model'] && <DetailBadge $variant="info">{attrs['llm.model']}</DetailBadge>}
-                              {(attrs['llm.total_tokens'] || attrs['cost.total_tokens']) && (
-                                <DetailBadge>⌃ {fmtTokens(attrs['llm.total_tokens'] ?? attrs['cost.total_tokens'])}</DetailBadge>
+                              {attrs['gen_ai.system'] && <DetailBadge $variant="info">{attrs['gen_ai.system']}</DetailBadge>}
+                              {attrs['gen_ai.request.model'] && <DetailBadge $variant="info">{attrs['gen_ai.request.model']}</DetailBadge>}
+                              {attrs['gen_ai.usage.total_tokens'] && (
+                                <DetailBadge>⌃ {fmtTokens(attrs['gen_ai.usage.total_tokens'])}</DetailBadge>
                               )}
-                              {attrs['cost.total_usd'] != null && attrs['cost.total_usd'] > 0 && (
-                                <DetailBadge>{fmtCost(attrs['cost.total_usd'])}</DetailBadge>
+                              {attrs['gen_ai.usage.cost'] != null && attrs['gen_ai.usage.cost'] > 0 && (
+                                <DetailBadge>{fmtCost(attrs['gen_ai.usage.cost'])}</DetailBadge>
                               )}
                             </DetailBadges>
                           </DetailHeader>

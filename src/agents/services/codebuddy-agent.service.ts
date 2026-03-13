@@ -7,7 +7,14 @@ import {
   MemorySaver,
   BaseCheckpointSaver,
 } from "@langchain/langgraph";
-import { trace, context, Span, SpanStatusCode } from "@opentelemetry/api";
+import {
+  trace,
+  context,
+  Span,
+  SpanStatusCode,
+  Tracer,
+  Context,
+} from "@opentelemetry/api";
 import * as vscode from "vscode";
 import { Logger, LogLevel } from "../../infrastructure/logger/logger";
 import { createAdvancedDeveloperAgent } from "../developer/agent";
@@ -37,10 +44,17 @@ import {
 } from "./agent-safety-guard";
 import { ConsentManager } from "./consent-manager";
 import { ContentNormalizer } from "./content-normalizer";
+import { ErrorRecoveryService } from "./error-recovery.service";
 import { TOOL_NAMES } from "../constants/tool-names";
 
 /** Typed alias for the async iterator from a LangGraph agent stream. */
 type AgentStreamIterator = AsyncIterator<unknown>;
+
+/** Non-optional bundle for propagating OTel tracing through sub-generators. */
+interface TraceBundle {
+  tracer: Tracer;
+  parentCtx: Context;
+}
 
 // Guaranteed fallback — extracted as a named constant for compile-time safety
 const DEFAULT_TOOL_DESCRIPTION: IToolDescription = Object.freeze({
@@ -708,6 +722,7 @@ export class CodeBuddyAgentService {
       hasErrored: false,
       forceStopReason: null,
       agentState: "planning",
+      toolSpans: new Map(),
     };
 
     // Snapshot safety limits once per stream session (O(1) config reads)
@@ -721,6 +736,7 @@ export class CodeBuddyAgentService {
       },
     });
     const parentCtx = trace.setSpan(context.active(), span);
+    const tracing: TraceBundle = { tracer, parentCtx };
 
     // Cost tracking — resolve current provider/model for pricing lookup
     const costTracker = CostTrackingService.getInstance();
@@ -734,8 +750,8 @@ export class CodeBuddyAgentService {
     }
 
     // Enrich root span with model metadata for the trace detail panel
-    span.setAttribute("llm.provider", providerName);
-    span.setAttribute("llm.model", currentModelName);
+    span.setAttribute("gen_ai.system", providerName);
+    span.setAttribute("gen_ai.request.model", currentModelName);
 
     try {
       const agent = await this.getAgent();
@@ -778,160 +794,245 @@ export class CodeBuddyAgentService {
         )
       )[Symbol.asyncIterator]();
 
-      while (true) {
-        const { value: event, done } = await streamIterator.next();
-        if (done) break;
-        // Stop immediately if we've already errored
-        if (ctx.hasErrored) break;
+      const recovery = new ErrorRecoveryService();
+      let retryAttempt = 0;
 
-        // DEBUG: Log raw events from agent (reduce verbosity in production)
-        this.logger.debug(
-          `[STREAM] Event #${ctx.eventCount + 1}: ${JSON.stringify(Object.keys(event || {}))}`,
-        );
+      // Labeled loop: on transient errors we retry with a nudge message
+      // instead of surfacing the error to the user.
+      streamLoop: while (true) {
+        try {
+          while (true) {
+            const { value: event, done } = await streamIterator.next();
+            if (done) break;
+            // Stop immediately if we've already errored
+            if (ctx.hasErrored) break;
 
-        ctx.eventCount++;
+            // DEBUG: Log raw events from agent (reduce verbosity in production)
+            this.logger.debug(
+              `[STREAM] Event #${ctx.eventCount + 1}: ${JSON.stringify(Object.keys(event || {}))}`,
+            );
 
-        // Check safety limits
-        const elapsed = Date.now() - ctx.startTime;
-        const safetyResult = this.safetyGuard.checkLimits(
-          ctx.eventCount,
-          ctx.totalToolInvocations,
-          elapsed,
-          limits,
-        );
+            ctx.eventCount++;
 
-        if (safetyResult.shouldStop) {
-          const limitLabel = this.safetyGuard.buildStopMessage(
-            safetyResult.reason!,
-            ctx.eventCount,
-            ctx.totalToolInvocations,
-            elapsed,
-          );
+            // Check safety limits
+            const elapsed = Date.now() - ctx.startTime;
+            const safetyResult = this.safetyGuard.checkLimits(
+              ctx.eventCount,
+              ctx.totalToolInvocations,
+              elapsed,
+              limits,
+            );
 
-          // Ask the user whether to continue or stop
-          yield {
-            type: StreamEventType.METADATA,
-            content: "interrupt_waiting",
-            metadata: {
-              threadId: conversationId,
-              status: "interrupt_waiting",
-              toolName: "Safety limit reached",
-              description: `${limitLabel} Would you like me to continue?`,
-            },
-          };
-          yield {
-            type: StreamEventType.CHUNK,
-            content: `${limitLabel} Would you like me to continue?`,
-            metadata: { threadId: conversationId, timestamp: Date.now() },
-          };
+            if (safetyResult.shouldStop) {
+              const limitLabel = this.safetyGuard.buildStopMessage(
+                safetyResult.reason!,
+                ctx.eventCount,
+                ctx.totalToolInvocations,
+                elapsed,
+              );
 
-          const continueGranted =
-            await this.waitForActionConsent(conversationId);
+              // Ask the user whether to continue or stop
+              yield {
+                type: StreamEventType.METADATA,
+                content: "interrupt_waiting",
+                metadata: {
+                  threadId: conversationId,
+                  status: "interrupt_waiting",
+                  toolName: "Safety limit reached",
+                  description: `${limitLabel} Would you like me to continue?`,
+                },
+              };
+              yield {
+                type: StreamEventType.CHUNK,
+                content: `${limitLabel} Would you like me to continue?`,
+                metadata: { threadId: conversationId, timestamp: Date.now() },
+              };
 
-          if (continueGranted) {
-            // User chose to continue — extend the limits and keep going
+              const continueGranted =
+                await this.waitForActionConsent(conversationId);
+
+              if (continueGranted) {
+                // User chose to continue — extend the limits and keep going
+                yield {
+                  type: StreamEventType.METADATA,
+                  content: "interrupt_approved",
+                  metadata: {
+                    threadId: conversationId,
+                    status: "interrupt_approved",
+                    toolName: "Safety limit reached",
+                  },
+                };
+                yield {
+                  type: StreamEventType.CHUNK,
+                  content: "Continuing...",
+                  metadata: { threadId: conversationId, timestamp: Date.now() },
+                };
+
+                this.safetyGuard.extendLimits(ctx);
+                Object.assign(ctx, this.safetyGuard.buildLimitReset());
+                this.logger.debug(
+                  `[STREAM] Limits extended for thread ${conversationId}: counters reset`,
+                );
+                continue;
+              }
+
+              // User denied — stop gracefully
+              ctx.forceStopReason = safetyResult.reason;
+
+              yield {
+                type: StreamEventType.METADATA,
+                content: "interrupt_denied",
+                metadata: {
+                  threadId: conversationId,
+                  status: "interrupt_denied",
+                  toolName: "Safety limit reached",
+                },
+              };
+
+              // Mark pending tools as completed
+              for (const [toolName, activity] of ctx.pendingToolCalls) {
+                activity.status = "completed";
+                activity.endTime = Date.now();
+                yield {
+                  type: StreamEventType.TOOL_END,
+                  content: JSON.stringify(activity),
+                  metadata: {
+                    toolName,
+                    duration: activity.endTime - activity.startTime,
+                  },
+                };
+              }
+              ctx.pendingToolCalls.clear();
+
+              yield {
+                type: StreamEventType.CHUNK,
+                content: limitLabel,
+                metadata: {
+                  threadId: conversationId,
+                  reason: ctx.forceStopReason,
+                },
+                accumulated: ctx.accumulatedContent
+                  ? `${ctx.accumulatedContent}\n\n${limitLabel}`
+                  : limitLabel,
+              };
+
+              break;
+            }
+
+            const entries = Object.entries(event as Record<string, unknown>);
+
+            const interruptEntry = entries.find(
+              ([nodeName]) => nodeName === "__interrupt__",
+            );
+
+            if (interruptEntry) {
+              const interruptGen = this.handleInterrupt(
+                interruptEntry as [string, IInterruptValue | IInterruptValue[]],
+                ctx,
+                agent,
+                config,
+              );
+              let interruptNext = await interruptGen.next();
+              while (!interruptNext.done) {
+                yield interruptNext.value;
+                interruptNext = await interruptGen.next();
+              }
+              // The generator's return value carries the new iterator (if any)
+              const newIter = interruptNext.value;
+              if (newIter) streamIterator = newIter;
+              continue;
+            }
+
+            yield* this.processNodeEntries(
+              entries as [string, IAgentNodeUpdate][],
+              ctx,
+              span,
+              streamManager,
+              costTracker,
+              conversationId,
+              providerName,
+              currentModelName,
+              limits,
+              onChunk,
+              tracing,
+            );
+          }
+
+          // Stream completed (normally or via safety guard) — exit retry loop
+          break streamLoop;
+        } catch (streamError) {
+          // ── Auto-recovery for transient errors ──
+          const err =
+            streamError instanceof Error
+              ? streamError
+              : new Error(String(streamError));
+          const decision = recovery.evaluate(err, retryAttempt, {
+            fromSafetyGuard: false,
+          });
+
+          if (decision.shouldRetry) {
+            retryAttempt++;
+            span.addEvent("error_recovery_attempt", {
+              attempt: retryAttempt,
+              "error.message": err.message.substring(0, 500),
+            });
+
+            // Mark pending tools as failed (they're stale from the old stream)
+            for (const [toolName, activity] of ctx.pendingToolCalls) {
+              activity.status = "failed";
+              activity.endTime = Date.now();
+              yield {
+                type: StreamEventType.TOOL_END,
+                content: JSON.stringify(activity),
+                metadata: { toolName, error: true },
+              };
+            }
+            ctx.pendingToolCalls.clear();
+
+            // Let the user know we're recovering (not a final error)
             yield {
-              type: StreamEventType.METADATA,
-              content: "interrupt_approved",
+              type: StreamEventType.WORKING,
+              content: `Recovering from a temporary error (attempt ${retryAttempt})...`,
               metadata: {
                 threadId: conversationId,
-                status: "interrupt_approved",
-                toolName: "Safety limit reached",
+                timestamp: Date.now(),
+                retryAttempt,
               },
             };
-            yield {
-              type: StreamEventType.CHUNK,
-              content: "Continuing...",
-              metadata: { threadId: conversationId, timestamp: Date.now() },
-            };
 
-            this.safetyGuard.extendLimits(ctx);
-            Object.assign(ctx, this.safetyGuard.buildLimitReset());
-            this.logger.debug(
-              `[STREAM] Limits extended for thread ${conversationId}: counters reset`,
+            // Exponential back-off
+            await new Promise((resolve) =>
+              setTimeout(resolve, decision.delayMs),
             );
-            continue;
+
+            // Reset error state so the loop can continue
+            ctx.hasErrored = false;
+            ctx.agentState = "running";
+
+            // Re-invoke the agent with a nudge message.  Because LangGraph
+            // uses checkpoint-based memory keyed on `thread_id`, the agent
+            // sees the full conversation history and can continue where it
+            // left off.
+            this.logger.log(
+              LogLevel.INFO,
+              `[ErrorRecovery] Nudging agent for thread ${conversationId} (attempt ${retryAttempt})`,
+            );
+            streamIterator = (
+              await agent.stream(
+                {
+                  messages: [{ role: "user", content: decision.nudgeMessage }],
+                },
+                config,
+              )
+            )[Symbol.asyncIterator]();
+
+            continue streamLoop;
           }
 
-          // User denied — stop gracefully
-          ctx.forceStopReason = safetyResult.reason;
-
-          yield {
-            type: StreamEventType.METADATA,
-            content: "interrupt_denied",
-            metadata: {
-              threadId: conversationId,
-              status: "interrupt_denied",
-              toolName: "Safety limit reached",
-            },
-          };
-
-          // Mark pending tools as completed
-          for (const [toolName, activity] of ctx.pendingToolCalls) {
-            activity.status = "completed";
-            activity.endTime = Date.now();
-            yield {
-              type: StreamEventType.TOOL_END,
-              content: JSON.stringify(activity),
-              metadata: {
-                toolName,
-                duration: activity.endTime - activity.startTime,
-              },
-            };
-          }
-          ctx.pendingToolCalls.clear();
-
-          yield {
-            type: StreamEventType.CHUNK,
-            content: limitLabel,
-            metadata: { threadId: conversationId, reason: ctx.forceStopReason },
-            accumulated: ctx.accumulatedContent
-              ? `${ctx.accumulatedContent}\n\n${limitLabel}`
-              : limitLabel,
-          };
-
-          break;
+          // Not retryable — rethrow to the outer catch
+          throw err;
         }
-
-        const entries = Object.entries(event as Record<string, unknown>);
-
-        const interruptEntry = entries.find(
-          ([nodeName]) => nodeName === "__interrupt__",
-        );
-
-        if (interruptEntry) {
-          const interruptGen = this.handleInterrupt(
-            interruptEntry as [string, IInterruptValue | IInterruptValue[]],
-            ctx,
-            agent,
-            config,
-          );
-          let interruptNext = await interruptGen.next();
-          while (!interruptNext.done) {
-            yield interruptNext.value;
-            interruptNext = await interruptGen.next();
-          }
-          // The generator's return value carries the new iterator (if any)
-          const newIter = interruptNext.value;
-          if (newIter) streamIterator = newIter;
-          continue;
-        }
-
-        yield* this.processNodeEntries(
-          entries as [string, IAgentNodeUpdate][],
-          ctx,
-          span,
-          streamManager,
-          costTracker,
-          conversationId,
-          providerName,
-          currentModelName,
-          limits,
-          onChunk,
-          tracer,
-          parentCtx,
-        );
-      }
+      } // end streamLoop
 
       yield* this.emitCompletion(
         ctx,
@@ -1174,180 +1275,185 @@ export class CodeBuddyAgentService {
     currentModelName: string,
     limits: AgentSafetyLimits,
     onChunk?: (chunk: IStreamEvent) => void,
-    tracer?: ReturnType<typeof trace.getTracer>,
-    parentCtx?: ReturnType<typeof context.active>,
+    tracing?: TraceBundle,
   ): AsyncGenerator<IStreamEvent> {
     for (const [nodeName, update] of entries) {
       // Create a child span per graph node for hierarchical tracing
-      const nodeSpan =
-        tracer && parentCtx
-          ? tracer.startSpan(
-              nodeName,
-              { attributes: { "graph.node": nodeName } },
-              parentCtx,
-            )
-          : undefined;
+      const nodeSpan = tracing
+        ? tracing.tracer.startSpan(
+            nodeName,
+            { attributes: { "graph.node": nodeName } },
+            tracing.parentCtx,
+          )
+        : undefined;
       const nodeCtx = nodeSpan
-        ? trace.setSpan(parentCtx!, nodeSpan)
-        : parentCtx;
+        ? trace.setSpan(tracing!.parentCtx, nodeSpan)
+        : tracing?.parentCtx;
+      const childTracing: TraceBundle | undefined =
+        tracing && nodeCtx
+          ? { tracer: tracing.tracer, parentCtx: nodeCtx }
+          : undefined;
 
-      if (update?.messages && Array.isArray(update.messages)) {
-        for (const message of update.messages) {
-          if (
-            message.usage_metadata &&
-            (message.usage_metadata.input_tokens ||
-              message.usage_metadata.output_tokens)
-          ) {
-            const usage = message.usage_metadata;
+      try {
+        if (update?.messages && Array.isArray(update.messages)) {
+          for (const message of update.messages) {
+            if (
+              message.usage_metadata &&
+              (message.usage_metadata.input_tokens ||
+                message.usage_metadata.output_tokens)
+            ) {
+              const usage = message.usage_metadata;
 
-            // Record LLM usage on the node span for per-node token visibility
-            if (nodeSpan) {
-              nodeSpan.setAttribute("llm.provider", providerName);
-              nodeSpan.setAttribute("llm.model", currentModelName);
-              nodeSpan.setAttribute(
-                "llm.input_tokens",
-                usage.input_tokens ?? 0,
-              );
-              nodeSpan.setAttribute(
-                "llm.output_tokens",
-                usage.output_tokens ?? 0,
-              );
-              nodeSpan.setAttribute(
-                "llm.total_tokens",
-                (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
-              );
-            }
-
-            const costData = costTracker.recordUsage(
-              conversationId,
-              providerName,
-              currentModelName,
-              usage.input_tokens ?? 0,
-              usage.output_tokens ?? 0,
-            );
-            yield {
-              type: StreamEventType.METADATA,
-              content: "cost_update",
-              metadata: {
-                threadId: conversationId,
-                status: "cost_update",
-                costData,
-              },
-            };
-          }
-
-          if (message.type === "tool" || message.name) {
-            const toolName = message.name || "unknown";
-            const toolActivity = ctx.pendingToolCalls.get(toolName);
-
-            if (toolActivity) {
-              toolActivity.status = "completed";
-              toolActivity.endTime = Date.now();
-              toolActivity.result = {
-                summary: this.summarizeToolResult(message.content, toolName),
-                itemCount: this.countResultItems(message.content),
-              };
-
-              span.addEvent("tool_end", {
-                "tool.name": toolName,
-                "tool.result_summary": toolActivity.result.summary,
-                "node.name": nodeName,
-                duration_ms: toolActivity.endTime - toolActivity.startTime,
-              });
-
-              // End the child span for this tool
-              const toolSpans = (ctx as any).__toolSpans as
-                | Map<string, Span>
-                | undefined;
-              const toolSpan = toolSpans?.get(toolName);
-              if (toolSpan) {
-                toolSpan.setAttribute(
-                  "tool.result_summary",
-                  toolActivity.result.summary ?? "",
+              // Record LLM usage on the node span for per-node token visibility
+              if (nodeSpan) {
+                nodeSpan.setAttribute("gen_ai.system", providerName);
+                nodeSpan.setAttribute("gen_ai.request.model", currentModelName);
+                nodeSpan.setAttribute(
+                  "gen_ai.usage.input_tokens",
+                  usage.input_tokens ?? 0,
                 );
-                toolSpan.setAttribute(
-                  "tool.duration_ms",
-                  toolActivity.endTime! - toolActivity.startTime,
+                nodeSpan.setAttribute(
+                  "gen_ai.usage.output_tokens",
+                  usage.output_tokens ?? 0,
                 );
-                toolSpan.setStatus({ code: SpanStatusCode.OK });
-                toolSpan.end();
-                toolSpans!.delete(toolName);
+                nodeSpan.setAttribute(
+                  "gen_ai.usage.total_tokens",
+                  (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
+                );
               }
 
+              const costData = costTracker.recordUsage(
+                conversationId,
+                providerName,
+                currentModelName,
+                usage.input_tokens ?? 0,
+                usage.output_tokens ?? 0,
+              );
               yield {
-                type: StreamEventType.TOOL_END,
-                content: JSON.stringify(toolActivity),
+                type: StreamEventType.METADATA,
+                content: "cost_update",
                 metadata: {
-                  toolName,
-                  node: nodeName,
-                  duration: toolActivity.endTime - toolActivity.startTime,
+                  threadId: conversationId,
+                  status: "cost_update",
+                  costData,
                 },
               };
+            }
 
-              yield {
-                type: StreamEventType.WORKING,
-                content: `Finished ${this.getToolInfo(toolName).name} and processing results...`,
-                metadata: {
-                  toolName,
-                  node: nodeName,
-                  result: toolActivity.result?.summary,
-                  timestamp: Date.now(),
-                },
+            if (message.type === "tool" || message.name) {
+              const toolName = message.name || "unknown";
+              const toolActivity = ctx.pendingToolCalls.get(toolName);
+
+              if (toolActivity) {
+                toolActivity.status = "completed";
+                toolActivity.endTime = Date.now();
+                toolActivity.result = {
+                  summary: this.summarizeToolResult(message.content, toolName),
+                  itemCount: this.countResultItems(message.content),
+                };
+
+                span.addEvent("tool_end", {
+                  "tool.name": toolName,
+                  "tool.result_summary": toolActivity.result.summary,
+                  "node.name": nodeName,
+                  duration_ms: toolActivity.endTime - toolActivity.startTime,
+                });
+
+                // End the child span for this tool
+                const toolSpan = ctx.toolSpans.get(toolName);
+                if (toolSpan) {
+                  toolSpan.setAttribute(
+                    "tool.result_summary",
+                    toolActivity.result.summary ?? "",
+                  );
+                  toolSpan.setAttribute(
+                    "tool.duration_ms",
+                    toolActivity.endTime! - toolActivity.startTime,
+                  );
+                  toolSpan.setStatus({ code: SpanStatusCode.OK });
+                  toolSpan.end();
+                  ctx.toolSpans.delete(toolName);
+                }
+
+                yield {
+                  type: StreamEventType.TOOL_END,
+                  content: JSON.stringify(toolActivity),
+                  metadata: {
+                    toolName,
+                    node: nodeName,
+                    duration: toolActivity.endTime - toolActivity.startTime,
+                  },
+                };
+
+                yield {
+                  type: StreamEventType.WORKING,
+                  content: `Finished ${this.getToolInfo(toolName).name} and processing results...`,
+                  metadata: {
+                    toolName,
+                    node: nodeName,
+                    result: toolActivity.result?.summary,
+                    timestamp: Date.now(),
+                  },
+                };
+
+                ctx.pendingToolCalls.delete(toolName);
+              }
+            }
+          }
+
+          const lastMessage = update.messages[update.messages.length - 1];
+          if (lastMessage?.content && lastMessage.type !== "tool") {
+            const newContent = this.contentNormalizer.normalize(
+              lastMessage.content,
+            );
+            const delta = newContent.slice(ctx.accumulatedContent.length);
+            if (delta) {
+              ctx.accumulatedContent = newContent;
+              const chunkMeta: Record<string, unknown> = { node: nodeName };
+              if (lastMessage.type) {
+                chunkMeta.messageType = lastMessage.type;
+              }
+              streamManager.addChunk(delta, chunkMeta);
+
+              const chunkEvent = {
+                type: StreamEventType.CHUNK,
+                content: delta,
+                metadata: chunkMeta,
+                accumulated: ctx.accumulatedContent,
               };
-
-              ctx.pendingToolCalls.delete(toolName);
+              yield chunkEvent;
+              onChunk?.(chunkEvent);
             }
           }
         }
 
-        const lastMessage = update.messages[update.messages.length - 1];
-        if (lastMessage?.content && lastMessage.type !== "tool") {
-          const newContent = this.contentNormalizer.normalize(
-            lastMessage.content,
+        const toolCalls = this.collectToolCalls(update);
+        if (toolCalls.length > 0) {
+          yield* this.processToolCalls(
+            toolCalls,
+            nodeName,
+            ctx,
+            span,
+            streamManager,
+            limits,
+            childTracing,
           );
-          const delta = newContent.slice(ctx.accumulatedContent.length);
-          if (delta) {
-            ctx.accumulatedContent = newContent;
-            const chunkMeta: Record<string, unknown> = { node: nodeName };
-            if (lastMessage.type) {
-              chunkMeta.messageType = lastMessage.type;
-            }
-            streamManager.addChunk(delta, chunkMeta);
-
-            const chunkEvent = {
-              type: StreamEventType.CHUNK,
-              content: delta,
-              metadata: chunkMeta,
-              accumulated: ctx.accumulatedContent,
-            };
-            yield chunkEvent;
-            onChunk?.(chunkEvent);
+          if (ctx.hasErrored) {
+            nodeSpan?.setStatus({ code: SpanStatusCode.ERROR });
+            return;
           }
         }
-      }
 
-      const toolCalls = this.collectToolCalls(update);
-      if (toolCalls.length > 0) {
-        yield* this.processToolCalls(
-          toolCalls,
-          nodeName,
-          ctx,
-          span,
-          streamManager,
-          limits,
-          tracer,
-          nodeCtx,
-        );
-        if (ctx.hasErrored) {
-          nodeSpan?.setStatus({ code: SpanStatusCode.ERROR });
-          nodeSpan?.end();
-          return;
-        }
+        nodeSpan?.setStatus({ code: SpanStatusCode.OK });
+      } catch (err) {
+        nodeSpan?.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      } finally {
+        nodeSpan?.end();
       }
-
-      // End the node span
-      nodeSpan?.setStatus({ code: SpanStatusCode.OK });
-      nodeSpan?.end();
     }
   }
 
@@ -1362,8 +1468,7 @@ export class CodeBuddyAgentService {
     span: Span,
     streamManager: StreamManager,
     limits: AgentSafetyLimits,
-    tracer?: ReturnType<typeof trace.getTracer>,
-    parentCtx?: ReturnType<typeof context.active>,
+    tracing?: TraceBundle,
   ): AsyncGenerator<IStreamEvent> {
     this.logger.debug(
       `[STREAM] Tool calls detected: ${toolCalls.length} tools - ${toolCalls.map((tc) => tc.name).join(", ")}`,
@@ -1494,26 +1599,22 @@ export class CodeBuddyAgentService {
       ctx.pendingToolCalls.set(toolCall.name, toolActivity);
 
       // Create a child span for this tool invocation
-      const toolSpan =
-        tracer && parentCtx
-          ? tracer.startSpan(
-              `tool:${toolCall.name}`,
-              {
-                attributes: {
-                  "tool.name": toolCall.name,
-                  "tool.args": JSON.stringify(toolCall.args).substring(0, 1000),
-                  "node.name": nodeName,
-                  "tool.is_middleware": isMiddlewareNode,
-                },
+      const toolSpan = tracing
+        ? tracing.tracer.startSpan(
+            `tool:${toolCall.name}`,
+            {
+              attributes: {
+                "tool.name": toolCall.name,
+                "tool.args": JSON.stringify(toolCall.args).substring(0, 1000),
+                "node.name": nodeName,
+                "tool.is_middleware": isMiddlewareNode,
               },
-              parentCtx,
-            )
-          : undefined;
+            },
+            tracing.parentCtx,
+          )
+        : undefined;
       if (toolSpan) {
-        // Store the span so it can be ended when the tool result arrives
-        (ctx as any).__toolSpans =
-          (ctx as any).__toolSpans || new Map<string, Span>();
-        (ctx as any).__toolSpans.set(toolCall.name, toolSpan);
+        ctx.toolSpans.set(toolCall.name, toolSpan);
       }
 
       span.addEvent("tool_start", {
@@ -1612,11 +1713,23 @@ export class CodeBuddyAgentService {
 
     // Enrich root span with final cost/token data
     if (finalCost) {
-      span.setAttribute("cost.total_usd", finalCost.estimatedCostUSD ?? 0);
-      span.setAttribute("cost.input_tokens", finalCost.inputTokens ?? 0);
-      span.setAttribute("cost.output_tokens", finalCost.outputTokens ?? 0);
-      span.setAttribute("cost.total_tokens", finalCost.totalTokens ?? 0);
-      span.setAttribute("cost.request_count", finalCost.requestCount ?? 0);
+      span.setAttribute("gen_ai.usage.cost", finalCost.estimatedCostUSD ?? 0);
+      span.setAttribute(
+        "gen_ai.usage.input_tokens",
+        finalCost.inputTokens ?? 0,
+      );
+      span.setAttribute(
+        "gen_ai.usage.output_tokens",
+        finalCost.outputTokens ?? 0,
+      );
+      span.setAttribute(
+        "gen_ai.usage.total_tokens",
+        finalCost.totalTokens ?? 0,
+      );
+      span.setAttribute(
+        "gen_ai.usage.request_count",
+        finalCost.requestCount ?? 0,
+      );
     }
 
     yield {

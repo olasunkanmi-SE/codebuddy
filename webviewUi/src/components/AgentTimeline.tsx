@@ -244,7 +244,7 @@ const ResultRow = styled.div`
   gap: 8px;
   font-size: 12px;
   color: var(--vscode-foreground, rgba(255, 255, 255, 0.8));
-  animation: ${() => pulse} 1.6s ease-in-out infinite;
+  animation: ${pulse} 1.6s ease-in-out infinite;
 `;
 
 const Empty = styled.div`
@@ -264,8 +264,8 @@ const formatLabel = (action: AgentTimelineState["actions"][number]) => {
   return action.type.charAt(0).toUpperCase() + action.type.slice(1);
 };
 
-const statusText = (s: string) =>
-  s === "completed" ? "done" : s === "failed" ? "fail" : "";
+const statusText = (s: string): string | null =>
+  s === "completed" ? "done" : s === "failed" ? "fail" : null;
 
 export const AgentTimeline: React.FC<AgentTimelineProps> = ({
   timeline,
