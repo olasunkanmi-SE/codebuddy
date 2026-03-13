@@ -6,6 +6,7 @@ import {
   ReadableSpan,
 } from "@opentelemetry/sdk-trace-base";
 import { Logger, LogLevel } from "../logger/logger";
+import { TelemetryPersistenceService } from "./telemetry-persistence.service";
 
 /**
  * LocalObservabilityService manages local-only telemetry for the AI Agent.
@@ -62,6 +63,14 @@ export class LocalObservabilityService {
             `[TELEMETRY] Attributes: ${JSON.stringify(span.attributes)}`,
           );
         }
+
+        // Persist span to SQLite for cross-session retention
+        try {
+          TelemetryPersistenceService.getInstance().recordSpan(span);
+        } catch {
+          // Non-fatal — in-memory buffer still works
+        }
+
         return originalOnEnd(span);
       };
 

@@ -8,7 +8,10 @@ export class ObservabilityHandler implements WebviewMessageHandler {
     "observability-get-logs",
     "observability-get-metrics",
     "observability-get-traces",
+    "observability-get-persisted-traces",
+    "observability-get-sessions",
     "observability-clear-traces",
+    "observability-clear-persisted-traces",
     "observability-send-test-trace",
     "get-dependency-graph",
   ];
@@ -69,6 +72,40 @@ export class ObservabilityHandler implements WebviewMessageHandler {
         ObservabilityService.getInstance().clearTraces();
         await ctx.webview.webview.postMessage({
           type: "observability-traces",
+          traces: [],
+        });
+        break;
+      }
+
+      case "observability-get-persisted-traces": {
+        const persistedTraces =
+          ObservabilityService.getInstance().getPersistedTraces(
+            message.days,
+            message.limit,
+          );
+        ctx.logger.debug(
+          `[WEBVIEW] Sending ${persistedTraces.length} persisted traces to webview`,
+        );
+        await ctx.webview.webview.postMessage({
+          type: "observability-persisted-traces",
+          traces: persistedTraces,
+        });
+        break;
+      }
+
+      case "observability-get-sessions": {
+        const sessions = ObservabilityService.getInstance().getSessions();
+        await ctx.webview.webview.postMessage({
+          type: "observability-sessions",
+          sessions,
+        });
+        break;
+      }
+
+      case "observability-clear-persisted-traces": {
+        ObservabilityService.getInstance().clearPersistedTraces();
+        await ctx.webview.webview.postMessage({
+          type: "observability-persisted-traces",
           traces: [],
         });
         break;

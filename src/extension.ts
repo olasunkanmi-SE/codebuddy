@@ -24,6 +24,7 @@ import { ReviewCode } from "./commands/review";
 import { EventEmitter } from "./emitter/publisher";
 import { Logger, LogLevel } from "./infrastructure/logger/logger";
 import { LocalObservabilityService } from "./infrastructure/observability/telemetry";
+import { TelemetryPersistenceService } from "./infrastructure/observability/telemetry-persistence.service";
 import { setupInstrumentation } from "./instrumentation"; // Moved call to tail end
 import { Memory } from "./memory/base";
 import { Orchestrator } from "./orchestrator";
@@ -1012,6 +1013,14 @@ export async function activate(context: vscode.ExtensionContext) {
     try {
       setupInstrumentation();
       await LocalObservabilityService.getInstance().initialize();
+
+      // Initialize telemetry persistence (SQLite-backed cross-session retention)
+      const persistEnabled = vscode.workspace
+        .getConfiguration("codebuddy.telemetry")
+        .get<boolean>("persistTraces", true);
+      if (persistEnabled) {
+        await TelemetryPersistenceService.getInstance().initialize();
+      }
     } catch (obsError) {
       logger.error("Failed to initialize observability:", obsError);
     }
@@ -1109,6 +1118,13 @@ export function deactivate(context: vscode.ExtensionContext) {
 
   // Dispose agent service (clears caches, ends streams, unsubscribes events)
   CodeBuddyAgentService.getInstance().dispose();
+
+  // Flush and close telemetry persistence
+  try {
+    TelemetryPersistenceService.getInstance().shutdown();
+  } catch (error) {
+    console.warn("Error shutting down telemetry persistence:", error);
+  }
 
   context.subscriptions.forEach((subscription) => subscription.dispose());
 
