@@ -7,7 +7,7 @@ import createDOMPurify from "dompurify";
 import { EnhancedCacheManager } from "./enhanced-cache-manager.service";
 
 /** Escape HTML special characters for safe interpolation into templates. */
-function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -17,7 +17,7 @@ function escapeHtml(str: string): string {
 }
 
 /** Escape a string for safe inclusion in a JavaScript single-quoted string literal. */
-function escapeJsString(str: string): string {
+export function escapeJsString(str: string): string {
   return str
     .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'")

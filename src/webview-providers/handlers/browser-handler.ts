@@ -28,7 +28,7 @@ const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 const BLOCKED_HOSTNAMES =
   /^(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|::1|0\.0\.0\.0)/i;
 
-function validateArticleUrl(rawUrl: string): URL {
+export function validateArticleUrl(rawUrl: string): URL {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -50,7 +50,7 @@ function validateArticleUrl(rawUrl: string): URL {
 // ── Content Length Guard ────────────────────────────────────────────────────
 const MAX_LLM_CHARS = 12_000;
 
-function truncateForLLM(text: string, maxChars = MAX_LLM_CHARS): string {
+export function truncateForLLM(text: string, maxChars = MAX_LLM_CHARS): string {
   if (text.length <= maxChars) return text;
 
   const head = Math.floor(maxChars * 0.8);
@@ -67,7 +67,7 @@ function truncateForLLM(text: string, maxChars = MAX_LLM_CHARS): string {
  * Sanitize article content before passing to LLM context to defend against
  * prompt injection attacks embedded in scraped web content.
  */
-function sanitizeForLLMContext(text: string): string {
+export function sanitizeForLLMContext(text: string): string {
   let sanitized = text;
 
   // Strip common prompt injection patterns
@@ -115,7 +115,7 @@ async function getDOMPurify() {
   return _domPurify;
 }
 
-async function sanitizeHtmlContent(html: string): Promise<string> {
+export async function sanitizeHtmlContent(html: string): Promise<string> {
   const DOMPurify = await getDOMPurify();
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
