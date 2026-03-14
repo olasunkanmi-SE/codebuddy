@@ -44,6 +44,8 @@ import { ObservabilityService } from "../services/observability.service";
 import { ChatHistoryPruningService } from "../services/chat-history-pruning.service";
 import { ContextEnhancementService } from "../services/context-enhancement.service";
 import { ProviderFailoverService } from "../services/provider-failover.service";
+import type { IProviderFactory } from "./provider-factory.interface";
+import { type ProviderKey, toProviderKey } from "./provider-name";
 import {
   BrowserHandler,
   ComposerHandler,
@@ -75,18 +77,26 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   public static webView: vscode.WebviewView | undefined;
   public currentWebView: vscode.WebviewView | undefined;
 
-  /**
-   * Factory callback set by WebViewProviderManager to create temporary
-   * provider instances for Ask-mode failover without circular imports.
-   */
-  static providerFactory?: (
-    providerName: string,
-    apiKey: string,
-    model: string,
-  ) => BaseWebViewProvider | undefined;
+  private static readonly AGENT_ID = "agentId" as const;
 
-  /** The provider registry key (e.g. "Groq", "Anthropic") for this instance. */
-  public providerName?: string;
+  /** Injected by WebViewProviderManager after construction. */
+  private providerFactory?: IProviderFactory;
+
+  /** Normalised provider key for this instance. */
+  private _providerKey?: ProviderKey;
+
+  set providerName(name: string | undefined) {
+    this._providerKey = name ? toProviderKey(name) : undefined;
+  }
+
+  get providerName(): string | undefined {
+    return this._providerKey;
+  }
+
+  /** Called once by WebViewProviderManager after construction. */
+  setProviderFactory(factory: IProviderFactory): void {
+    this.providerFactory = factory;
+  }
   _context: vscode.ExtensionContext;
   protected logger: Logger;
   private readonly disposables: vscode.Disposable[] = [];
@@ -894,193 +904,32 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                 }
 
                 // Record success for failover health tracking
-                if (this.providerName) {
+                if (this._providerKey) {
                   ProviderFailoverService.getInstance().recordSuccess(
-                    this.providerName.toLowerCase(),
+                    this._providerKey,
                   );
                 }
 
-                // Ensure we have a session for saving messages
-                if (!this.currentSessionId) {
-                  // Auto-generate a title from the first user message
-                  const title =
-                    sanitizedMessage.length > 50
-                      ? sanitizedMessage.substring(0, 47) + "..."
-                      : sanitizedMessage;
-                  this.currentSessionId = await this.agentService.createSession(
-                    "agentId",
-                    title,
-                  );
-                  // Notify webview about the new session
-                  const sessions =
-                    await this.agentService.getSessions("agentId");
-                  await this.currentWebView?.webview.postMessage({
-                    type: "session-created",
-                    sessionId: this.currentSessionId,
-                    sessions,
-                  });
-                }
-
-                // Save chat history to database with current session
-                await this.agentService.addChatMessage("agentId", {
-                  content: sanitizedMessage,
-                  type: "user",
-                  sessionId: this.currentSessionId,
-                });
-
-                await this.agentService.addChatMessage("agentId", {
-                  content: fullResponse,
-                  type: "model",
-                  sessionId: this.currentSessionId,
-                });
+                await this.persistChatExchange(sanitizedMessage, fullResponse);
               } catch (error: unknown) {
                 const err =
                   error instanceof Error ? error : new Error(String(error));
 
-                // ── Ask-mode Provider Failover ─────────────────────
-                const failoverEnabled = vscode.workspace
-                  .getConfiguration("codebuddy.failover")
-                  .get<boolean>("enabled", true);
+                const failoverHandled = await this.tryAskModeFailover({
+                  err,
+                  requestId,
+                  sanitizedMessage,
+                  messageAndSystemInstruction,
+                  metaData: message.metaData,
+                });
 
-                const primaryProvider = this.providerName?.toLowerCase();
-
-                if (
-                  failoverEnabled &&
-                  primaryProvider &&
-                  BaseWebViewProvider.providerFactory
-                ) {
-                  const failoverService = ProviderFailoverService.getInstance();
-                  const reason = failoverService.recordFailure(
-                    primaryProvider,
-                    err,
-                  );
-
-                  if (failoverService.shouldFailover(reason)) {
-                    try {
-                      const resolved =
-                        failoverService.resolveProvider(primaryProvider);
-
-                      if (resolved.isFallback) {
-                        this.logger.info(
-                          `[Ask Failover] Switching from "${primaryProvider}" to "${resolved.provider}" (reason: ${reason})`,
-                        );
-
-                        // Notify user about the switch
-                        await this.currentWebView?.webview.postMessage({
-                          type: "onStreamChunk",
-                          payload: {
-                            requestId,
-                            content: `\n\n> Switching to **${resolved.provider}** due to ${reason.replace(/_/g, " ")} on ${primaryProvider}...\n\n`,
-                          },
-                        });
-
-                        // Create a temporary provider and stream the response
-                        const fallbackProvider =
-                          BaseWebViewProvider.providerFactory(
-                            resolved.provider,
-                            resolved.apiKey,
-                            resolved.model || "",
-                          );
-
-                        if (fallbackProvider) {
-                          try {
-                            fullResponse = "";
-                            for await (const chunk of fallbackProvider.streamResponse(
-                              messageAndSystemInstruction,
-                              message.metaData,
-                            )) {
-                              fullResponse += chunk;
-                              await this.currentWebView?.webview.postMessage({
-                                type: "onStreamChunk",
-                                payload: { requestId, content: chunk },
-                              });
-                            }
-
-                            failoverService.recordSuccess(resolved.provider);
-
-                            // Save chat history with fallback response
-                            if (!this.currentSessionId) {
-                              const title =
-                                sanitizedMessage.length > 50
-                                  ? sanitizedMessage.substring(0, 47) + "..."
-                                  : sanitizedMessage;
-                              this.currentSessionId =
-                                await this.agentService.createSession(
-                                  "agentId",
-                                  title,
-                                );
-                              const sessions =
-                                await this.agentService.getSessions("agentId");
-                              await this.currentWebView?.webview.postMessage({
-                                type: "session-created",
-                                sessionId: this.currentSessionId,
-                                sessions,
-                              });
-                            }
-
-                            await this.agentService.addChatMessage("agentId", {
-                              content: sanitizedMessage,
-                              type: "user",
-                              sessionId: this.currentSessionId,
-                            });
-                            await this.agentService.addChatMessage("agentId", {
-                              content: fullResponse,
-                              type: "model",
-                              sessionId: this.currentSessionId,
-                            });
-
-                            // Dispose the temporary provider
-                            fallbackProvider.dispose();
-
-                            // Skip the error path — failover succeeded
-                            // Jump to the response formatting below
-                            if (fullResponse) {
-                              this.logger.info(
-                                `[Ask Failover] Response from ${resolved.provider}: ${fullResponse.length} characters`,
-                              );
-                              const formattedResponse =
-                                formatText(fullResponse);
-                              await this.sendResponse(formattedResponse, "bot");
-                              await this.currentWebView?.webview.postMessage({
-                                type: "onStreamEnd",
-                                payload: {
-                                  requestId,
-                                  content: formattedResponse,
-                                },
-                              });
-                            }
-                            return;
-                          } catch (fallbackError: unknown) {
-                            fallbackProvider.dispose();
-                            this.logger.error(
-                              `[Ask Failover] Fallback to "${resolved.provider}" also failed`,
-                              fallbackError,
-                            );
-                            failoverService.recordFailure(
-                              resolved.provider,
-                              fallbackError,
-                            );
-                            // Fall through to original error handling
-                          }
-                        }
-                      }
-                    } catch (resolveError: unknown) {
-                      this.logger.error(
-                        "[Ask Failover] Failed to resolve fallback provider",
-                        resolveError,
-                      );
-                      // Fall through to original error handling
-                    }
-                  }
-                }
+                if (failoverHandled) return;
 
                 // ── Original error handling ────────────────────────
-                let streamErrorMessage =
+                const streamErrorMessage =
+                  err.message ||
                   "An error occurred while generating a response";
-                if (err.message) {
-                  streamErrorMessage = err.message;
-                }
-                this.logger.error("Error during streaming", error);
+                this.logger.error("Error during streaming", err);
                 await this.currentWebView?.webview.postMessage({
                   type: "onStreamError",
                   payload: { requestId, error: streamErrorMessage },
@@ -1307,6 +1156,244 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
     } catch (error) {
       this.logger.error("synchronizeNotifications failed", error);
     }
+  }
+
+  // ── Ask-Mode Failover ─────────────────────────────────────
+
+  private isFailoverEnabled(): boolean {
+    return (
+      vscode.workspace
+        .getConfiguration("codebuddy.failover")
+        .get<boolean>("enabled", true) ?? true
+    );
+  }
+
+  /**
+   * Attempt Ask-mode provider failover after a stream error.
+   * Returns `true` if failover succeeded (caller should return early).
+   */
+  private async tryAskModeFailover(ctx: {
+    err: Error;
+    requestId: string;
+    sanitizedMessage: string;
+    messageAndSystemInstruction: LLMMessage;
+    metaData?: any;
+  }): Promise<boolean> {
+    const {
+      err,
+      requestId,
+      sanitizedMessage,
+      messageAndSystemInstruction,
+      metaData,
+    } = ctx;
+
+    if (
+      !this.isFailoverEnabled() ||
+      !this._providerKey ||
+      !this.providerFactory
+    ) {
+      return false;
+    }
+
+    const primaryProvider = this._providerKey;
+    const failoverService = ProviderFailoverService.getInstance();
+    const reason = failoverService.recordFailure(primaryProvider, err);
+
+    if (!failoverService.shouldFailover(reason)) {
+      return false;
+    }
+
+    let resolved: ReturnType<typeof failoverService.resolveProvider>;
+    try {
+      resolved = failoverService.resolveProvider(primaryProvider);
+    } catch (resolveError: unknown) {
+      this.logger.error(
+        "[Ask Failover] Failed to resolve fallback provider",
+        resolveError,
+      );
+      return false;
+    }
+
+    if (!resolved.isFallback) {
+      return false;
+    }
+
+    this.logger.info(
+      `[Ask Failover] ${primaryProvider} → ${resolved.provider} (reason: ${reason})`,
+    );
+
+    // Notify the user about the switch
+    await this.currentWebView?.webview.postMessage({
+      type: "onStreamChunk",
+      payload: {
+        requestId,
+        content: `\n\n> Switching to **${resolved.provider}** due to ${reason.replace(/_/g, " ")} on ${primaryProvider}...\n\n`,
+      },
+    });
+
+    const fallback = this.createFallbackProvider(resolved);
+    if (!fallback) {
+      return false;
+    }
+
+    try {
+      const response = await this.streamFromFallback(
+        fallback,
+        requestId,
+        messageAndSystemInstruction,
+        metaData,
+      );
+
+      failoverService.recordSuccess(resolved.provider);
+      await this.persistChatExchange(sanitizedMessage, response);
+      await this.sendFormattedStreamEnd(requestId, response);
+      return true;
+    } catch (fallbackError: unknown) {
+      const fallbackErr =
+        fallbackError instanceof Error
+          ? fallbackError
+          : new Error(String(fallbackError));
+
+      const fallbackReason = failoverService.recordFailure(
+        resolved.provider,
+        fallbackErr,
+      );
+
+      this.logger.error(
+        `[Ask Failover] Fallback "${resolved.provider}" failed (reason: ${fallbackReason})`,
+        { message: fallbackErr.message, primaryProvider },
+      );
+
+      // Surface to user: both providers failed
+      await this.currentWebView?.webview.postMessage({
+        type: "onStreamChunk",
+        payload: {
+          requestId,
+          content: `\n\n> ⚠️ Failover to **${resolved.provider}** also failed. Please check your configuration.\n\n`,
+        },
+      });
+
+      return false;
+    } finally {
+      fallback.dispose();
+    }
+  }
+
+  /**
+   * Validate and create a temporary fallback provider instance.
+   * Returns `undefined` if the resolved config is unusable.
+   */
+  private createFallbackProvider(resolved: {
+    provider: string;
+    apiKey: string;
+    model?: string;
+  }): BaseWebViewProvider | undefined {
+    if (!resolved.apiKey?.trim()) {
+      this.logger.warn(
+        `[Ask Failover] Cannot failover to "${resolved.provider}": API key is missing or empty`,
+      );
+      return undefined;
+    }
+
+    if (!resolved.provider?.trim()) {
+      this.logger.warn(
+        "[Ask Failover] Cannot failover: resolved provider name is empty",
+      );
+      return undefined;
+    }
+
+    return this.providerFactory?.createProviderByName(
+      resolved.provider,
+      resolved.apiKey,
+      resolved.model?.trim() || "",
+    );
+  }
+
+  /**
+   * Stream a response from a fallback provider, forwarding chunks to the UI.
+   */
+  private async streamFromFallback(
+    fallback: BaseWebViewProvider,
+    requestId: string,
+    messageAndSystemInstruction: LLMMessage,
+    metaData?: any,
+  ): Promise<string> {
+    let fullResponse = "";
+    for await (const chunk of fallback.streamResponse(
+      messageAndSystemInstruction,
+      metaData,
+    )) {
+      fullResponse += chunk;
+      await this.currentWebView?.webview.postMessage({
+        type: "onStreamChunk",
+        payload: { requestId, content: chunk },
+      });
+    }
+    return fullResponse;
+  }
+
+  // ── Session / History persistence ───────────────────────
+
+  /**
+   * Persist a user↔model exchange to the session history.
+   * Creates a new session if none exists yet.
+   */
+  private async persistChatExchange(
+    userMessage: string,
+    modelResponse: string,
+  ): Promise<void> {
+    if (!this.currentSessionId) {
+      const title =
+        userMessage.length > 50
+          ? `${userMessage.substring(0, 47)}...`
+          : userMessage;
+
+      this.currentSessionId = await this.agentService.createSession(
+        BaseWebViewProvider.AGENT_ID,
+        title,
+      );
+
+      const sessions = await this.agentService.getSessions(
+        BaseWebViewProvider.AGENT_ID,
+      );
+      await this.currentWebView?.webview.postMessage({
+        type: "session-created",
+        sessionId: this.currentSessionId,
+        sessions,
+      });
+    }
+
+    await this.agentService.addChatMessage(BaseWebViewProvider.AGENT_ID, {
+      content: userMessage,
+      type: "user",
+      sessionId: this.currentSessionId,
+    });
+
+    await this.agentService.addChatMessage(BaseWebViewProvider.AGENT_ID, {
+      content: modelResponse,
+      type: "model",
+      sessionId: this.currentSessionId,
+    });
+  }
+
+  /**
+   * Format a response and send the stream-end event to the webview.
+   */
+  private async sendFormattedStreamEnd(
+    requestId: string,
+    fullResponse: string,
+  ): Promise<void> {
+    if (!fullResponse) return;
+
+    this.logger.info(
+      `[Ask Failover] Response: ${fullResponse.length} characters`,
+    );
+    const formattedResponse = formatText(fullResponse);
+    await this.sendResponse(formattedResponse, "bot");
+    await this.currentWebView?.webview.postMessage({
+      type: "onStreamEnd",
+      payload: { requestId, content: formattedResponse },
+    });
   }
 
   abstract getTokenCounts(input: string): Promise<number>;
