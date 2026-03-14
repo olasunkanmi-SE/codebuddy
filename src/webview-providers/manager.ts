@@ -188,6 +188,21 @@ export class WebViewProviderManager implements vscode.Disposable {
     this.providerRegistry.set(generativeAiModels.QWEN, QwenWebViewProvider);
     this.providerRegistry.set(generativeAiModels.GLM, GLMWebViewProvider);
     this.providerRegistry.set(generativeAiModels.LOCAL, LocalWebViewProvider);
+
+    // Expose a factory for Ask-mode failover in BaseWebViewProvider.
+    // The failover service uses lowercase names, so do a case-insensitive registry lookup.
+    BaseWebViewProvider.providerFactory = (
+      providerName: string,
+      apiKey: string,
+      model: string,
+    ) => {
+      // Try exact match first, then case-insensitive lookup
+      const key =
+        [...this.providerRegistry.keys()].find(
+          (k) => k.toLowerCase() === providerName.toLowerCase(),
+        ) ?? providerName;
+      return this.createProvider(key, apiKey, model);
+    };
   }
 
   registerWebViewProvider(): vscode.Disposable | undefined {
@@ -266,6 +281,9 @@ export class WebViewProviderManager implements vscode.Disposable {
       }
       this.currentProvider = newProvider;
       this.activeProviderName = modelName;
+
+      // Tag the provider instance with its registry name for Ask-mode failover
+      newProvider.providerName = modelName;
       if (this.webviewView) {
         if (onload) {
           // First load — full HTML render

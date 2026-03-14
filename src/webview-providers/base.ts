@@ -43,6 +43,7 @@ import { ObservabilityService } from "../services/observability.service";
 
 import { ChatHistoryPruningService } from "../services/chat-history-pruning.service";
 import { ContextEnhancementService } from "../services/context-enhancement.service";
+import { ProviderFailoverService } from "../services/provider-failover.service";
 import {
   BrowserHandler,
   ComposerHandler,
@@ -73,6 +74,19 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
   public static readonly viewId = "chatView";
   public static webView: vscode.WebviewView | undefined;
   public currentWebView: vscode.WebviewView | undefined;
+
+  /**
+   * Factory callback set by WebViewProviderManager to create temporary
+   * provider instances for Ask-mode failover without circular imports.
+   */
+  static providerFactory?: (
+    providerName: string,
+    apiKey: string,
+    model: string,
+  ) => BaseWebViewProvider | undefined;
+
+  /** The provider registry key (e.g. "Groq", "Anthropic") for this instance. */
+  public providerName?: string;
   _context: vscode.ExtensionContext;
   protected logger: Logger;
   private readonly disposables: vscode.Disposable[] = [];
@@ -879,6 +893,13 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   });
                 }
 
+                // Record success for failover health tracking
+                if (this.providerName) {
+                  ProviderFailoverService.getInstance().recordSuccess(
+                    this.providerName.toLowerCase(),
+                  );
+                }
+
                 // Ensure we have a session for saving messages
                 if (!this.currentSessionId) {
                   // Auto-generate a title from the first user message
@@ -913,12 +934,151 @@ export abstract class BaseWebViewProvider implements vscode.Disposable {
                   sessionId: this.currentSessionId,
                 });
               } catch (error: unknown) {
+                const err =
+                  error instanceof Error ? error : new Error(String(error));
+
+                // ── Ask-mode Provider Failover ─────────────────────
+                const failoverEnabled = vscode.workspace
+                  .getConfiguration("codebuddy.failover")
+                  .get<boolean>("enabled", true);
+
+                const primaryProvider = this.providerName?.toLowerCase();
+
+                if (
+                  failoverEnabled &&
+                  primaryProvider &&
+                  BaseWebViewProvider.providerFactory
+                ) {
+                  const failoverService = ProviderFailoverService.getInstance();
+                  const reason = failoverService.recordFailure(
+                    primaryProvider,
+                    err,
+                  );
+
+                  if (failoverService.shouldFailover(reason)) {
+                    try {
+                      const resolved =
+                        failoverService.resolveProvider(primaryProvider);
+
+                      if (resolved.isFallback) {
+                        this.logger.info(
+                          `[Ask Failover] Switching from "${primaryProvider}" to "${resolved.provider}" (reason: ${reason})`,
+                        );
+
+                        // Notify user about the switch
+                        await this.currentWebView?.webview.postMessage({
+                          type: "onStreamChunk",
+                          payload: {
+                            requestId,
+                            content: `\n\n> Switching to **${resolved.provider}** due to ${reason.replace(/_/g, " ")} on ${primaryProvider}...\n\n`,
+                          },
+                        });
+
+                        // Create a temporary provider and stream the response
+                        const fallbackProvider =
+                          BaseWebViewProvider.providerFactory(
+                            resolved.provider,
+                            resolved.apiKey,
+                            resolved.model || "",
+                          );
+
+                        if (fallbackProvider) {
+                          try {
+                            fullResponse = "";
+                            for await (const chunk of fallbackProvider.streamResponse(
+                              messageAndSystemInstruction,
+                              message.metaData,
+                            )) {
+                              fullResponse += chunk;
+                              await this.currentWebView?.webview.postMessage({
+                                type: "onStreamChunk",
+                                payload: { requestId, content: chunk },
+                              });
+                            }
+
+                            failoverService.recordSuccess(resolved.provider);
+
+                            // Save chat history with fallback response
+                            if (!this.currentSessionId) {
+                              const title =
+                                sanitizedMessage.length > 50
+                                  ? sanitizedMessage.substring(0, 47) + "..."
+                                  : sanitizedMessage;
+                              this.currentSessionId =
+                                await this.agentService.createSession(
+                                  "agentId",
+                                  title,
+                                );
+                              const sessions =
+                                await this.agentService.getSessions("agentId");
+                              await this.currentWebView?.webview.postMessage({
+                                type: "session-created",
+                                sessionId: this.currentSessionId,
+                                sessions,
+                              });
+                            }
+
+                            await this.agentService.addChatMessage("agentId", {
+                              content: sanitizedMessage,
+                              type: "user",
+                              sessionId: this.currentSessionId,
+                            });
+                            await this.agentService.addChatMessage("agentId", {
+                              content: fullResponse,
+                              type: "model",
+                              sessionId: this.currentSessionId,
+                            });
+
+                            // Dispose the temporary provider
+                            fallbackProvider.dispose();
+
+                            // Skip the error path — failover succeeded
+                            // Jump to the response formatting below
+                            if (fullResponse) {
+                              this.logger.info(
+                                `[Ask Failover] Response from ${resolved.provider}: ${fullResponse.length} characters`,
+                              );
+                              const formattedResponse =
+                                formatText(fullResponse);
+                              await this.sendResponse(formattedResponse, "bot");
+                              await this.currentWebView?.webview.postMessage({
+                                type: "onStreamEnd",
+                                payload: {
+                                  requestId,
+                                  content: formattedResponse,
+                                },
+                              });
+                            }
+                            return;
+                          } catch (fallbackError: unknown) {
+                            fallbackProvider.dispose();
+                            this.logger.error(
+                              `[Ask Failover] Fallback to "${resolved.provider}" also failed`,
+                              fallbackError,
+                            );
+                            failoverService.recordFailure(
+                              resolved.provider,
+                              fallbackError,
+                            );
+                            // Fall through to original error handling
+                          }
+                        }
+                      }
+                    } catch (resolveError: unknown) {
+                      this.logger.error(
+                        "[Ask Failover] Failed to resolve fallback provider",
+                        resolveError,
+                      );
+                      // Fall through to original error handling
+                    }
+                  }
+                }
+
+                // ── Original error handling ────────────────────────
                 let streamErrorMessage =
                   "An error occurred while generating a response";
-                if (error instanceof Error) {
-                  streamErrorMessage = error.message;
-                } else if (typeof error === "string") {
-                  streamErrorMessage = error;
+                if (err.message) {
+                  streamErrorMessage = err.message;
                 }
                 this.logger.error("Error during streaming", error);
                 await this.currentWebView?.webview.postMessage({
