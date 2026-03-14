@@ -202,14 +202,21 @@ export class InlineReviewService implements vscode.Disposable {
 
   /**
    * Check whether the document has changed since the snapshot was taken.
+   * Does NOT require the document to be the active editor — we just verify
+   * the document version hasn't changed so line numbers are still valid.
    */
   static isContextStale(ctx: ReviewContext): boolean {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) return true;
-    return (
-      editor.document.uri.fsPath !== ctx.filePath ||
-      editor.document.version !== ctx.documentVersion
+    // Try to find the document in open text documents
+    const uri = vscode.Uri.file(ctx.filePath);
+    const doc = vscode.workspace.textDocuments.find(
+      (d) => d.uri.fsPath === uri.fsPath,
     );
+
+    // If doc not open, we can still create comments (they'll open it)
+    if (!doc) return false;
+
+    // Only stale if the document version changed (edits were made)
+    return doc.version !== ctx.documentVersion;
   }
 
   /**
@@ -244,6 +251,9 @@ export class InlineReviewService implements vscode.Disposable {
     }
 
     let threadCount = 0;
+    let firstUri: vscode.Uri | undefined;
+    let firstLine = 0;
+
     for (const fileReview of fileReviews) {
       if (threadCount >= InlineReviewService.MAX_THREADS) break;
 
@@ -262,6 +272,12 @@ export class InlineReviewService implements vscode.Disposable {
         const endLine = comment.endLine
           ? Math.max(0, comment.endLine - 1)
           : startLine;
+
+        // Track first comment location to open file
+        if (!firstUri) {
+          firstUri = uri;
+          firstLine = startLine;
+        }
 
         const range = new vscode.Range(startLine, 0, endLine, 0);
 
@@ -290,6 +306,30 @@ export class InlineReviewService implements vscode.Disposable {
     this.logger.info(
       `[InlineReview] Created ${this.threads.length} comment threads across ${fileReviews.length} file(s)`,
     );
+
+    // Open file and reveal first comment, then show Comments panel
+    if (firstUri && this.threads.length > 0) {
+      try {
+        const doc = await vscode.workspace.openTextDocument(firstUri);
+        const editor = await vscode.window.showTextDocument(doc, {
+          preview: false,
+          preserveFocus: false,
+        });
+        // Scroll to first comment
+        const position = new vscode.Position(firstLine, 0);
+        editor.revealRange(
+          new vscode.Range(position, position),
+          vscode.TextEditorRevealType.InCenter,
+        );
+        // Open the Comments panel to show all review comments
+        await vscode.commands.executeCommand("workbench.panel.comments.focus");
+      } catch (err) {
+        this.logger.warn(
+          "[InlineReview] Failed to open file with comments",
+          err,
+        );
+      }
+    }
   }
 
   /**
@@ -379,15 +419,31 @@ export class InlineReviewService implements vscode.Disposable {
   // ── URI Resolution ─────────────────────────────────────
 
   private resolveUri(filePath: string): vscode.Uri | undefined {
+    // Empty path — cannot resolve
+    if (!filePath || !filePath.trim()) {
+      return undefined;
+    }
+
+    const trimmed = filePath.trim();
+
     // Absolute paths (Unix and Windows)
-    if (filePath.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(filePath)) {
-      return vscode.Uri.file(filePath);
+    if (trimmed.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(trimmed)) {
+      return vscode.Uri.file(trimmed);
     }
 
     // Relative to workspace root
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders && workspaceFolders.length > 0) {
-      return vscode.Uri.joinPath(workspaceFolders[0].uri, filePath);
+      return vscode.Uri.joinPath(workspaceFolders[0].uri, trimmed);
+    }
+
+    // No workspace — try to find matching open document by filename
+    const fileName = trimmed.split(/[\\/]/).pop() ?? trimmed;
+    const matchingDoc = vscode.workspace.textDocuments.find((doc) =>
+      doc.uri.fsPath.endsWith(fileName),
+    );
+    if (matchingDoc) {
+      return matchingDoc.uri;
     }
 
     return undefined;
@@ -472,6 +528,8 @@ export class InlineReviewService implements vscode.Disposable {
 
   /**
    * Validate and normalise JSON-parsed review comment objects.
+   * If the JSON includes a `file` field, line numbers are assumed absolute.
+   * Otherwise, lineOffset is applied to convert selection-relative to absolute.
    */
   private static normalizeJsonComments(
     raw: RawJsonComment[],
@@ -481,12 +539,17 @@ export class InlineReviewService implements vscode.Disposable {
     const byFile = new Map<string, ReviewComment[]>();
 
     for (const item of raw) {
-      const line = InlineReviewService.sanitizeLine(item.line, lineOffset);
+      // If LLM provided file path, lines are already absolute (no offset)
+      // Otherwise, apply offset to convert selection-relative to absolute
+      const hasExplicitFile = typeof item.file === "string" && item.file.trim();
+      const effectiveOffset = hasExplicitFile ? 0 : lineOffset;
+
+      const line = InlineReviewService.sanitizeLine(item.line, effectiveOffset);
       if (line === null) continue;
 
       const endLine =
         typeof item.endLine === "number"
-          ? InlineReviewService.sanitizeLine(item.endLine, lineOffset)
+          ? InlineReviewService.sanitizeLine(item.endLine, effectiveOffset)
           : undefined;
 
       // Validate endLine >= line
@@ -495,10 +558,7 @@ export class InlineReviewService implements vscode.Disposable {
           ? endLine
           : undefined;
 
-      const fp =
-        typeof item.file === "string" && item.file.trim()
-          ? item.file.trim()
-          : defaultFilePath;
+      const fp = hasExplicitFile ? item.file!.trim() : defaultFilePath;
 
       const severity = InlineReviewService.normalizeSeverity(item.severity);
       const comment: ReviewComment = {

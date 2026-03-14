@@ -767,12 +767,22 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         return;
       }
 
+      // For review commands, prepend file context so LLM knows the file path
+      const isReviewCmd =
+        commandAction === CODEBUDDY_ACTIONS.review ||
+        commandAction === CODEBUDDY_ACTIONS.reviewPR;
+      let codeWithContext = selectedCode ?? "";
+      if (isReviewCmd && reviewContext && selectedCode) {
+        const startLine = reviewContext.selectionStartLine + 1; // 0-based to 1-based
+        codeWithContext = `File: ${reviewContext.filePath}\nStarting at line ${startLine}:\n\n${selectedCode}`;
+      }
+
       if (message && selectedCode) {
-        prompt = await this.createPrompt(`${message} \n ${selectedCode}`);
+        prompt = await this.createPrompt(`${message} \n ${codeWithContext}`);
       } else {
         message
           ? (prompt = await this.createPrompt(message))
-          : (prompt = await this.createPrompt(selectedCode));
+          : (prompt = await this.createPrompt(codeWithContext));
       }
 
       if (!prompt) {
@@ -847,46 +857,39 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       const isReviewCommand =
         commandAction === CODEBUDDY_ACTIONS.review ||
         commandAction === CODEBUDDY_ACTIONS.reviewPR;
-      const isPRReview = commandAction === CODEBUDDY_ACTIONS.reviewPR;
 
       if (InlineReviewService.isEnabled() && isReviewCommand) {
         try {
-          // For single-file reviews, require valid context and check staleness.
-          // For PR reviews, context is optional (LLM provides file paths in JSON).
-          if (!isPRReview && !reviewContext) {
-            this.logger.warn(
-              "[InlineReview] No active editor for single-file review; skipping inline comments",
-            );
-          } else if (
-            !isPRReview &&
+          // Use editor context if available, otherwise empty defaults.
+          // For PR reviews, the LLM provides absolute file paths in JSON.
+          // For single-file reviews, we use the captured context.
+          const defaultFilePath = reviewContext?.filePath ?? "";
+          const lineOffset = reviewContext?.selectionStartLine ?? 0;
+
+          // Check staleness only if we have context and doc was edited
+          if (
             reviewContext &&
             InlineReviewService.isContextStale(reviewContext)
           ) {
             this.logger.warn(
-              "[InlineReview] Document changed during review stream; skipping inline comments",
+              "[InlineReview] Document edited during review; line numbers may be off",
             );
-          } else {
-            // Use editor context for single-file reviews, empty defaults for PR reviews
-            const defaultFilePath = reviewContext?.filePath ?? "";
-            const lineOffset = isPRReview
-              ? 0
-              : (reviewContext?.selectionStartLine ?? 0);
+          }
 
-            const fileReviews = InlineReviewService.parseReviewMarkdown(
-              fullResponse,
-              defaultFilePath,
-              lineOffset,
-            );
-            if (fileReviews.length > 0) {
-              const inlineService = InlineReviewService.getInstance();
-              await inlineService.showReviewComments(fileReviews);
-              span.addEvent("inline_comments_shown", {
-                commentCount: fileReviews.reduce(
-                  (sum, f) => sum + f.comments.length,
-                  0,
-                ),
-              });
-            }
+          const fileReviews = InlineReviewService.parseReviewMarkdown(
+            fullResponse,
+            defaultFilePath,
+            lineOffset,
+          );
+          if (fileReviews.length > 0) {
+            const inlineService = InlineReviewService.getInstance();
+            await inlineService.showReviewComments(fileReviews);
+            span.addEvent("inline_comments_shown", {
+              commentCount: fileReviews.reduce(
+                (sum, f) => sum + f.comments.length,
+                0,
+              ),
+            });
           }
         } catch (inlineError: unknown) {
           this.logger.error(

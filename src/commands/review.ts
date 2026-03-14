@@ -129,19 +129,20 @@ After your full review, append a fenced JSON block with ALL identified issues so
 ${"```"}json
 // REVIEW_COMMENTS
 [
-  {"line": 45, "endLine": 47, "severity": "critical", "title": "SQL Injection vulnerability", "body": "Use parameterized queries instead of string interpolation."},
-  {"line": 23, "severity": "moderate", "title": "N+1 query problem", "body": "Batch the queries to reduce database round-trips."}
+  {"file": "/path/to/file.ts", "line": 45, "endLine": 47, "severity": "critical", "title": "SQL Injection vulnerability", "body": "Use parameterized queries instead of string interpolation."},
+  {"file": "/path/to/file.ts", "line": 23, "severity": "moderate", "title": "N+1 query problem", "body": "Batch the queries to reduce database round-trips."}
 ]
 ${"```"}
 
 Rules for the JSON block:
-- \`file\` (optional): relative file path if reviewing multiple files
-- \`line\` (required): 1-based line number in the reviewed code
-- \`endLine\` (optional): end line for multi-line issues
+- \`file\` (required): the FULL ABSOLUTE file path provided at the start of the code (e.g., /Users/.../file.ts)
+- \`line\` (required): 1-based line number in the ORIGINAL file (add the starting line offset to your relative line numbers)
+- \`endLine\` (optional): end line for multi-line issues (also absolute line number)
 - \`severity\` (required): "critical", "moderate", or "minor"
 - \`title\` (required): short issue label
 - \`body\` (required): explanation with fix suggestion
 - Include EVERY issue you identified, not just examples
+- IMPORTANT: Use the exact file path from "File:" at the top and add the starting line number to your line references
 
 ### **Mermaid SEQUENCE DIAGRAM for the overall flow**
 

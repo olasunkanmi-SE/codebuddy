@@ -35,6 +35,17 @@ const copyAssetsPlugin = {
           );
         });
       }
+
+      // Copy public static files (logo, etc.) to dist/webview/
+      const publicFiles = ["codebuddylogo.svg"];
+      const webviewDistSrc = path.join(__dirname, "webviewUi", "dist");
+      const webviewDestDir = path.join(__dirname, "dist", "webview");
+      for (const file of publicFiles) {
+        const srcPath = path.join(webviewDistSrc, file);
+        if (fs.existsSync(srcPath)) {
+          fs.copyFileSync(srcPath, path.join(webviewDestDir, file));
+        }
+      }
     });
   },
 };
