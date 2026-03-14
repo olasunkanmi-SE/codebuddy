@@ -12,6 +12,12 @@ import { LogLevel } from "../services/telemetry";
 import { Orchestrator } from "../orchestrator";
 import { generativeAiModels } from "../application/constant";
 import { ILlmConfig } from "../llms/interface";
+import {
+  TokenBudgetAllocator,
+  createAnalysisBudget,
+  RelevanceScoring,
+} from "../services/analyzers/token-budget";
+import { CodeSnippet } from "../services/codebase-analysis-worker";
 
 const orchestrator = Orchestrator.getInstance();
 
@@ -355,6 +361,514 @@ ${sanitizedQuestion}
   );
 }
 
+// ============================================================================
+// Type definitions for budget selection items
+// ============================================================================
+
+interface BudgetItem<T> {
+  data: T;
+  size: number;
+  priority: number;
+}
+
+interface DependencyData {
+  name: string;
+  version: string;
+}
+
+interface EndpointData {
+  method: string;
+  path: string;
+  file?: string;
+  line?: number;
+}
+
+interface ModelData {
+  name: string;
+  type: string;
+  file?: string;
+  extends?: string;
+  implements?: string[];
+  methods?: string[];
+  isExported?: boolean;
+}
+
+interface RelationshipData {
+  entity: string;
+  relatedEntities?: string[];
+}
+
+interface DirectoryData {
+  dir: string;
+  files: string[];
+}
+
+// ============================================================================
+// Section Generator Helpers (use TokenBudgetAllocator for intelligent limits)
+// ============================================================================
+
+function generateOverviewSection(analysis: any): string {
+  return [
+    `## Codebase Overview`,
+    `- **Total Files:** ${analysis.summary.totalFiles}`,
+    `- **Total Lines:** ${analysis.summary.totalLines}`,
+    `- **Complexity:** ${analysis.summary.complexity}`,
+    `- **Git Branch:** ${analysis.gitState?.branch || "unknown"}`,
+    `- **Last Analysis:** ${analysis.analysisMetadata?.createdAt || "unknown"}`,
+  ].join("\n");
+}
+
+function generateFrameworksSection(analysis: any): string {
+  const lines = [`## Frameworks & Technologies`];
+  if (analysis.frameworks?.length > 0) {
+    lines.push(analysis.frameworks.map((f: string) => `- ${f}`).join("\n"));
+  } else {
+    lines.push("No specific frameworks detected");
+  }
+  return lines.join("\n");
+}
+
+function generateLanguageSection(analysis: any): string {
+  const lines = [`## Language Distribution`];
+  const langDist = analysis.summary?.languageDistribution || {};
+  const sortedLangs = Object.entries(langDist).sort(
+    (a, b) => (b[1] as number) - (a[1] as number),
+  );
+  lines.push(
+    sortedLangs.map(([ext, count]) => `- ${ext}: ${count} files`).join("\n"),
+  );
+  return lines.join("\n");
+}
+
+function generateDependenciesSection(
+  analysis: any,
+  budget: TokenBudgetAllocator,
+  userQuestion?: string,
+): string {
+  const lines = [`## Key Dependencies`];
+  const deps = analysis.dependencies || {};
+  const depEntries = Object.entries(deps);
+
+  if (depEntries.length === 0) {
+    logger.debug("No dependencies found in analysis");
+    return lines.join("\n") + "\nNo dependencies found";
+  }
+
+  logger.debug(
+    `Processing ${depEntries.length} dependencies with budget allocator`,
+  );
+
+  // Use budget allocator for selection
+  const depItems: BudgetItem<DependencyData>[] = depEntries.map(
+    ([name, version]) => ({
+      data: { name, version: version as string },
+      size: `- ${name}: ${version}`.length + 1,
+      priority: scoreDependency(name, userQuestion),
+    }),
+  );
+
+  const selected = budget.selectWithinBudget<BudgetItem<DependencyData>>(
+    "dependencies",
+    depItems,
+    (item) => item.size,
+    (item) => item.priority,
+  );
+
+  logger.debug(
+    `Selected ${selected.length}/${depEntries.length} dependencies within budget`,
+  );
+
+  if (selected.length > 0) {
+    lines.push(
+      selected
+        .map((item) => `- ${item.data.name}: ${item.data.version}`)
+        .join("\n"),
+    );
+  } else {
+    lines.push("No dependencies found");
+  }
+  return lines.join("\n");
+}
+
+function scoreDependency(name: string, question?: string): number {
+  let score = 1;
+  const lowerName = name.toLowerCase();
+
+  // Important framework/library patterns
+  const importantDeps = [
+    "react",
+    "vue",
+    "angular",
+    "svelte",
+    "next",
+    "nuxt",
+    "express",
+    "fastify",
+    "nestjs",
+    "koa",
+    "hono",
+    "prisma",
+    "typeorm",
+    "mongoose",
+    "sequelize",
+    "drizzle",
+    "typescript",
+    "webpack",
+    "vite",
+    "esbuild",
+  ];
+  if (importantDeps.some((d) => lowerName.includes(d))) {
+    score += 3;
+  }
+
+  // Question relevance
+  if (question) {
+    const questionLower = question.toLowerCase();
+    if (questionLower.includes(lowerName)) {
+      score += 5;
+    }
+  }
+
+  return score;
+}
+
+function generateEndpointsSection(
+  analysis: any,
+  budget: TokenBudgetAllocator,
+  userQuestion?: string,
+): string {
+  const lines = [`## API Endpoints`];
+  const endpoints = analysis.apiEndpoints || [];
+
+  if (endpoints.length === 0) {
+    logger.debug("No API endpoints found in analysis");
+    return lines.join("\n") + "\nNo API endpoints detected";
+  }
+
+  logger.debug(
+    `Processing ${endpoints.length} API endpoints with budget allocator`,
+  );
+
+  // Use budget allocator for selection
+  const endpointItems: BudgetItem<EndpointData>[] = endpoints.map(
+    (ep: any) => ({
+      data: ep as EndpointData,
+      size:
+        `- **${ep.method}** \`${ep.path}\` → ${ep.file?.split("/").pop() || "unknown"}${ep.line ? `:${ep.line}` : ""}`
+          .length + 1,
+      priority: RelevanceScoring.scoreEndpoint(ep, userQuestion),
+    }),
+  );
+
+  const selected = budget.selectWithinBudget<BudgetItem<EndpointData>>(
+    "endpoints",
+    endpointItems,
+    (item) => item.size,
+    (item) => item.priority,
+  );
+
+  if (selected.length === 0) {
+    logger.debug("No endpoints selected within budget");
+    return lines.join("\n") + "\nNo API endpoints detected";
+  }
+
+  logger.debug(
+    `Selected ${selected.length}/${endpoints.length} endpoints within budget`,
+  );
+
+  // Group by base path
+  const grouped = new Map<string, EndpointData[]>();
+  for (const item of selected) {
+    const ep = item.data;
+    const basePath = ep.path.split("/").slice(0, 3).join("/") || "/";
+    if (!grouped.has(basePath)) grouped.set(basePath, []);
+    grouped.get(basePath)!.push(ep);
+  }
+
+  for (const [basePath, eps] of grouped) {
+    lines.push(`\n### ${basePath}`);
+    for (const ep of eps) {
+      const fileName = ep.file?.split("/").pop() || "unknown";
+      lines.push(
+        `- **${ep.method}** \`${ep.path}\` → ${fileName}${ep.line ? `:${ep.line}` : ""}`,
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function generateModelsSection(
+  analysis: any,
+  budget: TokenBudgetAllocator,
+  userQuestion?: string,
+): string {
+  const lines = [`## Data Models & Types`];
+  const models = analysis.dataModels || [];
+
+  if (models.length === 0) {
+    logger.debug("No data models found in analysis");
+    return lines.join("\n") + "\nNo data models detected";
+  }
+
+  logger.debug(`Processing ${models.length} data models with budget allocator`);
+
+  // Use budget allocator for selection
+  const modelItems: BudgetItem<ModelData>[] = models.map((model: any) => ({
+    data: model as ModelData,
+    size:
+      `- **${model.name}** (${model.file?.split("/").pop() || ""})`.length + 20,
+    priority: RelevanceScoring.scoreModel(model, userQuestion),
+  }));
+
+  const selected = budget.selectWithinBudget<BudgetItem<ModelData>>(
+    "models",
+    modelItems,
+    (item) => item.size,
+    (item) => item.priority,
+  );
+
+  if (selected.length === 0) {
+    logger.debug("No models selected within budget");
+    return lines.join("\n") + "\nNo data models detected";
+  }
+
+  logger.debug(
+    `Selected ${selected.length}/${models.length} models within budget`,
+  );
+
+  // Group by type
+  const classes = selected.filter((m) => m.data.type === "class");
+  const interfaces = selected.filter(
+    (m) => m.data.type === "interface" || m.data.type === "type",
+  );
+  const components = selected.filter((m) => m.data.type === "react_component");
+  const functions = selected.filter((m) => m.data.type === "function");
+
+  if (classes.length > 0) {
+    lines.push(`\n### Classes (${classes.length})`);
+    for (const item of classes) {
+      const cls = item.data;
+      const fileName = cls.file?.split("/").pop() || "";
+      let detail = `- **${cls.name}**`;
+      if (cls.extends) detail += ` extends ${cls.extends}`;
+      if (cls.implements?.length)
+        detail += ` implements ${cls.implements.join(", ")}`;
+      detail += ` (${fileName})`;
+      if (cls.methods?.length)
+        detail += `\n  - Methods: ${cls.methods.slice(0, 5).join(", ")}${cls.methods.length > 5 ? "..." : ""}`;
+      lines.push(detail);
+    }
+  }
+
+  if (interfaces.length > 0) {
+    lines.push(`\n### Interfaces & Types (${interfaces.length})`);
+    for (const item of interfaces) {
+      const iface = item.data;
+      const fileName = iface.file?.split("/").pop() || "";
+      lines.push(`- **${iface.name}** (${fileName})`);
+    }
+  }
+
+  if (components.length > 0) {
+    lines.push(`\n### React Components (${components.length})`);
+    for (const item of components) {
+      const comp = item.data;
+      const fileName = comp.file?.split("/").pop() || "";
+      lines.push(`- **${comp.name}** (${fileName})`);
+    }
+  }
+
+  if (
+    functions.length > 0 &&
+    functions.filter((f) => f.data.isExported).length > 0
+  ) {
+    lines.push(`\n### Exported Functions`);
+    for (const item of functions.filter((f) => f.data.isExported)) {
+      const fn = item.data;
+      const fileName = fn.file?.split("/").pop() || "";
+      lines.push(`- **${fn.name}** (${fileName})`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function generateSnippetsSection(
+  analysis: any,
+  budget: TokenBudgetAllocator,
+  userQuestion?: string,
+): string {
+  const codeSnippets: CodeSnippet[] = analysis.codeSnippets || [];
+  if (codeSnippets.length === 0) {
+    logger.debug("No code snippets found in analysis");
+    return "";
+  }
+
+  logger.debug(
+    `Processing ${codeSnippets.length} code snippets with budget allocator`,
+  );
+
+  const lines = [
+    `## Key Code Files`,
+    `_Showing important files for context._\n`,
+  ];
+
+  // Use budget allocator for selection with file scoring
+  const snippetItems: BudgetItem<CodeSnippet>[] = codeSnippets.map(
+    (snippet) => ({
+      data: snippet,
+      size: `### ${getRelativePath(snippet.file)}\n\`\`\`${snippet.language}\n${snippet.content}\n\`\`\`\n`
+        .length,
+      priority: RelevanceScoring.scoreFile(snippet.file, {
+        question: userQuestion,
+      }),
+    }),
+  );
+
+  const selected = budget.selectWithinBudget<BudgetItem<CodeSnippet>>(
+    "codeSnippets",
+    snippetItems,
+    (item) => item.size,
+    (item) => item.priority,
+  );
+
+  logger.debug(
+    `Selected ${selected.length}/${codeSnippets.length} code snippets within budget`,
+  );
+
+  for (const item of selected) {
+    const snippet = item.data;
+    const relativePath = getRelativePath(snippet.file);
+    lines.push(`### ${relativePath}`);
+    lines.push("```" + (snippet.language || "typescript"));
+
+    // Truncate if still too long using remaining budget
+    const remainingBudget = budget.getRemaining("codeSnippets");
+    const maxContentLen = Math.min(
+      snippet.content.length,
+      remainingBudget - 50,
+    );
+    if (snippet.content.length > maxContentLen && maxContentLen > 0) {
+      const truncatedLines = snippet.content
+        .substring(0, maxContentLen)
+        .split("\n");
+      lines.push(truncatedLines.join("\n"));
+      lines.push("// ... (truncated)");
+    } else {
+      lines.push(snippet.content);
+    }
+    lines.push("```");
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+function generateRelationshipsSection(
+  analysis: any,
+  budget: TokenBudgetAllocator,
+): string {
+  const relationships = analysis.domainRelationships || [];
+  if (relationships.length === 0) {
+    logger.debug("No domain relationships found in analysis");
+    return "";
+  }
+
+  logger.debug(
+    `Processing ${relationships.length} domain relationships with budget allocator`,
+  );
+
+  const lines = [`## Domain Relationships`];
+  const relItems: BudgetItem<RelationshipData>[] = relationships.map(
+    (rel: any) => ({
+      data: rel as RelationshipData,
+      size:
+        `- **${rel.entity}** → ${rel.relatedEntities?.join(", ") || "none"}`
+          .length + 1,
+      priority: 1,
+    }),
+  );
+
+  const selected = budget.selectWithinBudget<BudgetItem<RelationshipData>>(
+    "relationships",
+    relItems,
+    (item) => item.size,
+    (item) => item.priority,
+  );
+
+  logger.debug(
+    `Selected ${selected.length}/${relationships.length} relationships within budget`,
+  );
+
+  for (const item of selected) {
+    const rel = item.data;
+    lines.push(
+      `- **${rel.entity}** → ${rel.relatedEntities?.join(", ") || "none"}`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function generateFileStructureSection(
+  analysis: any,
+  budget: TokenBudgetAllocator,
+): string {
+  const files = analysis.files || [];
+  if (files.length === 0) {
+    logger.debug("No files found in analysis");
+    return `## Project Structure\nNo files analyzed`;
+  }
+
+  logger.debug(
+    `Processing ${files.length} files for project structure section`,
+  );
+
+  const lines = [`## Project Structure`];
+
+  // Group by directory
+  const byDir = new Map<string, string[]>();
+  for (const file of files) {
+    const dir = file.split("/").slice(0, -1).join("/") || ".";
+    if (!byDir.has(dir)) byDir.set(dir, []);
+    byDir.get(dir)!.push(file.split("/").pop());
+  }
+
+  // Create items for budget selection
+  const dirItems: BudgetItem<DirectoryData>[] = Array.from(byDir.entries()).map(
+    ([dir, dirFiles]) => ({
+      data: { dir, files: dirFiles },
+      size:
+        `- **${dir.split("/").slice(-2).join("/")}/** (${dirFiles.length} files)`
+          .length + 1,
+      priority: dirFiles.length, // More files = higher priority
+    }),
+  );
+
+  const selected = budget.selectWithinBudget<BudgetItem<DirectoryData>>(
+    "fileList",
+    dirItems,
+    (item) => item.size,
+    (item) => item.priority,
+  );
+
+  logger.debug(
+    `Selected ${selected.length}/${byDir.size} directories within budget`,
+  );
+
+  for (const item of selected) {
+    const shortDir =
+      item.data.dir.split("/").slice(-2).join("/") || item.data.dir;
+    lines.push(`- **${shortDir}/** (${item.data.files.length} files)`);
+    if (item.data.files.length <= 3) {
+      lines.push(`  - ${item.data.files.join(", ")}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
 /**
  * Create rich analysis context from persistent analysis data
  * Uses token budget allocation for optimal context utilization
@@ -362,259 +876,81 @@ ${sanitizedQuestion}
 function createContextFromAnalysis(
   analysis: any,
   userQuestion?: string,
+  totalBudgetChars: number = 32000,
 ): string {
+  logger.debug(
+    `Creating context from analysis with ${totalBudgetChars} char budget`,
+  );
+
+  const budget = createAnalysisBudget(totalBudgetChars);
+
+  // Add dependencies allocation (not in default budget)
+  budget.allocate("dependencies", 2000, 5);
+
   const sections: string[] = [];
 
   // === SECTION 1: Codebase Overview (always include) ===
-  sections.push(`## Codebase Overview`);
-  sections.push(`- **Total Files:** ${analysis.summary.totalFiles}`);
-  sections.push(`- **Total Lines:** ${analysis.summary.totalLines}`);
-  sections.push(`- **Complexity:** ${analysis.summary.complexity}`);
-  sections.push(`- **Git Branch:** ${analysis.gitState?.branch || "unknown"}`);
   sections.push(
-    `- **Last Analysis:** ${analysis.analysisMetadata?.createdAt || "unknown"}`,
+    budget.truncateToFit("overview", generateOverviewSection(analysis)),
   );
   sections.push("");
 
   // === SECTION 2: Frameworks & Technologies ===
-  sections.push(`## Frameworks & Technologies`);
-  if (analysis.frameworks?.length > 0) {
-    sections.push(analysis.frameworks.map((f: string) => `- ${f}`).join("\n"));
-  } else {
-    sections.push("No specific frameworks detected");
-  }
+  sections.push(
+    budget.truncateToFit("overview", generateFrameworksSection(analysis)),
+  );
   sections.push("");
 
   // === SECTION 3: Language Distribution ===
-  sections.push(`## Language Distribution`);
-  const langDist = analysis.summary?.languageDistribution || {};
-  const sortedLangs = Object.entries(langDist).sort(
-    (a, b) => (b[1] as number) - (a[1] as number),
-  );
   sections.push(
-    sortedLangs.map(([ext, count]) => `- ${ext}: ${count} files`).join("\n"),
+    budget.truncateToFit("overview", generateLanguageSection(analysis)),
   );
   sections.push("");
 
-  // === SECTION 4: Dependencies (prioritized) ===
-  sections.push(`## Key Dependencies`);
-  const deps = analysis.dependencies || {};
-  const depEntries = Object.entries(deps);
-  if (depEntries.length > 0) {
-    // Prioritize important dependencies
-    const importantDeps = [
-      "react",
-      "vue",
-      "angular",
-      "svelte",
-      "next",
-      "nuxt",
-      "express",
-      "fastify",
-      "nestjs",
-      "koa",
-      "hono",
-      "prisma",
-      "typeorm",
-      "mongoose",
-      "sequelize",
-      "typescript",
-      "webpack",
-      "vite",
-      "esbuild",
-    ];
-    const sorted = depEntries.sort((a, b) => {
-      const aImportant = importantDeps.some((d) =>
-        a[0].toLowerCase().includes(d),
-      )
-        ? 1
-        : 0;
-      const bImportant = importantDeps.some((d) =>
-        b[0].toLowerCase().includes(d),
-      )
-        ? 1
-        : 0;
-      return bImportant - aImportant;
-    });
-    sections.push(
-      sorted
-        .slice(0, 30)
-        .map(([name, version]) => `- ${name}: ${version}`)
-        .join("\n"),
-    );
-  } else {
-    sections.push("No dependencies found");
-  }
+  // === SECTION 4: Dependencies (prioritized with budget) ===
+  sections.push(generateDependenciesSection(analysis, budget, userQuestion));
   sections.push("");
 
-  // === SECTION 5: API Endpoints (detailed) ===
-  sections.push(`## API Endpoints`);
-  const endpoints = analysis.apiEndpoints || [];
-  if (endpoints.length > 0) {
-    // Group by base path
-    const grouped = new Map<string, any[]>();
-    for (const ep of endpoints) {
-      const basePath = ep.path.split("/").slice(0, 3).join("/") || "/";
-      if (!grouped.has(basePath)) grouped.set(basePath, []);
-      grouped.get(basePath)!.push(ep);
-    }
-
-    let endpointCount = 0;
-    for (const [basePath, eps] of grouped) {
-      if (endpointCount >= 25) break;
-      sections.push(`\n### ${basePath}`);
-      for (const ep of eps.slice(0, 8)) {
-        if (endpointCount >= 25) break;
-        const fileName = ep.file?.split("/").pop() || "unknown";
-        sections.push(
-          `- **${ep.method}** \`${ep.path}\` → ${fileName}${ep.line ? `:${ep.line}` : ""}`,
-        );
-        endpointCount++;
-      }
-    }
-  } else {
-    sections.push("No API endpoints detected");
-  }
+  // === SECTION 5: API Endpoints (using budget) ===
+  sections.push(generateEndpointsSection(analysis, budget, userQuestion));
   sections.push("");
 
-  // === SECTION 6: Data Models (detailed) ===
-  sections.push(`## Data Models & Types`);
-  const models = analysis.dataModels || [];
-  if (models.length > 0) {
-    // Group by type
-    const classes = models.filter((m: any) => m.type === "class");
-    const interfaces = models.filter(
-      (m: any) => m.type === "interface" || m.type === "type",
-    );
-    const components = models.filter((m: any) => m.type === "react_component");
-    const functions = models.filter((m: any) => m.type === "function");
-    const others = models.filter(
-      (m: any) =>
-        !["class", "interface", "type", "react_component", "function"].includes(
-          m.type,
-        ),
-    );
-
-    if (classes.length > 0) {
-      sections.push(`\n### Classes (${classes.length})`);
-      for (const cls of classes.slice(0, 10)) {
-        const fileName = cls.file?.split("/").pop() || "";
-        let detail = `- **${cls.name}**`;
-        if (cls.extends) detail += ` extends ${cls.extends}`;
-        if (cls.implements?.length)
-          detail += ` implements ${cls.implements.join(", ")}`;
-        detail += ` (${fileName})`;
-        if (cls.methods?.length)
-          detail += `\n  - Methods: ${cls.methods.slice(0, 5).join(", ")}${cls.methods.length > 5 ? "..." : ""}`;
-        sections.push(detail);
-      }
-    }
-
-    if (interfaces.length > 0) {
-      sections.push(`\n### Interfaces & Types (${interfaces.length})`);
-      for (const iface of interfaces.slice(0, 10)) {
-        const fileName = iface.file?.split("/").pop() || "";
-        sections.push(`- **${iface.name}** (${fileName})`);
-      }
-    }
-
-    if (components.length > 0) {
-      sections.push(`\n### React Components (${components.length})`);
-      for (const comp of components.slice(0, 10)) {
-        const fileName = comp.file?.split("/").pop() || "";
-        sections.push(`- **${comp.name}** (${fileName})`);
-      }
-    }
-
-    if (
-      functions.length > 0 &&
-      functions.filter((f: any) => f.isExported).length > 0
-    ) {
-      sections.push(`\n### Exported Functions`);
-      for (const fn of functions
-        .filter((f: any) => f.isExported)
-        .slice(0, 10)) {
-        const fileName = fn.file?.split("/").pop() || "";
-        sections.push(`- **${fn.name}** (${fileName})`);
-      }
-    }
-  } else {
-    sections.push("No data models detected");
-  }
+  // === SECTION 6: Data Models (using budget) ===
+  sections.push(generateModelsSection(analysis, budget, userQuestion));
   sections.push("");
 
-  // === SECTION 7: Code Snippets (NEW - actual code!) ===
-  const codeSnippets = analysis.codeSnippets || [];
-  if (codeSnippets.length > 0) {
-    sections.push(`## Key Code Files`);
-    sections.push(`_Showing first lines of important files for context._\n`);
-
-    // Sort by importance (entry points first)
-    const entryPatterns = ["index", "main", "app", "server"];
-    const sorted = [...codeSnippets].sort((a: any, b: any) => {
-      const aName = a.file?.split("/").pop()?.toLowerCase() || "";
-      const bName = b.file?.split("/").pop()?.toLowerCase() || "";
-      const aScore = entryPatterns.some((p) => aName.includes(p)) ? 1 : 0;
-      const bScore = entryPatterns.some((p) => bName.includes(p)) ? 1 : 0;
-      return bScore - aScore;
-    });
-
-    // Include up to 5 snippets
-    for (const snippet of sorted.slice(0, 5)) {
-      const fileName = snippet.file?.split("/").pop() || "file";
-      const relativePath = getRelativePath(snippet.file);
-      sections.push(`### ${relativePath}`);
-      sections.push("```" + (snippet.language || "typescript"));
-      // Truncate to ~50 lines max
-      const lines = (snippet.content || "").split("\n").slice(0, 50);
-      sections.push(lines.join("\n"));
-      if ((snippet.content || "").split("\n").length > 50) {
-        sections.push("// ... (truncated)");
-      }
-      sections.push("```");
-      sections.push("");
-    }
-  }
-
-  // === SECTION 8: Domain Relationships ===
-  const relationships = analysis.domainRelationships || [];
-  if (relationships.length > 0) {
-    sections.push(`## Domain Relationships`);
-    for (const rel of relationships.slice(0, 10)) {
-      sections.push(
-        `- **${rel.entity}** → ${rel.relatedEntities?.join(", ") || "none"}`,
-      );
-    }
+  // === SECTION 7: Code Snippets (using budget) ===
+  const snippetsSection = generateSnippetsSection(
+    analysis,
+    budget,
+    userQuestion,
+  );
+  if (snippetsSection) {
+    sections.push(snippetsSection);
     sections.push("");
   }
 
-  // === SECTION 9: File Structure (compact) ===
-  sections.push(`## Project Structure`);
-  const files = analysis.files || [];
-  if (files.length > 0) {
-    // Group by directory
-    const byDir = new Map<string, string[]>();
-    for (const file of files) {
-      const dir = file.split("/").slice(0, -1).join("/") || ".";
-      if (!byDir.has(dir)) byDir.set(dir, []);
-      byDir.get(dir)!.push(file.split("/").pop());
-    }
-
-    // Show top directories
-    const sortedDirs = Array.from(byDir.entries())
-      .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, 15);
-
-    for (const [dir, dirFiles] of sortedDirs) {
-      const shortDir = dir.split("/").slice(-2).join("/") || dir;
-      sections.push(`- **${shortDir}/** (${dirFiles.length} files)`);
-      if (dirFiles.length <= 3) {
-        sections.push(`  - ${dirFiles.join(", ")}`);
-      }
-    }
-  } else {
-    sections.push("No files analyzed");
+  // === SECTION 8: Domain Relationships (using budget) ===
+  const relationshipsSection = generateRelationshipsSection(analysis, budget);
+  if (relationshipsSection) {
+    sections.push(relationshipsSection);
+    sections.push("");
   }
+
+  // === SECTION 9: File Structure (using budget) ===
+  sections.push(generateFileStructureSection(analysis, budget));
+
+  // Log budget summary
+  const budgetSummary = budget.getSummary();
+  logger.debug(
+    `Context generation complete. Budget usage: ${JSON.stringify(
+      budgetSummary.map((s) => ({
+        name: s.name,
+        used: s.used,
+        remaining: s.remaining,
+      })),
+    )}`,
+  );
 
   return sections.join("\n");
 }

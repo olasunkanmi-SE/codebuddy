@@ -240,41 +240,55 @@ class CodebaseAnalysisTask {
         const ext = path.extname(file).toLowerCase();
         languageDistribution[ext] = (languageDistribution[ext] || 0) + 1;
 
-        // Collect endpoints and models
-        apiEndpoints.push(...fileAnalysis.endpoints);
-        dataModels.push(...fileAnalysis.models);
-
-        // Process Tree-sitter analysis results (preferred)
+        // Process analysis results - prefer Tree-sitter, fallback to regex
         if (fileAnalysis.treeSitterAnalysis) {
+          // Tree-sitter provided accurate results
           this.processTreeSitterAnalysis(
             fileAnalysis.treeSitterAnalysis,
             file,
             dataModels,
             apiEndpoints,
           );
-        } else if (fileAnalysis.analysis) {
-          // Fallback to legacy regex analysis
-          this.processStructuredAnalysis(
-            fileAnalysis.analysis,
-            file,
-            dataModels,
-          );
+        } else {
+          // Fallback: collect regex-extracted endpoints and models
+          if (fileAnalysis.endpoints.length > 0) {
+            apiEndpoints.push(...fileAnalysis.endpoints);
+          }
+          if (fileAnalysis.models.length > 0) {
+            dataModels.push(...fileAnalysis.models);
+          }
+          // Process structured analysis for additional model info
+          if (fileAnalysis.analysis) {
+            this.processStructuredAnalysis(
+              fileAnalysis.analysis,
+              file,
+              dataModels,
+            );
+          }
         }
 
         // Collect code snippets for important files
+        // Let the TokenBudgetAllocator handle truncation in context generation
         const isImportant = importantPatterns.some((p) => p.test(file));
-        if (isImportant && fileAnalysis.content.length < 10000) {
+        if (isImportant && fileAnalysis.content.length < 15000) {
           const language = this.getLanguageFromExt(ext);
           codeSnippets.push({
             file,
-            content: this.truncateContent(fileAnalysis.content, 100), // First 100 lines
+            content: fileAnalysis.content, // Full content - budget allocator will truncate
             language,
           });
         }
-      } catch (error: any) {
-        this.logger.warn(`Failed to analyze file ${file}:`, error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to analyze file ${file}: ${errorMessage}`);
       }
     }
+
+    // Log analysis summary
+    this.logger.info(
+      `File analysis complete: ${files.length} files, ${apiEndpoints.length} endpoints, ${dataModels.length} models, ${codeSnippets.length} code snippets`,
+    );
 
     return {
       fileContents,
@@ -322,6 +336,9 @@ class CodebaseAnalysisTask {
     dataModels: any[],
     apiEndpoints: any[],
   ): void {
+    const fileName = path.basename(filePath);
+    let extractedCount = 0;
+
     // Extract classes as data models
     if (analysis.classes) {
       for (const classInfo of analysis.classes) {
@@ -335,6 +352,7 @@ class CodebaseAnalysisTask {
           implements: classInfo.implements || [],
           startLine: classInfo.startLine,
         });
+        extractedCount++;
       }
     }
 
@@ -347,6 +365,7 @@ class CodebaseAnalysisTask {
           file: filePath,
           startLine: component.startLine,
         });
+        extractedCount++;
       }
     }
 
@@ -373,8 +392,15 @@ class CodebaseAnalysisTask {
             isExported: true,
             startLine: func.startLine,
           });
+          extractedCount++;
         }
       }
+    }
+
+    if (extractedCount > 0) {
+      this.logger.debug(
+        `Tree-sitter extracted ${extractedCount} models and ${analysis.endpoints?.length || 0} endpoints from ${fileName}`,
+      );
     }
   }
 
@@ -398,10 +424,11 @@ class CodebaseAnalysisTask {
             content,
             filePath,
           );
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           this.logger.warn(
-            `Tree-sitter analysis failed for ${filePath}, falling back to regex:`,
-            error,
+            `Tree-sitter analysis failed for ${filePath}, falling back to regex: ${errorMessage}`,
           );
         }
       }
@@ -414,10 +441,11 @@ class CodebaseAnalysisTask {
           if (analyzer) {
             analysis = analyzer.analyze(content, filePath);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           this.logger.warn(
-            `Failed to run structured analysis on ${filePath}:`,
-            error,
+            `Failed to run structured analysis on ${filePath}: ${errorMessage}`,
           );
         }
       }
@@ -430,19 +458,21 @@ class CodebaseAnalysisTask {
       if (!treeSitterAnalysis) {
         try {
           endpoints = this.extractApiEndpoints(filePath, content);
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           this.logger.warn(
-            `Failed to extract API endpoints from ${filePath}:`,
-            error,
+            `Failed to extract API endpoints from ${filePath}: ${errorMessage}`,
           );
         }
 
         try {
           models = this.extractDataModels(filePath, content);
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           this.logger.warn(
-            `Failed to extract data models from ${filePath}:`,
-            error,
+            `Failed to extract data models from ${filePath}: ${errorMessage}`,
           );
         }
       }
@@ -455,12 +485,10 @@ class CodebaseAnalysisTask {
         analysis,
         treeSitterAnalysis,
       };
-    } catch (error: any) {
-      // simplified error handling for worker
-      if (error instanceof Error) {
-        // ... keep logic if needed or simplify ...
-      }
-      throw new Error(`Failed to analyze file ${filePath}`);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to analyze file ${filePath}: ${errorMessage}`);
     }
   }
 

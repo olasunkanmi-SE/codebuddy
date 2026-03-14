@@ -9,6 +9,8 @@ import * as path from "path";
 import * as fs from "fs";
 import { Parser, Language, Tree } from "web-tree-sitter";
 import { FileAnalyzer } from "./index";
+import { Logger } from "../../infrastructure/logger/logger";
+import { LogLevel } from "../telemetry";
 
 // Type alias for Tree-sitter syntax nodes (web-tree-sitter doesn't export SyntaxNode directly)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -150,6 +152,12 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
   private languageCache = new Map<string, Language>();
   private initPromise: Promise<void> | null = null;
   private grammarsPath: string;
+  private logger = Logger.initialize("TreeSitterAnalyzer", {
+    minLevel: LogLevel.DEBUG,
+    enableConsole: true,
+    enableFile: true,
+    enableTelemetry: false,
+  });
 
   constructor(grammarsPath?: string) {
     // Default to common paths
@@ -167,6 +175,7 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
 
     this.initPromise = (async () => {
       const wasmPath = path.join(this.grammarsPath, "tree-sitter.wasm");
+      this.logger.debug(`Initializing Tree-sitter from ${wasmPath}`);
 
       // Check if we're in a worker context (no vscode)
       const locateFile = (file: string) => {
@@ -175,6 +184,7 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
 
       await Parser.init({ locateFile } as any);
       this.parser = new Parser();
+      this.logger.info("Tree-sitter parser initialized successfully");
     })();
 
     return this.initPromise;
@@ -199,20 +209,30 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     };
 
     const grammarFile = grammarFiles[languageId];
-    if (!grammarFile) return null;
+    if (!grammarFile) {
+      this.logger.debug(
+        `No grammar file configured for language: ${languageId}`,
+      );
+      return null;
+    }
 
     const grammarPath = path.join(this.grammarsPath, grammarFile);
     if (!fs.existsSync(grammarPath)) {
-      console.warn(`Grammar not found: ${grammarPath}`);
+      this.logger.warn(`Grammar not found: ${grammarPath}`);
       return null;
     }
 
     try {
       const language = await Language.load(grammarPath);
       this.languageCache.set(languageId, language);
+      this.logger.debug(`Loaded grammar for ${languageId}`);
       return language;
     } catch (error) {
-      console.error(`Failed to load grammar for ${languageId}:`, error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to load grammar for ${languageId}: ${errorMessage}`,
+      );
       return null;
     }
   }
@@ -240,15 +260,24 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     content: string,
     filePath: string,
   ): Promise<TreeSitterAnalysisResult> {
+    const fileName = path.basename(filePath);
+    this.logger.debug(`Analyzing ${fileName} with Tree-sitter`);
+
     await this.initialize();
 
     const languageId = this.getLanguageId(filePath);
     if (!languageId || !this.parser) {
+      this.logger.debug(
+        `No parser available for ${fileName}, returning empty result`,
+      );
       return this.createEmptyResult(filePath);
     }
 
     const language = await this.loadLanguage(languageId);
     if (!language) {
+      this.logger.debug(
+        `Failed to load language for ${fileName}, returning empty result`,
+      );
       return this.createEmptyResult(filePath);
     }
 
@@ -256,6 +285,7 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     const tree = this.parser.parse(content);
 
     if (!tree) {
+      this.logger.warn(`Failed to parse ${fileName}`);
       return this.createEmptyResult(filePath);
     }
 
@@ -272,6 +302,10 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     if (languageId === "javascript" || languageId === "typescript") {
       result.components = this.extractReactComponents(tree, content);
     }
+
+    this.logger.debug(
+      `Extracted from ${fileName}: ${result.classes.length} classes, ${result.functions.length} functions, ${result.endpoints.length} endpoints`,
+    );
 
     return result;
   }
