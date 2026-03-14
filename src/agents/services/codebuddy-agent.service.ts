@@ -45,6 +45,10 @@ import {
 import { ConsentManager } from "./consent-manager";
 import { ContentNormalizer } from "./content-normalizer";
 import { ErrorRecoveryService } from "./error-recovery.service";
+import {
+  ProviderFailoverService,
+  classifyFailoverReason,
+} from "../../services/provider-failover.service";
 import { TOOL_NAMES } from "../constants/tool-names";
 
 /** Typed alias for the async iterator from a LangGraph agent stream. */
@@ -277,6 +281,7 @@ export class CodeBuddyAgentService {
   private readonly consentManager: ConsentManager;
   private readonly contentNormalizer: ContentNormalizer;
   private readonly errorRecovery: ErrorRecoveryService;
+  private readonly failoverService: ProviderFailoverService;
   private readonly modelChangeDisposable: { dispose(): void };
   private static readonly MAX_WARNED_TOOLS = 100;
   private static readonly MAX_CACHED_AGENTS = 3;
@@ -294,6 +299,8 @@ export class CodeBuddyAgentService {
     this.consentManager = new ConsentManager();
     this.contentNormalizer = new ContentNormalizer();
     this.errorRecovery = new ErrorRecoveryService();
+    this.failoverService = ProviderFailoverService.getInstance();
+    this.initFailoverChain();
 
     // Invalidate cached agents when the user switches model/provider
     this.modelChangeDisposable =
@@ -309,6 +316,61 @@ export class CodeBuddyAgentService {
 
     // Track every file the agent edits so checkpoints cover them
     this.initFileTracking();
+  }
+
+  /**
+   * Read the failover chain from VS Code settings.
+   * If empty/unconfigured, auto-detect from providers that have API keys.
+   */
+  private initFailoverChain(): void {
+    const enabled = vscode.workspace
+      .getConfiguration("codebuddy.failover")
+      .get<boolean>("enabled", true);
+    if (!enabled) return;
+
+    const configured = vscode.workspace
+      .getConfiguration("codebuddy.failover")
+      .get<string[]>("providers", []);
+
+    if (configured.length > 0) {
+      this.failoverService.setFallbackChain(configured);
+    } else {
+      // Auto-detect: check which providers have API keys configured
+      const allProviders = [
+        "Anthropic",
+        "OpenAI",
+        "Gemini",
+        "Groq",
+        "Deepseek",
+        "Qwen",
+        "GLM",
+        "Local",
+      ];
+      const available: string[] = [];
+      for (const p of allProviders) {
+        try {
+          const cfg = getAPIKeyAndModel(p.toLowerCase());
+          if (cfg.apiKey && cfg.apiKey !== "apiKey") {
+            available.push(p);
+          }
+        } catch {
+          // Not configured — skip
+        }
+      }
+      if (available.length > 1) {
+        this.failoverService.setFallbackChain(available);
+      }
+    }
+
+    // Re-init when settings change
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (
+        e.affectsConfiguration("codebuddy.failover") ||
+        e.affectsConfiguration("generativeAi.option")
+      ) {
+        this.initFailoverChain();
+      }
+    });
   }
 
   /**
@@ -770,6 +832,22 @@ export class CodeBuddyAgentService {
         metadata: { threadId: conversationId, timestamp: Date.now() },
       };
 
+      // Emit provider health for the webview indicator
+      const providerHealth = this.failoverService.getAllHealth();
+      if (providerHealth.length > 0) {
+        yield {
+          type: StreamEventType.METADATA,
+          content: "provider_health",
+          metadata: {
+            threadId: conversationId,
+            timestamp: Date.now(),
+            status: "provider_health",
+            activeProvider: providerName,
+            health: providerHealth,
+          },
+        };
+      }
+
       // Create a checkpoint before the agent starts modifying files
       try {
         const checkpointSvc = CheckpointService.getInstance();
@@ -1064,6 +1142,9 @@ export class CodeBuddyAgentService {
         }
       } // end streamLoop
 
+      // Record provider success for health tracking
+      this.failoverService.recordSuccess(providerName);
+
       yield* this.emitCompletion(
         ctx,
         span,
@@ -1073,6 +1154,174 @@ export class CodeBuddyAgentService {
       );
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
+
+      // ── Provider Failover ────────────────────────────────
+      // If the primary provider failed and failover is enabled,
+      // try the next provider in the chain before giving up.
+      const failoverEnabled = vscode.workspace
+        .getConfiguration("codebuddy.failover")
+        .get<boolean>("enabled", true);
+
+      if (failoverEnabled) {
+        const reason = this.failoverService.recordFailure(providerName, err);
+
+        if (this.failoverService.shouldFailover(reason)) {
+          // Try to resolve an alternative provider
+          try {
+            const resolved = this.failoverService.resolveProvider(providerName);
+
+            if (resolved.isFallback) {
+              this.logger.log(
+                LogLevel.INFO,
+                `[Failover] Switching from "${providerName}" to "${resolved.provider}" (reason: ${reason})`,
+              );
+
+              // Notify user about the provider switch
+              yield {
+                type: StreamEventType.WORKING,
+                content: `Switching to ${resolved.provider} due to ${reason.replace(/_/g, " ")} on ${providerName}...`,
+                metadata: {
+                  threadId: conversationId,
+                  timestamp: Date.now(),
+                  failover: true,
+                  fromProvider: providerName,
+                  toProvider: resolved.provider,
+                },
+              };
+
+              // Drain tool spans from the failed attempt
+              this.drainToolSpans(
+                ctx,
+                SpanStatusCode.ERROR,
+                "provider_failover",
+              );
+
+              // Mark pending tools as failed
+              for (const [toolName, activity] of ctx.pendingToolCalls) {
+                activity.status = "failed";
+                activity.endTime = Date.now();
+                yield {
+                  type: StreamEventType.TOOL_END,
+                  content: JSON.stringify(activity),
+                  metadata: { toolName, error: true },
+                };
+              }
+              ctx.pendingToolCalls.clear();
+
+              // Clear the agent cache so a fresh agent is created with the new provider
+              this.agentCache.clear();
+
+              // Create new agent with the failover provider
+              const failoverAgent = await this.getAgent();
+
+              // Reset stream context for the new attempt
+              ctx.hasErrored = false;
+              ctx.agentState = "running";
+
+              // Update provider/model tracking for cost and tracing
+              const failoverProviderName = resolved.provider;
+              const failoverModelName = resolved.model ?? resolved.provider;
+              span.setAttribute("gen_ai.failover.from", providerName);
+              span.setAttribute("gen_ai.failover.to", failoverProviderName);
+              span.setAttribute("gen_ai.failover.reason", reason);
+              span.addEvent("provider_failover", {
+                from: providerName,
+                to: failoverProviderName,
+                reason,
+              });
+
+              // Stream from the failover agent using the same thread_id
+              // so the agent retains conversation context from checkpoints
+              const failoverConfig = {
+                configurable: { thread_id: conversationId },
+                recursionLimit: 100,
+              };
+              const failoverIterator: AgentStreamIterator = (
+                await failoverAgent.stream(
+                  {
+                    messages: [
+                      {
+                        role: "human",
+                        content:
+                          "There was a temporary issue with the previous provider. Please continue from where you left off and complete your response.",
+                      },
+                    ],
+                  },
+                  failoverConfig,
+                )
+              )[Symbol.asyncIterator]();
+
+              // Process the failover stream (single pass — no nested failover)
+              try {
+                while (true) {
+                  const { value: event, done } = await failoverIterator.next();
+                  if (done) break;
+                  if (ctx.hasErrored) break;
+
+                  ctx.eventCount++;
+                  const elapsed = Date.now() - ctx.startTime;
+                  const safetyResult = this.safetyGuard.checkLimits(
+                    ctx.eventCount,
+                    ctx.totalToolInvocations,
+                    elapsed,
+                    limits,
+                  );
+                  if (safetyResult.shouldStop) break;
+
+                  const entries = Object.entries(
+                    event as Record<string, unknown>,
+                  ) as [string, IAgentNodeUpdate][];
+
+                  yield* this.processNodeEntries(
+                    entries,
+                    ctx,
+                    span,
+                    streamManager,
+                    costTracker,
+                    conversationId,
+                    failoverProviderName,
+                    failoverModelName,
+                    limits,
+                    onChunk,
+                    tracing,
+                  );
+                }
+
+                // Failover stream succeeded
+                this.failoverService.recordSuccess(failoverProviderName);
+
+                yield* this.emitCompletion(
+                  ctx,
+                  span,
+                  streamManager,
+                  costTracker,
+                  conversationId,
+                );
+                return; // Success — exit the generator
+              } catch (failoverError) {
+                // Failover stream also failed — record and fall through to error
+                this.failoverService.recordFailure(
+                  failoverProviderName,
+                  failoverError,
+                );
+                this.logger.log(
+                  LogLevel.ERROR,
+                  `[Failover] Fallback provider "${failoverProviderName}" also failed`,
+                  failoverError,
+                );
+              }
+            }
+          } catch (resolveError) {
+            // No alternative provider available — fall through to error
+            this.logger.log(
+              LogLevel.WARN,
+              `[Failover] No alternative provider available: ${resolveError instanceof Error ? resolveError.message : resolveError}`,
+            );
+          }
+        }
+      }
+
+      // ── Original error path (no failover or failover exhausted) ──
       ctx.agentState = "failed";
       ctx.hasErrored = true;
       span.recordException(err);
@@ -1915,6 +2164,17 @@ export class CodeBuddyAgentService {
       this.consentManager.clearThread(threadId);
       this.logger.log(LogLevel.INFO, `Stream cancelled for thread ${threadId}`);
     }
+  }
+
+  /**
+   * Get the current health status of all configured providers.
+   * Used by the webview handler to show provider status indicators.
+   */
+  getProviderHealth() {
+    return {
+      activeProvider: getGenerativeAiModel() ?? "unknown",
+      health: this.failoverService.getAllHealth(),
+    };
   }
 
   async dispose(): Promise<void> {

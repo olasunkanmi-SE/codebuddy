@@ -514,6 +514,8 @@ export class WebViewProviderManager implements vscode.Disposable {
           description: event.message?.description ?? nested.description,
           content: event.message?.content,
           costData: nested.costData,
+          activeProvider: nested.activeProvider,
+          health: nested.health,
           timestamp: Date.now(),
         },
       });

@@ -38,6 +38,7 @@ export class SettingsHandler implements WebviewMessageHandler {
     "update-model-event",
     "reindex-workspace-event",
     "open-codebuddy-settings",
+    "get-provider-health",
   ];
 
   constructor(
@@ -171,6 +172,18 @@ export class SettingsHandler implements WebviewMessageHandler {
           "@ext:fiatinnovations.ola-code-buddy",
         );
         break;
+
+      case "get-provider-health": {
+        const { CodeBuddyAgentService } =
+          await import("../../agents/services/codebuddy-agent.service");
+        const healthData =
+          CodeBuddyAgentService.getInstance().getProviderHealth();
+        ctx.webview.webview.postMessage({
+          command: "provider-health-update",
+          data: healthData,
+        });
+        break;
+      }
     }
   }
 }
