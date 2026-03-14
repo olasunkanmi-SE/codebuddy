@@ -41,6 +41,12 @@ export class SettingsHandler implements WebviewMessageHandler {
     "get-provider-health",
   ];
 
+  private static readonly HEALTH_QUERY_THROTTLE_MS = 2_000;
+  private lastHealthQueryAt = 0;
+  private agentServiceModule:
+    | typeof import("../../agents/services/codebuddy-agent.service")
+    | null = null;
+
   constructor(
     private readonly orchestrator: {
       publish: (event: string, ...args: any[]) => void;
@@ -174,14 +180,27 @@ export class SettingsHandler implements WebviewMessageHandler {
         break;
 
       case "get-provider-health": {
-        const { CodeBuddyAgentService } =
-          await import("../../agents/services/codebuddy-agent.service");
-        const healthData =
-          CodeBuddyAgentService.getInstance().getProviderHealth();
-        ctx.webview.webview.postMessage({
-          command: "provider-health-update",
-          data: healthData,
-        });
+        const now = Date.now();
+        if (
+          now - this.lastHealthQueryAt <
+          SettingsHandler.HEALTH_QUERY_THROTTLE_MS
+        ) {
+          break; // Silently drop — UI will get the next update shortly
+        }
+        this.lastHealthQueryAt = now;
+
+        try {
+          this.agentServiceModule ??=
+            await import("../../agents/services/codebuddy-agent.service");
+          const healthData =
+            this.agentServiceModule.CodeBuddyAgentService.getInstance().getProviderHealth();
+          ctx.webview.webview.postMessage({
+            command: "provider-health-update",
+            data: healthData,
+          });
+        } catch {
+          // Agent service not yet initialized — silently skip
+        }
         break;
       }
     }

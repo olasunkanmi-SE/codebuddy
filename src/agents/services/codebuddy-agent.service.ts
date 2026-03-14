@@ -262,6 +262,18 @@ export function summarizeToolResultContent(
   return "Completed successfully";
 }
 
+/**
+ * Returns true if the API key looks like a real credential
+ * rather than a placeholder or empty value.
+ */
+function isValidApiKey(key: string | undefined): key is string {
+  if (!key || key.trim().length === 0) return false;
+  if (key === "apiKey") return false; // VS Code settings default placeholder
+  if (key === "YOUR_API_KEY_HERE") return false; // Common copy-paste mistake
+  if (key.length < 8) return false; // Too short to be real
+  return true;
+}
+
 export class CodeBuddyAgentService {
   /**
    * Agents are keyed by `provider:model` but intentionally share a single
@@ -283,6 +295,7 @@ export class CodeBuddyAgentService {
   private readonly errorRecovery: ErrorRecoveryService;
   private readonly failoverService: ProviderFailoverService;
   private readonly modelChangeDisposable: { dispose(): void };
+  private readonly failoverConfigDisposable: { dispose(): void };
   private static readonly MAX_WARNED_TOOLS = 100;
   private static readonly MAX_CACHED_AGENTS = 3;
   private readonly warnedUnknownTools = new Set<string>();
@@ -301,6 +314,18 @@ export class CodeBuddyAgentService {
     this.errorRecovery = new ErrorRecoveryService();
     this.failoverService = ProviderFailoverService.getInstance();
     this.initFailoverChain();
+
+    // Watch for failover/provider config changes (registered once, not per-init)
+    this.failoverConfigDisposable = vscode.workspace.onDidChangeConfiguration(
+      (e) => {
+        if (
+          e.affectsConfiguration("codebuddy.failover") ||
+          e.affectsConfiguration("generativeAi.option")
+        ) {
+          this.initFailoverChain();
+        }
+      },
+    );
 
     // Invalidate cached agents when the user switches model/provider
     this.modelChangeDisposable =
@@ -350,7 +375,7 @@ export class CodeBuddyAgentService {
       for (const p of allProviders) {
         try {
           const cfg = getAPIKeyAndModel(p.toLowerCase());
-          if (cfg.apiKey && cfg.apiKey !== "apiKey") {
+          if (isValidApiKey(cfg.apiKey)) {
             available.push(p);
           }
         } catch {
@@ -361,16 +386,6 @@ export class CodeBuddyAgentService {
         this.failoverService.setFallbackChain(available);
       }
     }
-
-    // Re-init when settings change
-    vscode.workspace.onDidChangeConfiguration((e) => {
-      if (
-        e.affectsConfiguration("codebuddy.failover") ||
-        e.affectsConfiguration("generativeAi.option")
-      ) {
-        this.initFailoverChain();
-      }
-    });
   }
 
   /**
@@ -1208,8 +1223,12 @@ export class CodeBuddyAgentService {
               }
               ctx.pendingToolCalls.clear();
 
-              // Clear the agent cache so a fresh agent is created with the new provider
-              this.agentCache.clear();
+              // Remove only the failed provider's cached agent (preserve other providers)
+              for (const key of this.agentCache.keys()) {
+                if (key.startsWith(`agent:${providerName}:`)) {
+                  this.agentCache.delete(key);
+                }
+              }
 
               // Create new agent with the failover provider
               const failoverAgent = await this.getAgent();
@@ -1241,9 +1260,8 @@ export class CodeBuddyAgentService {
                   {
                     messages: [
                       {
-                        role: "human",
-                        content:
-                          "There was a temporary issue with the previous provider. Please continue from where you left off and complete your response.",
+                        role: "user",
+                        content: sanitizedMessage,
                       },
                     ],
                   },
@@ -1253,39 +1271,19 @@ export class CodeBuddyAgentService {
 
               // Process the failover stream (single pass — no nested failover)
               try {
-                while (true) {
-                  const { value: event, done } = await failoverIterator.next();
-                  if (done) break;
-                  if (ctx.hasErrored) break;
-
-                  ctx.eventCount++;
-                  const elapsed = Date.now() - ctx.startTime;
-                  const safetyResult = this.safetyGuard.checkLimits(
-                    ctx.eventCount,
-                    ctx.totalToolInvocations,
-                    elapsed,
-                    limits,
-                  );
-                  if (safetyResult.shouldStop) break;
-
-                  const entries = Object.entries(
-                    event as Record<string, unknown>,
-                  ) as [string, IAgentNodeUpdate][];
-
-                  yield* this.processNodeEntries(
-                    entries,
-                    ctx,
-                    span,
-                    streamManager,
-                    costTracker,
-                    conversationId,
-                    failoverProviderName,
-                    failoverModelName,
-                    limits,
-                    onChunk,
-                    tracing,
-                  );
-                }
+                yield* this.drainAgentStream(
+                  failoverIterator,
+                  ctx,
+                  span,
+                  streamManager,
+                  costTracker,
+                  conversationId,
+                  failoverProviderName,
+                  failoverModelName,
+                  limits,
+                  onChunk,
+                  tracing,
+                );
 
                 // Failover stream succeeded
                 this.failoverService.recordSuccess(failoverProviderName);
@@ -1544,6 +1542,67 @@ export class CodeBuddyAgentService {
     }
 
     return newIterator;
+  }
+
+  /**
+   * Drain an agent stream iterator through the standard node-entry pipeline.
+   * Used for both primary retries and failover streams to avoid logic duplication.
+   * Does NOT handle interrupts or safety interludes — callers manage those.
+   *
+   * @throws if the underlying stream throws (caller decides how to handle)
+   */
+  private async *drainAgentStream(
+    iterator: AgentStreamIterator,
+    ctx: IStreamContext,
+    span: Span,
+    streamManager: StreamManager,
+    costTracker: CostTrackingService,
+    conversationId: string,
+    providerName: string,
+    modelName: string,
+    limits: AgentSafetyLimits,
+    onChunk?: (chunk: IStreamEvent) => void,
+    tracing?: TraceBundle,
+  ): AsyncGenerator<IStreamEvent> {
+    while (true) {
+      const { value: event, done } = await iterator.next();
+      if (done || ctx.hasErrored) break;
+
+      ctx.eventCount++;
+      const elapsed = Date.now() - ctx.startTime;
+      const safetyResult = this.safetyGuard.checkLimits(
+        ctx.eventCount,
+        ctx.totalToolInvocations,
+        elapsed,
+        limits,
+      );
+      if (safetyResult.shouldStop) {
+        this.logger.log(
+          LogLevel.WARN,
+          `[Stream] Safety limit hit during drain: ${safetyResult.reason}`,
+        );
+        break;
+      }
+
+      const entries = Object.entries(event as Record<string, unknown>) as [
+        string,
+        IAgentNodeUpdate,
+      ][];
+
+      yield* this.processNodeEntries(
+        entries,
+        ctx,
+        span,
+        streamManager,
+        costTracker,
+        conversationId,
+        providerName,
+        modelName,
+        limits,
+        onChunk,
+        tracing,
+      );
+    }
   }
 
   private async *processNodeEntries(
@@ -2196,6 +2255,7 @@ export class CodeBuddyAgentService {
 
     // Unsubscribe from model-change events
     this.modelChangeDisposable.dispose();
+    this.failoverConfigDisposable.dispose();
 
     // Wait for pending initialization before closing, to avoid race condition
     // where dispose() is called while initCheckpointer() is still running

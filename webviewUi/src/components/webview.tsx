@@ -560,7 +560,7 @@ export const WebviewUI = () => {
               </VSCodeButton>
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="status-bar-row">
             <ProviderHealthIndicator activeProvider={providerHealth?.activeProvider} health={providerHealth?.health} />
             <CostDisplay costData={conversationCost} isStreaming={isStreaming} />
           </div>

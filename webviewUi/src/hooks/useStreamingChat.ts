@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ProviderHealthState } from "../types/provider-health";
 
 /** Module-level constant — zero allocation on every friendlyToolName call. */
 const FRIENDLY_NAMES: Readonly<Record<string, string>> = Object.freeze({
@@ -148,17 +149,8 @@ export const useStreamingChat = (
   const [conversationCost, setConversationCost] =
     useState<IConversationCostData | null>(null);
   const conversationCostRef = useRef<IConversationCostData | null>(null);
-  const [providerHealth, setProviderHealth] = useState<{
-    activeProvider: string;
-    health: Array<{
-      provider: string;
-      status: "healthy" | "degraded" | "down";
-      errorCount: number;
-      lastError?: string;
-      lastErrorReason?: string;
-      cooldownUntil: number;
-    }>;
-  } | null>(null);
+  const [providerHealth, setProviderHealth] =
+    useState<ProviderHealthState | null>(null);
 
   const currentRequestIdRef = useRef<string | null>(null);
   const threadIdRef = useRef<string>(

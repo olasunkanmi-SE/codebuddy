@@ -43,8 +43,8 @@ const REASON_PATTERNS: Array<[RegExp, FailoverReason]> = [
   [/\btimeout\b/i, "timeout"],
   [/\btimed?\s*out\b/i, "timeout"],
   [/\bETIMEDOUT\b/, "timeout"],
-  [/\bECONNRESET\b/, "timeout"],
-  [/\bECONNREFUSED\b/, "timeout"],
+  [/\bECONNRESET\b/, "overloaded"],
+  [/\bECONNREFUSED\b/, "overloaded"],
   [/\bmodel.*not.*found\b/i, "model_not_found"],
   [/\bmodel.*does.*not.*exist\b/i, "model_not_found"],
   [/\boverloaded\b/i, "overloaded"],
@@ -54,7 +54,7 @@ const REASON_PATTERNS: Array<[RegExp, FailoverReason]> = [
 ];
 
 /** Reasons that should NOT trigger failover to the next provider. */
-const NON_FAILOVER_REASONS = new Set<FailoverReason>(["format"]);
+const NON_FAILOVER_REASONS = new Set<FailoverReason>(["format", "unknown"]);
 
 /**
  * Classify an error into a `FailoverReason`.
@@ -90,7 +90,7 @@ export function classifyFailoverReason(error: unknown): FailoverReason {
 
 /** Extract a 3-digit HTTP status from an error message. */
 function extractStatusFromMessage(msg: string): number | undefined {
-  const m = msg.match(/\bstatus\s*(?:code\s*)?(\d{3})\b/i);
+  const m = msg.match(/\bstatus\s*(?:code\s*)?:?\s*([45]\d{2})\b/i);
   return m ? Number(m[1]) : undefined;
 }
 
@@ -410,19 +410,34 @@ export class ProviderFailoverService {
 
   getHealth(provider: string): ProviderHealth {
     const p = provider.toLowerCase();
-    return (
-      this.healthMap.get(p) ?? {
-        provider: p,
-        status: "healthy" as const,
-        errorCount: 0,
+    const stored = this.healthMap.get(p);
+    if (stored) return { ...stored };
+    return {
+      provider: p,
+      status: "healthy" as const,
+      errorCount: 0,
+      cooldownUntil: 0,
+    };
+  }
+
+  /**
+   * Expire a provider's cooldown if it has elapsed.
+   * Explicit mutation — separated from read methods (CQS).
+   */
+  private expireCooldownIfElapsed(provider: string, now: number): void {
+    const health = this.healthMap.get(provider);
+    if (!health) return;
+    if (health.cooldownUntil > 0 && health.cooldownUntil <= now) {
+      this.healthMap.set(provider, {
+        ...health,
         cooldownUntil: 0,
-      }
-    );
+        status: health.status === "down" ? "degraded" : health.status,
+      });
+    }
   }
 
   getAllHealth(): ProviderHealth[] {
     const now = Date.now();
-    const result: ProviderHealth[] = [];
 
     // Include all providers in fallback chain + any with recorded health
     const allProviders = new Set([
@@ -430,19 +445,13 @@ export class ProviderFailoverService {
       ...this.healthMap.keys(),
     ]);
 
+    // Expire cooldowns first (explicit mutation step)
     for (const p of allProviders) {
-      const health = this.getHealth(p);
-      // Auto-clear expired cooldowns
-      if (health.cooldownUntil > 0 && health.cooldownUntil <= now) {
-        health.cooldownUntil = 0;
-        if (health.status === "down" || health.status === "degraded") {
-          health.status = "degraded"; // Don't auto-promote to healthy until success
-        }
-      }
-      result.push({ ...health });
+      this.expireCooldownIfElapsed(p, now);
     }
 
-    return result;
+    // Return safe copies
+    return [...allProviders].map((p) => this.getHealth(p));
   }
 
   /**

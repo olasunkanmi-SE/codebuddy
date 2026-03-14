@@ -41,6 +41,12 @@
   gap: 20px;
 }
 
+.status-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .horizontal-stack-setting {
   display: flex;
   justify-content: left;

@@ -1,16 +1,9 @@
-interface ProviderHealth {
-  provider: string;
-  status: "healthy" | "degraded" | "down";
-  errorCount: number;
-  lastError?: string;
-  lastErrorReason?: string;
-  cooldownUntil: number;
-}
+import type {
+  ProviderHealthState,
+} from "../types/provider-health";
+import "./ProviderHealthIndicator.css";
 
-interface ProviderHealthIndicatorProps {
-  activeProvider?: string;
-  health?: ProviderHealth[];
-}
+type ProviderHealthIndicatorProps = Partial<ProviderHealthState>;
 
 const STATUS_COLORS: Record<string, string> = {
   healthy: "var(--vscode-testing-iconPassed, #4ec9b0)",
@@ -58,32 +51,12 @@ export function ProviderHealthIndicator({
     .join(" · ");
 
   return (
-    <span
-      className="provider-health-indicator"
-      title={tooltip}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "4px",
-        fontSize: "11px",
-        opacity: 0.8,
-        cursor: "default",
-        marginRight: "6px",
-      }}
-    >
+    <span className="provider-health-indicator" title={tooltip}>
       <span
-        style={{
-          width: "7px",
-          height: "7px",
-          borderRadius: "50%",
-          backgroundColor: color,
-          display: "inline-block",
-          flexShrink: 0,
-        }}
+        className="provider-health-dot"
+        style={{ backgroundColor: color }}
       />
-      <span style={{ color: "var(--vscode-descriptionForeground)" }}>
-        {activeProvider}
-      </span>
+      <span className="provider-health-label">{activeProvider}</span>
     </span>
   );
 }
