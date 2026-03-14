@@ -1014,6 +1014,29 @@
             "type": "string",
             "default": "",
             "description": "Optional OTLP HTTP endpoint for exporting traces to an external backend (e.g. LangFuse, LangSmith, Jaeger). Leave empty to disable."
+          },
+          "codebuddy.failover.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Automatically switch to a fallback LLM provider when the primary fails (rate limit, timeout, auth error)."
+          },
+          "codebuddy.failover.providers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Anthropic",
+                "OpenAI",
+                "Gemini",
+                "Groq",
+                "Deepseek",
+                "Qwen",
+                "GLM",
+                "Local"
+              ]
+            },
+            "default": [],
+            "markdownDescription": "Ordered list of fallback providers to try when the primary fails. Leave empty to auto-detect from configured API keys."
           }
         }
       }

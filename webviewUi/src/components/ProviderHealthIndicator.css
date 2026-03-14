@@ -1,0 +1,21 @@
+.provider-health-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  opacity: 0.8;
+  cursor: default;
+  margin-right: 6px;
+}
+
+.provider-health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.provider-health-label {
+  color: var(--vscode-descriptionForeground);
+}

@@ -27,6 +27,7 @@ import { AgentTimeline } from "./AgentTimeline";
 import AttachmentIcon from "./attachmentIcon";
 import ChatInput from "./ChatInput";
 import { CostDisplay } from "./CostDisplay";
+import { ProviderHealthIndicator } from "./ProviderHealthIndicator";
 import { CommandFeedbackLoader } from "./commandFeedbackLoader";
 import MessageRenderer from "./MessageRenderer";
 import { PendingChangesPanel } from "./PendingChangesPanel";
@@ -128,6 +129,7 @@ export const WebviewUI = () => {
     cancelCurrentRequest,
     threadId,
     conversationCost,
+    providerHealth,
   } = useStreamingChat(vsCode, {
     enableStreaming,
     onLegacyMessage: (messages) => {
@@ -558,7 +560,10 @@ export const WebviewUI = () => {
               </VSCodeButton>
             </div>
           )}
-          <CostDisplay costData={conversationCost} isStreaming={isStreaming} />
+          <div className="status-bar-row">
+            <ProviderHealthIndicator activeProvider={providerHealth?.activeProvider} health={providerHealth?.health} />
+            <CostDisplay costData={conversationCost} isStreaming={isStreaming} />
+          </div>
           <ChatInput onSendMessage={handleSend} disabled={isStreaming || isBotLoading} folders={folders} activeEditor={activeEditor} />
         </div>
         <div className="horizontal-stack">

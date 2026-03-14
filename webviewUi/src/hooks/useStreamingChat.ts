@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ProviderHealthState } from "../types/provider-health";
 
 /** Module-level constant — zero allocation on every friendlyToolName call. */
 const FRIENDLY_NAMES: Readonly<Record<string, string>> = Object.freeze({
@@ -148,6 +149,8 @@ export const useStreamingChat = (
   const [conversationCost, setConversationCost] =
     useState<IConversationCostData | null>(null);
   const conversationCostRef = useRef<IConversationCostData | null>(null);
+  const [providerHealth, setProviderHealth] =
+    useState<ProviderHealthState | null>(null);
 
   const currentRequestIdRef = useRef<string | null>(null);
   const threadIdRef = useRef<string>(
@@ -449,6 +452,15 @@ export const useStreamingChat = (
         }
         break;
       }
+      case "provider_health": {
+        if (payload.activeProvider && payload.health) {
+          setProviderHealth({
+            activeProvider: payload.activeProvider,
+            health: payload.health,
+          });
+        }
+        break;
+      }
       case "interrupt_waiting": {
         const desc =
           payload.description ||
@@ -737,6 +749,16 @@ export const useStreamingChat = (
           }
           break;
 
+        // Provider health update from settings handler
+        case "provider-health-update":
+          if (message.data?.activeProvider && message.data?.health) {
+            setProviderHealth({
+              activeProvider: message.data.activeProvider,
+              health: message.data.health,
+            });
+          }
+          break;
+
         default:
           break;
       }
@@ -776,5 +798,6 @@ export const useStreamingChat = (
     cancelCurrentRequest,
     threadId: threadIdRef.current,
     conversationCost,
+    providerHealth,
   };
 };
