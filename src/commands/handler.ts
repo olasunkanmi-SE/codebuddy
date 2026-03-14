@@ -37,6 +37,7 @@ import {
   NotificationService,
   NotificationSource,
 } from "../services/notification.service";
+import { InlineReviewService } from "../services/inline-review.service";
 import { architecturalRecommendationCommand } from "./architectural-recommendation";
 import { trace, SpanStatusCode, SpanKind, Tracer } from "@opentelemetry/api";
 
@@ -755,10 +756,11 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       this.logger.info(this.action);
       let prompt;
       const selectedCode = this.getSelectedWindowArea();
-      const activeFilePath =
-        vscode.window.activeTextEditor?.document.uri.fsPath;
-      const selectionStartLine =
-        vscode.window.activeTextEditor?.selection.start.line ?? 0;
+
+      // Capture editor context atomically before the async stream begins.
+      // This snapshot survives tab switches during the (potentially long) stream.
+      const reviewContext = InlineReviewService.captureReviewContext();
+
       if (!message && !selectedCode) {
         vscode.window.showErrorMessage("select a piece of code.");
         span.setStatus({ code: SpanStatusCode.UNSET });
@@ -841,25 +843,39 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
 
       // ── Inline Review Comments ───────────────────────────
       // When enabled, parse the review output and show comment
-      // threads directly in the workspace file.
-      // Re-read activeFilePath *after* streaming completes so we
-      // target the file the user is actually looking at, not the
-      // one captured before the (potentially long) stream.
-      const reviewFilePath =
-        vscode.window.activeTextEditor?.document.uri.fsPath ?? activeFilePath;
-      if (
-        reviewFilePath &&
-        (commandAction === CODEBUDDY_ACTIONS.review ||
-          commandAction === CODEBUDDY_ACTIONS.reviewPR)
-      ) {
+      // threads directly in the workspace file using the pre-stream snapshot.
+      const isReviewCommand =
+        commandAction === CODEBUDDY_ACTIONS.review ||
+        commandAction === CODEBUDDY_ACTIONS.reviewPR;
+      const isPRReview = commandAction === CODEBUDDY_ACTIONS.reviewPR;
+
+      if (InlineReviewService.isEnabled() && isReviewCommand) {
         try {
-          const { InlineReviewService } =
-            await import("../services/inline-review.service");
-          if (InlineReviewService.isEnabled()) {
+          // For single-file reviews, require valid context and check staleness.
+          // For PR reviews, context is optional (LLM provides file paths in JSON).
+          if (!isPRReview && !reviewContext) {
+            this.logger.warn(
+              "[InlineReview] No active editor for single-file review; skipping inline comments",
+            );
+          } else if (
+            !isPRReview &&
+            reviewContext &&
+            InlineReviewService.isContextStale(reviewContext)
+          ) {
+            this.logger.warn(
+              "[InlineReview] Document changed during review stream; skipping inline comments",
+            );
+          } else {
+            // Use editor context for single-file reviews, empty defaults for PR reviews
+            const defaultFilePath = reviewContext?.filePath ?? "";
+            const lineOffset = isPRReview
+              ? 0
+              : (reviewContext?.selectionStartLine ?? 0);
+
             const fileReviews = InlineReviewService.parseReviewMarkdown(
               fullResponse,
-              reviewFilePath,
-              selectionStartLine,
+              defaultFilePath,
+              lineOffset,
             );
             if (fileReviews.length > 0) {
               const inlineService = InlineReviewService.getInstance();
@@ -872,10 +888,10 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
               });
             }
           }
-        } catch (inlineError: any) {
+        } catch (inlineError: unknown) {
           this.logger.error(
             "Failed to show inline review comments",
-            inlineError,
+            inlineError as Error,
           );
         }
       }

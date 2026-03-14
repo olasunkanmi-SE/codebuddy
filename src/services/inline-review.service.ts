@@ -24,6 +24,16 @@ export interface FileReviewComments {
 }
 
 /**
+ * Snapshot of the editor state captured atomically before streaming.
+ * Used to detect stale context after asynchronous operations.
+ */
+export interface ReviewContext {
+  filePath: string;
+  selectionStartLine: number;
+  documentVersion: number;
+}
+
+/**
  * Shape expected from the LLM's REVIEW_COMMENTS JSON block.
  * Used to validate / narrow the parsed result before conversion.
  */
@@ -37,6 +47,13 @@ interface RawJsonComment {
   file?: string;
 }
 
+/**
+ * Read-only statistics exposed for testing without accessing private fields.
+ */
+export interface InlineReviewStats {
+  threadCount: number;
+}
+
 // ─── Severity helpers ────────────────────────────────────
 
 const SEVERITY_LABEL: Record<ReviewSeverity, string> = {
@@ -45,6 +62,64 @@ const SEVERITY_LABEL: Record<ReviewSeverity, string> = {
   minor: "🔵 Minor",
   info: "ℹ️ Info",
 };
+
+/** Exhaustive lookup table for severity normalization. */
+const SEVERITY_MAP: Record<string, ReviewSeverity> = {
+  critical: "critical",
+  high: "critical",
+  error: "critical",
+  moderate: "moderate",
+  medium: "moderate",
+  warning: "moderate",
+  minor: "minor",
+  low: "minor",
+  info: "info",
+  hint: "info",
+};
+
+// ─── Line Classifier ─────────────────────────────────────
+
+type LineClassification =
+  | { type: "stop" }
+  | { type: "severity"; severity: ReviewSeverity }
+  | { type: "section_issue" }
+  | { type: "content" };
+
+const STOP_SECTION =
+  /strength|learning|resource|diagram|example|recommendation|optimization|checklist/i;
+
+function classifyLine(line: string): LineClassification {
+  const isHeader = /^#{2,3}\s/.test(line);
+
+  // Stop sections — strengths, learning, recommendations, etc.
+  if (/strengths/i.test(line) || /✅/u.test(line)) {
+    return { type: "stop" };
+  }
+  if (/optimization|recommendation/i.test(line) || /🚀|🎯/u.test(line)) {
+    return { type: "stop" };
+  }
+  if (isHeader && STOP_SECTION.test(line)) {
+    return { type: "stop" };
+  }
+
+  // Severity-carrying lines
+  if (/critical\s*issues?/i.test(line) || /🔴/u.test(line)) {
+    return { type: "severity", severity: "critical" };
+  }
+  if (/moderate\s*issues?/i.test(line) || /🟡/u.test(line)) {
+    return { type: "severity", severity: "moderate" };
+  }
+  if (/minor\s*issues?/i.test(line) || /🔵/u.test(line)) {
+    return { type: "severity", severity: "minor" };
+  }
+
+  // Generic issue section header without explicit severity
+  if (isHeader && /issue|problem|fix|bug|vulnerab|risk/i.test(line)) {
+    return { type: "section_issue" };
+  }
+
+  return { type: "content" };
+}
 
 // ─── Service ─────────────────────────────────────────────
 
@@ -112,6 +187,39 @@ export class InlineReviewService implements vscode.Disposable {
   }
 
   /**
+   * Capture the current editor state atomically for use after streaming.
+   * Returns undefined if no active editor is open.
+   */
+  static captureReviewContext(): ReviewContext | undefined {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return undefined;
+    return {
+      filePath: editor.document.uri.fsPath,
+      selectionStartLine: editor.selection.start.line,
+      documentVersion: editor.document.version,
+    };
+  }
+
+  /**
+   * Check whether the document has changed since the snapshot was taken.
+   */
+  static isContextStale(ctx: ReviewContext): boolean {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return true;
+    return (
+      editor.document.uri.fsPath !== ctx.filePath ||
+      editor.document.version !== ctx.documentVersion
+    );
+  }
+
+  /**
+   * Read-only statistics for testing and observability.
+   */
+  getStats(): InlineReviewStats {
+    return { threadCount: this.threads.length };
+  }
+
+  /**
    * Display review comments as VS Code comment threads.
    *
    * @param fileReviews  Parsed review data per file.
@@ -159,13 +267,16 @@ export class InlineReviewService implements vscode.Disposable {
 
         const thread = this.commentController.createCommentThread(uri, range, [
           {
-            author: { name: "Code Review" },
+            author: {
+              name: "CodeBuddy",
+              iconPath: this.getIconUri(),
+            },
             body: this.buildCommentMarkdown(comment),
             mode: vscode.CommentMode.Preview,
           },
         ]);
         thread.canReply = false;
-        thread.label = `${SEVERITY_LABEL[comment.severity]}`;
+        thread.label = SEVERITY_LABEL[comment.severity];
         thread.collapsibleState =
           comment.severity === "critical"
             ? vscode.CommentThreadCollapsibleState.Expanded
@@ -201,19 +312,34 @@ export class InlineReviewService implements vscode.Disposable {
     }
   }
 
+  // ── Branding ───────────────────────────────────────────
+
+  private getIconUri(): vscode.Uri | undefined {
+    const ext = vscode.extensions.getExtension(
+      "fiatinnovations.ola-code-buddy",
+    );
+    if (!ext) return undefined;
+    return vscode.Uri.joinPath(ext.extensionUri, "images", "codebuddylogo.png");
+  }
+
   // ── Markdown Sanitization ──────────────────────────────
 
   /**
    * Build a safe MarkdownString from untrusted LLM content.
-   * Strips VS Code command URIs and HTML to prevent injection.
+   * Applies context-sensitive escaping: titles are inline-escaped
+   * to prevent markdown structural breakout; bodies are block-sanitized.
    */
   private buildCommentMarkdown(comment: ReviewComment): vscode.MarkdownString {
-    const sanitizedTitle = InlineReviewService.sanitizeMarkdown(comment.title);
-    const sanitizedBody = InlineReviewService.sanitizeMarkdown(comment.body);
     const label = SEVERITY_LABEL[comment.severity] ?? "ℹ️ Info";
+    // Title is inline — escape structural chars to prevent breakout
+    const safeTitle = InlineReviewService.escapeMarkdownStructure(
+      InlineReviewService.sanitizeMarkdown(comment.title),
+    );
+    // Body is block-level — sanitize but allow markdown formatting
+    const safeBody = InlineReviewService.sanitizeMarkdown(comment.body);
 
     const md = new vscode.MarkdownString(
-      `**${label}** — ${sanitizedTitle}\n\n${sanitizedBody}`,
+      `**${label}** — ${safeTitle}\n\n${safeBody}`,
     );
     md.isTrusted = false;
     md.supportHtml = false;
@@ -221,20 +347,32 @@ export class InlineReviewService implements vscode.Disposable {
   }
 
   /**
+   * Escape markdown structural characters in inline context
+   * to prevent bold/link/heading breakout from untrusted titles.
+   */
+  private static escapeMarkdownStructure(input: string): string {
+    return input
+      .replace(/[*_`[\]()#]/g, "\\$&")
+      .replace(/\n/g, " ")
+      .slice(0, 500);
+  }
+
+  /**
    * Strip markdown command links and HTML from untrusted LLM content.
-   * Preserves inline code, bold, italic, and standard links.
+   * Truncation is applied FIRST (before stripping) to prevent an attacker
+   * from padding past the limit and hiding malicious markup.
    */
   private static sanitizeMarkdown(input: string): string {
     return (
       input
+        // Limit length FIRST to prevent padding attacks
+        .slice(0, 5000)
         // Remove VS Code command URI links: [label](command:...)
         .replace(/\[([^\]]*)\]\(command:[^)]*\)/gi, "$1")
         // Remove bare command: URIs
         .replace(/command:[^\s)"']*/gi, "")
         // Strip raw HTML tags
         .replace(/<[^>]+>/g, "")
-        // Limit length to prevent UI flooding
-        .slice(0, 2000)
     );
   }
 
@@ -322,6 +460,17 @@ export class InlineReviewService implements vscode.Disposable {
   }
 
   /**
+   * Validate that a line number is a finite positive integer.
+   * Returns the adjusted value (with offset) or null if invalid.
+   */
+  private static sanitizeLine(raw: number, offset: number): number | null {
+    if (!Number.isFinite(raw) || raw < 1 || !Number.isInteger(raw)) {
+      return null;
+    }
+    return Math.max(1, raw + offset);
+  }
+
+  /**
    * Validate and normalise JSON-parsed review comment objects.
    */
   private static normalizeJsonComments(
@@ -332,16 +481,34 @@ export class InlineReviewService implements vscode.Disposable {
     const byFile = new Map<string, ReviewComment[]>();
 
     for (const item of raw) {
-      const fp = typeof item.file === "string" ? item.file : defaultFilePath;
+      const line = InlineReviewService.sanitizeLine(item.line, lineOffset);
+      if (line === null) continue;
+
+      const endLine =
+        typeof item.endLine === "number"
+          ? InlineReviewService.sanitizeLine(item.endLine, lineOffset)
+          : undefined;
+
+      // Validate endLine >= line
+      const validatedEndLine =
+        endLine !== undefined && endLine !== null && endLine >= line
+          ? endLine
+          : undefined;
+
+      const fp =
+        typeof item.file === "string" && item.file.trim()
+          ? item.file.trim()
+          : defaultFilePath;
+
       const severity = InlineReviewService.normalizeSeverity(item.severity);
       const comment: ReviewComment = {
-        line: item.line + lineOffset,
-        endLine:
-          typeof item.endLine === "number"
-            ? item.endLine + lineOffset
-            : undefined,
+        line,
+        endLine: validatedEndLine,
         severity,
-        title: typeof item.title === "string" ? item.title : "Review Issue",
+        title:
+          typeof item.title === "string" && item.title.trim()
+            ? item.title.trim().slice(0, 500)
+            : "Review Issue",
         body:
           typeof item.body === "string"
             ? item.body
@@ -360,10 +527,9 @@ export class InlineReviewService implements vscode.Disposable {
   }
 
   /**
-   * Section-aware regex fallback: only extracts line references from
-   * recognized "issues" sections (Critical, Moderate, Minor) and ignores
-   * Strengths, Recommendations, Examples, and Learning Resources sections
-   * to avoid false positives.
+   * Section-aware regex fallback using classifyLine() for single-pass
+   * header classification. Only extracts line references from recognized
+   * "issues" sections and ignores Strengths, Recommendations, etc.
    */
   private static extractFromMarkdown(
     markdown: string,
@@ -372,10 +538,6 @@ export class InlineReviewService implements vscode.Disposable {
   ): FileReviewComments[] {
     const comments: ReviewComment[] = [];
 
-    const ISSUE_SECTION = /issue|problem|fix|bug|vulnerab|risk/i;
-    const STOP_SECTION =
-      /strength|learning|resource|diagram|example|recommendation|optimization|checklist/i;
-
     let inIssueSection = false;
     let currentSeverity: ReviewSeverity = "info";
 
@@ -383,39 +545,17 @@ export class InlineReviewService implements vscode.Disposable {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // Detect section boundaries (H2/H3 headers)
-      if (/^#{2,3}\s/.test(line)) {
-        if (STOP_SECTION.test(line)) {
+      // Single-pass line classification
+      const cls = classifyLine(line);
+      if (cls.type !== "content") {
+        if (cls.type === "stop") {
           inIssueSection = false;
-          continue;
-        }
-        if (ISSUE_SECTION.test(line)) {
+        } else if (cls.type === "severity") {
+          currentSeverity = cls.severity;
+          inIssueSection = true;
+        } else if (cls.type === "section_issue") {
           inIssueSection = true;
         }
-      }
-
-      // Detect severity from emoji/keyword patterns anywhere
-      if (/critical\s*issues?/i.test(line) || /🔴/u.test(line)) {
-        currentSeverity = "critical";
-        inIssueSection = true;
-        continue;
-      }
-      if (/moderate\s*issues?/i.test(line) || /🟡/u.test(line)) {
-        currentSeverity = "moderate";
-        inIssueSection = true;
-        continue;
-      }
-      if (/minor\s*issues?/i.test(line) || /🔵/u.test(line)) {
-        currentSeverity = "minor";
-        inIssueSection = true;
-        continue;
-      }
-      if (/strengths/i.test(line) || /✅/u.test(line)) {
-        inIssueSection = false;
-        continue;
-      }
-      if (/optimization|recommendation/i.test(line) || /🚀|🎯/u.test(line)) {
-        inIssueSection = false;
         continue;
       }
 
@@ -455,14 +595,15 @@ export class InlineReviewService implements vscode.Disposable {
         }
       }
 
-      // Collect body: gather next lines until we hit another location or section
+      // Collect body: gather next lines until we hit another location,
+      // section header, or any fenced code block (with or without language tag)
       const bodyLines: string[] = [];
-      for (let j = i + 1; j < lines.length && j <= i + 15; j++) {
+      for (let j = i + 1; j < lines.length && j <= i + 50; j++) {
         const nextLine = lines[j];
         if (
           /\/\/\s*Issue:/i.test(nextLine) ||
           /^#{2,}/u.test(nextLine) ||
-          /^```$/u.test(nextLine)
+          /^```/u.test(nextLine)
         ) {
           break;
         }
@@ -488,22 +629,25 @@ export class InlineReviewService implements vscode.Disposable {
     return [{ filePath, comments }];
   }
 
+  /**
+   * Normalize arbitrary severity strings to the ReviewSeverity union.
+   * Uses an exhaustive lookup table for exact matches, then substring
+   * matching for compound values like "critical-security".
+   */
   private static normalizeSeverity(raw: unknown): ReviewSeverity {
     if (typeof raw !== "string") return "info";
-    const lower = raw.toLowerCase();
-    if (lower.includes("critical") || lower === "high" || lower === "error") {
-      return "critical";
+    const lower = raw.toLowerCase().trim();
+
+    // Exact match first — O(1)
+    if (lower in SEVERITY_MAP) {
+      return SEVERITY_MAP[lower];
     }
-    if (
-      lower.includes("moderate") ||
-      lower === "medium" ||
-      lower === "warning"
-    ) {
-      return "moderate";
+
+    // Substring match for compound values
+    for (const [key, severity] of Object.entries(SEVERITY_MAP)) {
+      if (lower.includes(key)) return severity;
     }
-    if (lower.includes("minor") || lower === "low" || lower === "info") {
-      return "minor";
-    }
+
     return "info";
   }
 }

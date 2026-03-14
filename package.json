@@ -385,7 +385,7 @@
         {
           "id": "codeBuddy-view-container",
           "title": "CodeBuddy",
-          "icon": "$(chat-editor-label-icon)"
+          "icon": "images/codebuddylogo.svg"
         }
       ]
     },

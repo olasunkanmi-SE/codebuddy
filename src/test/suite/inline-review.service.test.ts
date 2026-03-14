@@ -210,7 +210,8 @@ suite("InlineReviewService", () => {
       ["warning", "moderate"],
       ["minor", "minor"],
       ["low", "minor"],
-      ["info", "minor"],
+      ["info", "info"],
+      ["hint", "info"],
       ["unknown-value", "info"],
     ];
 
@@ -527,9 +528,7 @@ suite("InlineReviewService", () => {
 
       await service.showReviewComments(fileReviews);
 
-      // Threads were created (accessing private field for verification)
-      const threads = (service as any).threads;
-      assert.strictEqual(threads.length, 2);
+      assert.strictEqual(service.getStats().threadCount, 2);
     });
 
     test("critical threads are expanded, others collapsed", async () => {
@@ -546,6 +545,9 @@ suite("InlineReviewService", () => {
 
       await service.showReviewComments(fileReviews);
 
+      // Verify count via public API
+      assert.strictEqual(service.getStats().threadCount, 3);
+      // Verify collapsible state via internal (thread behavior)
       const threads = (service as any).threads;
       assert.strictEqual(
         threads[0].collapsibleState,
@@ -571,7 +573,7 @@ suite("InlineReviewService", () => {
           ],
         },
       ]);
-      assert.strictEqual((service as any).threads.length, 2);
+      assert.strictEqual(service.getStats().threadCount, 2);
 
       await service.showReviewComments(
         [
@@ -582,7 +584,7 @@ suite("InlineReviewService", () => {
         ],
         true,
       );
-      assert.strictEqual((service as any).threads.length, 1);
+      assert.strictEqual(service.getStats().threadCount, 1);
     });
 
     test("clearPrevious=false preserves existing threads", async () => {
@@ -602,7 +604,7 @@ suite("InlineReviewService", () => {
         ],
         false,
       );
-      assert.strictEqual((service as any).threads.length, 2);
+      assert.strictEqual(service.getStats().threadCount, 2);
     });
 
     test("maps 1-based line numbers to 0-based ranges", async () => {
@@ -648,7 +650,7 @@ suite("InlineReviewService", () => {
         },
       ]);
 
-      assert.strictEqual((service as any).threads.length, 0);
+      assert.strictEqual(service.getStats().threadCount, 0);
     });
 
     test("sets canReply to false on all threads", async () => {
@@ -685,15 +687,15 @@ suite("InlineReviewService", () => {
         },
       ]);
 
-      assert.strictEqual((service as any).threads.length, 2);
+      assert.strictEqual(service.getStats().threadCount, 2);
       service.clearComments();
-      assert.strictEqual((service as any).threads.length, 0);
+      assert.strictEqual(service.getStats().threadCount, 0);
     });
 
     test("is safe to call when no threads exist", () => {
       const service = InlineReviewService.getInstance();
       service.clearComments(); // should not throw
-      assert.strictEqual((service as any).threads.length, 0);
+      assert.strictEqual(service.getStats().threadCount, 0);
     });
   });
 
@@ -771,7 +773,7 @@ suite("InlineReviewService", () => {
 
     test("truncates excessively long content", async () => {
       const service = InlineReviewService.getInstance();
-      const longBody = "x".repeat(3000);
+      const longBody = "x".repeat(6000);
       await service.showReviewComments([
         {
           filePath: "/src/test.ts",
@@ -783,8 +785,8 @@ suite("InlineReviewService", () => {
 
       const thread = (service as any).threads[0];
       const mdContent = thread.comments[0].body.value;
-      // Body is capped at 2000 + header text
-      assert.ok(mdContent.length < 2200, "content should be truncated");
+      // Body is capped at 5000 + header text
+      assert.ok(mdContent.length < 5500, "content should be truncated");
     });
 
     test("sets isTrusted=false and supportHtml=false", async () => {
@@ -828,8 +830,7 @@ suite("InlineReviewService", () => {
         { filePath: "/src/test.ts", comments },
       ]);
 
-      const threads = (service as any).threads;
-      assert.strictEqual(threads.length, 500);
+      assert.strictEqual(service.getStats().threadCount, 500);
     });
 
     test("caps across multiple files", async () => {
@@ -847,8 +848,7 @@ suite("InlineReviewService", () => {
         { filePath: "/src/b.ts", comments: makeComments(300) },
       ]);
 
-      const threads = (service as any).threads;
-      assert.strictEqual(threads.length, 500);
+      assert.strictEqual(service.getStats().threadCount, 500);
     });
   });
 
@@ -875,7 +875,7 @@ suite("InlineReviewService", () => {
         },
       ]);
 
-      assert.strictEqual((service as any).threads.length, 1);
+      assert.strictEqual(service.getStats().threadCount, 1);
     });
 
     test("resolves relative paths when workspace folder exists", async () => {
@@ -892,7 +892,7 @@ suite("InlineReviewService", () => {
         },
       ]);
 
-      assert.strictEqual((service as any).threads.length, 1);
+      assert.strictEqual(service.getStats().threadCount, 1);
     });
 
     test("returns undefined for relative paths without a workspace folder", async () => {
@@ -906,7 +906,7 @@ suite("InlineReviewService", () => {
         },
       ]);
 
-      assert.strictEqual((service as any).threads.length, 0);
+      assert.strictEqual(service.getStats().threadCount, 0);
     });
   });
 
@@ -962,6 +962,157 @@ suite("InlineReviewService", () => {
       const thread = (service as any).threads[0];
       assert.strictEqual(thread.range.start.line, 0);
       InlineReviewService.resetInstance();
+    });
+  });
+
+  // ── Line validation (normalizeJsonComments) ────────────
+
+  suite("line validation", () => {
+    test("skips comments with non-integer line (float)", () => {
+      const md = jsonBlock([
+        { line: 5.7, severity: "minor", title: "Float", body: "b" },
+      ]);
+      const result = InlineReviewService.parseReviewMarkdown(md, TEST_FILE);
+      assert.strictEqual(result.length, 0);
+    });
+
+    test("skips comments with line < 1", () => {
+      const md = jsonBlock([
+        { line: 0, severity: "minor", title: "Zero", body: "b" },
+        { line: -3, severity: "minor", title: "Neg", body: "b" },
+      ]);
+      const result = InlineReviewService.parseReviewMarkdown(md, TEST_FILE);
+      assert.strictEqual(result.length, 0);
+    });
+
+    test("skips comments with Infinity line", () => {
+      const md = jsonBlock([
+        { line: Infinity, severity: "minor", title: "Inf", body: "b" },
+      ]);
+      const result = InlineReviewService.parseReviewMarkdown(md, TEST_FILE);
+      assert.strictEqual(result.length, 0);
+    });
+
+    test("validates endLine >= line", () => {
+      const md = jsonBlock([
+        { line: 10, endLine: 5, severity: "minor", title: "T", body: "b" },
+      ]);
+      const result = InlineReviewService.parseReviewMarkdown(md, TEST_FILE);
+      assert.strictEqual(result[0].comments[0].endLine, undefined);
+    });
+  });
+
+  // ── Body truncation ────────────────────────────────────
+
+  suite("body completeness", () => {
+    test("preserves long comment bodies from JSON block", () => {
+      const longBody = "This is a detailed explanation.\n".repeat(100);
+      const md = jsonBlock([
+        { line: 1, severity: "minor", title: "T", body: longBody },
+      ]);
+      const result = InlineReviewService.parseReviewMarkdown(md, TEST_FILE);
+      assert.strictEqual(result[0].comments[0].body, longBody);
+    });
+
+    test("regex fallback collects up to 50 lines of body", () => {
+      const bodyLines = Array.from(
+        { length: 45 },
+        (_, i) => `Detail line ${i + 1} about this issue`,
+      );
+      const md = [
+        "## 🔴 Critical Issues",
+        "// Issue: Complex problem",
+        "// Location: Line 10",
+        ...bodyLines,
+      ].join("\n");
+
+      const result = InlineReviewService.parseReviewMarkdown(md, TEST_FILE);
+      assert.strictEqual(result.length, 1);
+      const body = result[0].comments[0].body;
+      // All 45 body lines should be captured (within the 50-line limit)
+      assert.ok(body.includes("Detail line 1"), "first line preserved");
+      assert.ok(body.includes("Detail line 45"), "last line preserved");
+    });
+
+    test("title escaping preserves informative content", async () => {
+      const service = InlineReviewService.getInstance();
+      const longTitle =
+        "Missing input validation in `processUserData()` function allows SQL injection";
+      await service.showReviewComments([
+        {
+          filePath: "/src/test.ts",
+          comments: [{ line: 1, severity: "critical", title: longTitle, body: "b" }],
+        },
+      ]);
+      const thread = (service as any).threads[0];
+      const mdContent = thread.comments[0].body.value;
+      assert.ok(
+        mdContent.includes("Missing input validation"),
+        "title substance should be preserved",
+      );
+      InlineReviewService.resetInstance();
+    });
+  });
+
+  // ── Branding ───────────────────────────────────────────
+
+  suite("comment branding", () => {
+    teardown(() => {
+      InlineReviewService.resetInstance();
+    });
+
+    test("comment author name is CodeBuddy", async () => {
+      const service = InlineReviewService.getInstance();
+      await service.showReviewComments([
+        {
+          filePath: "/src/test.ts",
+          comments: [
+            { line: 1, severity: "minor", title: "T", body: "b" },
+          ],
+        },
+      ]);
+      const thread = (service as any).threads[0];
+      assert.strictEqual(thread.comments[0].author.name, "CodeBuddy");
+    });
+  });
+
+  // ── getStats ───────────────────────────────────────────
+
+  suite("getStats", () => {
+    teardown(() => {
+      InlineReviewService.resetInstance();
+    });
+
+    test("returns 0 when no threads exist", () => {
+      const service = InlineReviewService.getInstance();
+      assert.strictEqual(service.getStats().threadCount, 0);
+    });
+
+    test("returns correct count after showing comments", async () => {
+      const service = InlineReviewService.getInstance();
+      await service.showReviewComments([
+        {
+          filePath: "/src/test.ts",
+          comments: [
+            { line: 1, severity: "minor", title: "A", body: "a" },
+            { line: 2, severity: "minor", title: "B", body: "b" },
+            { line: 3, severity: "minor", title: "C", body: "c" },
+          ],
+        },
+      ]);
+      assert.strictEqual(service.getStats().threadCount, 3);
+    });
+
+    test("returns 0 after clearing", async () => {
+      const service = InlineReviewService.getInstance();
+      await service.showReviewComments([
+        {
+          filePath: "/src/test.ts",
+          comments: [{ line: 1, severity: "minor", title: "A", body: "a" }],
+        },
+      ]);
+      service.clearComments();
+      assert.strictEqual(service.getStats().threadCount, 0);
     });
   });
 });

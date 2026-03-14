@@ -135,6 +135,7 @@ ${"```"}json
 ${"```"}
 
 Rules for the JSON block:
+- \`file\` (optional): relative file path if reviewing multiple files
 - \`line\` (required): 1-based line number in the reviewed code
 - \`endLine\` (optional): end line for multi-line issues
 - \`severity\` (required): "critical", "moderate", or "minor"
