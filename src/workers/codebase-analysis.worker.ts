@@ -3,11 +3,23 @@ import * as fs from "fs";
 import * as path from "path";
 import { AnalyzerFactory } from "../services/analyzers/analyzer-factory";
 import { AnalysisResult as FileAnalysisResult } from "../services/analyzers/index";
+import {
+  TreeSitterAnalyzer,
+  TreeSitterAnalysisResult,
+} from "../services/analyzers/tree-sitter-analyzer";
 
 // Types matching the ones in the service, but adapted for Worker context
 export interface WorkerInputData {
   workspacePath: string;
   files: string[];
+  grammarsPath?: string; // Path to grammar files
+}
+
+export interface CodeSnippet {
+  file: string;
+  content: string;
+  language: string;
+  summary?: string;
 }
 
 export interface AnalysisResult {
@@ -19,6 +31,7 @@ export interface AnalysisResult {
   databaseSchema: any;
   domainRelationships: any[];
   fileContents: Map<string, string>;
+  codeSnippets: CodeSnippet[]; // NEW: Important code snippets
   summary: {
     totalFiles: number;
     totalLines: number;
@@ -51,10 +64,26 @@ class WorkerLogger {
 class CodebaseAnalysisTask {
   private readonly logger = new WorkerLogger();
   private readonly analyzerFactory = new AnalyzerFactory();
+  private treeSitterAnalyzer: TreeSitterAnalyzer | null = null;
   private isCancelled = false;
 
   async performAnalysis(data: WorkerInputData): Promise<AnalysisResult> {
     this.reportProgress(0, 100, "Starting codebase analysis...");
+
+    // Initialize Tree-sitter analyzer
+    if (data.grammarsPath) {
+      this.treeSitterAnalyzer = new TreeSitterAnalyzer(data.grammarsPath);
+      try {
+        await this.treeSitterAnalyzer.initialize();
+        this.logger.info("Tree-sitter analyzer initialized");
+      } catch (error: any) {
+        this.logger.warn(
+          "Failed to initialize Tree-sitter, falling back to regex",
+          error,
+        );
+        this.treeSitterAnalyzer = null;
+      }
+    }
 
     const files = data.files;
     this.reportProgress(10, 100, `Found ${files.length} files to analyze...`);
@@ -106,6 +135,7 @@ class CodebaseAnalysisTask {
       databaseSchema,
       domainRelationships,
       fileContents: analysisResults.fileContents,
+      codeSnippets: analysisResults.codeSnippets,
       summary: {
         totalFiles: files.length,
         totalLines: analysisResults.totalLines,
@@ -136,16 +166,54 @@ class CodebaseAnalysisTask {
 
   private async analyzeFileContents(files: string[]): Promise<{
     fileContents: Map<string, string>;
+    codeSnippets: CodeSnippet[];
     apiEndpoints: any[];
     dataModels: any[];
     totalLines: number;
     languageDistribution: Record<string, number>;
   }> {
     const fileContents = new Map<string, string>();
+    const codeSnippets: CodeSnippet[] = [];
     const apiEndpoints: any[] = [];
     const dataModels: any[] = [];
     let totalLines = 0;
     const languageDistribution: Record<string, number> = {};
+
+    // Track important files for code snippets
+    // Includes entry points, manifest files, and README for all languages
+    const importantPatterns = [
+      // Entry points
+      /index\.(ts|js|tsx|jsx)$/i,
+      /main\.(ts|js|py|go|rs|java|php)$/i,
+      /app\.(ts|js|tsx|jsx|py)$/i,
+      /server\.(ts|js)$/i,
+      /routes?\.(ts|js)$/i,
+      /controller/i,
+      /service/i,
+      /handler/i,
+      /model/i,
+      /schema/i,
+      // README files (all languages)
+      /readme\.(md|txt|rst)?$/i,
+      /readme$/i,
+      // JavaScript/TypeScript manifests
+      /package\.json$/i,
+      /tsconfig\.json$/i,
+      // Python manifests
+      /pyproject\.toml$/i,
+      /setup\.py$/i,
+      /requirements\.txt$/i,
+      /Pipfile$/i,
+      // Go manifests
+      /go\.mod$/i,
+      // Rust manifests
+      /Cargo\.toml$/i,
+      // Java manifests
+      /pom\.xml$/i,
+      /build\.gradle$/i,
+      // PHP manifests
+      /composer\.json$/i,
+    ];
 
     for (let i = 0; i < files.length; i++) {
       this.checkCancellation();
@@ -172,17 +240,36 @@ class CodebaseAnalysisTask {
         const ext = path.extname(file).toLowerCase();
         languageDistribution[ext] = (languageDistribution[ext] || 0) + 1;
 
-        // Collect endpoints and models from legacy analysis
+        // Collect endpoints and models
         apiEndpoints.push(...fileAnalysis.endpoints);
         dataModels.push(...fileAnalysis.models);
 
-        // Process structured analysis results
-        if (fileAnalysis.analysis) {
+        // Process Tree-sitter analysis results (preferred)
+        if (fileAnalysis.treeSitterAnalysis) {
+          this.processTreeSitterAnalysis(
+            fileAnalysis.treeSitterAnalysis,
+            file,
+            dataModels,
+            apiEndpoints,
+          );
+        } else if (fileAnalysis.analysis) {
+          // Fallback to legacy regex analysis
           this.processStructuredAnalysis(
             fileAnalysis.analysis,
             file,
             dataModels,
           );
+        }
+
+        // Collect code snippets for important files
+        const isImportant = importantPatterns.some((p) => p.test(file));
+        if (isImportant && fileAnalysis.content.length < 10000) {
+          const language = this.getLanguageFromExt(ext);
+          codeSnippets.push({
+            file,
+            content: this.truncateContent(fileAnalysis.content, 100), // First 100 lines
+            language,
+          });
         }
       } catch (error: any) {
         this.logger.warn(`Failed to analyze file ${file}:`, error);
@@ -191,11 +278,104 @@ class CodebaseAnalysisTask {
 
     return {
       fileContents,
+      codeSnippets,
       apiEndpoints,
       dataModels,
       totalLines,
       languageDistribution,
     };
+  }
+
+  /**
+   * Get language identifier from file extension
+   */
+  private getLanguageFromExt(ext: string): string {
+    const extMap: Record<string, string> = {
+      ".ts": "typescript",
+      ".tsx": "typescript",
+      ".js": "javascript",
+      ".jsx": "javascript",
+      ".py": "python",
+      ".java": "java",
+      ".go": "go",
+      ".rs": "rust",
+      ".php": "php",
+    };
+    return extMap[ext] || "plaintext";
+  }
+
+  /**
+   * Truncate content to first N lines
+   */
+  private truncateContent(content: string, maxLines: number): string {
+    const lines = content.split("\n");
+    if (lines.length <= maxLines) return content;
+    return lines.slice(0, maxLines).join("\n") + "\n// ... (truncated)";
+  }
+
+  /**
+   * Process Tree-sitter analysis results
+   */
+  private processTreeSitterAnalysis(
+    analysis: TreeSitterAnalysisResult,
+    filePath: string,
+    dataModels: any[],
+    apiEndpoints: any[],
+  ): void {
+    // Extract classes as data models
+    if (analysis.classes) {
+      for (const classInfo of analysis.classes) {
+        dataModels.push({
+          name: classInfo.name,
+          type: classInfo.type,
+          file: filePath,
+          properties: classInfo.properties || [],
+          methods: classInfo.methods?.map((m) => m.name) || [],
+          extends: classInfo.extends,
+          implements: classInfo.implements || [],
+          startLine: classInfo.startLine,
+        });
+      }
+    }
+
+    // Extract React components
+    if (analysis.components) {
+      for (const component of analysis.components) {
+        dataModels.push({
+          name: component.name,
+          type: "react_component",
+          file: filePath,
+          startLine: component.startLine,
+        });
+      }
+    }
+
+    // Extract API endpoints from Tree-sitter analysis
+    if (analysis.endpoints) {
+      for (const endpoint of analysis.endpoints) {
+        apiEndpoints.push({
+          method: endpoint.method,
+          path: endpoint.path,
+          file: endpoint.file,
+          line: endpoint.line,
+        });
+      }
+    }
+
+    // Extract functions as potential utilities
+    if (analysis.functions) {
+      for (const func of analysis.functions) {
+        if (func.isExported) {
+          dataModels.push({
+            name: func.name,
+            type: "function",
+            file: filePath,
+            isExported: true,
+            startLine: func.startLine,
+          });
+        }
+      }
+    }
   }
 
   private async analyzeSingleFile(filePath: string): Promise<{
@@ -204,45 +384,67 @@ class CodebaseAnalysisTask {
     endpoints: any[];
     models: any[];
     analysis?: FileAnalysisResult;
+    treeSitterAnalysis?: TreeSitterAnalysisResult;
   }> {
     try {
       const content = await fs.promises.readFile(filePath, "utf-8");
       const lines = content.split("\n").length;
 
-      // Use analyzer factory for structured analysis
-      let analysis: FileAnalysisResult | undefined;
-      try {
-        const analyzer = this.analyzerFactory.getAnalyzer(filePath);
-        if (analyzer) {
-          analysis = analyzer.analyze(content, filePath);
+      // Try Tree-sitter analysis first (more accurate)
+      let treeSitterAnalysis: TreeSitterAnalysisResult | undefined;
+      if (this.treeSitterAnalyzer?.canAnalyze(filePath)) {
+        try {
+          treeSitterAnalysis = await this.treeSitterAnalyzer.analyze(
+            content,
+            filePath,
+          );
+        } catch (error: any) {
+          this.logger.warn(
+            `Tree-sitter analysis failed for ${filePath}, falling back to regex:`,
+            error,
+          );
         }
-      } catch (error: any) {
-        this.logger.warn(
-          `Failed to run structured analysis on ${filePath}:`,
-          error,
-        );
+      }
+
+      // Fallback to regex-based analyzer factory
+      let analysis: FileAnalysisResult | undefined;
+      if (!treeSitterAnalysis) {
+        try {
+          const analyzer = this.analyzerFactory.getAnalyzer(filePath);
+          if (analyzer) {
+            analysis = analyzer.analyze(content, filePath);
+          }
+        } catch (error: any) {
+          this.logger.warn(
+            `Failed to run structured analysis on ${filePath}:`,
+            error,
+          );
+        }
       }
 
       // Extract API endpoints and data models with error handling
+      // (regex-based fallback for endpoints not caught by Tree-sitter)
       let endpoints: any[] = [];
       let models: any[] = [];
 
-      try {
-        endpoints = this.extractApiEndpoints(filePath, content);
-      } catch (error: any) {
-        this.logger.warn(
-          `Failed to extract API endpoints from ${filePath}:`,
-          error,
-        );
-      }
+      if (!treeSitterAnalysis) {
+        try {
+          endpoints = this.extractApiEndpoints(filePath, content);
+        } catch (error: any) {
+          this.logger.warn(
+            `Failed to extract API endpoints from ${filePath}:`,
+            error,
+          );
+        }
 
-      try {
-        models = this.extractDataModels(filePath, content);
-      } catch (error: any) {
-        this.logger.warn(
-          `Failed to extract data models from ${filePath}:`,
-          error,
-        );
+        try {
+          models = this.extractDataModels(filePath, content);
+        } catch (error: any) {
+          this.logger.warn(
+            `Failed to extract data models from ${filePath}:`,
+            error,
+          );
+        }
       }
 
       return {
@@ -251,6 +453,7 @@ class CodebaseAnalysisTask {
         endpoints,
         models,
         analysis,
+        treeSitterAnalysis,
       };
     } catch (error: any) {
       // simplified error handling for worker
@@ -341,7 +544,7 @@ class CodebaseAnalysisTask {
   ): Promise<Record<string, string>> {
     const dependencies: Record<string, string> = {};
 
-    // Analyze package.json
+    // === JavaScript/TypeScript: package.json ===
     const packageJsonPath = path.join(workspacePath, "package.json");
     if (fs.existsSync(packageJsonPath)) {
       try {
@@ -355,22 +558,202 @@ class CodebaseAnalysisTask {
       }
     }
 
-    // Analyze requirements.txt (Python)
+    // === Python: requirements.txt ===
     const requirementsPath = path.join(workspacePath, "requirements.txt");
     if (fs.existsSync(requirementsPath)) {
       try {
         const content = await fs.promises.readFile(requirementsPath, "utf-8");
         const lines = content
           .split("\n")
-          .filter((line) => line.trim() && !line.startsWith("#"));
+          .filter(
+            (line) =>
+              line.trim() && !line.startsWith("#") && !line.startsWith("-"),
+          );
         for (const line of lines) {
-          const [name, version] = line.split("==");
-          if (name && version) {
-            dependencies[name.trim()] = version.trim();
+          // Handle various formats: pkg==1.0, pkg>=1.0, pkg~=1.0, pkg[extra]>=1.0
+          const match = line.match(
+            /^([a-zA-Z0-9_-]+)(?:\[.*?\])?(?:([=<>~!]+)(.+))?/,
+          );
+          if (match) {
+            const name = match[1].trim();
+            const version = match[3]?.trim() || "*";
+            dependencies[name] = version;
           }
         }
       } catch (error: any) {
         this.logger.warn("Failed to analyze requirements.txt:", error);
+      }
+    }
+
+    // === Python: pyproject.toml ===
+    const pyprojectPath = path.join(workspacePath, "pyproject.toml");
+    if (fs.existsSync(pyprojectPath)) {
+      try {
+        const content = await fs.promises.readFile(pyprojectPath, "utf-8");
+        // Simple TOML parsing for dependencies
+        const depsMatch = content.match(
+          /\[project\.dependencies\]([\s\S]*?)(?:\[|$)/,
+        );
+        if (depsMatch) {
+          const depsLines = depsMatch[1].split("\n");
+          for (const line of depsLines) {
+            const match = line.match(
+              /["']([a-zA-Z0-9_-]+)(?:\[.*?\])?(?:([=<>~!]+)(.+?))?["']/,
+            );
+            if (match) {
+              dependencies[match[1]] = match[3]?.trim() || "*";
+            }
+          }
+        }
+        // Also check [tool.poetry.dependencies] for Poetry projects
+        const poetryMatch = content.match(
+          /\[tool\.poetry\.dependencies\]([\s\S]*?)(?:\[|$)/,
+        );
+        if (poetryMatch) {
+          const depsLines = poetryMatch[1].split("\n");
+          for (const line of depsLines) {
+            const match = line.match(
+              /^([a-zA-Z0-9_-]+)\s*=\s*["']?([^"'\n]+)["']?/,
+            );
+            if (match && match[1] !== "python") {
+              dependencies[match[1]] = match[2].trim();
+            }
+          }
+        }
+      } catch (error: any) {
+        this.logger.warn("Failed to analyze pyproject.toml:", error);
+      }
+    }
+
+    // === Go: go.mod ===
+    const goModPath = path.join(workspacePath, "go.mod");
+    if (fs.existsSync(goModPath)) {
+      try {
+        const content = await fs.promises.readFile(goModPath, "utf-8");
+        // Extract module name (useful context)
+        const moduleMatch = content.match(/^module\s+(.+)$/m);
+        if (moduleMatch) {
+          dependencies["__go_module__"] = moduleMatch[1].trim();
+        }
+        // Extract require statements
+        const requireBlock = content.match(/require\s*\(([\s\S]*?)\)/);
+        if (requireBlock) {
+          const lines = requireBlock[1].split("\n");
+          for (const line of lines) {
+            const match = line.match(/^\s*([^\s]+)\s+v?([^\s/]+)/);
+            if (match) {
+              dependencies[match[1]] = match[2];
+            }
+          }
+        }
+        // Also handle single-line requires
+        const singleRequires = content.matchAll(
+          /^require\s+([^\s]+)\s+v?([^\s]+)$/gm,
+        );
+        for (const match of singleRequires) {
+          dependencies[match[1]] = match[2];
+        }
+      } catch (error: any) {
+        this.logger.warn("Failed to analyze go.mod:", error);
+      }
+    }
+
+    // === Rust: Cargo.toml ===
+    const cargoPath = path.join(workspacePath, "Cargo.toml");
+    if (fs.existsSync(cargoPath)) {
+      try {
+        const content = await fs.promises.readFile(cargoPath, "utf-8");
+        // Extract [dependencies] section
+        const depsMatch = content.match(/\[dependencies\]([\s\S]*?)(?:\[|$)/);
+        if (depsMatch) {
+          const lines = depsMatch[1].split("\n");
+          for (const line of lines) {
+            // Handle: pkg = "1.0" or pkg = { version = "1.0", ... }
+            const simpleMatch = line.match(
+              /^([a-zA-Z0-9_-]+)\s*=\s*["']([^"']+)["']/,
+            );
+            const complexMatch = line.match(
+              /^([a-zA-Z0-9_-]+)\s*=\s*\{.*version\s*=\s*["']([^"']+)["']/,
+            );
+            if (simpleMatch) {
+              dependencies[simpleMatch[1]] = simpleMatch[2];
+            } else if (complexMatch) {
+              dependencies[complexMatch[1]] = complexMatch[2];
+            }
+          }
+        }
+        // Also check [dev-dependencies]
+        const devDepsMatch = content.match(
+          /\[dev-dependencies\]([\s\S]*?)(?:\[|$)/,
+        );
+        if (devDepsMatch) {
+          const lines = devDepsMatch[1].split("\n");
+          for (const line of lines) {
+            const simpleMatch = line.match(
+              /^([a-zA-Z0-9_-]+)\s*=\s*["']([^"']+)["']/,
+            );
+            if (simpleMatch) {
+              dependencies[simpleMatch[1]] = simpleMatch[2];
+            }
+          }
+        }
+      } catch (error: any) {
+        this.logger.warn("Failed to analyze Cargo.toml:", error);
+      }
+    }
+
+    // === Java: pom.xml (Maven) ===
+    const pomPath = path.join(workspacePath, "pom.xml");
+    if (fs.existsSync(pomPath)) {
+      try {
+        const content = await fs.promises.readFile(pomPath, "utf-8");
+        // Extract dependencies using regex (simple XML parsing)
+        const depMatches = content.matchAll(
+          /<dependency>[\s\S]*?<groupId>([^<]+)<\/groupId>[\s\S]*?<artifactId>([^<]+)<\/artifactId>[\s\S]*?(?:<version>([^<]+)<\/version>)?[\s\S]*?<\/dependency>/g,
+        );
+        for (const match of depMatches) {
+          const name = `${match[1]}:${match[2]}`;
+          dependencies[name] = match[3] || "*";
+        }
+      } catch (error: any) {
+        this.logger.warn("Failed to analyze pom.xml:", error);
+      }
+    }
+
+    // === Java: build.gradle (Gradle) ===
+    const gradlePath = path.join(workspacePath, "build.gradle");
+    if (fs.existsSync(gradlePath)) {
+      try {
+        const content = await fs.promises.readFile(gradlePath, "utf-8");
+        // Extract implementation/compile dependencies
+        const depMatches = content.matchAll(
+          /(?:implementation|compile|api|testImplementation)\s*[("']([^"'()]+)[)"']/g,
+        );
+        for (const match of depMatches) {
+          const dep = match[1];
+          // Parse group:artifact:version format
+          const parts = dep.split(":");
+          if (parts.length >= 2) {
+            const name = `${parts[0]}:${parts[1]}`;
+            dependencies[name] = parts[2] || "*";
+          }
+        }
+      } catch (error: any) {
+        this.logger.warn("Failed to analyze build.gradle:", error);
+      }
+    }
+
+    // === PHP: composer.json ===
+    const composerPath = path.join(workspacePath, "composer.json");
+    if (fs.existsSync(composerPath)) {
+      try {
+        const composer = JSON.parse(
+          await fs.promises.readFile(composerPath, "utf-8"),
+        );
+        Object.assign(dependencies, composer.require || {});
+        Object.assign(dependencies, composer["require-dev"] || {});
+      } catch (error: any) {
+        this.logger.warn("Failed to analyze composer.json:", error);
       }
     }
 
@@ -382,38 +765,186 @@ class CodebaseAnalysisTask {
     dependencies: Record<string, string>,
   ): Promise<string[]> {
     const frameworks: Set<string> = new Set();
-    const frameworkMap: Record<string, string> = {
+
+    // JavaScript/TypeScript frameworks
+    const jsFrameworks: Record<string, string> = {
       react: "React",
       vue: "Vue.js",
-      angular: "Angular",
+      "@angular/core": "Angular",
       svelte: "Svelte",
       next: "Next.js",
       nuxt: "Nuxt.js",
       express: "Express.js",
       fastify: "Fastify",
-      nestjs: "NestJS",
-      django: "Django",
-      flask: "Flask",
-      spring: "Spring Boot",
-      laravel: "Laravel",
-      symfony: "Symfony",
+      "@nestjs/core": "NestJS",
+      hono: "Hono",
+      koa: "Koa",
+      "@hapi/hapi": "Hapi",
+      "socket.io": "Socket.io",
+      prisma: "Prisma",
+      typeorm: "TypeORM",
+      mongoose: "Mongoose",
+      sequelize: "Sequelize",
+      drizzle: "Drizzle ORM",
+      webpack: "Webpack",
+      vite: "Vite",
+      esbuild: "esbuild",
+      rollup: "Rollup",
+      electron: "Electron",
+      "react-native": "React Native",
     };
 
-    for (const [dep, framework] of Object.entries(frameworkMap)) {
+    // Python frameworks (by package name)
+    const pyFrameworks: Record<string, string> = {
+      django: "Django",
+      flask: "Flask",
+      fastapi: "FastAPI",
+      starlette: "Starlette",
+      tornado: "Tornado",
+      pyramid: "Pyramid",
+      aiohttp: "aiohttp",
+      sqlalchemy: "SQLAlchemy",
+      alembic: "Alembic",
+      celery: "Celery",
+      pytest: "pytest",
+      pandas: "pandas",
+      numpy: "NumPy",
+      tensorflow: "TensorFlow",
+      torch: "PyTorch",
+      scikit_learn: "scikit-learn",
+    };
+
+    // Go frameworks (by module path patterns)
+    const goFrameworks: Record<string, string> = {
+      "github.com/gin-gonic/gin": "Gin",
+      "github.com/labstack/echo": "Echo",
+      "github.com/go-chi/chi": "Chi",
+      "github.com/gofiber/fiber": "Fiber",
+      "github.com/gorilla/mux": "Gorilla Mux",
+      "gorm.io/gorm": "GORM",
+      "github.com/jmoiron/sqlx": "sqlx",
+    };
+
+    // Rust frameworks (by crate name)
+    const rustFrameworks: Record<string, string> = {
+      actix_web: "Actix-web",
+      axum: "Axum",
+      rocket: "Rocket",
+      warp: "Warp",
+      tokio: "Tokio",
+      diesel: "Diesel",
+      sqlx: "SQLx",
+      serde: "Serde",
+    };
+
+    // Java frameworks (by artifact patterns)
+    const javaFrameworks: Record<string, string> = {
+      "spring-boot": "Spring Boot",
+      "spring-webmvc": "Spring MVC",
+      "spring-data": "Spring Data",
+      hibernate: "Hibernate",
+      "jakarta.persistence": "JPA",
+      "javax.persistence": "JPA",
+      quarkus: "Quarkus",
+      micronaut: "Micronaut",
+      "jersey-server": "Jersey (JAX-RS)",
+    };
+
+    // PHP frameworks (by package name)
+    const phpFrameworks: Record<string, string> = {
+      "laravel/framework": "Laravel",
+      "symfony/framework-bundle": "Symfony",
+      "slim/slim": "Slim",
+      "cakephp/cakephp": "CakePHP",
+      "yiisoft/yii2": "Yii",
+      "doctrine/orm": "Doctrine ORM",
+    };
+
+    // Check JS/TS dependencies
+    for (const [dep, framework] of Object.entries(jsFrameworks)) {
       if (dependencies[dep] || dependencies[`@${dep}`]) {
         frameworks.add(framework);
       }
     }
 
+    // Check Python dependencies (case insensitive, underscore/hyphen agnostic)
+    for (const [dep, framework] of Object.entries(pyFrameworks)) {
+      const normalizedDep = dep.toLowerCase().replace(/_/g, "-");
+      const found = Object.keys(dependencies).some(
+        (d) => d.toLowerCase().replace(/_/g, "-") === normalizedDep,
+      );
+      if (found) {
+        frameworks.add(framework);
+      }
+    }
+
+    // Check Go dependencies
+    for (const [dep, framework] of Object.entries(goFrameworks)) {
+      if (Object.keys(dependencies).some((d) => d.includes(dep))) {
+        frameworks.add(framework);
+      }
+    }
+
+    // Check Rust dependencies
+    for (const [dep, framework] of Object.entries(rustFrameworks)) {
+      const normalizedDep = dep.toLowerCase().replace(/_/g, "-");
+      if (
+        Object.keys(dependencies).some(
+          (d) => d.toLowerCase().replace(/_/g, "-") === normalizedDep,
+        )
+      ) {
+        frameworks.add(framework);
+      }
+    }
+
+    // Check Java dependencies
+    for (const [dep, framework] of Object.entries(javaFrameworks)) {
+      if (
+        Object.keys(dependencies).some((d) => d.toLowerCase().includes(dep))
+      ) {
+        frameworks.add(framework);
+      }
+    }
+
+    // Check PHP dependencies
+    for (const [dep, framework] of Object.entries(phpFrameworks)) {
+      if (dependencies[dep]) {
+        frameworks.add(framework);
+      }
+    }
+
+    // File-based framework detection
     const filePatterns: Record<string, string> = {
+      // JavaScript/TypeScript
       "next.config.js": "Next.js",
+      "next.config.ts": "Next.js",
+      "next.config.mjs": "Next.js",
       "nuxt.config.js": "Nuxt.js",
+      "nuxt.config.ts": "Nuxt.js",
       "vue.config.js": "Vue.js",
       "angular.json": "Angular",
       "svelte.config.js": "Svelte",
+      "svelte.config.ts": "Svelte",
+      "vite.config.js": "Vite",
+      "vite.config.ts": "Vite",
+      "webpack.config.js": "Webpack",
+      "tailwind.config.js": "Tailwind CSS",
+      "tailwind.config.ts": "Tailwind CSS",
+      // Python
       "manage.py": "Django",
+      "wsgi.py": "WSGI Application",
+      "asgi.py": "ASGI Application",
+      // PHP
       artisan: "Laravel",
       "composer.json": "PHP/Composer",
+      // Go
+      "go.mod": "Go Modules",
+      // Rust
+      "Cargo.toml": "Rust/Cargo",
+      // Java
+      "pom.xml": "Maven",
+      "build.gradle": "Gradle",
+      "settings.gradle": "Gradle",
     };
 
     for (const file of files) {

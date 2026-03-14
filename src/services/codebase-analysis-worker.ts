@@ -31,6 +31,14 @@ export interface CodebaseAnalysisWorkerData {
   filePatterns: string[];
   excludePatterns: string[];
   maxFiles: number;
+  grammarsPath?: string; // Path to Tree-sitter grammar files
+}
+
+export interface CodeSnippet {
+  file: string;
+  content: string;
+  language: string;
+  summary?: string;
 }
 
 export interface AnalysisResult {
@@ -42,6 +50,7 @@ export interface AnalysisResult {
   databaseSchema: any;
   domainRelationships: any[];
   fileContents: Map<string, string>;
+  codeSnippets: CodeSnippet[]; // NEW: Key code snippets for context
   summary: {
     totalFiles: number;
     totalLines: number;

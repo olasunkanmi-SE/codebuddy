@@ -85,6 +85,21 @@ export const languageConfigs: Readonly<Record<string, ILanguageConfig>> = {
       methodDefinitions: `(function_item name: (identifier) @name) @method.definition`,
     },
   },
+  php: {
+    grammarPath: "dist/grammars/tree-sitter-php.wasm",
+    languageIdMap: ["php", "php3", "php4", "php5", "phtml"],
+    queries: {
+      // PHP 8+ syntax support
+      functionDefinitions: `(function_definition name: (name) @name) @function.definition`,
+      classDefinitions: `
+        (class_declaration name: (name) @name) @class.definition
+        (interface_declaration name: (name) @name) @class.definition
+        (trait_declaration name: (name) @name) @class.definition
+        (enum_declaration name: (name) @name) @class.definition
+      `,
+      methodDefinitions: `(method_declaration name: (name) @name) @method.definition`,
+    },
+  },
 };
 
 export function validateLanguageConfig(

@@ -356,67 +356,282 @@ ${sanitizedQuestion}
 }
 
 /**
- * Create analysis context from persistent analysis data
+ * Create rich analysis context from persistent analysis data
+ * Uses token budget allocation for optimal context utilization
  */
-function createContextFromAnalysis(analysis: any): string {
-  const sections = [
-    `## Codebase Overview`,
-    `**Total Files:** ${analysis.summary.totalFiles}`,
-    `**Total Lines:** ${analysis.summary.totalLines}`,
-    `**Complexity:** ${analysis.summary.complexity}`,
-    `**Git Branch:** ${analysis.gitState.branch}`,
-    `**Last Analysis:** ${analysis.analysisMetadata.createdAt}`,
-    ``,
-    `## Frameworks & Technologies`,
-    analysis.frameworks.length > 0
-      ? analysis.frameworks.map((f: string) => `- ${f}`).join("\n")
-      : "No specific frameworks detected",
-    ``,
-    `## Dependencies`,
-    Object.keys(analysis.dependencies).length > 0
-      ? Object.entries(analysis.dependencies)
-          .slice(0, 20) // Limit to avoid overwhelming the context
-          .map(([name, version]) => `- ${name}: ${version}`)
-          .join("\n")
-      : "No dependencies found",
-    ``,
-    `## API Endpoints`,
-    analysis.apiEndpoints.length > 0
-      ? analysis.apiEndpoints
-          .slice(0, 15) // Limit endpoints
-          .map(
-            (endpoint: any) =>
-              `- ${endpoint.method} ${endpoint.path} (${endpoint.file})`,
-          )
-          .join("\n")
-      : "No API endpoints detected",
-    ``,
-    `## Data Models`,
-    analysis.dataModels.length > 0
-      ? analysis.dataModels
-          .slice(0, 10) // Limit models
-          .map(
-            (model: any) => `- ${model.name} (${model.type}) - ${model.file}`,
-          )
-          .join("\n")
-      : "No data models detected",
-    ``,
-    `## File Structure`,
-    analysis.files.length > 0
-      ? analysis.files
-          .slice(0, 30) // Limit files shown
-          .map(
-            (file: string, index: number) =>
-              `[[${index + 1}]](${file}) ${file}`,
-          )
-          .join("\n")
-      : "No files analyzed",
-    ``,
-    `## Language Distribution`,
-    Object.entries(analysis.summary.languageDistribution)
-      .map(([ext, count]) => `- ${ext}: ${count} files`)
-      .join("\n"),
-  ];
+function createContextFromAnalysis(
+  analysis: any,
+  userQuestion?: string,
+): string {
+  const sections: string[] = [];
+
+  // === SECTION 1: Codebase Overview (always include) ===
+  sections.push(`## Codebase Overview`);
+  sections.push(`- **Total Files:** ${analysis.summary.totalFiles}`);
+  sections.push(`- **Total Lines:** ${analysis.summary.totalLines}`);
+  sections.push(`- **Complexity:** ${analysis.summary.complexity}`);
+  sections.push(`- **Git Branch:** ${analysis.gitState?.branch || "unknown"}`);
+  sections.push(
+    `- **Last Analysis:** ${analysis.analysisMetadata?.createdAt || "unknown"}`,
+  );
+  sections.push("");
+
+  // === SECTION 2: Frameworks & Technologies ===
+  sections.push(`## Frameworks & Technologies`);
+  if (analysis.frameworks?.length > 0) {
+    sections.push(analysis.frameworks.map((f: string) => `- ${f}`).join("\n"));
+  } else {
+    sections.push("No specific frameworks detected");
+  }
+  sections.push("");
+
+  // === SECTION 3: Language Distribution ===
+  sections.push(`## Language Distribution`);
+  const langDist = analysis.summary?.languageDistribution || {};
+  const sortedLangs = Object.entries(langDist).sort(
+    (a, b) => (b[1] as number) - (a[1] as number),
+  );
+  sections.push(
+    sortedLangs.map(([ext, count]) => `- ${ext}: ${count} files`).join("\n"),
+  );
+  sections.push("");
+
+  // === SECTION 4: Dependencies (prioritized) ===
+  sections.push(`## Key Dependencies`);
+  const deps = analysis.dependencies || {};
+  const depEntries = Object.entries(deps);
+  if (depEntries.length > 0) {
+    // Prioritize important dependencies
+    const importantDeps = [
+      "react",
+      "vue",
+      "angular",
+      "svelte",
+      "next",
+      "nuxt",
+      "express",
+      "fastify",
+      "nestjs",
+      "koa",
+      "hono",
+      "prisma",
+      "typeorm",
+      "mongoose",
+      "sequelize",
+      "typescript",
+      "webpack",
+      "vite",
+      "esbuild",
+    ];
+    const sorted = depEntries.sort((a, b) => {
+      const aImportant = importantDeps.some((d) =>
+        a[0].toLowerCase().includes(d),
+      )
+        ? 1
+        : 0;
+      const bImportant = importantDeps.some((d) =>
+        b[0].toLowerCase().includes(d),
+      )
+        ? 1
+        : 0;
+      return bImportant - aImportant;
+    });
+    sections.push(
+      sorted
+        .slice(0, 30)
+        .map(([name, version]) => `- ${name}: ${version}`)
+        .join("\n"),
+    );
+  } else {
+    sections.push("No dependencies found");
+  }
+  sections.push("");
+
+  // === SECTION 5: API Endpoints (detailed) ===
+  sections.push(`## API Endpoints`);
+  const endpoints = analysis.apiEndpoints || [];
+  if (endpoints.length > 0) {
+    // Group by base path
+    const grouped = new Map<string, any[]>();
+    for (const ep of endpoints) {
+      const basePath = ep.path.split("/").slice(0, 3).join("/") || "/";
+      if (!grouped.has(basePath)) grouped.set(basePath, []);
+      grouped.get(basePath)!.push(ep);
+    }
+
+    let endpointCount = 0;
+    for (const [basePath, eps] of grouped) {
+      if (endpointCount >= 25) break;
+      sections.push(`\n### ${basePath}`);
+      for (const ep of eps.slice(0, 8)) {
+        if (endpointCount >= 25) break;
+        const fileName = ep.file?.split("/").pop() || "unknown";
+        sections.push(
+          `- **${ep.method}** \`${ep.path}\` → ${fileName}${ep.line ? `:${ep.line}` : ""}`,
+        );
+        endpointCount++;
+      }
+    }
+  } else {
+    sections.push("No API endpoints detected");
+  }
+  sections.push("");
+
+  // === SECTION 6: Data Models (detailed) ===
+  sections.push(`## Data Models & Types`);
+  const models = analysis.dataModels || [];
+  if (models.length > 0) {
+    // Group by type
+    const classes = models.filter((m: any) => m.type === "class");
+    const interfaces = models.filter(
+      (m: any) => m.type === "interface" || m.type === "type",
+    );
+    const components = models.filter((m: any) => m.type === "react_component");
+    const functions = models.filter((m: any) => m.type === "function");
+    const others = models.filter(
+      (m: any) =>
+        !["class", "interface", "type", "react_component", "function"].includes(
+          m.type,
+        ),
+    );
+
+    if (classes.length > 0) {
+      sections.push(`\n### Classes (${classes.length})`);
+      for (const cls of classes.slice(0, 10)) {
+        const fileName = cls.file?.split("/").pop() || "";
+        let detail = `- **${cls.name}**`;
+        if (cls.extends) detail += ` extends ${cls.extends}`;
+        if (cls.implements?.length)
+          detail += ` implements ${cls.implements.join(", ")}`;
+        detail += ` (${fileName})`;
+        if (cls.methods?.length)
+          detail += `\n  - Methods: ${cls.methods.slice(0, 5).join(", ")}${cls.methods.length > 5 ? "..." : ""}`;
+        sections.push(detail);
+      }
+    }
+
+    if (interfaces.length > 0) {
+      sections.push(`\n### Interfaces & Types (${interfaces.length})`);
+      for (const iface of interfaces.slice(0, 10)) {
+        const fileName = iface.file?.split("/").pop() || "";
+        sections.push(`- **${iface.name}** (${fileName})`);
+      }
+    }
+
+    if (components.length > 0) {
+      sections.push(`\n### React Components (${components.length})`);
+      for (const comp of components.slice(0, 10)) {
+        const fileName = comp.file?.split("/").pop() || "";
+        sections.push(`- **${comp.name}** (${fileName})`);
+      }
+    }
+
+    if (
+      functions.length > 0 &&
+      functions.filter((f: any) => f.isExported).length > 0
+    ) {
+      sections.push(`\n### Exported Functions`);
+      for (const fn of functions
+        .filter((f: any) => f.isExported)
+        .slice(0, 10)) {
+        const fileName = fn.file?.split("/").pop() || "";
+        sections.push(`- **${fn.name}** (${fileName})`);
+      }
+    }
+  } else {
+    sections.push("No data models detected");
+  }
+  sections.push("");
+
+  // === SECTION 7: Code Snippets (NEW - actual code!) ===
+  const codeSnippets = analysis.codeSnippets || [];
+  if (codeSnippets.length > 0) {
+    sections.push(`## Key Code Files`);
+    sections.push(`_Showing first lines of important files for context._\n`);
+
+    // Sort by importance (entry points first)
+    const entryPatterns = ["index", "main", "app", "server"];
+    const sorted = [...codeSnippets].sort((a: any, b: any) => {
+      const aName = a.file?.split("/").pop()?.toLowerCase() || "";
+      const bName = b.file?.split("/").pop()?.toLowerCase() || "";
+      const aScore = entryPatterns.some((p) => aName.includes(p)) ? 1 : 0;
+      const bScore = entryPatterns.some((p) => bName.includes(p)) ? 1 : 0;
+      return bScore - aScore;
+    });
+
+    // Include up to 5 snippets
+    for (const snippet of sorted.slice(0, 5)) {
+      const fileName = snippet.file?.split("/").pop() || "file";
+      const relativePath = getRelativePath(snippet.file);
+      sections.push(`### ${relativePath}`);
+      sections.push("```" + (snippet.language || "typescript"));
+      // Truncate to ~50 lines max
+      const lines = (snippet.content || "").split("\n").slice(0, 50);
+      sections.push(lines.join("\n"));
+      if ((snippet.content || "").split("\n").length > 50) {
+        sections.push("// ... (truncated)");
+      }
+      sections.push("```");
+      sections.push("");
+    }
+  }
+
+  // === SECTION 8: Domain Relationships ===
+  const relationships = analysis.domainRelationships || [];
+  if (relationships.length > 0) {
+    sections.push(`## Domain Relationships`);
+    for (const rel of relationships.slice(0, 10)) {
+      sections.push(
+        `- **${rel.entity}** → ${rel.relatedEntities?.join(", ") || "none"}`,
+      );
+    }
+    sections.push("");
+  }
+
+  // === SECTION 9: File Structure (compact) ===
+  sections.push(`## Project Structure`);
+  const files = analysis.files || [];
+  if (files.length > 0) {
+    // Group by directory
+    const byDir = new Map<string, string[]>();
+    for (const file of files) {
+      const dir = file.split("/").slice(0, -1).join("/") || ".";
+      if (!byDir.has(dir)) byDir.set(dir, []);
+      byDir.get(dir)!.push(file.split("/").pop());
+    }
+
+    // Show top directories
+    const sortedDirs = Array.from(byDir.entries())
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 15);
+
+    for (const [dir, dirFiles] of sortedDirs) {
+      const shortDir = dir.split("/").slice(-2).join("/") || dir;
+      sections.push(`- **${shortDir}/** (${dirFiles.length} files)`);
+      if (dirFiles.length <= 3) {
+        sections.push(`  - ${dirFiles.join(", ")}`);
+      }
+    }
+  } else {
+    sections.push("No files analyzed");
+  }
 
   return sections.join("\n");
+}
+
+/**
+ * Get relative path from workspace root
+ */
+function getRelativePath(fullPath: string): string {
+  if (!fullPath) return "unknown";
+  // Extract path after common root directories
+  const patterns = ["/src/", "/lib/", "/app/", "/pages/", "/components/"];
+  for (const pattern of patterns) {
+    const idx = fullPath.indexOf(pattern);
+    if (idx !== -1) {
+      return fullPath.substring(idx + 1);
+    }
+  }
+  // Fallback: last 3 path segments
+  return fullPath.split("/").slice(-3).join("/");
 }

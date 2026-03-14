@@ -213,18 +213,49 @@ export class PersistentCodebaseUnderstandingService {
     const startTime = Date.now();
 
     try {
+      // Get extension path for grammars
+      const extension = vscode.extensions.getExtension("nicola.codebuddy");
+      const extensionPath = extension?.extensionPath || "";
+      const grammarsPath = extensionPath
+        ? `${extensionPath}/dist/grammars`
+        : undefined;
+
       // Prepare worker data
       const workerData: CodebaseAnalysisWorkerData = {
         workspacePath: gitState.workspacePath,
         filePatterns: [
-          "**/*.{ts,js,tsx,jsx}",
-          "**/*.{py,java,cs,php}",
+          // Source code
+          "**/*.{ts,js,tsx,jsx}", // JavaScript/TypeScript
+          "**/*.{py}", // Python
+          "**/*.{java}", // Java
+          "**/*.{go}", // Go
+          "**/*.{rs}", // Rust
+          "**/*.{php,phtml}", // PHP
+          // Config & data
           "**/*.{json,yaml,yml}",
-          "**/*.{md,txt}",
+          "**/*.{md,txt,rst}", // Documentation (including README)
+          // JavaScript/TypeScript manifests
           "**/package.json",
+          "**/tsconfig.json",
+          // Python manifests
           "**/requirements.txt",
-          "**/composer.json",
+          "**/pyproject.toml",
+          "**/setup.py",
+          "**/setup.cfg",
+          "**/Pipfile",
+          // Go manifests
+          "**/go.mod",
+          "**/go.sum",
+          // Rust manifests
+          "**/Cargo.toml",
+          "**/Cargo.lock",
+          // Java manifests
           "**/pom.xml",
+          "**/build.gradle",
+          "**/settings.gradle",
+          // PHP manifests
+          "**/composer.json",
+          // Database
           "**/*.sql",
           "**/schema.prisma",
         ],
@@ -239,6 +270,7 @@ export class PersistentCodebaseUnderstandingService {
           "**/.nuxt/**",
         ],
         maxFiles: 1000,
+        grammarsPath, // Pass grammars path for Tree-sitter
       };
 
       // Show progress to user
