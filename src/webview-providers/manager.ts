@@ -19,9 +19,13 @@ import { OpenAIWebViewProvider } from "./openai";
 import { QwenWebViewProvider } from "./qwen";
 import { GLMWebViewProvider } from "./glm";
 import { LocalWebViewProvider } from "./local";
+import type { IProviderFactory } from "./provider-factory.interface";
+import { toProviderKey } from "./provider-name";
 import { Terminal } from "../utils/terminal";
 
-export class WebViewProviderManager implements vscode.Disposable {
+export class WebViewProviderManager
+  implements vscode.Disposable, IProviderFactory
+{
   private static instance: WebViewProviderManager;
   private currentProvider: BaseWebViewProvider | undefined;
   private activeProviderName: string | undefined;
@@ -190,6 +194,28 @@ export class WebViewProviderManager implements vscode.Disposable {
     this.providerRegistry.set(generativeAiModels.LOCAL, LocalWebViewProvider);
   }
 
+  // ── IProviderFactory ──────────────────────────────────────
+
+  /**
+   * Create a provider instance by name (case-insensitive registry lookup).
+   * Implements IProviderFactory for Ask-mode failover injection.
+   */
+  createProviderByName(
+    providerName: string,
+    apiKey: string,
+    model: string,
+  ): BaseWebViewProvider | undefined {
+    const key = this.findRegistryKey(providerName) ?? providerName;
+    return this.createProvider(key, apiKey, model);
+  }
+
+  private findRegistryKey(providerName: string): string | undefined {
+    const needle = toProviderKey(providerName);
+    return [...this.providerRegistry.keys()].find(
+      (k) => k.toLowerCase() === needle,
+    );
+  }
+
   registerWebViewProvider(): vscode.Disposable | undefined {
     if (!this.webviewViewProvider) {
       this.webviewViewProvider = {
@@ -266,6 +292,10 @@ export class WebViewProviderManager implements vscode.Disposable {
       }
       this.currentProvider = newProvider;
       this.activeProviderName = modelName;
+
+      // Inject failover dependencies for Ask-mode
+      newProvider.providerName = modelName;
+      newProvider.setProviderFactory(this);
       if (this.webviewView) {
         if (onload) {
           // First load — full HTML render
