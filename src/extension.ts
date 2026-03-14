@@ -406,11 +406,13 @@ export async function activate(context: vscode.ExtensionContext) {
     const { InlineReviewService } =
       await import("./services/inline-review.service");
     const inlineReviewService = InlineReviewService.getInstance();
-    context.subscriptions.push(inlineReviewService);
+    context.subscriptions.push({
+      dispose: () => InlineReviewService.resetInstance(),
+    });
     context.subscriptions.push(
       vscode.commands.registerCommand(
         "codebuddy.clearInlineReviewComments",
-        () => inlineReviewService.clearComments(),
+        () => InlineReviewService.getInstance().clearComments(),
       ),
     );
 

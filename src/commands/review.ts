@@ -126,13 +126,13 @@ const posts = useMemo(() => loadPosts(), [dependency]);
 
 After your full review, append a fenced JSON block with ALL identified issues so they can be displayed inline in the editor. Use this EXACT format:
 
-\\\`\\\`\\\`json
+${"```"}json
 // REVIEW_COMMENTS
 [
   {"line": 45, "endLine": 47, "severity": "critical", "title": "SQL Injection vulnerability", "body": "Use parameterized queries instead of string interpolation."},
   {"line": 23, "severity": "moderate", "title": "N+1 query problem", "body": "Batch the queries to reduce database round-trips."}
 ]
-\\\`\\\`\\\`
+${"```"}
 
 Rules for the JSON block:
 - \`line\` (required): 1-based line number in the reviewed code

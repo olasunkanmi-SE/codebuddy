@@ -6,9 +6,9 @@ import { Logger, LogLevel } from "../infrastructure/logger/logger";
 export type ReviewSeverity = "critical" | "moderate" | "minor" | "info";
 
 export interface ReviewComment {
-  /** 1-based line number where the issue was found. */
+  /** 1-based absolute line number in the file. */
   line: number;
-  /** Optional end line for multi-line ranges. */
+  /** Optional end line for multi-line ranges (1-based). */
   endLine?: number;
   severity: ReviewSeverity;
   /** Short human-readable issue title. */
@@ -21,6 +21,20 @@ export interface FileReviewComments {
   /** Absolute or workspace-relative file path. */
   filePath: string;
   comments: ReviewComment[];
+}
+
+/**
+ * Shape expected from the LLM's REVIEW_COMMENTS JSON block.
+ * Used to validate / narrow the parsed result before conversion.
+ */
+interface RawJsonComment {
+  line: number;
+  endLine?: number;
+  severity?: string;
+  title?: string;
+  body?: string;
+  message?: string;
+  file?: string;
 }
 
 // ─── Severity helpers ────────────────────────────────────
@@ -43,11 +57,13 @@ const SEVERITY_LABEL: Record<ReviewSeverity, string> = {
  * `clearComments()` when the user dismisses them.
  */
 export class InlineReviewService implements vscode.Disposable {
-  private static instance: InlineReviewService;
+  private static instance: InlineReviewService | undefined;
+  private static readonly MAX_THREADS = 500;
 
   private readonly commentController: vscode.CommentController;
   private threads: vscode.CommentThread[] = [];
   private readonly logger: Logger;
+  private disposed = false;
 
   private constructor() {
     this.commentController = vscode.comments.createCommentController(
@@ -58,7 +74,7 @@ export class InlineReviewService implements vscode.Disposable {
     this.commentController.commentingRangeProvider = undefined;
 
     this.logger = Logger.initialize("InlineReviewService", {
-      minLevel: LogLevel.DEBUG,
+      minLevel: LogLevel.INFO,
       enableConsole: true,
       enableFile: true,
       enableTelemetry: true,
@@ -66,10 +82,20 @@ export class InlineReviewService implements vscode.Disposable {
   }
 
   static getInstance(): InlineReviewService {
-    if (!InlineReviewService.instance) {
+    if (
+      !InlineReviewService.instance ||
+      InlineReviewService.instance.disposed
+    ) {
+      InlineReviewService.instance?.dispose();
       InlineReviewService.instance = new InlineReviewService();
     }
     return InlineReviewService.instance;
+  }
+
+  /** Called during extension deactivation or test teardown. */
+  static resetInstance(): void {
+    InlineReviewService.instance?.dispose();
+    InlineReviewService.instance = undefined;
   }
 
   // ── Public API ─────────────────────────────────────────
@@ -99,7 +125,20 @@ export class InlineReviewService implements vscode.Disposable {
       this.clearComments();
     }
 
+    const totalIncoming = fileReviews.reduce(
+      (sum, f) => sum + f.comments.length,
+      0,
+    );
+    if (totalIncoming > InlineReviewService.MAX_THREADS) {
+      this.logger.warn(
+        `[InlineReview] ${totalIncoming} comments exceed MAX_THREADS (${InlineReviewService.MAX_THREADS}). Showing first ${InlineReviewService.MAX_THREADS} only.`,
+      );
+    }
+
+    let threadCount = 0;
     for (const fileReview of fileReviews) {
+      if (threadCount >= InlineReviewService.MAX_THREADS) break;
+
       const uri = this.resolveUri(fileReview.filePath);
       if (!uri) {
         this.logger.warn(
@@ -109,7 +148,9 @@ export class InlineReviewService implements vscode.Disposable {
       }
 
       for (const comment of fileReview.comments) {
-        const startLine = Math.max(0, comment.line - 1); // VS Code is 0-based
+        if (threadCount >= InlineReviewService.MAX_THREADS) break;
+
+        const startLine = Math.max(0, comment.line - 1); // 1-based → 0-based
         const endLine = comment.endLine
           ? Math.max(0, comment.endLine - 1)
           : startLine;
@@ -119,9 +160,7 @@ export class InlineReviewService implements vscode.Disposable {
         const thread = this.commentController.createCommentThread(uri, range, [
           {
             author: { name: "Code Review" },
-            body: new vscode.MarkdownString(
-              `**${SEVERITY_LABEL[comment.severity]}** — ${comment.title}\n\n${comment.body}`,
-            ),
+            body: this.buildCommentMarkdown(comment),
             mode: vscode.CommentMode.Preview,
           },
         ]);
@@ -133,6 +172,7 @@ export class InlineReviewService implements vscode.Disposable {
             : vscode.CommentThreadCollapsibleState.Collapsed;
 
         this.threads.push(thread);
+        threadCount++;
       }
     }
 
@@ -152,14 +192,56 @@ export class InlineReviewService implements vscode.Disposable {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.clearComments();
     this.commentController.dispose();
+    if (InlineReviewService.instance === this) {
+      InlineReviewService.instance = undefined;
+    }
+  }
+
+  // ── Markdown Sanitization ──────────────────────────────
+
+  /**
+   * Build a safe MarkdownString from untrusted LLM content.
+   * Strips VS Code command URIs and HTML to prevent injection.
+   */
+  private buildCommentMarkdown(comment: ReviewComment): vscode.MarkdownString {
+    const sanitizedTitle = InlineReviewService.sanitizeMarkdown(comment.title);
+    const sanitizedBody = InlineReviewService.sanitizeMarkdown(comment.body);
+    const label = SEVERITY_LABEL[comment.severity] ?? "ℹ️ Info";
+
+    const md = new vscode.MarkdownString(
+      `**${label}** — ${sanitizedTitle}\n\n${sanitizedBody}`,
+    );
+    md.isTrusted = false;
+    md.supportHtml = false;
+    return md;
+  }
+
+  /**
+   * Strip markdown command links and HTML from untrusted LLM content.
+   * Preserves inline code, bold, italic, and standard links.
+   */
+  private static sanitizeMarkdown(input: string): string {
+    return (
+      input
+        // Remove VS Code command URI links: [label](command:...)
+        .replace(/\[([^\]]*)\]\(command:[^)]*\)/gi, "$1")
+        // Remove bare command: URIs
+        .replace(/command:[^\s)"']*/gi, "")
+        // Strip raw HTML tags
+        .replace(/<[^>]+>/g, "")
+        // Limit length to prevent UI flooding
+        .slice(0, 2000)
+    );
   }
 
   // ── URI Resolution ─────────────────────────────────────
 
   private resolveUri(filePath: string): vscode.Uri | undefined {
-    // Absolute paths
+    // Absolute paths (Unix and Windows)
     if (filePath.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(filePath)) {
       return vscode.Uri.file(filePath);
     }
@@ -182,15 +264,15 @@ export class InlineReviewService implements vscode.Disposable {
    * Extraction strategy:
    * 1. First look for a fenced ```json block labelled REVIEW_COMMENTS
    *    (injected via the structured prompt addendum).
-   * 2. Fall back to regex-based heuristics that match the patterns from
-   *    the existing review prompt template (e.g. `// Location: Line 45-47`).
+   * 2. Fall back to section-aware regex heuristics that only extract
+   *    line references from recognized "issues" sections.
    *
-   * @param markdown  The full review response from the LLM.
-   * @param filePath  The file that was reviewed (used when the LLM
-   *                  doesn't explicitly state the file path).
-   * @param lineOffset  0-based line offset to add when the review was
-   *                    performed on a selection (e.g. selection starts at line 50
-   *                    → LLM's "Line 2" maps to file line 52).
+   * @param markdown    The full review response from the LLM.
+   * @param filePath    The file that was reviewed (used when the LLM
+   *                    doesn't explicitly state the file path).
+   * @param lineOffset  0-based selection start line. The LLM reports 1-based
+   *                    lines relative to the selection. To map back to the file:
+   *                    `absolute_1based = llm_1based + lineOffset`.
    */
   static parseReviewMarkdown(
     markdown: string,
@@ -207,7 +289,7 @@ export class InlineReviewService implements vscode.Disposable {
       );
     }
 
-    // ── Strategy 2: Regex heuristics ─────────────────────
+    // ── Strategy 2: Section-aware regex heuristics ───────
     return InlineReviewService.extractFromMarkdown(
       markdown,
       filePath,
@@ -218,15 +300,22 @@ export class InlineReviewService implements vscode.Disposable {
   /**
    * Look for ```json ... ``` block with a REVIEW_COMMENTS marker.
    */
-  private static extractJsonBlock(markdown: string): any[] | null {
+  private static extractJsonBlock(markdown: string): RawJsonComment[] | null {
     const jsonPattern =
       /```json\s*\n\s*\/\/\s*REVIEW_COMMENTS\s*\n([\s\S]*?)```/i;
     const match = jsonPattern.exec(markdown);
     if (!match) return null;
 
     try {
-      const parsed = JSON.parse(match[1]);
-      return Array.isArray(parsed) ? parsed : null;
+      const parsed: unknown = JSON.parse(match[1]);
+      if (!Array.isArray(parsed)) return null;
+      // Basic structural validation
+      return parsed.filter(
+        (item: unknown): item is RawJsonComment =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof (item as RawJsonComment).line === "number",
+      );
     } catch {
       return null;
     }
@@ -236,21 +325,13 @@ export class InlineReviewService implements vscode.Disposable {
    * Validate and normalise JSON-parsed review comment objects.
    */
   private static normalizeJsonComments(
-    raw: any[],
+    raw: RawJsonComment[],
     defaultFilePath: string,
     lineOffset = 0,
   ): FileReviewComments[] {
     const byFile = new Map<string, ReviewComment[]>();
 
     for (const item of raw) {
-      if (
-        typeof item !== "object" ||
-        item === null ||
-        typeof item.line !== "number"
-      ) {
-        continue;
-      }
-
       const fp = typeof item.file === "string" ? item.file : defaultFilePath;
       const severity = InlineReviewService.normalizeSeverity(item.severity);
       const comment: ReviewComment = {
@@ -272,15 +353,17 @@ export class InlineReviewService implements vscode.Disposable {
       byFile.set(fp, existing);
     }
 
-    return [...byFile.entries()].map(([filePath, comments]) => ({
-      filePath,
+    return [...byFile.entries()].map(([fp, comments]) => ({
+      filePath: fp,
       comments,
     }));
   }
 
   /**
-   * Regex-based fallback: scans the markdown for patterns like
-   * `// Location: Line 45` or `// Line 45-47` within issue blocks.
+   * Section-aware regex fallback: only extracts line references from
+   * recognized "issues" sections (Critical, Moderate, Minor) and ignores
+   * Strengths, Recommendations, Examples, and Learning Resources sections
+   * to avoid false positives.
    */
   private static extractFromMarkdown(
     markdown: string,
@@ -289,41 +372,71 @@ export class InlineReviewService implements vscode.Disposable {
   ): FileReviewComments[] {
     const comments: ReviewComment[] = [];
 
-    // Detect current severity section
+    const ISSUE_SECTION = /issue|problem|fix|bug|vulnerab|risk/i;
+    const STOP_SECTION =
+      /strength|learning|resource|diagram|example|recommendation|optimization|checklist/i;
+
+    let inIssueSection = false;
     let currentSeverity: ReviewSeverity = "info";
 
     const lines = markdown.split("\n");
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // Detect severity sections
+      // Detect section boundaries (H2/H3 headers)
+      if (/^#{2,3}\s/.test(line)) {
+        if (STOP_SECTION.test(line)) {
+          inIssueSection = false;
+          continue;
+        }
+        if (ISSUE_SECTION.test(line)) {
+          inIssueSection = true;
+        }
+      }
+
+      // Detect severity from emoji/keyword patterns anywhere
       if (/critical\s*issues?/i.test(line) || /🔴/u.test(line)) {
         currentSeverity = "critical";
+        inIssueSection = true;
         continue;
       }
       if (/moderate\s*issues?/i.test(line) || /🟡/u.test(line)) {
         currentSeverity = "moderate";
+        inIssueSection = true;
         continue;
       }
       if (/minor\s*issues?/i.test(line) || /🔵/u.test(line)) {
         currentSeverity = "minor";
+        inIssueSection = true;
         continue;
       }
       if (/strengths/i.test(line) || /✅/u.test(line)) {
-        currentSeverity = "info";
+        inIssueSection = false;
         continue;
       }
       if (/optimization|recommendation/i.test(line) || /🚀|🎯/u.test(line)) {
-        currentSeverity = "info";
+        inIssueSection = false;
         continue;
       }
 
+      // Only extract line references when inside a recognized issues section
+      if (!inIssueSection) continue;
+
       // Match location patterns
-      // Patterns: "// Location: Line 45-47", "Line 45", "line 23-28", "Lines 10 to 15"
       const locationMatch = line.match(
         /(?:\/\/\s*)?(?:Location:\s*)?[Ll]ines?\s+(\d+)(?:\s*[-–to]+\s*(\d+))?/,
       );
       if (!locationMatch) continue;
+
+      // Require corroborating issue context within nearby lines
+      const contextSlice = lines
+        .slice(Math.max(0, i - 5), Math.min(lines.length, i + 5))
+        .join("\n");
+      if (
+        !/issue|problem|fix|vulnerability|impact|benefit/i.test(contextSlice)
+      ) {
+        continue;
+      }
 
       const startLine = parseInt(locationMatch[1], 10) + lineOffset;
       const endLine = locationMatch[2]
@@ -334,7 +447,6 @@ export class InlineReviewService implements vscode.Disposable {
       let title = "Review Issue";
       let body = "";
 
-      // Look backwards for "// Issue: ..." within 3 lines
       for (let j = Math.max(0, i - 3); j <= i; j++) {
         const issueLine = lines[j].match(/\/\/\s*Issue:\s*(.+)/i);
         if (issueLine) {
@@ -347,7 +459,6 @@ export class InlineReviewService implements vscode.Disposable {
       const bodyLines: string[] = [];
       for (let j = i + 1; j < lines.length && j <= i + 15; j++) {
         const nextLine = lines[j];
-        // Stop at next issue, section, or empty code block end
         if (
           /\/\/\s*Issue:/i.test(nextLine) ||
           /^#{2,}/u.test(nextLine) ||

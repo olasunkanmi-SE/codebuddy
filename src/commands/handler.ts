@@ -842,8 +842,13 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       // ── Inline Review Comments ───────────────────────────
       // When enabled, parse the review output and show comment
       // threads directly in the workspace file.
+      // Re-read activeFilePath *after* streaming completes so we
+      // target the file the user is actually looking at, not the
+      // one captured before the (potentially long) stream.
+      const reviewFilePath =
+        vscode.window.activeTextEditor?.document.uri.fsPath ?? activeFilePath;
       if (
-        activeFilePath &&
+        reviewFilePath &&
         (commandAction === CODEBUDDY_ACTIONS.review ||
           commandAction === CODEBUDDY_ACTIONS.reviewPR)
       ) {
@@ -853,7 +858,7 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
           if (InlineReviewService.isEnabled()) {
             const fileReviews = InlineReviewService.parseReviewMarkdown(
               fullResponse,
-              activeFilePath,
+              reviewFilePath,
               selectionStartLine,
             );
             if (fileReviews.length > 0) {
