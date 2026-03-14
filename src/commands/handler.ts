@@ -755,6 +755,10 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       this.logger.info(this.action);
       let prompt;
       const selectedCode = this.getSelectedWindowArea();
+      const activeFilePath =
+        vscode.window.activeTextEditor?.document.uri.fsPath;
+      const selectionStartLine =
+        vscode.window.activeTextEditor?.selection.start.line ?? 0;
       if (!message && !selectedCode) {
         vscode.window.showErrorMessage("select a piece of code.");
         span.setStatus({ code: SpanStatusCode.UNSET });
@@ -834,6 +838,42 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         type: "onStreamEnd",
         payload: { requestId, content: formattedResponse },
       });
+
+      // ── Inline Review Comments ───────────────────────────
+      // When enabled, parse the review output and show comment
+      // threads directly in the workspace file.
+      if (
+        activeFilePath &&
+        (commandAction === CODEBUDDY_ACTIONS.review ||
+          commandAction === CODEBUDDY_ACTIONS.reviewPR)
+      ) {
+        try {
+          const { InlineReviewService } =
+            await import("../services/inline-review.service");
+          if (InlineReviewService.isEnabled()) {
+            const fileReviews = InlineReviewService.parseReviewMarkdown(
+              fullResponse,
+              activeFilePath,
+              selectionStartLine,
+            );
+            if (fileReviews.length > 0) {
+              const inlineService = InlineReviewService.getInstance();
+              await inlineService.showReviewComments(fileReviews);
+              span.addEvent("inline_comments_shown", {
+                commentCount: fileReviews.reduce(
+                  (sum, f) => sum + f.comments.length,
+                  0,
+                ),
+              });
+            }
+          }
+        } catch (inlineError: any) {
+          this.logger.error(
+            "Failed to show inline review comments",
+            inlineError,
+          );
+        }
+      }
 
       span.setAttribute("command.response_length", fullResponse.length);
       span.addEvent("stream_end");

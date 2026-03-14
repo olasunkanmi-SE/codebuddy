@@ -402,6 +402,18 @@ export async function activate(context: vscode.ExtensionContext) {
       ),
     );
 
+    // Initialize Inline Review Service (Comment threads for code reviews)
+    const { InlineReviewService } =
+      await import("./services/inline-review.service");
+    const inlineReviewService = InlineReviewService.getInstance();
+    context.subscriptions.push(inlineReviewService);
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "codebuddy.clearInlineReviewComments",
+        () => inlineReviewService.clearComments(),
+      ),
+    );
+
     // Wire DiffReviewService events to Orchestrator
     context.subscriptions.push(
       diffReviewService.onChangeEvent((event) => {
