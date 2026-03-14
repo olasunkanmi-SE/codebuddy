@@ -218,8 +218,17 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onSearchChange,
 }) => {
   // Get logo URI from body data attribute (injected by extension)
+  // Only allow vscode-webview-resource or https URIs to prevent injection
   const logoUri = useMemo(() => {
-    return document.body.getAttribute('data-logo-uri') || '';
+    const raw = document.body.getAttribute('data-logo-uri') ?? '';
+    if (
+      !raw.startsWith('vscode-webview-resource:') &&
+      !raw.startsWith('https:') &&
+      !raw.startsWith('vscode-resource:')
+    ) {
+      return '';
+    }
+    return raw;
   }, []);
 
   // Filter categories based on search query

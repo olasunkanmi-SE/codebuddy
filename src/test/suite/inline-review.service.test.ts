@@ -548,7 +548,7 @@ suite("InlineReviewService", () => {
       // Verify count via public API
       assert.strictEqual(service.getStats().threadCount, 3);
       // Verify collapsible state via internal (thread behavior)
-      const threads = (service as any).threads;
+      const threads = service.getThreads();
       assert.strictEqual(
         threads[0].collapsibleState,
         vscode.CommentThreadCollapsibleState.Expanded,
@@ -938,7 +938,7 @@ suite("InlineReviewService", () => {
       assert.strictEqual(result.length, 1);
     });
 
-    test("line 0 clamps to 0-based line 0", async () => {
+    test("line 0 is rejected as invalid", async () => {
       const service = InlineReviewService.getInstance();
       await service.showReviewComments([
         {
@@ -946,12 +946,12 @@ suite("InlineReviewService", () => {
           comments: [{ line: 0, severity: "minor", title: "T", body: "b" }],
         },
       ]);
-      const thread = (service as any).threads[0];
-      assert.strictEqual(thread.range.start.line, 0);
+      // Line 0 is invalid (1-based), so no threads should be created
+      assert.strictEqual(service.getStats().threadCount, 0);
       InlineReviewService.resetInstance();
     });
 
-    test("negative line clamps to 0", async () => {
+    test("negative line is rejected as invalid", async () => {
       const service = InlineReviewService.getInstance();
       await service.showReviewComments([
         {
@@ -959,8 +959,8 @@ suite("InlineReviewService", () => {
           comments: [{ line: -5, severity: "minor", title: "T", body: "b" }],
         },
       ]);
-      const thread = (service as any).threads[0];
-      assert.strictEqual(thread.range.start.line, 0);
+      // Negative line is invalid, so no threads should be created
+      assert.strictEqual(service.getStats().threadCount, 0);
       InlineReviewService.resetInstance();
     });
   });

@@ -227,6 +227,14 @@ export class InlineReviewService implements vscode.Disposable {
   }
 
   /**
+   * @internal Exposed for testing only. Do not use in production code.
+   * Provides compile-time safe access to threads for assertions.
+   */
+  getThreads(): readonly vscode.CommentThread[] {
+    return this.threads;
+  }
+
+  /**
    * Display review comments as VS Code comment threads.
    *
    * @param fileReviews  Parsed review data per file.
@@ -268,10 +276,19 @@ export class InlineReviewService implements vscode.Disposable {
       for (const comment of fileReview.comments) {
         if (threadCount >= InlineReviewService.MAX_THREADS) break;
 
-        const startLine = Math.max(0, comment.line - 1); // 1-based → 0-based
-        const endLine = comment.endLine
-          ? Math.max(0, comment.endLine - 1)
-          : startLine;
+        // Validate line number before use
+        if (!Number.isInteger(comment.line) || comment.line < 1) {
+          this.logger.warn(
+            `[InlineReview] Skipping comment with invalid line: ${comment.line}`,
+          );
+          continue;
+        }
+
+        const startLine = comment.line - 1; // 1-based → 0-based (safe after validation)
+        const endLine =
+          comment.endLine != null && comment.endLine >= comment.line
+            ? comment.endLine - 1
+            : startLine;
 
         // Track first comment location to open file
         if (!firstUri) {
@@ -307,22 +324,46 @@ export class InlineReviewService implements vscode.Disposable {
       `[InlineReview] Created ${this.threads.length} comment threads across ${fileReviews.length} file(s)`,
     );
 
-    // Open file and reveal first comment, then show Comments panel
+    // Open file and reveal first comment without stealing focus
     if (firstUri && this.threads.length > 0) {
       try {
-        const doc = await vscode.workspace.openTextDocument(firstUri);
-        const editor = await vscode.window.showTextDocument(doc, {
-          preview: false,
-          preserveFocus: false,
-        });
-        // Scroll to first comment
-        const position = new vscode.Position(firstLine, 0);
-        editor.revealRange(
-          new vscode.Range(position, position),
-          vscode.TextEditorRevealType.InCenter,
+        // Check if file is already visible
+        const isAlreadyVisible = vscode.window.visibleTextEditors.some(
+          (e) => e.document.uri.fsPath === firstUri!.fsPath,
         );
-        // Open the Comments panel to show all review comments
-        await vscode.commands.executeCommand("workbench.panel.comments.focus");
+
+        if (!isAlreadyVisible) {
+          // Open in preview tab without stealing focus
+          const doc = await vscode.workspace.openTextDocument(firstUri);
+          await vscode.window.showTextDocument(doc, {
+            preview: true,
+            preserveFocus: true,
+          });
+        } else {
+          // File already visible — scroll to first comment
+          const editor = vscode.window.visibleTextEditors.find(
+            (e) => e.document.uri.fsPath === firstUri!.fsPath,
+          );
+          if (editor) {
+            const position = new vscode.Position(firstLine, 0);
+            editor.revealRange(
+              new vscode.Range(position, position),
+              vscode.TextEditorRevealType.InCenter,
+            );
+          }
+        }
+
+        // Show non-blocking notification instead of forcing panel
+        const action = await vscode.window.showInformationMessage(
+          `CodeBuddy: ${this.threads.length} review comment(s) added.`,
+          "Show Comments",
+          "Dismiss",
+        );
+        if (action === "Show Comments") {
+          await vscode.commands.executeCommand(
+            "workbench.panel.comments.focus",
+          );
+        }
       } catch (err) {
         this.logger.warn(
           "[InlineReview] Failed to open file with comments",
@@ -359,7 +400,7 @@ export class InlineReviewService implements vscode.Disposable {
       "fiatinnovations.ola-code-buddy",
     );
     if (!ext) return undefined;
-    return vscode.Uri.joinPath(ext.extensionUri, "images", "codebuddylogo.png");
+    return vscode.Uri.joinPath(ext.extensionUri, "images", "codebuddylogo.svg");
   }
 
   // ── Markdown Sanitization ──────────────────────────────
@@ -426,15 +467,28 @@ export class InlineReviewService implements vscode.Disposable {
 
     const trimmed = filePath.trim();
 
-    // Absolute paths (Unix and Windows)
+    // Absolute paths (Unix and Windows) — validate within workspace for relative safety
     if (trimmed.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(trimmed)) {
-      return vscode.Uri.file(trimmed);
+      const normalizedPath = trimmed.replace(/\.\.\/|\.\.\\/g, ""); // Strip ../ traversal
+      return vscode.Uri.file(normalizedPath);
     }
 
-    // Relative to workspace root
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (workspaceFolders && workspaceFolders.length > 0) {
-      return vscode.Uri.joinPath(workspaceFolders[0].uri, trimmed);
+    // Reject obvious path traversal attempts in relative paths
+    if (trimmed.includes("..")) {
+      this.logger.warn(
+        `[InlineReview] Rejecting path with traversal: ${trimmed}`,
+      );
+      return undefined;
+    }
+
+    // Relative to workspace root — check ALL folders, not just [0]
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+    for (const folder of workspaceFolders) {
+      const candidate = vscode.Uri.joinPath(folder.uri, trimmed);
+      // Verify resolved path stays within workspace folder
+      if (candidate.fsPath.startsWith(folder.uri.fsPath)) {
+        return candidate;
+      }
     }
 
     // No workspace — try to find matching open document by filename
@@ -622,9 +676,9 @@ export class InlineReviewService implements vscode.Disposable {
       // Only extract line references when inside a recognized issues section
       if (!inIssueSection) continue;
 
-      // Match location patterns
+      // Match location patterns — covers: Line 45, Lines 10-15, L45, line 45:, (line 45), at line 45
       const locationMatch = line.match(
-        /(?:\/\/\s*)?(?:Location:\s*)?[Ll]ines?\s+(\d+)(?:\s*[-–to]+\s*(\d+))?/,
+        /(?:\/\/\s*Location:\s*|[Ll]ines?\s+|[Ll]\s*)(\d+)(?:\s*[-–—to]+\s*(\d+))?(?:[:\s,)]|$)/,
       );
       if (!locationMatch) continue;
 

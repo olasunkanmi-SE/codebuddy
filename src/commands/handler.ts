@@ -854,11 +854,9 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       // ── Inline Review Comments ───────────────────────────
       // When enabled, parse the review output and show comment
       // threads directly in the workspace file using the pre-stream snapshot.
-      const isReviewCommand =
-        commandAction === CODEBUDDY_ACTIONS.review ||
-        commandAction === CODEBUDDY_ACTIONS.reviewPR;
+      // Reuse isReviewCmd computed earlier to avoid duplication.
 
-      if (InlineReviewService.isEnabled() && isReviewCommand) {
+      if (InlineReviewService.isEnabled() && isReviewCmd) {
         try {
           // Use editor context if available, otherwise empty defaults.
           // For PR reviews, the LLM provides absolute file paths in JSON.
