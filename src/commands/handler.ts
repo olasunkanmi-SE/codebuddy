@@ -37,6 +37,7 @@ import {
   NotificationService,
   NotificationSource,
 } from "../services/notification.service";
+import { InlineReviewService } from "../services/inline-review.service";
 import { architecturalRecommendationCommand } from "./architectural-recommendation";
 import { trace, SpanStatusCode, SpanKind, Tracer } from "@opentelemetry/api";
 
@@ -755,18 +756,33 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
       this.logger.info(this.action);
       let prompt;
       const selectedCode = this.getSelectedWindowArea();
+
+      // Capture editor context atomically before the async stream begins.
+      // This snapshot survives tab switches during the (potentially long) stream.
+      const reviewContext = InlineReviewService.captureReviewContext();
+
       if (!message && !selectedCode) {
         vscode.window.showErrorMessage("select a piece of code.");
         span.setStatus({ code: SpanStatusCode.UNSET });
         return;
       }
 
+      // For review commands, prepend file context so LLM knows the file path
+      const isReviewCmd =
+        commandAction === CODEBUDDY_ACTIONS.review ||
+        commandAction === CODEBUDDY_ACTIONS.reviewPR;
+      let codeWithContext = selectedCode ?? "";
+      if (isReviewCmd && reviewContext && selectedCode) {
+        const startLine = reviewContext.selectionStartLine + 1; // 0-based to 1-based
+        codeWithContext = `File: ${reviewContext.filePath}\nStarting at line ${startLine}:\n\n${selectedCode}`;
+      }
+
       if (message && selectedCode) {
-        prompt = await this.createPrompt(`${message} \n ${selectedCode}`);
+        prompt = await this.createPrompt(`${message} \n ${codeWithContext}`);
       } else {
         message
           ? (prompt = await this.createPrompt(message))
-          : (prompt = await this.createPrompt(selectedCode));
+          : (prompt = await this.createPrompt(codeWithContext));
       }
 
       if (!prompt) {
@@ -834,6 +850,52 @@ export abstract class CodeCommandHandler implements ICodeCommandHandler {
         type: "onStreamEnd",
         payload: { requestId, content: formattedResponse },
       });
+
+      // ── Inline Review Comments ───────────────────────────
+      // When enabled, parse the review output and show comment
+      // threads directly in the workspace file using the pre-stream snapshot.
+      // Reuse isReviewCmd computed earlier to avoid duplication.
+
+      if (InlineReviewService.isEnabled() && isReviewCmd) {
+        try {
+          // Use editor context if available, otherwise empty defaults.
+          // For PR reviews, the LLM provides absolute file paths in JSON.
+          // For single-file reviews, we use the captured context.
+          const defaultFilePath = reviewContext?.filePath ?? "";
+          const lineOffset = reviewContext?.selectionStartLine ?? 0;
+
+          // Check staleness only if we have context and doc was edited
+          if (
+            reviewContext &&
+            InlineReviewService.isContextStale(reviewContext)
+          ) {
+            this.logger.warn(
+              "[InlineReview] Document edited during review; line numbers may be off",
+            );
+          }
+
+          const fileReviews = InlineReviewService.parseReviewMarkdown(
+            fullResponse,
+            defaultFilePath,
+            lineOffset,
+          );
+          if (fileReviews.length > 0) {
+            const inlineService = InlineReviewService.getInstance();
+            await inlineService.showReviewComments(fileReviews);
+            span.addEvent("inline_comments_shown", {
+              commentCount: fileReviews.reduce(
+                (sum, f) => sum + f.comments.length,
+                0,
+              ),
+            });
+          }
+        } catch (inlineError: unknown) {
+          this.logger.error(
+            "Failed to show inline review comments",
+            inlineError as Error,
+          );
+        }
+      }
 
       span.setAttribute("command.response_length", fullResponse.length);
       span.addEvent("stream_end");

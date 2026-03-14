@@ -57,6 +57,27 @@ return user.subscription.isPaid ? 'premium' : 'unpaid';
 
 **Guidelines**: Be specific, show concrete examples, explain benefits, prioritize by impact.
 
+### **Structured Review Data**
+
+After your full review, append a fenced JSON block with ALL identified issues so they can be displayed inline in the editor. Use this EXACT format:
+
+\`\`\`json
+// REVIEW_COMMENTS
+[
+  {"file": "src/services/auth.ts", "line": 45, "endLine": 47, "severity": "critical", "title": "SQL Injection vulnerability", "body": "Use parameterized queries instead of string interpolation."},
+  {"file": "src/utils/helpers.ts", "line": 23, "severity": "moderate", "title": "N+1 query problem", "body": "Batch the queries to reduce database round-trips."}
+]
+\`\`\`
+
+Rules for the JSON block:
+- \`file\` (required for PR reviews): relative file path from the changed files list
+- \`line\` (required): 1-based line number in that file
+- \`endLine\` (optional): end line for multi-line issues
+- \`severity\` (required): "critical", "moderate", or "minor"
+- \`title\` (required): short issue label
+- \`body\` (required): explanation with fix suggestion
+- Include EVERY issue you identified across ALL files, not just examples
+
 ### **Mermaid SEQUENCE DIAGRAM for the overall flow**
 
 ### **Learning resources for identified gaps**

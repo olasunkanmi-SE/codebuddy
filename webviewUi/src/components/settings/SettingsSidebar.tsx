@@ -217,9 +217,19 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   searchQuery,
   onSearchChange,
 }) => {
-  const getInitials = (name: string) => {
-    return name.charAt(0).toUpperCase();
-  };
+  // Get logo URI from body data attribute (injected by extension)
+  // Only allow vscode-webview-resource or https URIs to prevent injection
+  const logoUri = useMemo(() => {
+    const raw = document.body.getAttribute('data-logo-uri') ?? '';
+    if (
+      !raw.startsWith('vscode-webview-resource:') &&
+      !raw.startsWith('https:') &&
+      !raw.startsWith('vscode-resource:')
+    ) {
+      return '';
+    }
+    return raw;
+  }, []);
 
   // Filter categories based on search query
   const filteredCategories = useMemo(() => {
@@ -237,11 +247,13 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
     <SidebarContainer>
       <UserSection>
         <UserProfile>
-          <Avatar $hasImage={!!avatarUrl}>
+          <Avatar $hasImage={!!avatarUrl || !!logoUri}>
             {avatarUrl ? (
               <img src={avatarUrl} alt={username} />
+            ) : logoUri ? (
+              <img src={logoUri} alt="CodeBuddy" />
             ) : (
-              getInitials(username)
+              username.charAt(0).toUpperCase()
             )}
           </Avatar>
           <UserInfo>

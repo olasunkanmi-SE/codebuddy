@@ -292,6 +292,11 @@
         "category": "CodeBuddy"
       },
       {
+        "command": "codebuddy.clearInlineReviewComments",
+        "title": "%commands.clearInlineReviewComments%",
+        "category": "CodeBuddy"
+      },
+      {
         "command": "codebuddy.applyComposerSession",
         "title": "%commands.applyComposerSession%",
         "category": "CodeBuddy"
@@ -380,7 +385,7 @@
         {
           "id": "codeBuddy-view-container",
           "title": "CodeBuddy",
-          "icon": "$(chat-editor-label-icon)"
+          "icon": "images/codebuddylogo.svg"
         }
       ]
     },
@@ -655,6 +660,11 @@
             "type": "boolean",
             "default": false,
             "description": "%config.requireDiffApproval%"
+          },
+          "codebuddy.review.inlineComments": {
+            "type": "boolean",
+            "default": true,
+            "description": "%config.reviewInlineComments%"
           },
           "codebuddy.agent.maxEventCount": {
             "type": "number",
