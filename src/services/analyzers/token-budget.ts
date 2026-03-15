@@ -10,8 +10,18 @@ import type { BudgetItem } from "../../interfaces/analysis.interface";
 // Re-export for consumers of token-budget.ts
 export type { BudgetItem };
 
-// Approximate characters per token (GPT-family average ~3.5 chars/token)
-const CHARS_PER_TOKEN = 3.5;
+/**
+ * Characters per token estimates by content type.
+ * Source code tokenizes more densely than prose (identifiers, brackets, operators).
+ */
+export const CHARS_PER_TOKEN = {
+  /** Source code: identifiers, brackets, operators tokenize densely */
+  code: 2.0,
+  /** Prose/markdown: closer to GPT average */
+  prose: 3.5,
+  /** Conservative default: use when content type is unknown */
+  conservative: 2.0,
+} as const;
 
 export interface BudgetAllocation {
   name: string;
@@ -41,15 +51,21 @@ export class TokenBudgetAllocator {
   /**
    * Convert tokens to characters
    */
-  static tokensToChars(tokens: number): number {
-    return tokens * CHARS_PER_TOKEN;
+  static tokensToChars(
+    tokens: number,
+    contentType: keyof typeof CHARS_PER_TOKEN = "conservative",
+  ): number {
+    return Math.floor(tokens * CHARS_PER_TOKEN[contentType]);
   }
 
   /**
    * Convert characters to approximate tokens
    */
-  static charsToTokens(chars: number): number {
-    return Math.ceil(chars / CHARS_PER_TOKEN);
+  static charsToTokens(
+    chars: number,
+    contentType: keyof typeof CHARS_PER_TOKEN = "conservative",
+  ): number {
+    return Math.ceil(chars / CHARS_PER_TOKEN[contentType]);
   }
 
   /**
@@ -207,13 +223,15 @@ export function createAnalysisBudget(
   const budget = new TokenBudgetAllocator(totalChars);
   const effective = budget.getTotalRemaining(); // after safety margin
 
-  // Proportional weights (sum = 1.0) — budget categories always fit within total
+  // Proportional weights (sum ≈ 0.97, ~3% overflow buffer)
+  // Code snippets reduced from 0.468 to 0.40 because code tokenizes
+  // at ~2 chars/token vs 3.5 for prose, so same char budget = more tokens
   const weights: [string, number, number][] = [
     ["overview", 0.025, 10],
     ["frameworks", 0.019, 9],
     ["languages", 0.013, 9],
     ["architecture", 0.094, 8],
-    ["codeSnippets", 0.468, 7], // largest share
+    ["codeSnippets", 0.4, 7], // largest share (reduced for denser tokenization)
     ["endpoints", 0.125, 6],
     ["models", 0.125, 5],
     ["dependencies", 0.062, 5],

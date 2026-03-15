@@ -24,19 +24,20 @@ const MAX_SNIPPET_CHARS = 3000;
 
 // Important file patterns for code snippet collection
 // Defined at module level to avoid re-instantiation on each call
+// Uses [^\\/]* instead of .* to prevent catastrophic backtracking on adversarial paths
 const IMPORTANT_FILE_PATTERNS = [
   // Entry points (must be in project source, not node_modules)
-  /(?:^|[\\/])src[\\/].*index\.(ts|js|tsx|jsx)$/i,
-  /(?:^|[\\/])(?:src|lib|app)[\\/].*main\.(ts|js|py|go|rs|java|php)$/i,
-  /(?:^|[\\/])(?:src|lib|app)[\\/].*app\.(ts|js|tsx|jsx|py)$/i,
-  /(?:^|[\\/])(?:src|lib|app)[\\/].*server\.(ts|js)$/i,
-  /(?:^|[\\/])(?:src|lib|app)[\\/].*routes?\.(ts|js)$/i,
+  /(?:^|[\\/])src[\\/][^\\/]*index\.(ts|js|tsx|jsx)$/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/][^\\/]*main\.(ts|js|py|go|rs|java|php)$/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/][^\\/]*app\.(ts|js|tsx|jsx|py)$/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/][^\\/]*server\.(ts|js)$/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/][^\\/]*routes?\.(ts|js)$/i,
   // Controllers, services, etc. - only in project dirs
-  /(?:^|[\\/])(?:src|lib|app)[\\/].*controllers?[\\/]/i,
-  /(?:^|[\\/])(?:src|lib|app)[\\/].*services?[\\/]/i,
-  /(?:^|[\\/])(?:src|lib|app)[\\/].*handlers?[\\/]/i,
-  /(?:^|[\\/])(?:src|lib|app)[\\/].*models?[\\/]/i,
-  /(?:^|[\\/])(?:src|lib|app)[\\/].*schemas?[\\/]/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/](?:[^\\/]+[\\/])*controllers?[\\/]/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/](?:[^\\/]+[\\/])*services?[\\/]/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/](?:[^\\/]+[\\/])*handlers?[\\/]/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/](?:[^\\/]+[\\/])*models?[\\/]/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/](?:[^\\/]+[\\/])*schemas?[\\/]/i,
   // README files (root only, not from dependencies)
   /(?:^|[\\/])readme\.(md|txt|rst)?$/i,
   // Manifest files (root only)
@@ -1233,9 +1234,35 @@ function validateWorkerInput(payload: unknown): WorkerInputData {
   return {
     workspacePath: resolved,
     files: data.files as string[],
-    grammarsPath:
-      typeof data.grammarsPath === "string" ? data.grammarsPath : undefined,
+    grammarsPath: validateGrammarsPath(data.grammarsPath),
   };
+}
+
+/**
+ * Validate grammarsPath: must be absolute and contain expected directory segments.
+ * Prevents loading arbitrary WASM files via path traversal.
+ */
+function validateGrammarsPath(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length === 0) return undefined;
+
+  const resolved = path.resolve(value);
+
+  if (!path.isAbsolute(resolved)) {
+    throw new Error("Invalid grammarsPath: must be absolute");
+  }
+
+  // Must contain 'grammars' or 'dist' segment as a sanity check
+  const segments = resolved.split(path.sep);
+  const hasExpectedSegment = segments.some(
+    (s) => s === "grammars" || s === "dist",
+  );
+  if (!hasExpectedSegment) {
+    throw new Error(
+      `Invalid grammarsPath: unexpected path structure: ${resolved}`,
+    );
+  }
+
+  return resolved;
 }
 
 // Logic to handle messages

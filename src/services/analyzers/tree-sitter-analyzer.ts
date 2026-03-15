@@ -26,23 +26,24 @@ export interface IAnalyzerLogger {
 }
 
 /** Console-based fallback logger safe in any context */
+function logWithOptionalData(
+  fn: (...args: unknown[]) => void,
+  prefix: string,
+  msg: string,
+  data?: unknown,
+): void {
+  if (data !== undefined) {
+    fn(`[TreeSitterAnalyzer:${prefix}] ${msg}`, data);
+  } else {
+    fn(`[TreeSitterAnalyzer:${prefix}] ${msg}`);
+  }
+}
+
 const defaultLogger: IAnalyzerLogger = {
-  debug: (msg: string, data?: unknown) =>
-    data !== undefined
-      ? console.log(`[TreeSitterAnalyzer:DEBUG] ${msg}`, data)
-      : console.log(`[TreeSitterAnalyzer:DEBUG] ${msg}`),
-  info: (msg: string, data?: unknown) =>
-    data !== undefined
-      ? console.log(`[TreeSitterAnalyzer:INFO] ${msg}`, data)
-      : console.log(`[TreeSitterAnalyzer:INFO] ${msg}`),
-  warn: (msg: string, data?: unknown) =>
-    data !== undefined
-      ? console.warn(`[TreeSitterAnalyzer:WARN] ${msg}`, data)
-      : console.warn(`[TreeSitterAnalyzer:WARN] ${msg}`),
-  error: (msg: string, data?: unknown) =>
-    data !== undefined
-      ? console.error(`[TreeSitterAnalyzer:ERROR] ${msg}`, data)
-      : console.error(`[TreeSitterAnalyzer:ERROR] ${msg}`),
+  debug: (msg, data) => logWithOptionalData(console.log, "DEBUG", msg, data),
+  info: (msg, data) => logWithOptionalData(console.log, "INFO", msg, data),
+  warn: (msg, data) => logWithOptionalData(console.warn, "WARN", msg, data),
+  error: (msg, data) => logWithOptionalData(console.error, "ERROR", msg, data),
 };
 
 // Language-specific query patterns for API endpoint detection
@@ -176,8 +177,13 @@ export interface TreeSitterAnalysisResult {
 /**
  * Tree-sitter based analyzer for accurate code extraction
  */
+interface ParserPoolEntry {
+  available: Parser[];
+  inUse: Set<Parser>;
+}
+
 export class TreeSitterAnalyzer implements FileAnalyzer {
-  private parserPool = new Map<string, Parser>();
+  private parserPool = new Map<string, ParserPoolEntry>();
   private parserInitLock = new Map<string, Promise<Parser | null>>();
   private languageCache = new Map<string, Language>();
   private initPromise: Promise<void> | null = null;
@@ -236,20 +242,28 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
   }
 
   /**
-   * Get or create a parser for the specified language (thread-safe)
+   * Acquire a parser for the given language from the pool.
+   * Creates a new Parser if none are available. Callers MUST call releaseParser() when done.
    */
-  private async getParserForLanguage(
-    languageId: string,
-  ): Promise<Parser | null> {
-    // Fast path: parser already built
-    const existing = this.parserPool.get(languageId);
-    if (existing) return existing;
+  private async acquireParser(languageId: string): Promise<Parser | null> {
+    // Fast path: reuse an available parser
+    const entry = this.parserPool.get(languageId);
+    if (entry?.available.length) {
+      const parser = entry.available.pop()!;
+      entry.inUse.add(parser);
+      return parser;
+    }
 
-    // In-flight dedup: await the existing promise
+    // In-flight dedup: wait for the initial grammar load
     const inFlight = this.parserInitLock.get(languageId);
-    if (inFlight) return inFlight;
+    if (inFlight) {
+      const parser = await inFlight;
+      if (!parser) return null;
+      // The first parser was already placed in the pool — create a new one
+      return this.createAndCheckoutParser(languageId);
+    }
 
-    // Start new initialization
+    // First time: load grammar and create initial parser
     const initPromise = (async (): Promise<Parser | null> => {
       try {
         const language = await this.loadLanguage(languageId);
@@ -257,11 +271,14 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
 
         const parser = new Parser();
         parser.setLanguage(language);
-        this.parserPool.set(languageId, parser);
+
+        if (!this.parserPool.has(languageId)) {
+          this.parserPool.set(languageId, { available: [], inUse: new Set() });
+        }
+        this.parserPool.get(languageId)!.inUse.add(parser);
         this.logger.debug(`Created parser for language: ${languageId}`);
         return parser;
       } finally {
-        // Always clear the lock so future callers use the pool directly
         this.parserInitLock.delete(languageId);
       }
     })();
@@ -271,9 +288,43 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
   }
 
   /**
+   * Create an additional parser for a language whose grammar is already loaded.
+   */
+  private async createAndCheckoutParser(
+    languageId: string,
+  ): Promise<Parser | null> {
+    const language = this.languageCache.get(languageId);
+    if (!language) return null;
+
+    const parser = new Parser();
+    parser.setLanguage(language);
+
+    if (!this.parserPool.has(languageId)) {
+      this.parserPool.set(languageId, { available: [], inUse: new Set() });
+    }
+    this.parserPool.get(languageId)!.inUse.add(parser);
+    return parser;
+  }
+
+  /**
+   * Return a parser to the pool after use.
+   */
+  private releaseParser(languageId: string, parser: Parser): void {
+    const entry = this.parserPool.get(languageId);
+    if (entry) {
+      entry.inUse.delete(parser);
+      entry.available.push(parser);
+    }
+  }
+
+  /**
    * Dispose all parsers (call in tests or on extension deactivation)
    */
   dispose(): void {
+    for (const entry of this.parserPool.values()) {
+      entry.available.length = 0;
+      entry.inUse.clear();
+    }
     this.parserPool.clear();
     this.parserInitLock.clear();
     this.languageCache.clear();
@@ -365,8 +416,8 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
       return this.createEmptyResult();
     }
 
-    // Get language-specific parser from pool (thread-safe)
-    const parser = await this.getParserForLanguage(languageId);
+    // Acquire a parser from the pool (safe for concurrent use)
+    const parser = await this.acquireParser(languageId);
     if (!parser) {
       this.logger.debug(
         `Failed to get parser for ${fileName}, returning empty result`,
@@ -374,32 +425,36 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
       return this.createEmptyResult();
     }
 
-    const tree = parser.parse(content);
+    try {
+      const tree = parser.parse(content);
 
-    if (!tree) {
-      this.logger.warn(`Failed to parse ${fileName}`);
-      return this.createEmptyResult();
+      if (!tree) {
+        this.logger.warn(`Failed to parse ${fileName}`);
+        return this.createEmptyResult();
+      }
+
+      const result: TreeSitterAnalysisResult = {
+        classes: this.extractClasses(tree, content, languageId),
+        functions: this.extractFunctions(tree, content, languageId),
+        endpoints: this.extractEndpoints(content, filePath, languageId),
+        imports: this.extractImports(tree, content, languageId),
+        exports: this.extractExports(tree, content, languageId),
+        codeSnippet: this.getCodeSnippet(content, 50),
+      };
+
+      // Extract React components for JS/TS
+      if (languageId === "javascript" || languageId === "typescript") {
+        result.components = this.extractReactComponents(tree, content);
+      }
+
+      this.logger.debug(
+        `Extracted from ${fileName}: ${result.classes.length} classes, ${result.functions.length} functions, ${result.endpoints.length} endpoints`,
+      );
+
+      return result;
+    } finally {
+      this.releaseParser(languageId, parser);
     }
-
-    const result: TreeSitterAnalysisResult = {
-      classes: this.extractClasses(tree, content, languageId),
-      functions: this.extractFunctions(tree, content, languageId),
-      endpoints: this.extractEndpoints(content, filePath, languageId),
-      imports: this.extractImports(tree, content, languageId),
-      exports: this.extractExports(tree, content, languageId),
-      codeSnippet: this.getCodeSnippet(content, 50),
-    };
-
-    // Extract React components for JS/TS
-    if (languageId === "javascript" || languageId === "typescript") {
-      result.components = this.extractReactComponents(tree, content);
-    }
-
-    this.logger.debug(
-      `Extracted from ${fileName}: ${result.classes.length} classes, ${result.functions.length} functions, ${result.endpoints.length} endpoints`,
-    );
-
-    return result;
   }
 
   /**
@@ -509,7 +564,7 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
       }
     }
 
-    // Extract methods — iterative BFS consistent with traverseAST
+    // Extract methods — iterative DFS consistent with traverseAST
     const methodTypeSet = new Set(this.getMethodNodeTypes(languageId));
     const bodyNodeTypes = new Set([
       "class_body",
@@ -518,10 +573,14 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
       "block",
       "statement_block",
     ]);
-    const queue: SyntaxNode[] = [...node.children];
+    const methodStack: SyntaxNode[] = [];
+    // Push children right-to-left for left-to-right processing
+    for (let i = node.children.length - 1; i >= 0; i--) {
+      methodStack.push(node.children[i]);
+    }
 
-    while (queue.length > 0) {
-      const current = queue.shift()!;
+    while (methodStack.length > 0) {
+      const current = methodStack.pop()!;
 
       if (methodTypeSet.has(current.type)) {
         const method = this.extractMethodInfo(current, content, languageId);
@@ -532,7 +591,9 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
 
       // Only expand class body containers, not arbitrary nested nodes
       if (bodyNodeTypes.has(current.type)) {
-        queue.push(...current.children);
+        for (let i = current.children.length - 1; i >= 0; i--) {
+          methodStack.push(current.children[i]);
+        }
       }
     }
 
@@ -643,22 +704,37 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     const functions: ExtractedFunction[] = [];
     const functionTypes = new Set(this.getFunctionNodeTypes(languageId));
 
-    // Use iterative BFS with depth tracking to prevent stack overflow
-    const queue: Array<{ node: SyntaxNode; depth: number }> = [
+    /**
+     * Maximum AST depth for top-level function extraction.
+     * Depth 0 = program root, 1 = direct children (module declarations),
+     * 2 = export_statement children, 3 = object property values.
+     * Set to 3 to capture: `export default { handler: async () => {} }`
+     */
+    const TOP_LEVEL_FUNCTION_MAX_DEPTH = 3;
+
+    // DFS with depth tracking and stack (O(n) vs O(n²) with shift)
+    const stack: Array<{ node: SyntaxNode; depth: number }> = [
       { node: tree.rootNode, depth: 0 },
     ];
 
-    while (queue.length > 0) {
-      const { node, depth } = queue.shift()!;
+    while (stack.length > 0) {
+      const { node, depth } = stack.pop()!;
 
-      // Only extract top-level functions (depth 1 for most, 2 for module patterns)
-      if (functionTypes.has(node.type) && depth <= 2) {
+      if (
+        functionTypes.has(node.type) &&
+        depth <= TOP_LEVEL_FUNCTION_MAX_DEPTH
+      ) {
         const fn = this.extractFunctionInfo(node, content, languageId);
         if (fn) functions.push(fn);
+        // Don't recurse into function bodies to avoid nested functions
+        continue;
       }
 
-      for (const child of node.children) {
-        queue.push({ node: child, depth: depth + 1 });
+      // Only expand non-function nodes up to the depth limit
+      if (depth < TOP_LEVEL_FUNCTION_MAX_DEPTH) {
+        for (let i = node.children.length - 1; i >= 0; i--) {
+          stack.push({ node: node.children[i], depth: depth + 1 });
+        }
       }
     }
 
@@ -1027,15 +1103,15 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
   }
 
   /**
-   * Check if node contains JSX (iterative BFS to avoid stack overflow)
+   * Check if node contains JSX (iterative DFS to avoid stack overflow)
    */
   private containsJSX(node: SyntaxNode, maxDepth: number = 20): boolean {
-    const queue: Array<{ node: SyntaxNode; depth: number }> = [
+    const stack: Array<{ node: SyntaxNode; depth: number }> = [
       { node, depth: 0 },
     ];
 
-    while (queue.length > 0) {
-      const { node: current, depth } = queue.shift()!;
+    while (stack.length > 0) {
+      const { node: current, depth } = stack.pop()!;
 
       if (
         current.type === "jsx_element" ||
@@ -1046,8 +1122,8 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
       }
 
       if (depth < maxDepth) {
-        for (const child of current.children) {
-          queue.push({ node: child, depth: depth + 1 });
+        for (let i = current.children.length - 1; i >= 0; i--) {
+          stack.push({ node: current.children[i], depth: depth + 1 });
         }
       }
     }
@@ -1078,28 +1154,20 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
 
   /**
    * Iterative AST traversal helper (prevents stack overflow on large files)
+   * Uses DFS via stack — O(n) vs O(n²) from BFS queue.shift()
    */
   private traverseAST(
     rootNode: SyntaxNode,
     visitor: (node: SyntaxNode) => void,
   ): void {
-    const queue: SyntaxNode[] = [rootNode];
-    while (queue.length > 0) {
-      const node = queue.shift()!;
+    const stack: SyntaxNode[] = [rootNode];
+    while (stack.length > 0) {
+      const node = stack.pop()!;
       visitor(node);
-      for (const child of node.children) {
-        queue.push(child);
+      // Push children right-to-left so left child is processed first
+      for (let i = node.children.length - 1; i >= 0; i--) {
+        stack.push(node.children[i]);
       }
     }
   }
-}
-
-/**
- * Factory function for TreeSitterAnalyzer instances
- * Creates a new instance each time - callers manage lifecycle
- */
-export function createTreeSitterAnalyzer(
-  grammarsPath?: string,
-): TreeSitterAnalyzer {
-  return new TreeSitterAnalyzer(grammarsPath);
 }

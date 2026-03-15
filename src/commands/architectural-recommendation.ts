@@ -465,30 +465,33 @@ function scoreDependency(name: string, question?: string): number {
   let score = 1;
   const lowerName = name.toLowerCase();
 
-  // Important framework/library patterns
-  const importantDeps = [
+  // Exact-match set for frameworks/libraries to avoid false positives
+  // (e.g. "next-auth" should not match as "Next.js")
+  const FRAMEWORK_EXACT_NAMES = new Set([
     "react",
+    "react-dom",
     "vue",
-    "angular",
+    "@angular/core",
     "svelte",
     "next",
     "nuxt",
     "express",
     "fastify",
-    "nestjs",
+    "@nestjs/core",
     "koa",
     "hono",
+    "@prisma/client",
     "prisma",
     "typeorm",
     "mongoose",
     "sequelize",
-    "drizzle",
+    "drizzle-orm",
     "typescript",
     "webpack",
     "vite",
     "esbuild",
-  ];
-  if (importantDeps.some((d) => lowerName.includes(d))) {
+  ]);
+  if (FRAMEWORK_EXACT_NAMES.has(lowerName)) {
     score += 3;
   }
 
@@ -953,7 +956,9 @@ function getRelativePath(fullPath: string): string {
   const normalized = fullPath.replace(/\\/g, "/");
 
   for (const marker of ROOT_MARKERS) {
-    const idx = normalized.lastIndexOf(`/${marker}/`);
+    // Use indexOf (not lastIndexOf) to find the outermost marker,
+    // which is correct for monorepos with nested src/ directories.
+    const idx = normalized.indexOf(`/${marker}/`);
     if (idx !== -1) {
       return normalized.slice(idx + 1); // includes the marker dir: "src/controllers/..."
     }
