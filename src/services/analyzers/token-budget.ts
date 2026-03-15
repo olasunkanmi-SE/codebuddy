@@ -59,6 +59,16 @@ export class TokenBudgetAllocator {
    * @param priority Priority (higher = more important, will get full allocation first)
    */
   allocate(name: string, budget: number, priority: number = 1): this {
+    const currentAllocated = Array.from(this.allocations.values()).reduce(
+      (sum, a) => sum + a.budget,
+      0,
+    );
+
+    if (currentAllocated + budget > this.totalBudget) {
+      // Clamp to remaining available budget
+      budget = Math.max(0, this.totalBudget - currentAllocated);
+    }
+
     this.allocations.set(name, {
       name,
       budget,
@@ -195,18 +205,25 @@ export function createAnalysisBudget(
   totalChars: number = 32000,
 ): TokenBudgetAllocator {
   const budget = new TokenBudgetAllocator(totalChars);
+  const effective = budget.getTotalRemaining(); // after safety margin
 
-  // Allocate budget by priority (higher = more important)
-  budget.allocate("overview", 800, 10); // High priority - basic stats
-  budget.allocate("frameworks", 600, 9); // Frameworks & technologies
-  budget.allocate("languages", 400, 9); // Language distribution
-  budget.allocate("architecture", 3000, 8); // Architecture patterns
-  budget.allocate("codeSnippets", 15000, 7); // Main content - code
-  budget.allocate("endpoints", 4000, 6); // API endpoints
-  budget.allocate("models", 4000, 5); // Data models
-  budget.allocate("dependencies", 2000, 5); // Dependencies
-  budget.allocate("relationships", 2000, 4); // Domain relationships
-  budget.allocate("fileList", 2000, 3); // File listing
+  // Proportional weights (sum = 1.0) — budget categories always fit within total
+  const weights: [string, number, number][] = [
+    ["overview", 0.025, 10],
+    ["frameworks", 0.019, 9],
+    ["languages", 0.013, 9],
+    ["architecture", 0.094, 8],
+    ["codeSnippets", 0.468, 7], // largest share
+    ["endpoints", 0.125, 6],
+    ["models", 0.125, 5],
+    ["dependencies", 0.062, 5],
+    ["relationships", 0.062, 4],
+    ["fileList", 0.062, 3],
+  ];
+
+  for (const [name, weight, priority] of weights) {
+    budget.allocate(name, Math.floor(effective * weight), priority);
+  }
 
   return budget;
 }

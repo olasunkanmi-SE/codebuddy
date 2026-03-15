@@ -28,13 +28,21 @@ export interface IAnalyzerLogger {
 /** Console-based fallback logger safe in any context */
 const defaultLogger: IAnalyzerLogger = {
   debug: (msg: string, data?: unknown) =>
-    console.log(`[TreeSitterAnalyzer:DEBUG] ${msg}`, data ?? ""),
+    data !== undefined
+      ? console.log(`[TreeSitterAnalyzer:DEBUG] ${msg}`, data)
+      : console.log(`[TreeSitterAnalyzer:DEBUG] ${msg}`),
   info: (msg: string, data?: unknown) =>
-    console.log(`[TreeSitterAnalyzer:INFO] ${msg}`, data ?? ""),
+    data !== undefined
+      ? console.log(`[TreeSitterAnalyzer:INFO] ${msg}`, data)
+      : console.log(`[TreeSitterAnalyzer:INFO] ${msg}`),
   warn: (msg: string, data?: unknown) =>
-    console.warn(`[TreeSitterAnalyzer:WARN] ${msg}`, data ?? ""),
+    data !== undefined
+      ? console.warn(`[TreeSitterAnalyzer:WARN] ${msg}`, data)
+      : console.warn(`[TreeSitterAnalyzer:WARN] ${msg}`),
   error: (msg: string, data?: unknown) =>
-    console.error(`[TreeSitterAnalyzer:ERROR] ${msg}`, data ?? ""),
+    data !== undefined
+      ? console.error(`[TreeSitterAnalyzer:ERROR] ${msg}`, data)
+      : console.error(`[TreeSitterAnalyzer:ERROR] ${msg}`),
 };
 
 // Language-specific query patterns for API endpoint detection
@@ -178,11 +186,22 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
   private readonly logger: IAnalyzerLogger;
 
   constructor(grammarsPath?: string, logger?: IAnalyzerLogger) {
-    // Default to common paths
-    this.grammarsPath =
-      grammarsPath ||
-      path.join(__dirname, "..", "..", "..", "dist", "grammars");
     this.logger = logger ?? defaultLogger;
+    if (grammarsPath) {
+      this.grammarsPath = grammarsPath;
+    } else {
+      this.grammarsPath = path.join(
+        __dirname,
+        "..",
+        "..",
+        "..",
+        "dist",
+        "grammars",
+      );
+      this.logger.warn(
+        `No grammarsPath provided, using fallback: ${this.grammarsPath}`,
+      );
+    }
   }
 
   /**
@@ -193,17 +212,24 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
-      const wasmPath = path.join(this.grammarsPath, "tree-sitter.wasm");
-      this.logger.debug(`Initializing Tree-sitter from ${wasmPath}`);
+      try {
+        const wasmPath = path.join(this.grammarsPath, "tree-sitter.wasm");
+        this.logger.debug(`Initializing Tree-sitter from ${wasmPath}`);
 
-      // Check if we're in a worker context (no vscode)
-      const locateFile = (file: string) => {
-        return path.join(path.dirname(wasmPath), file);
-      };
+        // Check if we're in a worker context (no vscode)
+        const locateFile = (file: string) => {
+          return path.join(path.dirname(wasmPath), file);
+        };
 
-      await Parser.init({ locateFile } as any);
-      this.isInitialized = true;
-      this.logger.info("Tree-sitter parser initialized successfully");
+        await Parser.init({ locateFile } as any);
+        this.isInitialized = true;
+        this.logger.info("Tree-sitter parser initialized successfully");
+      } catch (error) {
+        // Reset state so a future call can retry
+        this.initPromise = null;
+        this.dispose();
+        throw error;
+      }
     })();
 
     return this.initPromise;
@@ -483,18 +509,32 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
       }
     }
 
-    // Extract methods
-    const methodTypes = this.getMethodNodeTypes(languageId);
-    const visitMethods = (n: SyntaxNode) => {
-      if (methodTypes.includes(n.type)) {
-        const method = this.extractMethodInfo(n, content, languageId);
+    // Extract methods — iterative BFS consistent with traverseAST
+    const methodTypeSet = new Set(this.getMethodNodeTypes(languageId));
+    const bodyNodeTypes = new Set([
+      "class_body",
+      "declaration_list",
+      "field_declaration_list",
+      "block",
+      "statement_block",
+    ]);
+    const queue: SyntaxNode[] = [...node.children];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+
+      if (methodTypeSet.has(current.type)) {
+        const method = this.extractMethodInfo(current, content, languageId);
         if (method) methods.push(method);
+        // Don't recurse into method bodies — only direct methods of this class
+        continue;
       }
-      for (const child of n.children) {
-        visitMethods(child);
+
+      // Only expand class body containers, not arbitrary nested nodes
+      if (bodyNodeTypes.has(current.type)) {
+        queue.push(...current.children);
       }
-    };
-    visitMethods(node);
+    }
 
     // Extract decorators (for languages that support them)
     // Walk backwards collecting all consecutive decorators (e.g. stacked NestJS decorators)
@@ -739,21 +779,31 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     const patterns = API_ENDPOINT_QUERIES[languageId] || [];
 
     for (const pattern of patterns) {
-      pattern.lastIndex = 0;
-      let match;
-      while ((match = pattern.exec(content)) !== null) {
-        const method = (match[1] || "GET").toUpperCase();
-        const path = match[2] || match[1] || "";
+      // Create a fresh regex to avoid shared lastIndex state across invocations
+      const freshPattern = new RegExp(pattern.source, pattern.flags);
 
-        if (path && !path.startsWith("@")) {
-          const line = content.substring(0, match.index).split("\n").length;
-          endpoints.push({
-            method,
-            path: path.startsWith("/") ? path : `/${path}`,
-            file: filePath,
-            line,
-          });
+      try {
+        const matches = [...content.matchAll(freshPattern)];
+        for (const match of matches) {
+          const method = (match[1] || "GET").toUpperCase();
+          const routePath = match[2] || match[1] || "";
+
+          if (routePath && !routePath.startsWith("@")) {
+            const line = content
+              .substring(0, match.index ?? 0)
+              .split("\n").length;
+            endpoints.push({
+              method,
+              path: routePath.startsWith("/") ? routePath : `/${routePath}`,
+              file: filePath,
+              line,
+            });
+          }
         }
+      } catch (err) {
+        this.logger.warn(
+          `Endpoint regex failed for ${filePath}: ${err instanceof Error ? err.message : err}`,
+        );
       }
     }
 

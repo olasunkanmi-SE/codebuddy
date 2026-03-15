@@ -103,7 +103,6 @@ export interface AnalysisResult {
   dataModels: ModelData[];
   databaseSchema: Record<string, unknown>;
   domainRelationships: RelationshipData[];
-  fileContents: Record<string, string>;
   codeSnippets: CodeSnippet[];
   summary: AnalysisSummary;
 }
@@ -151,26 +150,33 @@ export interface WorkerInputData {
 }
 
 /**
- * Worker message for communication
+ * Worker message for communication (discriminated union)
+ * Each message type carries only its relevant payload fields.
  */
-export interface WorkerMessage {
-  type:
-    | "ANALYZE_CODEBASE"
-    | "ANALYSIS_COMPLETE"
-    | "ANALYSIS_ERROR"
-    | "ANALYSIS_PROGRESS"
-    | "LOG";
-  payload?: WorkerInputData | AnalysisResult;
-  error?: string;
-  progress?: {
-    current: number;
-    total: number;
-    message: string;
-  };
-  level?: string;
-  message?: string;
-  data?: any;
-}
+export type WorkerMessage =
+  | {
+      type: "ANALYZE_CODEBASE";
+      payload: WorkerInputData;
+    }
+  | {
+      type: "ANALYSIS_COMPLETE";
+      payload: AnalysisResult;
+    }
+  | {
+      type: "ANALYSIS_ERROR";
+      error: string;
+    }
+  | {
+      type: "ANALYSIS_PROGRESS";
+      progress: { current: number; total: number; message: string };
+    }
+  | {
+      type: "LOG";
+      level: string;
+      message: string;
+      timestamp?: string;
+      data?: unknown;
+    };
 
 /**
  * Codebase analysis worker data

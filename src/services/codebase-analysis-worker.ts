@@ -127,7 +127,7 @@ export class CodebaseAnalysisWorker {
     switch (message.type) {
       case "ANALYSIS_COMPLETE":
         if (this.resolveAnalysis) {
-          this.resolveAnalysis(message.payload as AnalysisResult);
+          this.resolveAnalysis(message.payload);
           this.resolveAnalysis = undefined; // prevent double resolve
           this.cleanup();
         }
@@ -140,7 +140,7 @@ export class CodebaseAnalysisWorker {
         }
         break;
       case "ANALYSIS_PROGRESS":
-        if (this.onProgressCallback && message.progress) {
+        if (this.onProgressCallback) {
           this.onProgressCallback(message.progress);
         }
         break;

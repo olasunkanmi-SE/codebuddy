@@ -135,11 +135,8 @@ class CodebaseAnalysisTask {
 
       this.reportProgress(80, 100, "Analyzing database schema...");
 
-      // Step 5: Analyze database schema
-      const databaseSchema = await this.analyzeDatabaseSchema(
-        files,
-        analysisResults.fileContents,
-      );
+      // Step 5: Analyze database schema (reads its own files to avoid accumulating all content in memory)
+      const databaseSchema = await this.analyzeDatabaseSchema(files);
 
       this.reportProgress(90, 100, "Building domain relationships...");
 
@@ -166,7 +163,6 @@ class CodebaseAnalysisTask {
         dataModels: analysisResults.dataModels,
         databaseSchema,
         domainRelationships,
-        fileContents: Object.fromEntries(analysisResults.fileContents),
         codeSnippets: analysisResults.codeSnippets,
         summary: {
           totalFiles: files.length,
@@ -205,14 +201,12 @@ class CodebaseAnalysisTask {
   }
 
   private async analyzeFileContents(files: string[]): Promise<{
-    fileContents: Map<string, string>;
     codeSnippets: CodeSnippet[];
     apiEndpoints: any[];
     dataModels: any[];
     totalLines: number;
     languageDistribution: Record<string, number>;
   }> {
-    const fileContents = new Map<string, string>();
     const codeSnippets: CodeSnippet[] = [];
     const apiEndpoints: any[] = [];
     const dataModels: any[] = [];
@@ -240,7 +234,6 @@ class CodebaseAnalysisTask {
       try {
         const fileAnalysis = await this.analyzeSingleFile(file);
 
-        fileContents.set(file, fileAnalysis.content);
         totalLines += fileAnalysis.lines;
 
         // Update language distribution
@@ -308,7 +301,6 @@ class CodebaseAnalysisTask {
     );
 
     return {
-      fileContents,
       codeSnippets,
       apiEndpoints,
       dataModels,
@@ -1095,30 +1087,54 @@ class CodebaseAnalysisTask {
 
   private async analyzeDatabaseSchema(
     files: string[],
-    fileContents: Map<string, string>,
-  ): Promise<any> {
-    const schema = {
-      tables: [] as any[],
-      relationships: [] as any[],
+  ): Promise<Record<string, unknown>> {
+    const schema: Record<string, unknown> = {
+      tables: [] as { name: string; file: string; columns: string[] }[],
+      relationships: [] as string[],
       migrations: [] as string[],
     };
 
-    for (const [filePath, content] of fileContents) {
+    // Only read files relevant to database schema to avoid memory bloat
+    const schemaFiles = files.filter((f) => {
+      const filename = path.basename(f).toLowerCase();
+      return (
+        filename.includes("migration") ||
+        filename.endsWith(".sql") ||
+        filename === "schema.prisma"
+      );
+    });
+
+    for (const filePath of schemaFiles) {
       const filename = path.basename(filePath).toLowerCase();
 
       if (filename.includes("migration") || filename.endsWith(".sql")) {
-        schema.migrations.push(filePath);
+        (schema.migrations as string[]).push(filePath);
       }
 
       if (filename === "schema.prisma") {
-        const modelRegex = /model\s+(\w+)\s*{([^}]+)}/gi;
-        let match;
-        while ((match = modelRegex.exec(content)) !== null) {
-          schema.tables.push({
-            name: match[1],
-            file: filePath,
-            columns: this.extractPrismaColumns(match[2]),
-          });
+        try {
+          const content = await fs.promises.readFile(filePath, "utf-8");
+          const modelRegex = /model\s+(\w+)\s*{([^}]+)}/gi;
+          let match;
+          while ((match = modelRegex.exec(content)) !== null) {
+            (
+              schema.tables as {
+                name: string;
+                file: string;
+                columns: string[];
+              }[]
+            ).push({
+              name: match[1],
+              file: filePath,
+              columns: this.extractPrismaColumns(match[2]),
+            });
+          }
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.warn(
+            `Failed to read schema file ${filePath}: ${errorMessage}`,
+          );
         }
       }
     }
@@ -1182,6 +1198,46 @@ class CodebaseAnalysisTask {
   }
 }
 
+/**
+ * Validate and sanitize worker input to prevent path traversal.
+ * All file paths must be absolute and reside within the workspace.
+ */
+function validateWorkerInput(payload: unknown): WorkerInputData {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Invalid payload: expected object");
+  }
+  const data = payload as Record<string, unknown>;
+
+  if (
+    typeof data.workspacePath !== "string" ||
+    !path.isAbsolute(data.workspacePath)
+  ) {
+    throw new Error(`Invalid workspacePath: must be an absolute path`);
+  }
+
+  if (!Array.isArray(data.files)) {
+    throw new Error("Invalid payload: files must be an array");
+  }
+
+  // Validate each file stays within workspacePath
+  const resolved = path.resolve(data.workspacePath);
+  for (const file of data.files as string[]) {
+    if (
+      !path.resolve(file).startsWith(resolved + path.sep) &&
+      path.resolve(file) !== resolved
+    ) {
+      throw new Error(`Security: file path escapes workspace: ${file}`);
+    }
+  }
+
+  return {
+    workspacePath: resolved,
+    files: data.files as string[],
+    grammarsPath:
+      typeof data.grammarsPath === "string" ? data.grammarsPath : undefined,
+  };
+}
+
 // Logic to handle messages
 if (!isMainThread && parentPort) {
   const task = new CodebaseAnalysisTask();
@@ -1191,9 +1247,8 @@ if (!isMainThread && parentPort) {
     async (message: { type: string; payload: unknown }) => {
       if (message.type === "ANALYZE_CODEBASE") {
         try {
-          const result = await task.performAnalysis(
-            message.payload as WorkerInputData,
-          );
+          const validatedInput = validateWorkerInput(message.payload);
+          const result = await task.performAnalysis(validatedInput);
           parentPort?.postMessage({
             type: "ANALYSIS_COMPLETE",
             payload: result,

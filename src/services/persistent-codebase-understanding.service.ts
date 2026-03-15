@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { Logger } from "../infrastructure/logger/logger";
 import { LogLevel } from "./telemetry";
 import { WorkspaceService } from "./workspace-service";
@@ -215,9 +216,9 @@ export class PersistentCodebaseUnderstandingService {
     try {
       // Get extension path for grammars
       const extension = vscode.extensions.getExtension("nicola.codebuddy");
-      const extensionPath = extension?.extensionPath || "";
+      const extensionPath = extension?.extensionPath;
       const grammarsPath = extensionPath
-        ? `${extensionPath}/dist/grammars`
+        ? path.join(extensionPath, "dist", "grammars")
         : undefined;
 
       // Prepare worker data

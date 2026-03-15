@@ -930,43 +930,35 @@ function createContextFromAnalysis(
 
 /**
  * Get relative path from workspace root
- * Uses VS Code workspace API when available, with pattern-based fallback
+ * Uses VS Code workspace API when available, with marker-based fallback
  */
 function getRelativePath(fullPath: string): string {
   if (!fullPath) return "unknown";
 
-  // Best case: use VS Code workspace folders API for accurate relative path
+  // 1. Best: VS Code workspace API with path.relative for cross-platform correctness
   try {
     const uri = vscode.Uri.file(fullPath);
     const wsFolder = vscode.workspace.getWorkspaceFolder(uri);
     if (wsFolder) {
-      const workspacePath = wsFolder.uri.fsPath;
-      if (fullPath.startsWith(workspacePath)) {
-        return fullPath.slice(workspacePath.length).replace(/^[\\/]/, "");
-      }
+      const rel = path.relative(wsFolder.uri.fsPath, fullPath);
+      // Ensure we didn't escape the workspace (path.relative returns '../...' if so)
+      if (!rel.startsWith("..")) return rel;
     }
   } catch {
     // Not in extension host context or workspace API unavailable
   }
 
-  // Fallback: Match only paths that START with /src/, /lib/, /app/, etc.
-  // This prevents matching system paths like /usr/local/lib/...
-  const workspaceRootPatterns = [
-    /^(?:.*[\\/])?(?:src|lib|app|pages|components)[\\/]/i,
-  ];
+  // 2. Fallback: find the first known project root marker and make relative from it
+  const ROOT_MARKERS = ["src", "lib", "app", "pages", "components"];
+  const normalized = fullPath.replace(/\\/g, "/");
 
-  for (const pattern of workspaceRootPatterns) {
-    const match = fullPath.match(pattern);
-    if (match) {
-      // Return path from the matched directory onwards
-      const matchedPath = match[0];
-      const startIdx = matchedPath.lastIndexOf(path.sep);
-      return fullPath.substring(
-        fullPath.indexOf(matchedPath) + (startIdx >= 0 ? startIdx + 1 : 0),
-      );
+  for (const marker of ROOT_MARKERS) {
+    const idx = normalized.lastIndexOf(`/${marker}/`);
+    if (idx !== -1) {
+      return normalized.slice(idx + 1); // includes the marker dir: "src/controllers/..."
     }
   }
 
-  // Fallback: basename only to avoid leaking absolute paths
+  // 3. Last resort: basename only (safe — no absolute path leakage)
   return path.basename(fullPath);
 }
