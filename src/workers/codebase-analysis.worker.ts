@@ -17,6 +17,9 @@ import type {
 // Re-export for backward compatibility
 export type { CodeSnippet, AnalysisResult, WorkerInputData };
 
+// Export pure utility functions for testing
+export { extractTomlSection };
+
 // Module-level constants for memory bounds
 const MAX_SNIPPETS = 30;
 const MAX_SNIPPET_LINES = 75;

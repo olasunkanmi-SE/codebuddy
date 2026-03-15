@@ -51,13 +51,13 @@ const API_ENDPOINT_QUERIES: Record<string, RegExp[]> = {
   // JavaScript/TypeScript: Express, NestJS, Fastify, Hono
   javascript: [
     /(?:app|router|server)\.(get|post|put|delete|patch|options|head)\s*\(\s*['"`]([^'"`]+)['"`]/gi,
-    /@(Get|Post|Put|Delete|Patch|Options|Head)\s*\(\s*['"`]?([^'"`\)]*)/gi, // NestJS
+    /@(Get|Post|Put|Delete|Patch|Options|Head)\s*\(\s*['"`]?([^'"`)]*)/gi, // NestJS
     /fastify\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]+)['"`]/gi,
     /\.route\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/gi,
   ],
   typescript: [
     /(?:app|router|server)\.(get|post|put|delete|patch|options|head)\s*\(\s*['"`]([^'"`]+)['"`]/gi,
-    /@(Get|Post|Put|Delete|Patch|Options|Head)\s*\(\s*['"`]?([^'"`\)]*)/gi, // NestJS
+    /@(Get|Post|Put|Delete|Patch|Options|Head)\s*\(\s*['"`]?([^'"`)]*)/gi, // NestJS
     /fastify\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]+)['"`]/gi,
     /\.route\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/gi,
   ],
@@ -69,7 +69,7 @@ const API_ENDPOINT_QUERIES: Record<string, RegExp[]> = {
   ],
   // Java: Spring, JAX-RS
   java: [
-    /@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|RequestMapping)\s*\(\s*(?:value\s*=\s*)?['"`]?([^'"`\)]*)/gi,
+    /@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|RequestMapping)\s*\(\s*(?:value\s*=\s*)?['"`]?([^'"`)]*)/gi,
     /@(GET|POST|PUT|DELETE|PATCH)\s*\n\s*@Path\s*\(\s*['"`]([^'"`]+)['"`]\)/gi, // JAX-RS
   ],
   // Go: Gin, Chi, Echo, net/http

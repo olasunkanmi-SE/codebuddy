@@ -461,7 +461,7 @@ function generateDependenciesSection(
   return lines.join("\n");
 }
 
-function scoreDependency(name: string, question?: string): number {
+export function scoreDependency(name: string, question?: string): number {
   let score = 1;
   const lowerName = name.toLowerCase();
 
@@ -950,7 +950,7 @@ function createContextFromAnalysis(
  * Get relative path from workspace root
  * Uses VS Code workspace API when available, with marker-based fallback
  */
-function getRelativePath(fullPath: string): string {
+export function getRelativePath(fullPath: string): string {
   if (!fullPath) return "unknown";
 
   // 1. Best: VS Code workspace API with path.relative for cross-platform correctness
