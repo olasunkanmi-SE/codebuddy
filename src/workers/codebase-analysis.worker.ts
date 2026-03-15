@@ -7,38 +7,14 @@ import {
   TreeSitterAnalyzer,
   TreeSitterAnalysisResult,
 } from "../services/analyzers/tree-sitter-analyzer";
+import type {
+  CodeSnippet,
+  AnalysisResult,
+  WorkerInputData,
+} from "../interfaces/analysis.interface";
 
-// Types matching the ones in the service, but adapted for Worker context
-export interface WorkerInputData {
-  workspacePath: string;
-  files: string[];
-  grammarsPath?: string; // Path to grammar files
-}
-
-export interface CodeSnippet {
-  file: string;
-  content: string;
-  language: string;
-  summary?: string;
-}
-
-export interface AnalysisResult {
-  frameworks: string[];
-  dependencies: Record<string, string>;
-  files: string[];
-  apiEndpoints: any[];
-  dataModels: any[];
-  databaseSchema: any;
-  domainRelationships: any[];
-  fileContents: Map<string, string>;
-  codeSnippets: CodeSnippet[]; // NEW: Important code snippets
-  summary: {
-    totalFiles: number;
-    totalLines: number;
-    languageDistribution: Record<string, number>;
-    complexity: "low" | "medium" | "high";
-  };
-}
+// Re-export for backward compatibility
+export type { CodeSnippet, AnalysisResult, WorkerInputData };
 
 class WorkerLogger {
   debug(msg: string, data?: any) {
@@ -181,39 +157,40 @@ class CodebaseAnalysisTask {
 
     // Track important files for code snippets
     // Includes entry points, manifest files, and README for all languages
+    // NOTE: All patterns check end of path to avoid matching node_modules
     const importantPatterns = [
-      // Entry points
-      /index\.(ts|js|tsx|jsx)$/i,
-      /main\.(ts|js|py|go|rs|java|php)$/i,
-      /app\.(ts|js|tsx|jsx|py)$/i,
-      /server\.(ts|js)$/i,
-      /routes?\.(ts|js)$/i,
-      /controller/i,
-      /service/i,
-      /handler/i,
-      /model/i,
-      /schema/i,
-      // README files (all languages)
-      /readme\.(md|txt|rst)?$/i,
-      /readme$/i,
-      // JavaScript/TypeScript manifests
-      /package\.json$/i,
-      /tsconfig\.json$/i,
-      // Python manifests
-      /pyproject\.toml$/i,
-      /setup\.py$/i,
-      /requirements\.txt$/i,
-      /Pipfile$/i,
-      // Go manifests
-      /go\.mod$/i,
-      // Rust manifests
-      /Cargo\.toml$/i,
-      // Java manifests
-      /pom\.xml$/i,
-      /build\.gradle$/i,
-      // PHP manifests
-      /composer\.json$/i,
+      // Entry points (must be in project source, not node_modules)
+      /(?:^|[\\/])src[\\/].*index\.(ts|js|tsx|jsx)$/i,
+      /(?:^|[\\/])(?:src|lib|app)[\\/].*main\.(ts|js|py|go|rs|java|php)$/i,
+      /(?:^|[\\/])(?:src|lib|app)[\\/].*app\.(ts|js|tsx|jsx|py)$/i,
+      /(?:^|[\\/])(?:src|lib|app)[\\/].*server\.(ts|js)$/i,
+      /(?:^|[\\/])(?:src|lib|app)[\\/].*routes?\.(ts|js)$/i,
+      // Controllers, services, etc. - only in project dirs
+      /(?:^|[\\/])(?:src|lib|app)[\\/].*controllers?[\\/]/i,
+      /(?:^|[\\/])(?:src|lib|app)[\\/].*services?[\\/]/i,
+      /(?:^|[\\/])(?:src|lib|app)[\\/].*handlers?[\\/]/i,
+      /(?:^|[\\/])(?:src|lib|app)[\\/].*models?[\\/]/i,
+      /(?:^|[\\/])(?:src|lib|app)[\\/].*schemas?[\\/]/i,
+      // README files (root only, not from dependencies)
+      /(?:^|[\\/])readme\.(md|txt|rst)?$/i,
+      // Manifest files (root only)
+      /(?:^|[\\/])package\.json$/i,
+      /(?:^|[\\/])tsconfig\.json$/i,
+      /(?:^|[\\/])pyproject\.toml$/i,
+      /(?:^|[\\/])setup\.py$/i,
+      /(?:^|[\\/])requirements\.txt$/i,
+      /(?:^|[\\/])Pipfile$/i,
+      /(?:^|[\\/])go\.mod$/i,
+      /(?:^|[\\/])Cargo\.toml$/i,
+      /(?:^|[\\/])pom\.xml$/i,
+      /(?:^|[\\/])build\.gradle$/i,
+      /(?:^|[\\/])composer\.json$/i,
     ];
+
+    // Constants for memory bounds
+    const MAX_SNIPPETS = 30;
+    const MAX_SNIPPET_LINES = 75;
+    const MAX_SNIPPET_CHARS = 3000;
 
     for (let i = 0; i < files.length; i++) {
       this.checkCancellation();
@@ -267,14 +244,32 @@ class CodebaseAnalysisTask {
           }
         }
 
-        // Collect code snippets for important files
-        // Let the TokenBudgetAllocator handle truncation in context generation
-        const isImportant = importantPatterns.some((p) => p.test(file));
-        if (isImportant && fileAnalysis.content.length < 15000) {
+        // Collect code snippets for important files (bounded collection)
+        // Exclude node_modules and similar dependency directories
+        const isNodeModules =
+          file.includes("node_modules") ||
+          file.includes("vendor") ||
+          file.includes(".venv") ||
+          file.includes("__pycache__");
+
+        const isImportant =
+          !isNodeModules && importantPatterns.some((p) => p.test(file));
+
+        if (
+          isImportant &&
+          codeSnippets.length < MAX_SNIPPETS &&
+          fileAnalysis.content.length > 0
+        ) {
           const language = this.getLanguageFromExt(ext);
+          // Truncate at collection time to bound memory usage
+          const truncatedContent =
+            fileAnalysis.content.length > MAX_SNIPPET_CHARS
+              ? this.truncateContent(fileAnalysis.content, MAX_SNIPPET_LINES)
+              : fileAnalysis.content;
+
           codeSnippets.push({
             file,
-            content: fileAnalysis.content, // Full content - budget allocator will truncate
+            content: truncatedContent,
             language,
           });
         }

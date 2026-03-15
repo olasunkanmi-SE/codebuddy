@@ -192,14 +192,17 @@ export function createAnalysisBudget(
 ): TokenBudgetAllocator {
   const budget = new TokenBudgetAllocator(totalChars);
 
-  // Allocate budget by priority
-  budget.allocate("overview", 2000, 10); // High priority - always include
-  budget.allocate("architecture", 3000, 9); // Architecture patterns
-  budget.allocate("codeSnippets", 15000, 8); // Main content - code
-  budget.allocate("endpoints", 4000, 7); // API endpoints
-  budget.allocate("models", 4000, 6); // Data models
-  budget.allocate("relationships", 2000, 5); // Domain relationships
-  budget.allocate("fileList", 2000, 4); // File listing
+  // Allocate budget by priority (higher = more important)
+  budget.allocate("overview", 800, 10); // High priority - basic stats
+  budget.allocate("frameworks", 600, 9); // Frameworks & technologies
+  budget.allocate("languages", 400, 9); // Language distribution
+  budget.allocate("architecture", 3000, 8); // Architecture patterns
+  budget.allocate("codeSnippets", 15000, 7); // Main content - code
+  budget.allocate("endpoints", 4000, 6); // API endpoints
+  budget.allocate("models", 4000, 5); // Data models
+  budget.allocate("dependencies", 2000, 5); // Dependencies
+  budget.allocate("relationships", 2000, 4); // Domain relationships
+  budget.allocate("fileList", 2000, 3); // File listing
 
   return budget;
 }

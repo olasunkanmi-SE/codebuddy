@@ -148,10 +148,12 @@ export interface TreeSitterAnalysisResult {
  * Tree-sitter based analyzer for accurate code extraction
  */
 export class TreeSitterAnalyzer implements FileAnalyzer {
-  private parser: Parser | null = null;
+  private parserPool = new Map<string, Parser>();
+  private parserInitLock = new Map<string, Promise<Parser | null>>();
   private languageCache = new Map<string, Language>();
   private initPromise: Promise<void> | null = null;
   private grammarsPath: string;
+  private isInitialized = false;
   private logger = Logger.initialize("TreeSitterAnalyzer", {
     minLevel: LogLevel.DEBUG,
     enableConsole: true,
@@ -170,7 +172,7 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
    * Initialize Tree-sitter parser
    */
   async initialize(): Promise<void> {
-    if (this.parser) return;
+    if (this.isInitialized) return;
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
@@ -183,11 +185,54 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
       };
 
       await Parser.init({ locateFile } as any);
-      this.parser = new Parser();
+      this.isInitialized = true;
       this.logger.info("Tree-sitter parser initialized successfully");
     })();
 
     return this.initPromise;
+  }
+
+  /**
+   * Get or create a parser for the specified language (thread-safe)
+   */
+  private async getParserForLanguage(
+    languageId: string,
+  ): Promise<Parser | null> {
+    // Return existing parser if available
+    if (this.parserPool.has(languageId)) {
+      return this.parserPool.get(languageId)!;
+    }
+
+    // Prevent duplicate initialization via lock
+    if (this.parserInitLock.has(languageId)) {
+      return this.parserInitLock.get(languageId)!;
+    }
+
+    const initPromise = (async (): Promise<Parser | null> => {
+      const language = await this.loadLanguage(languageId);
+      if (!language) return null;
+
+      const parser = new Parser();
+      parser.setLanguage(language);
+      this.parserPool.set(languageId, parser);
+      this.logger.debug(`Created parser for language: ${languageId}`);
+      return parser;
+    })();
+
+    this.parserInitLock.set(languageId, initPromise);
+    return initPromise;
+  }
+
+  /**
+   * Dispose all parsers (call in tests or on extension deactivation)
+   */
+  dispose(): void {
+    this.parserPool.clear();
+    this.parserInitLock.clear();
+    this.languageCache.clear();
+    this.isInitialized = false;
+    this.initPromise = null;
+    this.logger.debug("TreeSitterAnalyzer disposed");
   }
 
   /**
@@ -266,23 +311,23 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     await this.initialize();
 
     const languageId = this.getLanguageId(filePath);
-    if (!languageId || !this.parser) {
+    if (!languageId) {
       this.logger.debug(
-        `No parser available for ${fileName}, returning empty result`,
+        `No language detected for ${fileName}, returning empty result`,
       );
       return this.createEmptyResult(filePath);
     }
 
-    const language = await this.loadLanguage(languageId);
-    if (!language) {
+    // Get language-specific parser from pool (thread-safe)
+    const parser = await this.getParserForLanguage(languageId);
+    if (!parser) {
       this.logger.debug(
-        `Failed to load language for ${fileName}, returning empty result`,
+        `Failed to get parser for ${fileName}, returning empty result`,
       );
       return this.createEmptyResult(filePath);
     }
 
-    this.parser.setLanguage(language);
-    const tree = this.parser.parse(content);
+    const tree = parser.parse(content);
 
     if (!tree) {
       this.logger.warn(`Failed to parse ${fileName}`);
@@ -925,18 +970,31 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
   }
 
   /**
-   * Check if node contains JSX
+   * Check if node contains JSX (iterative BFS to avoid stack overflow)
    */
-  private containsJSX(node: SyntaxNode): boolean {
-    if (
-      node.type === "jsx_element" ||
-      node.type === "jsx_self_closing_element"
-    ) {
-      return true;
+  private containsJSX(node: SyntaxNode, maxDepth: number = 20): boolean {
+    const queue: Array<{ node: SyntaxNode; depth: number }> = [
+      { node, depth: 0 },
+    ];
+
+    while (queue.length > 0) {
+      const { node: current, depth } = queue.shift()!;
+
+      if (
+        current.type === "jsx_element" ||
+        current.type === "jsx_self_closing_element" ||
+        current.type === "jsx_fragment"
+      ) {
+        return true;
+      }
+
+      if (depth < maxDepth) {
+        for (const child of current.children) {
+          queue.push({ node: child, depth: depth + 1 });
+        }
+      }
     }
-    for (const child of node.children) {
-      if (this.containsJSX(child)) return true;
-    }
+
     return false;
   }
 
@@ -963,7 +1021,19 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
 }
 
 /**
- * Singleton instance for use in workers
+ * Factory function for TreeSitterAnalyzer instances
+ * Creates a new instance each time - callers manage lifecycle
+ */
+export function createTreeSitterAnalyzer(
+  grammarsPath?: string,
+): TreeSitterAnalyzer {
+  return new TreeSitterAnalyzer(grammarsPath);
+}
+
+/**
+ * @deprecated Use createTreeSitterAnalyzer() for new code.
+ * This singleton is kept for backward compatibility but should not be used
+ * in concurrent contexts. Call dispose() when done.
  */
 let analyzerInstance: TreeSitterAnalyzer | null = null;
 
@@ -974,4 +1044,12 @@ export function getTreeSitterAnalyzer(
     analyzerInstance = new TreeSitterAnalyzer(grammarsPath);
   }
   return analyzerInstance;
+}
+
+/**
+ * Reset the singleton (for testing)
+ */
+export function resetTreeSitterAnalyzer(): void {
+  analyzerInstance?.dispose();
+  analyzerInstance = null;
 }

@@ -17,7 +17,16 @@ import {
   createAnalysisBudget,
   RelevanceScoring,
 } from "../services/analyzers/token-budget";
-import { CodeSnippet } from "../services/codebase-analysis-worker";
+import type {
+  CodeSnippet,
+  CachedAnalysis,
+  EndpointData,
+  ModelData,
+  RelationshipData,
+  DirectoryData,
+  BudgetItem,
+  DependencyData,
+} from "../interfaces/analysis.interface";
 
 const orchestrator = Orchestrator.getInstance();
 
@@ -351,10 +360,12 @@ ${sanitizedQuestion}
         await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
 
         progress.report({ increment: 100, message: "Done!" });
-      } catch (error: any) {
-        logger.error("Error in architectural recommendation:", error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.error("Error in architectural recommendation:", errorMessage);
         vscode.window.showErrorMessage(
-          `Failed to analyze codebase (Model: ${selectedModel}): ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Failed to analyze codebase (Model: ${selectedModel}): ${errorMessage}`,
         );
       }
     },
@@ -362,52 +373,10 @@ ${sanitizedQuestion}
 }
 
 // ============================================================================
-// Type definitions for budget selection items
-// ============================================================================
-
-interface BudgetItem<T> {
-  data: T;
-  size: number;
-  priority: number;
-}
-
-interface DependencyData {
-  name: string;
-  version: string;
-}
-
-interface EndpointData {
-  method: string;
-  path: string;
-  file?: string;
-  line?: number;
-}
-
-interface ModelData {
-  name: string;
-  type: string;
-  file?: string;
-  extends?: string;
-  implements?: string[];
-  methods?: string[];
-  isExported?: boolean;
-}
-
-interface RelationshipData {
-  entity: string;
-  relatedEntities?: string[];
-}
-
-interface DirectoryData {
-  dir: string;
-  files: string[];
-}
-
-// ============================================================================
 // Section Generator Helpers (use TokenBudgetAllocator for intelligent limits)
 // ============================================================================
 
-function generateOverviewSection(analysis: any): string {
+function generateOverviewSection(analysis: CachedAnalysis): string {
   return [
     `## Codebase Overview`,
     `- **Total Files:** ${analysis.summary.totalFiles}`,
@@ -418,17 +387,18 @@ function generateOverviewSection(analysis: any): string {
   ].join("\n");
 }
 
-function generateFrameworksSection(analysis: any): string {
+function generateFrameworksSection(analysis: CachedAnalysis): string {
   const lines = [`## Frameworks & Technologies`];
-  if (analysis.frameworks?.length > 0) {
-    lines.push(analysis.frameworks.map((f: string) => `- ${f}`).join("\n"));
+  const frameworks = analysis.frameworks || [];
+  if (frameworks.length > 0) {
+    lines.push(frameworks.map((f: string) => `- ${f}`).join("\n"));
   } else {
     lines.push("No specific frameworks detected");
   }
   return lines.join("\n");
 }
 
-function generateLanguageSection(analysis: any): string {
+function generateLanguageSection(analysis: CachedAnalysis): string {
   const lines = [`## Language Distribution`];
   const langDist = analysis.summary?.languageDistribution || {};
   const sortedLangs = Object.entries(langDist).sort(
@@ -441,7 +411,7 @@ function generateLanguageSection(analysis: any): string {
 }
 
 function generateDependenciesSection(
-  analysis: any,
+  analysis: CachedAnalysis,
   budget: TokenBudgetAllocator,
   userQuestion?: string,
 ): string {
@@ -533,7 +503,7 @@ function scoreDependency(name: string, question?: string): number {
 }
 
 function generateEndpointsSection(
-  analysis: any,
+  analysis: CachedAnalysis,
   budget: TokenBudgetAllocator,
   userQuestion?: string,
 ): string {
@@ -599,7 +569,7 @@ function generateEndpointsSection(
 }
 
 function generateModelsSection(
-  analysis: any,
+  analysis: CachedAnalysis,
   budget: TokenBudgetAllocator,
   userQuestion?: string,
 ): string {
@@ -695,7 +665,7 @@ function generateModelsSection(
 }
 
 function generateSnippetsSection(
-  analysis: any,
+  analysis: CachedAnalysis,
   budget: TokenBudgetAllocator,
   userQuestion?: string,
 ): string {
@@ -766,7 +736,7 @@ function generateSnippetsSection(
 }
 
 function generateRelationshipsSection(
-  analysis: any,
+  analysis: CachedAnalysis,
   budget: TokenBudgetAllocator,
 ): string {
   const relationships = analysis.domainRelationships || [];
@@ -812,7 +782,7 @@ function generateRelationshipsSection(
 }
 
 function generateFileStructureSection(
-  analysis: any,
+  analysis: CachedAnalysis,
   budget: TokenBudgetAllocator,
 ): string {
   const files = analysis.files || [];
@@ -831,8 +801,9 @@ function generateFileStructureSection(
   const byDir = new Map<string, string[]>();
   for (const file of files) {
     const dir = file.split("/").slice(0, -1).join("/") || ".";
+    const fileName = file.split("/").pop() || file;
     if (!byDir.has(dir)) byDir.set(dir, []);
-    byDir.get(dir)!.push(file.split("/").pop());
+    byDir.get(dir)!.push(fileName);
   }
 
   // Create items for budget selection
@@ -874,7 +845,7 @@ function generateFileStructureSection(
  * Uses token budget allocation for optimal context utilization
  */
 function createContextFromAnalysis(
-  analysis: any,
+  analysis: CachedAnalysis,
   userQuestion?: string,
   totalBudgetChars: number = 32000,
 ): string {
@@ -883,9 +854,6 @@ function createContextFromAnalysis(
   );
 
   const budget = createAnalysisBudget(totalBudgetChars);
-
-  // Add dependencies allocation (not in default budget)
-  budget.allocate("dependencies", 2000, 5);
 
   const sections: string[] = [];
 
@@ -897,13 +865,13 @@ function createContextFromAnalysis(
 
   // === SECTION 2: Frameworks & Technologies ===
   sections.push(
-    budget.truncateToFit("overview", generateFrameworksSection(analysis)),
+    budget.truncateToFit("frameworks", generateFrameworksSection(analysis)),
   );
   sections.push("");
 
   // === SECTION 3: Language Distribution ===
   sections.push(
-    budget.truncateToFit("overview", generateLanguageSection(analysis)),
+    budget.truncateToFit("languages", generateLanguageSection(analysis)),
   );
   sections.push("");
 
