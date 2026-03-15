@@ -45,7 +45,7 @@ export class WorkerLogger {
     this.module = module;
     this.config = {
       minLevel: config.minLevel ?? LogLevel.DEBUG,
-      enableConsole: config.enableConsole ?? true,
+      enableConsole: config.enableConsole ?? false,
     };
   }
 

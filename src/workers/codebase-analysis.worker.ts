@@ -62,21 +62,30 @@ function extractTomlSection(content: string, sectionName: string): string[] {
   const lines = content.split("\n");
   const result: string[] = [];
   let inSection = false;
-  const escapedName = sectionName.replace(/\./g, "\\.");
-  const sectionHeader = new RegExp(`^\\[${escapedName}\\]\\s*$`);
-  const anyHeader = /^\[/;
+  // Escape all regex special characters in section name
+  const escapedName = sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sectionHeader = new RegExp(`^\\[${escapedName}\\]\\s*(?:#.*)?$`);
+  // Match [header] but NOT [[array-table]] — array tables use double brackets
+  const regularHeader = /^\[[^[]/;
+  const arrayTableHeader = /^\[\[/;
 
   for (const line of lines) {
     const trimmed = line.trim();
+
     if (sectionHeader.test(trimmed)) {
       inSection = true;
       continue;
     }
-    if (inSection && anyHeader.test(trimmed)) {
-      break; // Next section started
-    }
+
     if (inSection) {
-      result.push(line);
+      // Stop at next regular section or array-of-tables section
+      if (regularHeader.test(trimmed) || arrayTableHeader.test(trimmed)) {
+        break;
+      }
+      // Skip pure comment lines but include all other lines
+      if (trimmed && !trimmed.startsWith("#")) {
+        result.push(line);
+      }
     }
   }
   return result;
@@ -745,13 +754,22 @@ class CodebaseAnalysisTask {
         const rawContent = await fs.promises.readFile(pomPath, "utf-8");
         // Strip XML comments before parsing
         const content = stripXmlComments(rawContent);
-        // Extract dependencies using regex (simple XML parsing)
-        const depMatches = content.matchAll(
-          /<dependency>[\s\S]*?<groupId>([^<]+)<\/groupId>[\s\S]*?<artifactId>([^<]+)<\/artifactId>[\s\S]*?(?:<version>([^<]+)<\/version>)?[\s\S]*?<\/dependency>/g,
-        );
-        for (const match of depMatches) {
-          const name = `${match[1]}:${match[2]}`;
-          dependencies[name] = match[3] || "*";
+        // Two-pass extraction to prevent cross-block matching with greedy regex
+        const blockRegex = /<dependency>([\s\S]*?)<\/dependency>/g;
+        for (const blockMatch of content.matchAll(blockRegex)) {
+          const block = blockMatch[1];
+          const groupId = block
+            .match(/<groupId>([^<]+)<\/groupId>/)?.[1]
+            ?.trim();
+          const artifactId = block
+            .match(/<artifactId>([^<]+)<\/artifactId>/)?.[1]
+            ?.trim();
+          const version = block
+            .match(/<version>([^<]+)<\/version>/)?.[1]
+            ?.trim();
+          if (groupId && artifactId) {
+            dependencies[`${groupId}:${artifactId}`] = version || "*";
+          }
         }
       } catch (error: unknown) {
         const errorMessage =
@@ -1251,11 +1269,12 @@ function validateGrammarsPath(value: unknown): string | undefined {
     throw new Error("Invalid grammarsPath: must be absolute");
   }
 
-  // Must contain 'grammars' or 'dist' segment as a sanity check
+  // Must end with 'grammars' or contain a 'grammars' segment as a sanity check.
+  // A bare 'dist' segment alone is too permissive.
   const segments = resolved.split(path.sep);
-  const hasExpectedSegment = segments.some(
-    (s) => s === "grammars" || s === "dist",
-  );
+  const hasExpectedSegment =
+    segments[segments.length - 1] === "grammars" ||
+    segments.some((s) => s === "grammars");
   if (!hasExpectedSegment) {
     throw new Error(
       `Invalid grammarsPath: unexpected path structure: ${resolved}`,

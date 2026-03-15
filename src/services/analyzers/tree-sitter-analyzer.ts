@@ -111,7 +111,7 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
 
 export interface ExtractedClass {
   name: string;
-  type: "class" | "interface" | "struct" | "trait" | "enum";
+  type: "class" | "interface" | "struct" | "trait" | "enum" | "function";
   extends?: string;
   implements?: string[];
   methods: ExtractedMethod[];
@@ -257,9 +257,15 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     // In-flight dedup: wait for the initial grammar load
     const inFlight = this.parserInitLock.get(languageId);
     if (inFlight) {
-      const parser = await inFlight;
-      if (!parser) return null;
-      // The first parser was already placed in the pool — create a new one
+      const result = await inFlight;
+      if (!result) return null;
+      // Re-check pool — the init caller or another waiter may have released a parser
+      const poolEntry = this.parserPool.get(languageId);
+      if (poolEntry?.available.length) {
+        const reused = poolEntry.available.pop()!;
+        poolEntry.inUse.add(reused);
+        return reused;
+      }
       return this.createAndCheckoutParser(languageId);
     }
 
@@ -1086,7 +1092,7 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
               if (hasJSX) {
                 components.push({
                   name,
-                  type: "class", // Treat as class for consistency
+                  type: "function",
                   methods: [],
                   properties: [],
                   startLine: node.startPosition.row + 1,

@@ -465,22 +465,23 @@ function scoreDependency(name: string, question?: string): number {
   let score = 1;
   const lowerName = name.toLowerCase();
 
-  // Exact-match set for frameworks/libraries to avoid false positives
-  // (e.g. "next-auth" should not match as "Next.js")
-  const FRAMEWORK_EXACT_NAMES = new Set([
+  // Normalize scoped packages: @scope/name → extract both scope and bare name
+  const unscopedName = lowerName.startsWith("@")
+    ? (lowerName.split("/").pop() ?? lowerName)
+    : lowerName;
+
+  // Tier 1: exact match on common framework packages (unscoped)
+  const CORE_FRAMEWORK_NAMES = new Set([
     "react",
     "react-dom",
     "vue",
-    "@angular/core",
     "svelte",
     "next",
     "nuxt",
     "express",
     "fastify",
-    "@nestjs/core",
     "koa",
     "hono",
-    "@prisma/client",
     "prisma",
     "typeorm",
     "mongoose",
@@ -491,8 +492,15 @@ function scoreDependency(name: string, question?: string): number {
     "vite",
     "esbuild",
   ]);
-  if (FRAMEWORK_EXACT_NAMES.has(lowerName)) {
+
+  // Tier 2: scope-based detection (package scope indicates framework family)
+  const FRAMEWORK_SCOPES = new Set(["angular", "nestjs", "prisma", "trpc"]);
+
+  if (CORE_FRAMEWORK_NAMES.has(unscopedName)) {
     score += 3;
+  } else if (lowerName.startsWith("@")) {
+    const scope = lowerName.slice(1).split("/")[0];
+    if (FRAMEWORK_SCOPES.has(scope)) score += 3;
   }
 
   // Question relevance
@@ -701,8 +709,6 @@ function generateSnippetsSection(
   );
 
   // Capture remaining budget BEFORE selectWithinBudget consumes it
-  const availableBudget = budget.getRemaining("codeSnippets");
-
   const selected = budget.selectWithinBudget<BudgetItem<CodeSnippet>>(
     "codeSnippets",
     snippetItems,
@@ -710,13 +716,22 @@ function generateSnippetsSection(
     (item) => item.priority ?? 1,
   );
 
+  if (selected.length === 0) {
+    logger.debug("No snippets selected within budget");
+    return "";
+  }
+
   logger.debug(
     `Selected ${selected.length}/${codeSnippets.length} code snippets within budget`,
   );
 
-  // Use the pre-captured budget for per-snippet allocation
-  const perSnippetBudget = Math.floor(
-    availableBudget / Math.max(selected.length, 1),
+  // Compute per-snippet budget from remaining allocation AFTER selection,
+  // not from pre-captured total (which over-truncates when few are selected)
+  const remainingAfterSelection = budget.getRemaining("codeSnippets");
+  const totalSelectedSize = selected.reduce((sum, item) => sum + item.size, 0);
+  const perSnippetBudget = Math.max(
+    Math.floor((totalSelectedSize + remainingAfterSelection) / selected.length),
+    500, // minimum chars per snippet
   );
 
   for (const item of selected) {
@@ -951,14 +966,19 @@ function getRelativePath(fullPath: string): string {
     // Not in extension host context or workspace API unavailable
   }
 
-  // 2. Fallback: find the first known project root marker and make relative from it
+  // 2. Fallback: find the deepest known project root marker and make relative from it
   const ROOT_MARKERS = ["src", "lib", "app", "pages", "components"];
   const normalized = fullPath.replace(/\\/g, "/");
 
+  // Skip node_modules paths — they are dependencies, not project code
+  if (normalized.includes("/node_modules/")) {
+    return path.basename(fullPath);
+  }
+
   for (const marker of ROOT_MARKERS) {
-    // Use indexOf (not lastIndexOf) to find the outermost marker,
-    // which is correct for monorepos with nested src/ directories.
-    const idx = normalized.indexOf(`/${marker}/`);
+    // Use lastIndexOf for deepest match — avoids overly long paths in monorepos
+    // e.g. /workspace/src/packages/mylib/src/utils.ts → src/utils.ts
+    const idx = normalized.lastIndexOf(`/${marker}/`);
     if (idx !== -1) {
       return normalized.slice(idx + 1); // includes the marker dir: "src/controllers/..."
     }
