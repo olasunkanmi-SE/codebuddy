@@ -10,8 +10,8 @@ import type { BudgetItem } from "../../interfaces/analysis.interface";
 // Re-export for consumers of token-budget.ts
 export type { BudgetItem };
 
-// Approximate characters per token (conservative estimate)
-const CHARS_PER_TOKEN = 4;
+// Approximate characters per token (GPT-family average ~3.5 chars/token)
+const CHARS_PER_TOKEN = 3.5;
 
 export interface BudgetAllocation {
   name: string;
@@ -114,8 +114,12 @@ export class TokenBudgetAllocator {
     const remaining = this.getRemaining(name);
     if (remaining <= 0 || items.length === 0) return [];
 
-    // Sort by score descending
-    const sorted = [...items].sort((a, b) => getScore(b) - getScore(a));
+    // Sort by score descending, then by size ascending (smaller items first as tie-breaker)
+    const sorted = [...items].sort((a, b) => {
+      const scoreDiff = getScore(b) - getScore(a);
+      if (scoreDiff !== 0) return scoreDiff;
+      return getSize(a) - getSize(b);
+    });
 
     const selected: T[] = [];
     let usedBudget = 0;
@@ -126,6 +130,7 @@ export class TokenBudgetAllocator {
         selected.push(item);
         usedBudget += size;
       }
+      // Continue scanning — a smaller item later may still fit
     }
 
     // Record usage

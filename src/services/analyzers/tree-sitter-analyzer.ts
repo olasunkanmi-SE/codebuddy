@@ -9,12 +9,33 @@ import * as path from "path";
 import * as fs from "fs";
 import { Parser, Language, Tree } from "web-tree-sitter";
 import { FileAnalyzer } from "./index";
-import { Logger } from "../../infrastructure/logger/logger";
-import { LogLevel } from "../telemetry";
 
 // Type alias for Tree-sitter syntax nodes (web-tree-sitter doesn't export SyntaxNode directly)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SyntaxNode = any;
+
+/**
+ * Logger interface compatible with both VS Code Logger and WorkerLogger.
+ * Allows TreeSitterAnalyzer to be used in both extension host and worker thread contexts.
+ */
+export interface IAnalyzerLogger {
+  debug(message: string, data?: unknown): void;
+  info(message: string, data?: unknown): void;
+  warn(message: string, data?: unknown): void;
+  error(message: string, data?: unknown): void;
+}
+
+/** Console-based fallback logger safe in any context */
+const defaultLogger: IAnalyzerLogger = {
+  debug: (msg: string, data?: unknown) =>
+    console.log(`[TreeSitterAnalyzer:DEBUG] ${msg}`, data ?? ""),
+  info: (msg: string, data?: unknown) =>
+    console.log(`[TreeSitterAnalyzer:INFO] ${msg}`, data ?? ""),
+  warn: (msg: string, data?: unknown) =>
+    console.warn(`[TreeSitterAnalyzer:WARN] ${msg}`, data ?? ""),
+  error: (msg: string, data?: unknown) =>
+    console.error(`[TreeSitterAnalyzer:ERROR] ${msg}`, data ?? ""),
+};
 
 // Language-specific query patterns for API endpoint detection
 const API_ENDPOINT_QUERIES: Record<string, RegExp[]> = {
@@ -154,18 +175,14 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
   private initPromise: Promise<void> | null = null;
   private grammarsPath: string;
   private isInitialized = false;
-  private logger = Logger.initialize("TreeSitterAnalyzer", {
-    minLevel: LogLevel.DEBUG,
-    enableConsole: true,
-    enableFile: true,
-    enableTelemetry: false,
-  });
+  private readonly logger: IAnalyzerLogger;
 
-  constructor(grammarsPath?: string) {
+  constructor(grammarsPath?: string, logger?: IAnalyzerLogger) {
     // Default to common paths
     this.grammarsPath =
       grammarsPath ||
       path.join(__dirname, "..", "..", "..", "dist", "grammars");
+    this.logger = logger ?? defaultLogger;
   }
 
   /**
@@ -198,25 +215,29 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
   private async getParserForLanguage(
     languageId: string,
   ): Promise<Parser | null> {
-    // Return existing parser if available
-    if (this.parserPool.has(languageId)) {
-      return this.parserPool.get(languageId)!;
-    }
+    // Fast path: parser already built
+    const existing = this.parserPool.get(languageId);
+    if (existing) return existing;
 
-    // Prevent duplicate initialization via lock
-    if (this.parserInitLock.has(languageId)) {
-      return this.parserInitLock.get(languageId)!;
-    }
+    // In-flight dedup: await the existing promise
+    const inFlight = this.parserInitLock.get(languageId);
+    if (inFlight) return inFlight;
 
+    // Start new initialization
     const initPromise = (async (): Promise<Parser | null> => {
-      const language = await this.loadLanguage(languageId);
-      if (!language) return null;
+      try {
+        const language = await this.loadLanguage(languageId);
+        if (!language) return null;
 
-      const parser = new Parser();
-      parser.setLanguage(language);
-      this.parserPool.set(languageId, parser);
-      this.logger.debug(`Created parser for language: ${languageId}`);
-      return parser;
+        const parser = new Parser();
+        parser.setLanguage(language);
+        this.parserPool.set(languageId, parser);
+        this.logger.debug(`Created parser for language: ${languageId}`);
+        return parser;
+      } finally {
+        // Always clear the lock so future callers use the pool directly
+        this.parserInitLock.delete(languageId);
+      }
     })();
 
     this.parserInitLock.set(languageId, initPromise);
@@ -476,10 +497,12 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     visitMethods(node);
 
     // Extract decorators (for languages that support them)
+    // Walk backwards collecting all consecutive decorators (e.g. stacked NestJS decorators)
     if (languageId === "typescript" || languageId === "javascript") {
-      const prevSibling = node.previousSibling;
-      if (prevSibling?.type === "decorator") {
-        decorators.push(prevSibling.text);
+      let sibling = node.previousSibling;
+      while (sibling?.type === "decorator") {
+        decorators.unshift(sibling.text); // unshift preserves source order
+        sibling = sibling.previousSibling;
       }
     }
 

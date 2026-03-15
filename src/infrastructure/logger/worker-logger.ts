@@ -88,14 +88,16 @@ export class WorkerLogger {
     }
 
     const formattedMessage = `[${this.module}] ${message}`;
+    const timestamp = new Date().toISOString();
 
     if (parentPort) {
-      // In worker thread - send to parent
+      // In worker thread - send to parent with timestamp for ordering
       parentPort.postMessage({
         type: "LOG",
         level,
         message: formattedMessage,
         data,
+        timestamp,
       });
     } else if (this.config.enableConsole) {
       // Fallback for standalone/test usage
@@ -105,7 +107,7 @@ export class WorkerLogger {
           : level === LogLevel.WARN
             ? console.warn
             : console.log;
-      consoleFn(`[${level}] ${formattedMessage}`, data ?? "");
+      consoleFn(`${timestamp} [${level}] ${formattedMessage}`, data ?? "");
     }
   }
 }

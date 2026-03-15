@@ -54,25 +54,31 @@ const IMPORTANT_FILE_PATTERNS = [
 ];
 
 /**
- * Strip TOML comments from content
- * Handles both full-line (#) and inline comments
+ * Safely extract lines from a TOML section without full comment stripping.
+ * Uses line-by-line state machine to avoid breaking URLs and quoted values containing '#'.
  */
-function stripTomlComments(content: string): string {
-  return content
-    .split("\n")
-    .map((line) => {
-      // Don't strip # inside quotes
-      const quoteMatch = line.match(/^([^"']*)(["'].*["'])?(.*)$/);
-      if (quoteMatch && quoteMatch[2]) {
-        // Line has a quoted section - only strip comments after the quote
-        return (
-          quoteMatch[1] + quoteMatch[2] + quoteMatch[3].replace(/#.*$/, "")
-        );
-      }
-      // No quotes - strip from first #
-      return line.replace(/#.*$/, "");
-    })
-    .join("\n");
+function extractTomlSection(content: string, sectionName: string): string[] {
+  const lines = content.split("\n");
+  const result: string[] = [];
+  let inSection = false;
+  const escapedName = sectionName.replace(/\./g, "\\.");
+  const sectionHeader = new RegExp(`^\\[${escapedName}\\]\\s*$`);
+  const anyHeader = /^\[/;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (sectionHeader.test(trimmed)) {
+      inSection = true;
+      continue;
+    }
+    if (inSection && anyHeader.test(trimmed)) {
+      break; // Next section started
+    }
+    if (inSection) {
+      result.push(line);
+    }
+  }
+  return result;
 }
 
 /**
@@ -93,7 +99,10 @@ class CodebaseAnalysisTask {
 
     // Initialize Tree-sitter analyzer
     if (data.grammarsPath) {
-      this.treeSitterAnalyzer = new TreeSitterAnalyzer(data.grammarsPath);
+      this.treeSitterAnalyzer = new TreeSitterAnalyzer(
+        data.grammarsPath,
+        this.logger,
+      );
       try {
         await this.treeSitterAnalyzer.initialize();
         this.logger.info("Tree-sitter analyzer initialized");
@@ -157,7 +166,7 @@ class CodebaseAnalysisTask {
         dataModels: analysisResults.dataModels,
         databaseSchema,
         domainRelationships,
-        fileContents: analysisResults.fileContents,
+        fileContents: Object.fromEntries(analysisResults.fileContents),
         codeSnippets: analysisResults.codeSnippets,
         summary: {
           totalFiles: files.length,
@@ -266,20 +275,12 @@ class CodebaseAnalysisTask {
         }
 
         // Collect code snippets for important files (bounded collection)
-        // Exclude node_modules and similar dependency directories
-        const isNodeModules =
-          file.includes("node_modules") ||
-          file.includes("vendor") ||
-          file.includes(".venv") ||
-          file.includes("__pycache__");
-
-        const isImportant =
-          !isNodeModules && IMPORTANT_FILE_PATTERNS.some((p) => p.test(file));
-
+        // node_modules/vendor already excluded by file list filtering,
+        // but patterns already require src/lib/app prefix so they won't match
         if (
-          isImportant &&
           codeSnippets.length < MAX_SNIPPETS &&
-          fileAnalysis.content.length > 0
+          fileAnalysis.content.length > 0 &&
+          IMPORTANT_FILE_PATTERNS.some((p) => p.test(file))
         ) {
           const language = this.getLanguageFromExt(ext);
           // Truncate at collection time to bound memory usage
@@ -638,36 +639,30 @@ class CodebaseAnalysisTask {
     if (fs.existsSync(pyprojectPath)) {
       try {
         const rawContent = await fs.promises.readFile(pyprojectPath, "utf-8");
-        // Strip TOML comments before parsing
-        const content = stripTomlComments(rawContent);
-        // Simple TOML parsing for dependencies
-        const depsMatch = content.match(
-          /\[project\.dependencies\]([\s\S]*?)(?:\[|$)/,
+        // Use section extraction instead of full comment stripping to avoid breaking URLs/hashes
+        const depsLines = extractTomlSection(
+          rawContent,
+          "project.dependencies",
         );
-        if (depsMatch) {
-          const depsLines = depsMatch[1].split("\n");
-          for (const line of depsLines) {
-            const match = line.match(
-              /["']([a-zA-Z0-9_-]+)(?:\[.*?\])?(?:([=<>~!]+)(.+?))?["']/,
-            );
-            if (match) {
-              dependencies[match[1]] = match[3]?.trim() || "*";
-            }
+        for (const line of depsLines) {
+          const match = line.match(
+            /["']([a-zA-Z0-9_-]+)(?:\[.*?\])?(?:([=<>~!]+)(.+?))?["']/,
+          );
+          if (match) {
+            dependencies[match[1]] = match[3]?.trim() || "*";
           }
         }
         // Also check [tool.poetry.dependencies] for Poetry projects
-        const poetryMatch = content.match(
-          /\[tool\.poetry\.dependencies\]([\s\S]*?)(?:\[|$)/,
+        const poetryLines = extractTomlSection(
+          rawContent,
+          "tool.poetry.dependencies",
         );
-        if (poetryMatch) {
-          const depsLines = poetryMatch[1].split("\n");
-          for (const line of depsLines) {
-            const match = line.match(
-              /^([a-zA-Z0-9_-]+)\s*=\s*["']?([^"'\n]+)["']?/,
-            );
-            if (match && match[1] !== "python") {
-              dependencies[match[1]] = match[2].trim();
-            }
+        for (const line of poetryLines) {
+          const match = line.match(
+            /^([a-zA-Z0-9_-]+)\s*=\s*["']?([^"'\n]+)["']?/,
+          );
+          if (match && match[1] !== "python") {
+            dependencies[match[1]] = match[2].trim();
           }
         }
       } catch (error: unknown) {
@@ -717,40 +712,30 @@ class CodebaseAnalysisTask {
     if (fs.existsSync(cargoPath)) {
       try {
         const rawContent = await fs.promises.readFile(cargoPath, "utf-8");
-        // Strip TOML comments before parsing
-        const content = stripTomlComments(rawContent);
-        // Extract [dependencies] section
-        const depsMatch = content.match(/\[dependencies\]([\s\S]*?)(?:\[|$)/);
-        if (depsMatch) {
-          const lines = depsMatch[1].split("\n");
-          for (const line of lines) {
-            // Handle: pkg = "1.0" or pkg = { version = "1.0", ... }
-            const simpleMatch = line.match(
-              /^([a-zA-Z0-9_-]+)\s*=\s*["']([^"']+)["']/,
-            );
-            const complexMatch = line.match(
-              /^([a-zA-Z0-9_-]+)\s*=\s*\{.*version\s*=\s*["']([^"']+)["']/,
-            );
-            if (simpleMatch) {
-              dependencies[simpleMatch[1]] = simpleMatch[2];
-            } else if (complexMatch) {
-              dependencies[complexMatch[1]] = complexMatch[2];
-            }
+        // Use section extraction instead of full comment stripping
+        const depsLines = extractTomlSection(rawContent, "dependencies");
+        for (const line of depsLines) {
+          // Handle: pkg = "1.0" or pkg = { version = "1.0", ... }
+          const simpleMatch = line.match(
+            /^([a-zA-Z0-9_-]+)\s*=\s*["']([^"']+)["']/,
+          );
+          const complexMatch = line.match(
+            /^([a-zA-Z0-9_-]+)\s*=\s*\{.*version\s*=\s*["']([^"']+)["']/,
+          );
+          if (simpleMatch) {
+            dependencies[simpleMatch[1]] = simpleMatch[2];
+          } else if (complexMatch) {
+            dependencies[complexMatch[1]] = complexMatch[2];
           }
         }
         // Also check [dev-dependencies]
-        const devDepsMatch = content.match(
-          /\[dev-dependencies\]([\s\S]*?)(?:\[|$)/,
-        );
-        if (devDepsMatch) {
-          const lines = devDepsMatch[1].split("\n");
-          for (const line of lines) {
-            const simpleMatch = line.match(
-              /^([a-zA-Z0-9_-]+)\s*=\s*["']([^"']+)["']/,
-            );
-            if (simpleMatch) {
-              dependencies[simpleMatch[1]] = simpleMatch[2];
-            }
+        const devDepsLines = extractTomlSection(rawContent, "dev-dependencies");
+        for (const line of devDepsLines) {
+          const simpleMatch = line.match(
+            /^([a-zA-Z0-9_-]+)\s*=\s*["']([^"']+)["']/,
+          );
+          if (simpleMatch) {
+            dependencies[simpleMatch[1]] = simpleMatch[2];
           }
         }
       } catch (error: unknown) {

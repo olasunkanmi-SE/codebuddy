@@ -127,7 +127,7 @@ export class CodebaseAnalysisWorker {
     switch (message.type) {
       case "ANALYSIS_COMPLETE":
         if (this.resolveAnalysis) {
-          this.resolveAnalysis(message.payload);
+          this.resolveAnalysis(message.payload as AnalysisResult);
           this.resolveAnalysis = undefined; // prevent double resolve
           this.cleanup();
         }

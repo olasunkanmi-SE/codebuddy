@@ -697,6 +697,9 @@ function generateSnippetsSection(
     }),
   );
 
+  // Capture remaining budget BEFORE selectWithinBudget consumes it
+  const availableBudget = budget.getRemaining("codeSnippets");
+
   const selected = budget.selectWithinBudget<BudgetItem<CodeSnippet>>(
     "codeSnippets",
     snippetItems,
@@ -708,11 +711,9 @@ function generateSnippetsSection(
     `Selected ${selected.length}/${codeSnippets.length} code snippets within budget`,
   );
 
-  // Calculate total available content budget before the loop
-  // Each selected item already fits within budget, but we add per-snippet truncation
-  // as a safety measure in case content was measured inaccurately
+  // Use the pre-captured budget for per-snippet allocation
   const perSnippetBudget = Math.floor(
-    budget.getRemaining("codeSnippets") / Math.max(selected.length, 1),
+    availableBudget / Math.max(selected.length, 1),
   );
 
   for (const item of selected) {
@@ -966,6 +967,6 @@ function getRelativePath(fullPath: string): string {
     }
   }
 
-  // Fallback: last 3 path segments
-  return fullPath.split("/").slice(-3).join("/");
+  // Fallback: basename only to avoid leaking absolute paths
+  return path.basename(fullPath);
 }

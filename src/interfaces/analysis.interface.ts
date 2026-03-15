@@ -101,9 +101,9 @@ export interface AnalysisResult {
   files: string[];
   apiEndpoints: EndpointData[];
   dataModels: ModelData[];
-  databaseSchema: any;
+  databaseSchema: Record<string, unknown>;
   domainRelationships: RelationshipData[];
-  fileContents: Map<string, string>;
+  fileContents: Record<string, string>;
   codeSnippets: CodeSnippet[];
   summary: AnalysisSummary;
 }
@@ -122,7 +122,7 @@ export interface CachedAnalysis {
   dependencies?: Record<string, string>;
   apiEndpoints?: EndpointData[];
   dataModels?: ModelData[];
-  databaseSchema?: any;
+  databaseSchema?: Record<string, unknown>;
   domainRelationships?: RelationshipData[];
   codeSnippets?: CodeSnippet[];
   gitState?: GitState;
@@ -160,7 +160,7 @@ export interface WorkerMessage {
     | "ANALYSIS_ERROR"
     | "ANALYSIS_PROGRESS"
     | "LOG";
-  payload?: any;
+  payload?: WorkerInputData | AnalysisResult;
   error?: string;
   progress?: {
     current: number;

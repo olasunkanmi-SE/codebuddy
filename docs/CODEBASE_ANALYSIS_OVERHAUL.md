@@ -1,7 +1,8 @@
 # Codebase Analysis Feature Overhaul
 
 **Created**: March 15, 2026  
-**Status**: In Progress  
+**Updated**: June 2025  
+**Status**: Phase 1 Complete  
 **Feature**: `CodeBuddy.codebaseAnalysis` command  
 
 ---
@@ -85,7 +86,7 @@ New Markdown Document
 
 ## Implementation Phases
 
-### Phase 1: Immediate Fixes (3-4 days) ⬅️ CURRENT
+### Phase 1: Immediate Fixes (3-4 days) ✅ COMPLETE
 
 **Goal**: Get code snippets into context and remove arbitrary limits.
 
@@ -108,10 +109,10 @@ New Markdown Document
 | PHP | tree-sitter-php.wasm | ❌ | ❌ |
 
 **Tasks**:
-- [ ] Add PHP to `languageConfigs` in `src/ast/language-config.ts`
-- [ ] Create `TreeSitterAnalyzerService` that wraps existing `tree-sitter.parser.ts`
-- [ ] Replace regex-based extraction in worker with Tree-sitter queries for ALL 7 languages
-- [ ] Add Tree-sitter queries for:
+- [x] Add PHP to `languageConfigs` in `src/ast/language-config.ts`
+- [x] Create `TreeSitterAnalyzerService` that wraps existing `tree-sitter.parser.ts`
+- [x] Replace regex-based extraction in worker with Tree-sitter queries for ALL 7 languages
+- [x] Add Tree-sitter queries for:
   - Classes with decorators (TS/JS/Java/PHP)
   - Exported functions (arrow and regular)
   - React components (functional and class) — JS/TS only
@@ -135,10 +136,10 @@ New Markdown Document
 - `src/workers/codebase-analysis.worker.ts` (return code excerpts)
 
 **Tasks**:
-- [ ] Store truncated code snippets (first 50 lines) for key files
-- [ ] Add `codeSnippets` field to `AnalysisResult`
-- [ ] Modify `createContextFromAnalysis()` to include code blocks
-- [ ] Prioritize: entry points, API handlers, service classes, models
+- [x] Store truncated code snippets (first 50 lines) for key files
+- [x] Add `codeSnippets` field to `AnalysisResult`
+- [x] Modify `createContextFromAnalysis()` to include code blocks
+- [x] Prioritize: entry points, API handlers, service classes, models
 
 **Context format change**:
 ```markdown
@@ -165,8 +166,8 @@ export class UserController {
 - `src/commands/architectural-recommendation.ts`
 
 **Tasks**:
-- [ ] Replace hardcoded limits (20/15/10/30) with token budget
-- [ ] Add `TokenBudgetAllocator` utility:
+- [x] Replace hardcoded limits (20/15/10/30) with token budget
+- [x] Add `TokenBudgetAllocator` utility:
   ```typescript
   const budget = new TokenBudgetAllocator(32000); // ~8K tokens
   budget.allocate('overview', 2000);
