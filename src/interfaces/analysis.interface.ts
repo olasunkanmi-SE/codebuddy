@@ -133,9 +133,12 @@ export interface CachedAnalysis {
  * Budget item for token allocation
  */
 export interface BudgetItem<T> {
+  /** Wrapped data payload */
   data: T;
+  /** Estimated size in characters */
   size: number;
-  priority: number;
+  /** Higher priority items are selected first when budget is constrained */
+  priority?: number;
 }
 
 /**

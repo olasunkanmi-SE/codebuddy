@@ -315,7 +315,7 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
       this.logger.debug(
         `No language detected for ${fileName}, returning empty result`,
       );
-      return this.createEmptyResult(filePath);
+      return this.createEmptyResult();
     }
 
     // Get language-specific parser from pool (thread-safe)
@@ -324,14 +324,14 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
       this.logger.debug(
         `Failed to get parser for ${fileName}, returning empty result`,
       );
-      return this.createEmptyResult(filePath);
+      return this.createEmptyResult();
     }
 
     const tree = parser.parse(content);
 
     if (!tree) {
       this.logger.warn(`Failed to parse ${fileName}`);
-      return this.createEmptyResult(filePath);
+      return this.createEmptyResult();
     }
 
     const result: TreeSitterAnalysisResult = {
@@ -364,23 +364,18 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     languageId: string,
   ): ExtractedClass[] {
     const classes: ExtractedClass[] = [];
-    const rootNode = tree.rootNode;
+    const classNodeTypes = new Set(this.getClassNodeTypes(languageId));
 
-    const classNodeTypes = this.getClassNodeTypes(languageId);
-
-    const visit = (node: SyntaxNode) => {
-      if (classNodeTypes.includes(node.type)) {
+    // Use iterative BFS to prevent stack overflow on large files
+    this.traverseAST(tree.rootNode, (node) => {
+      if (classNodeTypes.has(node.type)) {
         const extracted = this.extractClassInfo(node, content, languageId);
         if (extracted) {
           classes.push(extracted);
         }
       }
-      for (const child of node.children) {
-        visit(child);
-      }
-    };
+    });
 
-    visit(rootNode);
     return classes;
   }
 
@@ -583,23 +578,27 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     languageId: string,
   ): ExtractedFunction[] {
     const functions: ExtractedFunction[] = [];
-    const rootNode = tree.rootNode;
+    const functionTypes = new Set(this.getFunctionNodeTypes(languageId));
 
-    const functionTypes = this.getFunctionNodeTypes(languageId);
+    // Use iterative BFS with depth tracking to prevent stack overflow
+    const queue: Array<{ node: SyntaxNode; depth: number }> = [
+      { node: tree.rootNode, depth: 0 },
+    ];
 
-    const visit = (node: SyntaxNode, depth: number) => {
+    while (queue.length > 0) {
+      const { node, depth } = queue.shift()!;
+
       // Only extract top-level functions (depth 1 for most, 2 for module patterns)
-      if (functionTypes.includes(node.type) && depth <= 2) {
+      if (functionTypes.has(node.type) && depth <= 2) {
         const fn = this.extractFunctionInfo(node, content, languageId);
         if (fn) functions.push(fn);
       }
 
       for (const child of node.children) {
-        visit(child, depth + 1);
+        queue.push({ node: child, depth: depth + 1 });
       }
-    };
+    }
 
-    visit(rootNode, 0);
     return functions;
   }
 
@@ -747,21 +746,16 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     languageId: string,
   ): ExtractedImport[] {
     const imports: ExtractedImport[] = [];
-    const rootNode = tree.rootNode;
+    const importTypes = new Set(this.getImportNodeTypes(languageId));
 
-    const importTypes = this.getImportNodeTypes(languageId);
-
-    const visit = (node: SyntaxNode) => {
-      if (importTypes.includes(node.type)) {
+    // Use iterative BFS to prevent stack overflow on large files
+    this.traverseAST(tree.rootNode, (node) => {
+      if (importTypes.has(node.type)) {
         const imp = this.extractImportInfo(node, languageId);
         if (imp) imports.push(imp);
       }
-      for (const child of node.children) {
-        visit(child);
-      }
-    };
+    });
 
-    visit(rootNode);
     return imports;
   }
 
@@ -870,9 +864,9 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     languageId: string,
   ): string[] {
     const exports: string[] = [];
-    const rootNode = tree.rootNode;
 
-    const visit = (node: SyntaxNode) => {
+    // Use iterative BFS to prevent stack overflow on large files
+    this.traverseAST(tree.rootNode, (node) => {
       if (
         node.type === "export_statement" ||
         node.type === "export_declaration"
@@ -887,7 +881,7 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
             if (nameNode) exports.push(nameNode.text);
           } else if (child.type === "lexical_declaration") {
             const declarator = child.children.find(
-              (c: any) => c.type === "variable_declarator",
+              (c: SyntaxNode) => c.type === "variable_declarator",
             );
             if (declarator) {
               const nameNode = declarator.childForFieldName("name");
@@ -903,13 +897,8 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
           }
         }
       }
+    });
 
-      for (const child of node.children) {
-        visit(child);
-      }
-    };
-
-    visit(rootNode);
     return exports;
   }
 
@@ -921,16 +910,16 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
     content: string,
   ): ExtractedClass[] {
     const components: ExtractedClass[] = [];
-    const rootNode = tree.rootNode;
 
-    const visit = (node: SyntaxNode) => {
+    // Use iterative BFS to prevent stack overflow on large files
+    this.traverseAST(tree.rootNode, (node) => {
       // Functional components: const Foo = () => <div>...</div>
       if (
         node.type === "lexical_declaration" ||
         node.type === "variable_declaration"
       ) {
         const declarator = node.children.find(
-          (c: any) => c.type === "variable_declarator",
+          (c: SyntaxNode) => c.type === "variable_declarator",
         );
         if (declarator) {
           const nameNode = declarator.childForFieldName("name");
@@ -959,13 +948,8 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
           }
         }
       }
+    });
 
-      for (const child of node.children) {
-        visit(child);
-      }
-    };
-
-    visit(rootNode);
     return components;
   }
 
@@ -1009,7 +993,7 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
   /**
    * Create empty result
    */
-  private createEmptyResult(filePath: string): TreeSitterAnalysisResult {
+  private createEmptyResult(): TreeSitterAnalysisResult {
     return {
       classes: [],
       functions: [],
@@ -1017,6 +1001,23 @@ export class TreeSitterAnalyzer implements FileAnalyzer {
       imports: [],
       exports: [],
     };
+  }
+
+  /**
+   * Iterative AST traversal helper (prevents stack overflow on large files)
+   */
+  private traverseAST(
+    rootNode: SyntaxNode,
+    visitor: (node: SyntaxNode) => void,
+  ): void {
+    const queue: SyntaxNode[] = [rootNode];
+    while (queue.length > 0) {
+      const node = queue.shift()!;
+      visitor(node);
+      for (const child of node.children) {
+        queue.push(child);
+      }
+    }
   }
 }
 
@@ -1028,28 +1029,4 @@ export function createTreeSitterAnalyzer(
   grammarsPath?: string,
 ): TreeSitterAnalyzer {
   return new TreeSitterAnalyzer(grammarsPath);
-}
-
-/**
- * @deprecated Use createTreeSitterAnalyzer() for new code.
- * This singleton is kept for backward compatibility but should not be used
- * in concurrent contexts. Call dispose() when done.
- */
-let analyzerInstance: TreeSitterAnalyzer | null = null;
-
-export function getTreeSitterAnalyzer(
-  grammarsPath?: string,
-): TreeSitterAnalyzer {
-  if (!analyzerInstance) {
-    analyzerInstance = new TreeSitterAnalyzer(grammarsPath);
-  }
-  return analyzerInstance;
-}
-
-/**
- * Reset the singleton (for testing)
- */
-export function resetTreeSitterAnalyzer(): void {
-  analyzerInstance?.dispose();
-  analyzerInstance = null;
 }

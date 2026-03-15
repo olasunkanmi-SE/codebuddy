@@ -7,6 +7,7 @@ import {
   TreeSitterAnalyzer,
   TreeSitterAnalysisResult,
 } from "../services/analyzers/tree-sitter-analyzer";
+import { WorkerLogger } from "../infrastructure/logger/worker-logger";
 import type {
   CodeSnippet,
   AnalysisResult,
@@ -16,29 +17,73 @@ import type {
 // Re-export for backward compatibility
 export type { CodeSnippet, AnalysisResult, WorkerInputData };
 
-class WorkerLogger {
-  debug(msg: string, data?: any) {
-    this.log("DEBUG", msg, data);
-  }
-  info(msg: string, data?: any) {
-    this.log("INFO", msg, data);
-  }
-  warn(msg: string, data?: any) {
-    this.log("WARN", msg, data);
-  }
-  error(msg: string, data?: any) {
-    this.log("ERROR", msg, data);
-  }
+// Module-level constants for memory bounds
+const MAX_SNIPPETS = 30;
+const MAX_SNIPPET_LINES = 75;
+const MAX_SNIPPET_CHARS = 3000;
 
-  private log(level: string, message: string, data?: any) {
-    if (parentPort) {
-      parentPort.postMessage({ type: "LOG", level, message, data });
-    }
-  }
+// Important file patterns for code snippet collection
+// Defined at module level to avoid re-instantiation on each call
+const IMPORTANT_FILE_PATTERNS = [
+  // Entry points (must be in project source, not node_modules)
+  /(?:^|[\\/])src[\\/].*index\.(ts|js|tsx|jsx)$/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/].*main\.(ts|js|py|go|rs|java|php)$/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/].*app\.(ts|js|tsx|jsx|py)$/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/].*server\.(ts|js)$/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/].*routes?\.(ts|js)$/i,
+  // Controllers, services, etc. - only in project dirs
+  /(?:^|[\\/])(?:src|lib|app)[\\/].*controllers?[\\/]/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/].*services?[\\/]/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/].*handlers?[\\/]/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/].*models?[\\/]/i,
+  /(?:^|[\\/])(?:src|lib|app)[\\/].*schemas?[\\/]/i,
+  // README files (root only, not from dependencies)
+  /(?:^|[\\/])readme\.(md|txt|rst)?$/i,
+  // Manifest files (root only)
+  /(?:^|[\\/])package\.json$/i,
+  /(?:^|[\\/])tsconfig\.json$/i,
+  /(?:^|[\\/])pyproject\.toml$/i,
+  /(?:^|[\\/])setup\.py$/i,
+  /(?:^|[\\/])requirements\.txt$/i,
+  /(?:^|[\\/])Pipfile$/i,
+  /(?:^|[\\/])go\.mod$/i,
+  /(?:^|[\\/])Cargo\.toml$/i,
+  /(?:^|[\\/])pom\.xml$/i,
+  /(?:^|[\\/])build\.gradle$/i,
+  /(?:^|[\\/])composer\.json$/i,
+];
+
+/**
+ * Strip TOML comments from content
+ * Handles both full-line (#) and inline comments
+ */
+function stripTomlComments(content: string): string {
+  return content
+    .split("\n")
+    .map((line) => {
+      // Don't strip # inside quotes
+      const quoteMatch = line.match(/^([^"']*)(["'].*["'])?(.*)$/);
+      if (quoteMatch && quoteMatch[2]) {
+        // Line has a quoted section - only strip comments after the quote
+        return (
+          quoteMatch[1] + quoteMatch[2] + quoteMatch[3].replace(/#.*$/, "")
+        );
+      }
+      // No quotes - strip from first #
+      return line.replace(/#.*$/, "");
+    })
+    .join("\n");
+}
+
+/**
+ * Strip XML comments from content
+ */
+function stripXmlComments(content: string): string {
+  return content.replace(/<!--[\s\S]*?-->/g, "");
 }
 
 class CodebaseAnalysisTask {
-  private readonly logger = new WorkerLogger();
+  private readonly logger = WorkerLogger.initialize("CodebaseAnalysisWorker");
   private readonly analyzerFactory = new AnalyzerFactory();
   private treeSitterAnalyzer: TreeSitterAnalyzer | null = null;
   private isCancelled = false;
@@ -52,73 +97,83 @@ class CodebaseAnalysisTask {
       try {
         await this.treeSitterAnalyzer.initialize();
         this.logger.info("Tree-sitter analyzer initialized");
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         this.logger.warn(
-          "Failed to initialize Tree-sitter, falling back to regex",
-          error,
+          `Failed to initialize Tree-sitter, falling back to regex: ${errorMessage}`,
         );
         this.treeSitterAnalyzer = null;
       }
     }
 
-    const files = data.files;
-    this.reportProgress(10, 100, `Found ${files.length} files to analyze...`);
+    try {
+      const files = data.files;
+      this.reportProgress(10, 100, `Found ${files.length} files to analyze...`);
 
-    this.checkCancellation();
+      this.checkCancellation();
 
-    // Step 2: Analyze dependencies
-    const dependencies = await this.analyzeDependencies(data.workspacePath);
-    this.reportProgress(20, 100, "Analyzing dependencies...");
+      // Step 2: Analyze dependencies
+      const dependencies = await this.analyzeDependencies(data.workspacePath);
+      this.reportProgress(20, 100, "Analyzing dependencies...");
 
-    // Step 3: Detect frameworks
-    const frameworks = await this.detectFrameworks(files, dependencies);
-    this.reportProgress(30, 100, "Detecting frameworks...");
+      // Step 3: Detect frameworks
+      const frameworks = await this.detectFrameworks(files, dependencies);
+      this.reportProgress(30, 100, "Detecting frameworks...");
 
-    // Step 4: Analyze file contents
-    const analysisResults = await this.analyzeFileContents(files);
+      // Step 4: Analyze file contents
+      const analysisResults = await this.analyzeFileContents(files);
 
-    this.reportProgress(80, 100, "Analyzing database schema...");
+      this.reportProgress(80, 100, "Analyzing database schema...");
 
-    // Step 5: Analyze database schema
-    const databaseSchema = await this.analyzeDatabaseSchema(
-      files,
-      analysisResults.fileContents,
-    );
+      // Step 5: Analyze database schema
+      const databaseSchema = await this.analyzeDatabaseSchema(
+        files,
+        analysisResults.fileContents,
+      );
 
-    this.reportProgress(90, 100, "Building domain relationships...");
+      this.reportProgress(90, 100, "Building domain relationships...");
 
-    // Step 6: Build domain relationships
-    const domainRelationships = this.buildDomainRelationships(
-      analysisResults.dataModels,
-      analysisResults.apiEndpoints,
-    );
+      // Step 6: Build domain relationships
+      const domainRelationships = this.buildDomainRelationships(
+        analysisResults.dataModels,
+        analysisResults.apiEndpoints,
+      );
 
-    // Step 7: Calculate complexity
-    const complexity = this.calculateComplexity(
-      files.length,
-      analysisResults.totalLines,
-      Object.keys(dependencies).length,
-    );
+      // Step 7: Calculate complexity
+      const complexity = this.calculateComplexity(
+        files.length,
+        analysisResults.totalLines,
+        Object.keys(dependencies).length,
+      );
 
-    this.reportProgress(100, 100, "Analysis complete!");
+      this.reportProgress(100, 100, "Analysis complete!");
 
-    return {
-      frameworks,
-      dependencies,
-      files,
-      apiEndpoints: analysisResults.apiEndpoints,
-      dataModels: analysisResults.dataModels,
-      databaseSchema,
-      domainRelationships,
-      fileContents: analysisResults.fileContents,
-      codeSnippets: analysisResults.codeSnippets,
-      summary: {
-        totalFiles: files.length,
-        totalLines: analysisResults.totalLines,
-        languageDistribution: analysisResults.languageDistribution,
-        complexity,
-      },
-    };
+      return {
+        frameworks,
+        dependencies,
+        files,
+        apiEndpoints: analysisResults.apiEndpoints,
+        dataModels: analysisResults.dataModels,
+        databaseSchema,
+        domainRelationships,
+        fileContents: analysisResults.fileContents,
+        codeSnippets: analysisResults.codeSnippets,
+        summary: {
+          totalFiles: files.length,
+          totalLines: analysisResults.totalLines,
+          languageDistribution: analysisResults.languageDistribution,
+          complexity,
+        },
+      };
+    } finally {
+      // Dispose Tree-sitter analyzer to release WASM memory
+      if (this.treeSitterAnalyzer) {
+        this.treeSitterAnalyzer.dispose();
+        this.treeSitterAnalyzer = null;
+        this.logger.debug("Tree-sitter analyzer disposed");
+      }
+    }
   }
 
   cancel() {
@@ -156,41 +211,7 @@ class CodebaseAnalysisTask {
     const languageDistribution: Record<string, number> = {};
 
     // Track important files for code snippets
-    // Includes entry points, manifest files, and README for all languages
-    // NOTE: All patterns check end of path to avoid matching node_modules
-    const importantPatterns = [
-      // Entry points (must be in project source, not node_modules)
-      /(?:^|[\\/])src[\\/].*index\.(ts|js|tsx|jsx)$/i,
-      /(?:^|[\\/])(?:src|lib|app)[\\/].*main\.(ts|js|py|go|rs|java|php)$/i,
-      /(?:^|[\\/])(?:src|lib|app)[\\/].*app\.(ts|js|tsx|jsx|py)$/i,
-      /(?:^|[\\/])(?:src|lib|app)[\\/].*server\.(ts|js)$/i,
-      /(?:^|[\\/])(?:src|lib|app)[\\/].*routes?\.(ts|js)$/i,
-      // Controllers, services, etc. - only in project dirs
-      /(?:^|[\\/])(?:src|lib|app)[\\/].*controllers?[\\/]/i,
-      /(?:^|[\\/])(?:src|lib|app)[\\/].*services?[\\/]/i,
-      /(?:^|[\\/])(?:src|lib|app)[\\/].*handlers?[\\/]/i,
-      /(?:^|[\\/])(?:src|lib|app)[\\/].*models?[\\/]/i,
-      /(?:^|[\\/])(?:src|lib|app)[\\/].*schemas?[\\/]/i,
-      // README files (root only, not from dependencies)
-      /(?:^|[\\/])readme\.(md|txt|rst)?$/i,
-      // Manifest files (root only)
-      /(?:^|[\\/])package\.json$/i,
-      /(?:^|[\\/])tsconfig\.json$/i,
-      /(?:^|[\\/])pyproject\.toml$/i,
-      /(?:^|[\\/])setup\.py$/i,
-      /(?:^|[\\/])requirements\.txt$/i,
-      /(?:^|[\\/])Pipfile$/i,
-      /(?:^|[\\/])go\.mod$/i,
-      /(?:^|[\\/])Cargo\.toml$/i,
-      /(?:^|[\\/])pom\.xml$/i,
-      /(?:^|[\\/])build\.gradle$/i,
-      /(?:^|[\\/])composer\.json$/i,
-    ];
-
-    // Constants for memory bounds
-    const MAX_SNIPPETS = 30;
-    const MAX_SNIPPET_LINES = 75;
-    const MAX_SNIPPET_CHARS = 3000;
+    // Uses module-level IMPORTANT_FILE_PATTERNS constant
 
     for (let i = 0; i < files.length; i++) {
       this.checkCancellation();
@@ -253,7 +274,7 @@ class CodebaseAnalysisTask {
           file.includes("__pycache__");
 
         const isImportant =
-          !isNodeModules && importantPatterns.some((p) => p.test(file));
+          !isNodeModules && IMPORTANT_FILE_PATTERNS.some((p) => p.test(file));
 
         if (
           isImportant &&
@@ -576,8 +597,10 @@ class CodebaseAnalysisTask {
         );
         Object.assign(dependencies, packageJson.dependencies || {});
         Object.assign(dependencies, packageJson.devDependencies || {});
-      } catch (error: any) {
-        this.logger.warn("Failed to analyze package.json:", error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to analyze package.json: ${errorMessage}`);
       }
     }
 
@@ -603,8 +626,10 @@ class CodebaseAnalysisTask {
             dependencies[name] = version;
           }
         }
-      } catch (error: any) {
-        this.logger.warn("Failed to analyze requirements.txt:", error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to analyze requirements.txt: ${errorMessage}`);
       }
     }
 
@@ -612,7 +637,9 @@ class CodebaseAnalysisTask {
     const pyprojectPath = path.join(workspacePath, "pyproject.toml");
     if (fs.existsSync(pyprojectPath)) {
       try {
-        const content = await fs.promises.readFile(pyprojectPath, "utf-8");
+        const rawContent = await fs.promises.readFile(pyprojectPath, "utf-8");
+        // Strip TOML comments before parsing
+        const content = stripTomlComments(rawContent);
         // Simple TOML parsing for dependencies
         const depsMatch = content.match(
           /\[project\.dependencies\]([\s\S]*?)(?:\[|$)/,
@@ -643,8 +670,10 @@ class CodebaseAnalysisTask {
             }
           }
         }
-      } catch (error: any) {
-        this.logger.warn("Failed to analyze pyproject.toml:", error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to analyze pyproject.toml: ${errorMessage}`);
       }
     }
 
@@ -653,10 +682,10 @@ class CodebaseAnalysisTask {
     if (fs.existsSync(goModPath)) {
       try {
         const content = await fs.promises.readFile(goModPath, "utf-8");
-        // Extract module name (useful context)
+        // Extract module name for logging context (not stored in dependencies to avoid polluting framework detection)
         const moduleMatch = content.match(/^module\s+(.+)$/m);
         if (moduleMatch) {
-          dependencies["__go_module__"] = moduleMatch[1].trim();
+          this.logger.debug(`Go module detected: ${moduleMatch[1].trim()}`);
         }
         // Extract require statements
         const requireBlock = content.match(/require\s*\(([\s\S]*?)\)/);
@@ -676,8 +705,10 @@ class CodebaseAnalysisTask {
         for (const match of singleRequires) {
           dependencies[match[1]] = match[2];
         }
-      } catch (error: any) {
-        this.logger.warn("Failed to analyze go.mod:", error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to analyze go.mod: ${errorMessage}`);
       }
     }
 
@@ -685,7 +716,9 @@ class CodebaseAnalysisTask {
     const cargoPath = path.join(workspacePath, "Cargo.toml");
     if (fs.existsSync(cargoPath)) {
       try {
-        const content = await fs.promises.readFile(cargoPath, "utf-8");
+        const rawContent = await fs.promises.readFile(cargoPath, "utf-8");
+        // Strip TOML comments before parsing
+        const content = stripTomlComments(rawContent);
         // Extract [dependencies] section
         const depsMatch = content.match(/\[dependencies\]([\s\S]*?)(?:\[|$)/);
         if (depsMatch) {
@@ -720,8 +753,10 @@ class CodebaseAnalysisTask {
             }
           }
         }
-      } catch (error: any) {
-        this.logger.warn("Failed to analyze Cargo.toml:", error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to analyze Cargo.toml: ${errorMessage}`);
       }
     }
 
@@ -729,7 +764,9 @@ class CodebaseAnalysisTask {
     const pomPath = path.join(workspacePath, "pom.xml");
     if (fs.existsSync(pomPath)) {
       try {
-        const content = await fs.promises.readFile(pomPath, "utf-8");
+        const rawContent = await fs.promises.readFile(pomPath, "utf-8");
+        // Strip XML comments before parsing
+        const content = stripXmlComments(rawContent);
         // Extract dependencies using regex (simple XML parsing)
         const depMatches = content.matchAll(
           /<dependency>[\s\S]*?<groupId>([^<]+)<\/groupId>[\s\S]*?<artifactId>([^<]+)<\/artifactId>[\s\S]*?(?:<version>([^<]+)<\/version>)?[\s\S]*?<\/dependency>/g,
@@ -738,8 +775,10 @@ class CodebaseAnalysisTask {
           const name = `${match[1]}:${match[2]}`;
           dependencies[name] = match[3] || "*";
         }
-      } catch (error: any) {
-        this.logger.warn("Failed to analyze pom.xml:", error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to analyze pom.xml: ${errorMessage}`);
       }
     }
 
@@ -761,8 +800,10 @@ class CodebaseAnalysisTask {
             dependencies[name] = parts[2] || "*";
           }
         }
-      } catch (error: any) {
-        this.logger.warn("Failed to analyze build.gradle:", error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to analyze build.gradle: ${errorMessage}`);
       }
     }
 
@@ -775,8 +816,10 @@ class CodebaseAnalysisTask {
         );
         Object.assign(dependencies, composer.require || {});
         Object.assign(dependencies, composer["require-dev"] || {});
-      } catch (error: any) {
-        this.logger.warn("Failed to analyze composer.json:", error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to analyze composer.json: ${errorMessage}`);
       }
     }
 
@@ -1158,22 +1201,29 @@ class CodebaseAnalysisTask {
 if (!isMainThread && parentPort) {
   const task = new CodebaseAnalysisTask();
 
-  parentPort.on("message", async (message: { type: string; payload: any }) => {
-    if (message.type === "ANALYZE_CODEBASE") {
-      try {
-        const result = await task.performAnalysis(message.payload);
-        parentPort?.postMessage({
-          type: "ANALYSIS_COMPLETE",
-          payload: result,
-        });
-      } catch (error: any) {
-        parentPort?.postMessage({
-          type: "ANALYSIS_ERROR",
-          error: error.message || String(error),
-        });
+  parentPort.on(
+    "message",
+    async (message: { type: string; payload: unknown }) => {
+      if (message.type === "ANALYZE_CODEBASE") {
+        try {
+          const result = await task.performAnalysis(
+            message.payload as WorkerInputData,
+          );
+          parentPort?.postMessage({
+            type: "ANALYSIS_COMPLETE",
+            payload: result,
+          });
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          parentPort?.postMessage({
+            type: "ANALYSIS_ERROR",
+            error: errorMessage,
+          });
+        }
+      } else if (message.type === "CANCEL") {
+        task.cancel();
       }
-    } else if (message.type === "CANCEL") {
-      task.cancel();
-    }
-  });
+    },
+  );
 }

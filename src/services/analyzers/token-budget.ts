@@ -5,6 +5,11 @@
  * to different context sections with priority-based selection.
  */
 
+import type { BudgetItem } from "../../interfaces/analysis.interface";
+
+// Re-export for consumers of token-budget.ts
+export type { BudgetItem };
+
 // Approximate characters per token (conservative estimate)
 const CHARS_PER_TOKEN = 4;
 
@@ -13,12 +18,6 @@ export interface BudgetAllocation {
   budget: number; // in characters
   priority: number; // higher = more important
   used: number;
-}
-
-export interface BudgetItem<T> {
-  data: T;
-  size: number; // character count
-  priority?: number; // item-level priority within category
 }
 
 /**

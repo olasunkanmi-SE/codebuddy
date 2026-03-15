@@ -87,7 +87,7 @@ export const languageConfigs: Readonly<Record<string, ILanguageConfig>> = {
   },
   php: {
     grammarPath: "dist/grammars/tree-sitter-php.wasm",
-    languageIdMap: ["php", "php3", "php4", "php5", "phtml"],
+    languageIdMap: ["php", "phtml"], // Removed php3/php4/php5 - dead variants
     queries: {
       // PHP 8+ syntax support
       functionDefinitions: `(function_definition name: (name) @name) @function.definition`,

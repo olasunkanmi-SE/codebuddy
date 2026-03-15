@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { PersistentCodebaseUnderstandingService } from "../services/persistent-codebase-understanding.service";
 import { GeminiLLM } from "../llms/gemini/gemini";
 import { GroqLLM } from "../llms/groq/groq";
@@ -441,7 +442,7 @@ function generateDependenciesSection(
     "dependencies",
     depItems,
     (item) => item.size,
-    (item) => item.priority,
+    (item) => item.priority ?? 1,
   );
 
   logger.debug(
@@ -534,7 +535,7 @@ function generateEndpointsSection(
     "endpoints",
     endpointItems,
     (item) => item.size,
-    (item) => item.priority,
+    (item) => item.priority ?? 1,
   );
 
   if (selected.length === 0) {
@@ -595,7 +596,7 @@ function generateModelsSection(
     "models",
     modelItems,
     (item) => item.size,
-    (item) => item.priority,
+    (item) => item.priority ?? 1,
   );
 
   if (selected.length === 0) {
@@ -700,11 +701,18 @@ function generateSnippetsSection(
     "codeSnippets",
     snippetItems,
     (item) => item.size,
-    (item) => item.priority,
+    (item) => item.priority ?? 1,
   );
 
   logger.debug(
     `Selected ${selected.length}/${codeSnippets.length} code snippets within budget`,
+  );
+
+  // Calculate total available content budget before the loop
+  // Each selected item already fits within budget, but we add per-snippet truncation
+  // as a safety measure in case content was measured inaccurately
+  const perSnippetBudget = Math.floor(
+    budget.getRemaining("codeSnippets") / Math.max(selected.length, 1),
   );
 
   for (const item of selected) {
@@ -713,13 +721,9 @@ function generateSnippetsSection(
     lines.push(`### ${relativePath}`);
     lines.push("```" + (snippet.language || "typescript"));
 
-    // Truncate if still too long using remaining budget
-    const remainingBudget = budget.getRemaining("codeSnippets");
-    const maxContentLen = Math.min(
-      snippet.content.length,
-      remainingBudget - 50,
-    );
-    if (snippet.content.length > maxContentLen && maxContentLen > 0) {
+    // Truncate if content exceeds per-snippet budget allocation
+    const maxContentLen = Math.max(perSnippetBudget - 50, 500); // Minimum 500 chars per snippet
+    if (snippet.content.length > maxContentLen) {
       const truncatedLines = snippet.content
         .substring(0, maxContentLen)
         .split("\n");
@@ -764,7 +768,7 @@ function generateRelationshipsSection(
     "relationships",
     relItems,
     (item) => item.size,
-    (item) => item.priority,
+    (item) => item.priority ?? 1,
   );
 
   logger.debug(
@@ -821,7 +825,7 @@ function generateFileStructureSection(
     "fileList",
     dirItems,
     (item) => item.size,
-    (item) => item.priority,
+    (item) => item.priority ?? 1,
   );
 
   logger.debug(
@@ -925,17 +929,43 @@ function createContextFromAnalysis(
 
 /**
  * Get relative path from workspace root
+ * Uses VS Code workspace API when available, with pattern-based fallback
  */
 function getRelativePath(fullPath: string): string {
   if (!fullPath) return "unknown";
-  // Extract path after common root directories
-  const patterns = ["/src/", "/lib/", "/app/", "/pages/", "/components/"];
-  for (const pattern of patterns) {
-    const idx = fullPath.indexOf(pattern);
-    if (idx !== -1) {
-      return fullPath.substring(idx + 1);
+
+  // Best case: use VS Code workspace folders API for accurate relative path
+  try {
+    const uri = vscode.Uri.file(fullPath);
+    const wsFolder = vscode.workspace.getWorkspaceFolder(uri);
+    if (wsFolder) {
+      const workspacePath = wsFolder.uri.fsPath;
+      if (fullPath.startsWith(workspacePath)) {
+        return fullPath.slice(workspacePath.length).replace(/^[\\/]/, "");
+      }
+    }
+  } catch {
+    // Not in extension host context or workspace API unavailable
+  }
+
+  // Fallback: Match only paths that START with /src/, /lib/, /app/, etc.
+  // This prevents matching system paths like /usr/local/lib/...
+  const workspaceRootPatterns = [
+    /^(?:.*[\\/])?(?:src|lib|app|pages|components)[\\/]/i,
+  ];
+
+  for (const pattern of workspaceRootPatterns) {
+    const match = fullPath.match(pattern);
+    if (match) {
+      // Return path from the matched directory onwards
+      const matchedPath = match[0];
+      const startIdx = matchedPath.lastIndexOf(path.sep);
+      return fullPath.substring(
+        fullPath.indexOf(matchedPath) + (startIdx >= 0 ? startIdx + 1 : 0),
+      );
     }
   }
+
   // Fallback: last 3 path segments
   return fullPath.split("/").slice(-3).join("/");
 }
