@@ -1279,7 +1279,7 @@
     "setup-chromadb-server": "echo 'Install ChromaDB server: pip install chromadb' && echo 'Start server: chroma run --host localhost --port 8000'"
   },
   "devDependencies": {
-    "@types/dompurify": "^3.0.5",
+    "@types/dompurify": "^3.2.0",
     "@types/fast-levenshtein": "^0.0.4",
     "@types/js-yaml": "^4.0.9",
     "@types/jsdom": "^21.1.7",
@@ -1325,7 +1325,7 @@
     "apache-arrow": "18.1.0",
     "axios": "^1.7.9",
     "deepagents": "^1.8.3",
-    "dompurify": "^3.2.6",
+    "dompurify": "^3.3.3",
     "dotenv": "^16.1.4",
     "fast-levenshtein": "^3.0.0",
     "groq-sdk": "^0.22.0",
