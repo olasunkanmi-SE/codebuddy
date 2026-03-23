@@ -1340,7 +1340,7 @@
     "openai": "^4.28.0",
     "readable-stream": "^4.5.2",
     "rss-parser": "^3.13.0",
-    "simple-git": "^3.25.0",
+    "simple-git": "^3.33.0",
     "sql.js": "^1.14.1",
     "web-tree-sitter": "^0.25.10"
   },
