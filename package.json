@@ -1342,7 +1342,7 @@
     "rss-parser": "^3.13.0",
     "simple-git": "^3.25.0",
     "sql.js": "^1.14.1",
-    "web-tree-sitter": "^0.25.10"
+    "web-tree-sitter": "^0.26.7"
   },
   "overrides": {
     "mongodb": {
