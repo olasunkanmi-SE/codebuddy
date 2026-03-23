@@ -1324,7 +1324,7 @@
     "@vscode/ripgrep": "^1.17.0",
     "apache-arrow": "18.1.0",
     "axios": "^1.7.9",
-    "deepagents": "^1.8.3",
+    "deepagents": "^1.8.4",
     "dompurify": "^3.2.6",
     "dotenv": "^16.1.4",
     "fast-levenshtein": "^3.0.0",
