@@ -1331,7 +1331,7 @@
     "groq-sdk": "^0.22.0",
     "js-yaml": "^4.1.1",
     "jsdom": "^26.0.0",
-    "langchain": "^1.0.4",
+    "langchain": "^1.2.36",
     "llama3-tokenizer-js": "^1.2.0",
     "lru-cache": "^11.2.2",
     "markdown-it": "^14.1.0",
