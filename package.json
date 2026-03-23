@@ -1330,7 +1330,7 @@
     "fast-levenshtein": "^3.0.0",
     "groq-sdk": "^0.22.0",
     "js-yaml": "^4.1.1",
-    "jsdom": "^26.0.0",
+    "jsdom": "^29.0.1",
     "langchain": "^1.0.4",
     "llama3-tokenizer-js": "^1.2.0",
     "lru-cache": "^11.2.2",
