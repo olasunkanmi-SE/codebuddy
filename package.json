@@ -1306,7 +1306,7 @@
     "@anthropic-ai/sdk": "^0.52.0",
     "@chroma-core/default-embed": "^0.1.8",
     "@google/genai": "^0.7.0",
-    "@google/generative-ai": "^0.21.0",
+    "@google/generative-ai": "^0.24.1",
     "@langchain/anthropic": "^1.3.19",
     "@langchain/core": "^1.1.27",
     "@langchain/google-genai": "^2.1.18",
