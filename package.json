@@ -1297,7 +1297,7 @@
     "@vscode/test-electron": "^2.3.2",
     "esbuild": "^0.25.8",
     "eslint": "^8.57.1",
-    "mocha": "^10.2.0",
+    "mocha": "^11.7.5",
     "prettier": "^3.2.5",
     "sinon": "^17.0.1",
     "typescript": "^5.4.3"
