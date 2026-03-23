@@ -1311,7 +1311,7 @@
     "@langchain/core": "^1.1.27",
     "@langchain/google-genai": "^2.1.18",
     "@langchain/groq": "^1.0.2",
-    "@langchain/langgraph": "^1.0.0",
+    "@langchain/langgraph": "^1.2.5",
     "@langchain/langgraph-checkpoint-sqlite": "^1.0.0",
     "@langchain/openai": "^1.2.4",
     "@modelcontextprotocol/sdk": "^1.24.3",
