@@ -1337,7 +1337,7 @@
     "markdown-it": "^14.1.0",
     "natural": "^8.1.0",
     "node-fetch": "^3.3.2",
-    "openai": "^4.28.0",
+    "openai": "^6.32.0",
     "readable-stream": "^4.5.2",
     "rss-parser": "^3.13.0",
     "simple-git": "^3.25.0",
