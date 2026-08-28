@@ -1,7 +1,7 @@
 > **DEPRECATION NOTICE**  
 > Active development for CodeBuddy has officially moved to a private repository. This public repository is now archived and will no longer accept new features, bug fixes, issues, or pull requests (including automated dependency updates). 
 > 
-> Thank you to everyone who supported and interacted with the public version of this project!
+> Thank you to everyone who supported and interacted with the public repo of this project!
 # CodeBuddy
 
 ### Autonomous AI Software Engineer for Visual Studio Code
