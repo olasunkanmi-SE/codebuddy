@@ -1291,7 +1291,7 @@
     "@types/sinon": "^17.0.3",
     "@types/sql.js": "^1.4.9",
     "@types/vscode": "^1.78.0",
-    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.56.0",
     "@vscode/test-cli": "^0.0.8",
     "@vscode/test-electron": "^2.3.2",
