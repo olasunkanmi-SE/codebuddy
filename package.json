@@ -1333,7 +1333,7 @@
     "jsdom": "^26.0.0",
     "langchain": "^1.0.4",
     "llama3-tokenizer-js": "^1.2.0",
-    "lru-cache": "^11.2.2",
+    "lru-cache": "^11.2.7",
     "markdown-it": "^14.1.0",
     "natural": "^8.1.0",
     "node-fetch": "^3.3.2",
