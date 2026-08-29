@@ -1322,7 +1322,7 @@
     "@traceloop/node-server-sdk": "^0.22.7",
     "@vscode/l10n": "^0.0.18",
     "@vscode/ripgrep": "^1.17.0",
-    "apache-arrow": "18.1.0",
+    "apache-arrow": "21.1.0",
     "axios": "^1.7.9",
     "deepagents": "^1.8.3",
     "dompurify": "^3.2.6",
